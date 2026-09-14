@@ -6,6 +6,7 @@ interface User {
   id: number
   username: string
   role: string
+  force_password_change?: boolean
 }
 
 export const useAuthStore = defineStore('auth', () => {
@@ -38,5 +39,15 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { user, isAuthenticated, login, logout, fetchMe }
+  async function changePassword(currentPassword: string, newPassword: string) {
+    await axios.post('/api/auth/change-password', {
+      current_password: currentPassword,
+      new_password: newPassword,
+    })
+    if (user.value) {
+      user.value.force_password_change = false
+    }
+  }
+
+  return { user, isAuthenticated, login, logout, fetchMe, changePassword }
 })

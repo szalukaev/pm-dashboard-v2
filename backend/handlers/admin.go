@@ -70,7 +70,7 @@ func (h *AdminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = h.DB.Exec("INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3)",
+	_, err = h.DB.Exec("INSERT INTO users (username, password_hash, role, force_password_change) VALUES ($1, $2, $3, true)",
 		body.Username, string(hash), body.Role)
 	if err != nil {
 		utils.Error(w, http.StatusConflict, "USER_EXISTS")

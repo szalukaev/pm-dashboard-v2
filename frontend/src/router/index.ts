@@ -50,13 +50,18 @@ router.beforeEach(async (to, _from, next) => {
     // API not available — allow navigation
   }
 
-  // Version check (once per session)
+  // Version check (once per session) — show visible warning
   if (!versionWarningShown) {
     try {
       const { data } = await axios.get('/api/status')
       if (data.version && data.version !== APP_VERSION) {
         versionWarningShown = true
-        console.warn(`Version mismatch: frontend=${APP_VERSION}, backend=${data.version}`)
+        // Show visible warning banner (not just console)
+        const banner = document.createElement('div')
+        banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:var(--warning);color:#111;padding:8px 16px;text-align:center;font-size:13px;font-weight:500;z-index:99999;'
+        banner.textContent = `Версии фронтенда и бэкенда не совпадают (frontend: ${APP_VERSION}, backend: ${data.version}). Обновите страницу или обратитесь к администратору.`
+        banner.onclick = () => banner.remove()
+        document.body.appendChild(banner)
       }
     } catch {}
   }

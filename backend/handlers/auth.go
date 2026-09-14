@@ -106,8 +106,9 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	var id int
 	var passwordHash, role string
-	err := h.DB.QueryRow("SELECT id, password_hash, role FROM users WHERE username = $1", req.Username).
-		Scan(&id, &passwordHash, &role)
+	var forcePasswordChange bool
+	err := h.DB.QueryRow("SELECT id, password_hash, role, COALESCE(force_password_change, false) FROM users WHERE username = $1", req.Username).
+		Scan(&id, &passwordHash, &role, &forcePasswordChange)
 	if err != nil {
 		recordFailure(req.Username)
 		if h.Audit != nil {
@@ -151,9 +152,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	utils.JSON(w, http.StatusOK, map[string]interface{}{
 		"success": true,
 		"user": map[string]interface{}{
-			"id":       id,
-			"username": req.Username,
-			"role":     role,
+			"id":                    id,
+			"username":              req.Username,
+			"role":                  role,
+			"force_password_change": forcePasswordChange,
 		},
 	})
 }
@@ -184,15 +186,69 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var username, role string
-	err := h.DB.QueryRow("SELECT username, role FROM users WHERE id = $1", userID).Scan(&username, &role)
+	var forcePasswordChange bool
+	err := h.DB.QueryRow("SELECT username, role, COALESCE(force_password_change, false) FROM users WHERE id = $1", userID).Scan(&username, &role, &forcePasswordChange)
 	if err != nil {
 		utils.Error(w, http.StatusNotFound, "USER_NOT_FOUND")
 		return
 	}
 
 	utils.JSON(w, http.StatusOK, map[string]interface{}{
-		"id":       userID,
-		"username": username,
-		"role":     role,
+		"id":                    userID,
+		"username":              username,
+		"role":                  role,
+		"force_password_change": forcePasswordChange,
 	})
+}
+
+func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r)
+	if userID == 0 {
+		utils.Error(w, http.StatusUnauthorized, "UNAUTHORIZED")
+		return
+	}
+
+	var body struct {
+		CurrentPassword string `json:"current_password"`
+		NewPassword     string `json:"new_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
+		return
+	}
+	if len(body.NewPassword) < 6 {
+		utils.Error(w, http.StatusBadRequest, "PASSWORD_TOO_SHORT")
+		return
+	}
+
+	var passwordHash string
+	err := h.DB.QueryRow("SELECT password_hash FROM users WHERE id = $1", userID).Scan(&passwordHash)
+	if err != nil {
+		utils.Error(w, http.StatusNotFound, "USER_NOT_FOUND")
+		return
+	}
+
+	// If current_password is provided, verify it (skip if force_password_change)
+	var forcePasswordChange bool
+	h.DB.QueryRow("SELECT COALESCE(force_password_change, false) FROM users WHERE id = $1", userID).Scan(&forcePasswordChange)
+
+	if !forcePasswordChange {
+		if body.CurrentPassword == "" {
+			utils.Error(w, http.StatusBadRequest, "CURRENT_PASSWORD_REQUIRED")
+			return
+		}
+		if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(body.CurrentPassword)); err != nil {
+			utils.Error(w, http.StatusUnauthorized, "INVALID_CURRENT_PASSWORD")
+			return
+		}
+	}
+
+	newHash, err := bcrypt.GenerateFromPassword([]byte(body.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "HASH_FAILED")
+		return
+	}
+
+	h.DB.Exec("UPDATE users SET password_hash = $1, force_password_change = false WHERE id = $2", string(newHash), userID)
+	utils.Success(w)
 }

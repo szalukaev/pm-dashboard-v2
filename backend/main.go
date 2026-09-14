@@ -164,6 +164,7 @@ func main() {
 
 	api.HandleFunc("/auth/logout", authH.Logout).Methods("POST")
 	api.HandleFunc("/auth/me", authH.Me).Methods("GET")
+	api.HandleFunc("/auth/change-password", authH.ChangePassword).Methods("POST")
 	api.HandleFunc("/settings", settingsH.GetSettings).Methods("GET")
 	api.HandleFunc("/settings", settingsH.UpdateSettings).Methods("PUT")
 
