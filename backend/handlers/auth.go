@@ -16,8 +16,9 @@ import (
 )
 
 type AuthHandler struct {
-	DB      *sql.DB
+	DB       *sql.DB
 	Sessions db.SessionStore
+	Audit    *middleware.AuditMiddleware
 }
 
 type loginRequest struct {
@@ -109,18 +110,27 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		Scan(&id, &passwordHash, &role)
 	if err != nil {
 		recordFailure(req.Username)
+		if h.Audit != nil {
+			h.Audit.LogLogin(0, req.Username, false, r)
+		}
 		utils.Error(w, http.StatusUnauthorized, "INVALID_CREDENTIALS")
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(req.Password)); err != nil {
 		recordFailure(req.Username)
+		if h.Audit != nil {
+			h.Audit.LogLogin(0, req.Username, false, r)
+		}
 		utils.Error(w, http.StatusUnauthorized, "INVALID_CREDENTIALS")
 		return
 	}
 
 	// Successful login — clear attempts
 	clearAttempts(req.Username)
+	if h.Audit != nil {
+		h.Audit.LogLogin(id, req.Username, true, r)
+	}
 
 	sessionID := uuid.New().String()
 	expiresAt := 7 * 24 * time.Hour
@@ -152,6 +162,9 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("session_id")
 	if err == nil {
 		h.Sessions.Delete(r.Context(), cookie.Value)
+	}
+	if h.Audit != nil {
+		h.Audit.LogLogout(middleware.GetUserID(r), r)
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session_id",

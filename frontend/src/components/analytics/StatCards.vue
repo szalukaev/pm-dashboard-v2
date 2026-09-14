@@ -5,7 +5,7 @@
       :key="stat.label"
       :label="$t('analytics.stats.' + stat.label)"
       :value="stat.is_pct ? stat.value.toFixed(1) + '%' : Math.round(stat.value)"
-      :variant="stat.variant || undefined"
+      :variant="(stat.variant as 'danger' | 'success' | 'warning' | 'info' | undefined)"
       data-testid="stat-card"
     />
   </div>

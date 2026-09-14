@@ -2,6 +2,8 @@ package middleware
 
 import (
 	"database/sql"
+	"encoding/base64"
+	"encoding/json"
 	"net/http"
 	"strings"
 	"sync"
@@ -11,10 +13,10 @@ import (
 type LicenseChecker struct {
 	DB *sql.DB
 
-	mu             sync.RWMutex
-	isReadOnly     bool
-	lastCheck      time.Time
-	checkInterval  time.Duration
+	mu            sync.RWMutex
+	isReadOnly    bool
+	lastCheck     time.Time
+	checkInterval time.Duration
 }
 
 func NewLicenseChecker(db *sql.DB) *LicenseChecker {
@@ -30,15 +32,21 @@ func (lc *LicenseChecker) check() {
 	lc.mu.Lock()
 	defer lc.mu.Unlock()
 
+	var blob string
 	var graceStarted *time.Time
-	var gracePeriodDays int = 14
 
-	err := lc.DB.QueryRow(`SELECT grace_started_at FROM licenses ORDER BY id DESC LIMIT 1`).Scan(&graceStarted)
+	err := lc.DB.QueryRow(`SELECT license_blob, grace_started_at FROM licenses ORDER BY id DESC LIMIT 1`).Scan(&blob, &graceStarted)
 	if err != nil {
 		// No license — not read-only (let activation screen work)
 		lc.isReadOnly = false
 		lc.lastCheck = time.Now()
 		return
+	}
+
+	// Read gracePeriodDays from the signed payload
+	gracePeriodDays := readGracePeriodFromBlob(blob)
+	if gracePeriodDays <= 0 {
+		gracePeriodDays = 14
 	}
 
 	if graceStarted != nil {
@@ -84,4 +92,26 @@ func (lc *LicenseChecker) ReadOnlyMiddleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+// readGracePeriodFromBlob decodes the license blob and reads grace_period_days
+func readGracePeriodFromBlob(blob string) int {
+	parts := strings.SplitN(blob, ".", 2)
+	if len(parts) != 2 {
+		return 14
+	}
+	payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		return 14
+	}
+	var payload struct {
+		GracePeriodDays int `json:"grace_period_days"`
+	}
+	if err := json.Unmarshal(payloadBytes, &payload); err != nil {
+		return 14
+	}
+	if payload.GracePeriodDays <= 0 {
+		return 14
+	}
+	return payload.GracePeriodDays
 }

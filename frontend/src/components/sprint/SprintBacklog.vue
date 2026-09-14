@@ -72,8 +72,10 @@ function isOpen(name: string): boolean {
 }
 
 function onDragStart(e: DragEvent, task: SprintTask) {
-  e.dataTransfer?.setData('text/plain', String(task.external_id))
-  e.dataTransfer?.effectAllowed = 'move'
+  if (e.dataTransfer) {
+    e.dataTransfer.setData('text/plain', String(task.external_id))
+    e.dataTransfer.effectAllowed = 'move'
+  }
 }
 
 function mapToKanbanCard(task: SprintTask): KanbanCardType {

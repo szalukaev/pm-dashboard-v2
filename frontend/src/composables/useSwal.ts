@@ -1,7 +1,7 @@
-import Swal, { type SweetAlertOptions } from 'sweetalert2'
+import Swal from 'sweetalert2'
 
 // UI_GUIDE-compliant SweetAlert2 defaults
-const defaultOptions: SweetAlertOptions = {
+const swalDefaults = {
   customClass: {
     popup: 'swal-popup',
     title: 'swal-title',
@@ -10,11 +10,11 @@ const defaultOptions: SweetAlertOptions = {
     cancelButton: 'swal-cancel',
   },
   buttonsStyling: false,
-}
+} as const
 
 export function useSwal() {
-  function fire(options: SweetAlertOptions) {
-    return Swal.fire({ ...defaultOptions, ...options })
+  function fire(options: Record<string, any>) {
+    return Swal.fire({ ...swalDefaults, ...options })
   }
 
   function success(title: string, text?: string) {

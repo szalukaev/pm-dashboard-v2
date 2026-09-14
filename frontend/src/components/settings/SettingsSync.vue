@@ -28,7 +28,7 @@
           <td>
             <span class="status-badge" :class="log.status">{{ log.status }}</span>
           </td>
-          <td class="error-cell" :title="log.error_text">
+          <td class="error-cell" :title="log.error_text || undefined">
             {{ log.error_text ? truncate(log.error_text, 60) : '—' }}
           </td>
         </tr>

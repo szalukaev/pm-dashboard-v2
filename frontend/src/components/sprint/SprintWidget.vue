@@ -50,7 +50,7 @@
         <KanbanCard
           v-for="task in sprint.tasks"
           :key="task.external_id"
-          :card="task"
+          :card="toKanbanCard(task)"
           @open-task="$emit('open-task', $event)"
         />
       </div>
@@ -69,6 +69,9 @@ import SprintProgressBar from './SprintProgressBar.vue'
 import KanbanCard from '../kanban/KanbanCard.vue'
 import type { Sprint } from '../../stores/sprint'
 
+import type { Sprint, SprintTask } from '../../stores/sprint'
+import type { KanbanCard as KanbanCardType } from '../../stores/kanban'
+
 const props = defineProps<{
   sprint: Sprint
 }>()
@@ -76,6 +79,24 @@ const props = defineProps<{
 const emit = defineEmits(['complete', 'edit', 'refresh', 'delete', 'open-task', 'assign-task'])
 
 const expanded = ref(props.sprint.status !== 'closed')
+
+function toKanbanCard(task: SprintTask): KanbanCardType {
+  return {
+    external_id: task.external_id,
+    subject: task.subject,
+    project_name: task.project_name,
+    status_name: task.status_name,
+    status_id: 0,
+    priority_name: task.priority_name,
+    priority_id: task.priority_id,
+    assigned_to_name: task.assigned_to_name,
+    assigned_to_id: null,
+    category_name: '',
+    due_date: task.due_date,
+    estimated_hours: task.estimated_hours,
+    is_overdue: task.is_overdue,
+  }
+}
 
 const isOverdue = computed(() => {
   if (!props.sprint.due_date || props.sprint.status === 'closed') return false

@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"crypto/ed25519"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -18,13 +20,25 @@ type LicenseHandler struct {
 }
 
 // Vendor public key — hardcoded, not from config (ТЗ requirement)
-var vendorPublicKey = ed25519.PublicKey{} // Set at build time via -ldflags
+// Set at build time: go build -ldflags "-X pm-dashboard/handlers.vendorPublicKeyHex=<hex>"
+var vendorPublicKeyHex string
+
+var vendorPublicKey ed25519.PublicKey
+
+func init() {
+	if vendorPublicKeyHex != "" {
+		keyBytes, err := hex.DecodeString(vendorPublicKeyHex)
+		if err == nil && len(keyBytes) == ed25519.PublicKeySize {
+			vendorPublicKey = keyBytes
+		}
+	}
+}
 
 type LicensePayload struct {
 	Client         string   `json:"client"`
 	HWIDComponents struct {
-		MachineIDHash  string `json:"machine_id_hash"`
-		BoardSerialHash string `json:"board_serial_hash"`
+		MachineIDHash    string `json:"machine_id_hash"`
+		BoardSerialHash  string `json:"board_serial_hash"`
 	} `json:"hwid_components"`
 	Edition         string   `json:"edition"`
 	Features        []string `json:"features"`
@@ -41,6 +55,7 @@ type LicenseStatus struct {
 	GraceEndsAt    *time.Time `json:"grace_ends_at,omitempty"`
 	ActivatedAt    *time.Time `json:"activated_at,omitempty"`
 	LastCheckOK    *time.Time `json:"last_check_ok,omitempty"`
+	GracePeriodDays int       `json:"grace_period_days,omitempty"`
 }
 
 func (h *LicenseHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
@@ -76,7 +91,7 @@ func (h *LicenseHandler) Activate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify signature
+	// Verify signature — FAIL-CLOSED: if no public key configured, reject
 	if len(vendorPublicKey) == 0 {
 		utils.Error(w, http.StatusInternalServerError, "LICENSE_VERIFICATION_NOT_CONFIGURED")
 		return
@@ -94,13 +109,17 @@ func (h *LicenseHandler) Activate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Read HWID
-	hwidHash := readHWID()
+	// Read HWID components and hash them
+	machineIDHash := hashString(readMachineID())
+	boardSerialHash := hashString(readBoardSerial())
+
+	// Store the combined HWID hash for later comparison
+	hwidCombined := hashString(machineIDHash + boardSerialHash)
 
 	// Store license
 	h.DB.Exec(`DELETE FROM licenses`)
 	h.DB.Exec(`INSERT INTO licenses (license_blob, hwid_hash, first_activated_at, last_check_ok_at)
-		VALUES ($1, $2, NOW(), NOW())`, body.LicenseBlob, hwidHash)
+		VALUES ($1, $2, NOW(), NOW())`, body.LicenseBlob, hwidCombined)
 
 	utils.JSON(w, http.StatusOK, map[string]interface{}{
 		"success": true,
@@ -129,25 +148,46 @@ func (h *LicenseHandler) checkLicense() LicenseStatus {
 		return LicenseStatus{IsActive: false, IsGracePeriod: true}
 	}
 
-	payloadBytes, _ := base64.RawURLEncoding.DecodeString(parts[0])
-	signature, _ := base64.RawURLEncoding.DecodeString(parts[1])
+	payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		return LicenseStatus{IsActive: false, IsGracePeriod: true}
+	}
+	signature, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return LicenseStatus{IsActive: false, IsGracePeriod: true}
+	}
 
-	if len(vendorPublicKey) > 0 && !ed25519.Verify(vendorPublicKey, payloadBytes, signature) {
+	// FAIL-CLOSED: if no public key, license cannot be verified
+	if len(vendorPublicKey) == 0 {
+		return LicenseStatus{IsActive: false, IsGracePeriod: true}
+	}
+
+	if !ed25519.Verify(vendorPublicKey, payloadBytes, signature) {
 		return LicenseStatus{IsActive: false, IsGracePeriod: true}
 	}
 
 	var payload LicensePayload
 	json.Unmarshal(payloadBytes, &payload)
 
-	// Check HWID (1 of 2 match)
-	currentHWID := readHWID()
-	hwidMatch := currentHWID == hwidHash
+	// HWID check: N-from-M (1 of 2 match)
+	// Compare SHA-256 hashes of current machine-id and board serial
+	// against the hashes stored in the payload at activation time
+	currentMachineHash := hashString(readMachineID())
+	currentBoardHash := hashString(readBoardSerial())
+
+	hwidMatch := false
+	// Check machine_id_hash (1 of 2)
+	if payload.HWIDComponents.MachineIDHash != "" && currentMachineHash == payload.HWIDComponents.MachineIDHash {
+		hwidMatch = true
+	}
+	// Check board_serial_hash (1 of 2)
+	if !hwidMatch && payload.HWIDComponents.BoardSerialHash != "" && currentBoardHash == payload.HWIDComponents.BoardSerialHash {
+		hwidMatch = true
+	}
+	// Fallback: compare combined hash
 	if !hwidMatch {
-		// Check individual components if available
-		if payload.HWIDComponents.MachineIDHash != "" {
-			hwidComponent := readMachineID()
-			hwidMatch = hwidComponent == payload.HWIDComponents.MachineIDHash
-		}
+		combined := hashString(currentMachineHash + currentBoardHash)
+		hwidMatch = combined == hwidHash
 	}
 
 	if !hwidMatch {
@@ -157,11 +197,15 @@ func (h *LicenseHandler) checkLicense() LicenseStatus {
 			h.DB.Exec("UPDATE licenses SET grace_started_at = $1 WHERE license_blob = $2", now, blob)
 			graceStarted = &now
 		}
-		graceEnd := graceStarted.Add(time.Duration(payload.GracePeriodDays) * 24 * time.Hour)
-		if time.Now().After(graceEnd) {
-			return LicenseStatus{IsActive: false, IsReadOnly: true, Client: payload.Client, Edition: payload.Edition}
+		graceDays := payload.GracePeriodDays
+		if graceDays <= 0 {
+			graceDays = 14
 		}
-		return LicenseStatus{IsActive: false, IsGracePeriod: true, GraceEndsAt: &graceEnd, Client: payload.Client, Edition: payload.Edition}
+		graceEnd := graceStarted.Add(time.Duration(graceDays) * 24 * time.Hour)
+		if time.Now().After(graceEnd) {
+			return LicenseStatus{IsActive: false, IsReadOnly: true, Client: payload.Client, Edition: payload.Edition, GracePeriodDays: graceDays}
+		}
+		return LicenseStatus{IsActive: false, IsGracePeriod: true, GraceEndsAt: &graceEnd, Client: payload.Client, Edition: payload.Edition, GracePeriodDays: graceDays}
 	}
 
 	// All good — update last check
@@ -173,7 +217,17 @@ func (h *LicenseHandler) checkLicense() LicenseStatus {
 		Edition:     payload.Edition,
 		ActivatedAt: firstActivated,
 		LastCheckOK: lastCheckOK,
+		GracePeriodDays: payload.GracePeriodDays,
 	}
+}
+
+// hashString returns hex-encoded SHA-256 of input
+func hashString(s string) string {
+	if s == "" {
+		return ""
+	}
+	h := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(h[:])
 }
 
 func readHWID() string {
@@ -190,4 +244,17 @@ func readMachineID() string {
 		return ""
 	}
 	return strings.TrimSpace(string(data))
+}
+
+func readBoardSerial() string {
+	data, err := os.ReadFile("/sys/class/dmi/id/board_serial")
+	if err != nil {
+		return ""
+	}
+	s := strings.TrimSpace(string(data))
+	// Filter out OEM placeholders
+	if s == "" || strings.Contains(s, "To Be Filled") || strings.Contains(s, "OEM") || strings.Contains(s, "Not Specified") {
+		return ""
+	}
+	return s
 }

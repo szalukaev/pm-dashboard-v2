@@ -22,7 +22,7 @@
             :key="a.name"
             class="legend-item"
           >
-            <span class="legend-dot" :style="{ background: chartColors[idx % chartColors.length] }"></span>
+            <span class="legend-dot" :style="{ background: getChartColors()[idx % getChartColors().length] }"></span>
             <span class="legend-name">{{ a.name }}</span>
             <span class="legend-count">{{ a.count }}</span>
           </div>
@@ -42,7 +42,7 @@ Chart.register(PieController, ArcElement, Tooltip, Legend)
 defineProps<{ distribution: ProjectDist[] }>()
 
 const canvasMap = ref<Map<string, HTMLCanvasElement>>(new Map())
-const chartInstances = ref<Map<string, Chart>>(new Map())
+const chartInstances = ref<Map<string, Chart<'pie'>>>(new Map())
 
 function getChartColors(): string[] {
   const s = getComputedStyle(document.documentElement)

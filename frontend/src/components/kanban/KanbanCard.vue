@@ -87,8 +87,10 @@ const priorityColor = computed(() => {
 
 function onDragStart(e: DragEvent) {
   isDragging.value = true
-  e.dataTransfer?.setData('text/plain', String(props.card.external_id))
-  e.dataTransfer?.effectAllowed = 'move'
+  if (e.dataTransfer) {
+    e.dataTransfer.setData('text/plain', String(props.card.external_id))
+    e.dataTransfer.effectAllowed = 'move'
+  }
 }
 
 function onDragEnd() {

@@ -5,7 +5,7 @@
       :key="stat.label"
       :label="$t('payments.stats.' + stat.label)"
       :value="formatValue(stat)"
-      :variant="stat.variant || undefined"
+      :variant="(stat.variant as 'danger' | 'success' | 'warning' | 'info' | undefined)"
     />
   </div>
 </template>

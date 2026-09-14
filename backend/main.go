@@ -36,7 +36,8 @@ func main() {
 	}
 	sqliteStore, err := config.NewSQLiteStore(dataDir)
 	if err != nil {
-		slog.Error("Failed to init SQLite config", "error", err); os.Exit(1)
+		slog.Error("Failed to init SQLite config", "error", err)
+		os.Exit(1)
 	}
 	defer sqliteStore.Close()
 
@@ -61,9 +62,21 @@ func main() {
 	sessionStore := db.NewSessionStore(redisURL)
 	defer sessionStore.Close()
 
+	// License checker (read-only middleware)
+	var licenseChecker *middleware.LicenseChecker
+	if pgDB != nil {
+		licenseChecker = middleware.NewLicenseChecker(pgDB)
+	}
+
+	// Audit middleware
+	var auditMW *middleware.AuditMiddleware
+	if pgDB != nil {
+		auditMW = &middleware.AuditMiddleware{DB: pgDB}
+	}
+
 	// Handlers
 	setupH := &handlers.SetupHandler{SQLite: sqliteStore, PGDB: &pgDB}
-	authH := &handlers.AuthHandler{DB: pgDB, Sessions: sessionStore}
+	authH := &handlers.AuthHandler{DB: pgDB, Sessions: sessionStore, Audit: auditMW}
 	settingsH := &handlers.SettingsHandler{DB: pgDB}
 	taskH := &handlers.TaskHandler{DB: pgDB}
 	analyticsH := &handlers.AnalyticsHandler{DB: pgDB}
@@ -75,19 +88,27 @@ func main() {
 	notifH := &handlers.NotificationsHandler{DB: pgDB}
 	wsHub := handlers.NewWSHub()
 
-	// Start Redmine sync if configured
+	// Start Redmine sync if configured (checks read-only before each sync)
 	if cfg.RedmineURL != "" && cfg.RedmineAPIKey != "" && pgDB != nil {
 		client := redmine.NewClient(cfg.RedmineURL, cfg.RedmineAPIKey)
 		syncer := redmine.NewSyncer(client)
 		go func() {
 			time.Sleep(2 * time.Second)
-			if err := syncer.SyncAll(context.Background(), pgDB); err != nil {
-				slog.Error("Initial sync failed", "error", err)
+			if licenseChecker == nil || !licenseChecker.IsReadOnly() {
+				if err := syncer.SyncAll(context.Background(), pgDB); err != nil {
+					slog.Error("Initial sync failed", "error", err)
+				}
+			} else {
+				slog.Warn("Skipping initial sync — system is in read-only mode")
 			}
 			// Periodic sync every 5 minutes
 			ticker := time.NewTicker(5 * time.Minute)
 			defer ticker.Stop()
 			for range ticker.C {
+				if licenseChecker != nil && licenseChecker.IsReadOnly() {
+					slog.Warn("Skipping periodic sync — system is in read-only mode")
+					continue
+				}
 				if err := syncer.SyncAll(context.Background(), pgDB); err != nil {
 					slog.Error("Periodic sync failed", "error", err)
 				}
@@ -130,6 +151,16 @@ func main() {
 	// Protected routes
 	api := r.PathPrefix("/api").Subrouter()
 	api.Use(middleware.RequireAuth(sessionStore, pgDB))
+
+	// Wire audit middleware — logs all mutating requests
+	if auditMW != nil {
+		api.Use(auditMW.Log)
+	}
+
+	// Wire license read-only middleware — blocks writes when license expired
+	if licenseChecker != nil {
+		api.Use(licenseChecker.ReadOnlyMiddleware)
+	}
 
 	api.HandleFunc("/auth/logout", authH.Logout).Methods("POST")
 	api.HandleFunc("/auth/me", authH.Me).Methods("GET")
@@ -239,7 +270,8 @@ func main() {
 
 	slog.Info("Server listening", "port", cfg.Port)
 	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
-		slog.Error("Server error", "error", err); os.Exit(1)
+		slog.Error("Server error", "error", err)
+		os.Exit(1)
 	}
 	slog.Info("Server stopped.")
 }
