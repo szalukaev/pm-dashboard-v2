@@ -1,0 +1,16 @@
+{
+  "name": "PM Dashboard",
+  "short_name": "PM Dashboard",
+  "description": "B2B SaaS платформа для управления проектами",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#010102",
+  "theme_color": "#5e6ad2",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

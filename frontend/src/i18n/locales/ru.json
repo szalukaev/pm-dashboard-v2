@@ -1,0 +1,247 @@
+{
+  "common": {
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "delete": "Удалить",
+    "edit": "Редактировать",
+    "create": "Создать",
+    "back": "Назад",
+    "next": "Далее",
+    "close": "Закрыть",
+    "search": "Поиск",
+    "filter": "Фильтр",
+    "export": "Экспорт",
+    "refresh": "Обновить",
+    "loading": "Загрузка…",
+    "empty": "Пока ничего нет",
+    "error": "Не удалось загрузить данные",
+    "retry": "Повторить",
+    "confirm": "Подтвердить",
+    "yes": "Да",
+    "no": "Нет",
+    "all": "Все",
+    "toggle_theme": "Переключить тему",
+    "confirm_delete_title": "Удалить {entity}?",
+    "confirm_delete_text": "Действие необратимо.",
+    "success": "Успешно",
+    "copied": "Скопировано"
+  },
+  "auth": {
+    "login": "Войти",
+    "logout": "Выйти",
+    "username": "Имя пользователя",
+    "password": "Пароль",
+    "login_title": "Вход в систему",
+    "login_subtitle": "Введите данные для авторизации",
+    "error_invalid_credentials": "Неверное имя пользователя или пароль"
+  },
+  "setup": {
+    "title": "Первоначальная настройка",
+    "step_of": "Шаг {current} из {total}",
+    "db_connection": "Подключение к базе данных",
+    "db_dsn": "Строка подключения (DSN)",
+    "db_dsn_hint": "Пример: postgres://user:pass@localhost:5432/pm_dashboard",
+    "test_connection": "Проверить доступ",
+    "connection_ok": "Соединение установлено",
+    "connection_failed": "Не удалось подключиться",
+    "datasource_connection": "Подключение к системе-источнику",
+    "datasource_type": "Тип источника",
+    "datasource_url": "URL системы",
+    "datasource_api_key": "API-ключ",
+    "create_admin": "Создание администратора",
+    "admin_created": "Администратор создан",
+    "setup_complete": "Настройка завершена",
+    "go_to_app": "Перейти в приложение"
+  },
+  "navigation": {
+    "tasks": "Задачи",
+    "analytics": "Аналитика",
+    "kanban": "Kanban",
+    "sprint": "Спринты",
+    "payments": "Оплаты",
+    "settings": "Настройки",
+    "admin": "Администрирование"
+  },
+  "tasks": {
+    "title": "Задачи",
+    "filters": {
+      "open": "Открытые",
+      "testing": "Тестирование",
+      "closed": "Закрытые",
+      "all": "Все",
+      "project": "Проект",
+      "search_placeholder": "Поиск по названию или номеру…",
+      "group_by_project": "По проектам",
+      "group_by_assignee": "По исполнителям",
+      "categories": "Категории"
+    },
+    "table": {
+      "name": "Название",
+      "number": "Номер",
+      "priority": "Приоритет",
+      "assignee": "Исполнитель",
+      "estimate": "Оценка, ч",
+      "fact": "Факт, ч",
+      "status": "Статус",
+      "bug_fix": "Bug fix, ч",
+      "bug_fix_pct": "Bug fix %",
+      "start_date": "Дата старта",
+      "end_date": "Дата окончания",
+      "category": "Категория"
+    },
+    "accordions": {
+      "estimate": "Оценка",
+      "fact": "Факт"
+    }
+  },
+  "analytics": {
+    "title": "Аналитика",
+    "stats": {
+      "active_projects": "Активных проектов",
+      "completion": "Выполнение",
+      "open": "Открытых",
+      "in_test": "В тесте",
+      "overdue": "Просрочено",
+      "bugs": "Bugs",
+      "no_estimate": "Без оценки"
+    },
+    "team_load": "Нагрузка на команду",
+    "distribution": "Распределение задач по проектам",
+    "deadlines": "Ближайшие дедлайны",
+    "deadline_groups": {
+      "overdue": "Просрочено",
+      "today": "Сегодня",
+      "three_days": "3 дня",
+      "week": "Неделя"
+    }
+  },
+  "kanban": {
+    "title": "Kanban",
+    "mode_by_users": "По сотрудникам",
+    "mode_by_statuses": "По статусам",
+    "unassigned": "Неназначенные",
+    "select_project": "Выберите проект",
+    "total_tasks": "Задач",
+    "card": {
+      "overdue": "Просрочено"
+    }
+  },
+  "sprint": {
+    "title": "Спринты",
+    "backlog": "Бэклог",
+    "new_sprint": "Новый спринт",
+    "edit_sprint": "Редактировать спринт",
+    "complete": "Завершить",
+    "delete": "Удалить",
+    "refresh_from_redmine": "Обновить из Redmine",
+    "form": {
+      "name": "Название",
+      "project": "Проект",
+      "category": "Категория",
+      "auto_fill": "Авто-заполнение по категории",
+      "start_date": "Дата начала",
+      "due_date": "Дата окончания",
+      "description": "Описание",
+      "status": "Статус"
+    },
+    "drag_hint": "Перетащите задачи из бэклога",
+    "no_tasks": "Нет задач",
+    "no_data": "Нет данных. Убедитесь, что проекты выбраны в фильтре.",
+    "overdue": "Просрочен",
+    "progress": {
+      "open": "Открыто",
+      "testing": "Тестирование",
+      "total": "Всего"
+    }
+  },
+  "payments": {
+    "title": "Оплаты",
+    "stats": {
+      "contracts": "Договоров",
+      "total_amount": "Общая сумма",
+      "invoiced": "Выставлено",
+      "debt": "Задолженность",
+      "paid": "Оплачено",
+      "closed": "Закрытых"
+    },
+    "filters": {
+      "all": "Все",
+      "service": "Сопровождение",
+      "onetime": "Разовый",
+      "show_closed": "Закрытые",
+      "search_placeholder": "Поиск по договору или организации…"
+    },
+    "export_csv": "Экспорт CSV",
+    "add_organization": "Добавить организацию",
+    "add_contract": "Добавить договор",
+    "issue_invoice": "Выставить счёт",
+    "without_org": "Без организации",
+    "contract_types": {
+      "service": "Сопровождение",
+      "onetime": "Разовый"
+    },
+    "invoice": {
+      "number": "№",
+      "date": "Дата",
+      "amount": "Сумма",
+      "paid": "Оплачено",
+      "remainder": "Остаток",
+      "pay_date": "Дата оплаты",
+      "status": "Статус",
+      "pay": "Оплатить",
+      "download": "Скачать",
+      "copy": "Копировать",
+      "form_title": "Выставление счёта",
+      "service_name": "Наименование услуги",
+      "quantity": "Количество",
+      "price": "Цена",
+      "add_row": "Добавить строку",
+      "total": "Итого",
+      "pay_form_title": "Оплата счёта",
+      "amount_label": "Сумма оплаты",
+      "pay_date_label": "Дата оплаты"
+    },
+    "statuses": {
+      "unpaid": "Не оплачен",
+      "partial": "Частично",
+      "paid": "Оплачен"
+    }
+  },
+  "settings": {
+    "title": "Настройки",
+    "tabs": {
+      "personal": "Личные данные",
+      "data": "Данные",
+      "interface": "Интерфейс",
+      "notifications": "Уведомления",
+      "connections": "Подключения",
+      "sync": "Синхронизация",
+      "audit": "Аудит",
+      "admin": "Администрирование"
+    },
+    "data": {
+      "title": "Фильтрация данных дашборда",
+      "projects": "Проекты",
+      "projects_hint": "Выберите проекты для отображения. Данные по невыбранным проектам будут скрыты во всех разделах.",
+      "team": "Команда",
+      "reset": "Сбросить к настройкам администратора"
+    },
+    "interface": {
+      "theme": "Тема оформления",
+      "language": "Язык",
+      "tab_order": "Порядок вкладок"
+    },
+    "notifications": {
+      "toast": "Toast-уведомления",
+      "overdue_alerts": "Уведомления о просроченных задачах"
+    }
+  },
+  "errors": {
+    "generic": "Произошла ошибка",
+    "not_found": "Ресурс не найден",
+    "unauthorized": "Необходима авторизация",
+    "forbidden": "Нет доступа",
+    "network": "Ошибка сети",
+    "timeout": "Превышено время ожидания"
+  }
+}

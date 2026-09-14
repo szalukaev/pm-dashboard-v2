@@ -1,0 +1,263 @@
+/* ═══════════════════════════════════════════════════════
+   PM Dashboard V3 — Global Styles (UI_GUIDE §3, §4)
+   Font: Inter, self-hosted. No external CDN.
+   ═══════════════════════════════════════════════════════ */
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  src: url('/fonts/inter/inter-400.woff2') format('woff2');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  src: url('/fonts/inter/inter-500.woff2') format('woff2');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  src: url('/fonts/inter/inter-600.woff2') format('woff2');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  src: url('/fonts/inter/inter-700.woff2') format('woff2');
+  font-display: swap;
+}
+
+/* ── Reset ── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  font-family: 'Inter', 'SF Pro Display', -apple-system, system-ui, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+#app {
+  height: 100%;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--accent-hover);
+}
+
+/* Focus ring (UI_GUIDE §4 — :focus-visible, not :focus) */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  border: none;
+  background: none;
+  outline: none;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--hairline-strong);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
+}
+
+/* ── Quasar overrides (UI_GUIDE compliance) ── */
+
+:deep(.q-field) .q-field__control {
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+}
+
+:deep(.q-field.q-field--focused) .q-field__control {
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+
+:deep(.q-btn) {
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 13px;
+  transition: all 0.15s;
+}
+
+:deep(.q-dialog .q-dialog__inner > div) {
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+:deep(.q-menu) {
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+:deep(.q-table) {
+  background: transparent;
+}
+
+:deep(.q-table thead tr th) {
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border-bottom: 1px solid var(--border-light);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky-header);
+}
+
+:deep(.q-table tbody tr td) {
+  border-bottom: 1px solid var(--border-light);
+  color: var(--text-dim);
+}
+
+:deep(.q-table tbody tr:hover td) {
+  background: var(--bg-hover);
+}
+
+/* ── Print (UI_GUIDE §7) ── */
+@media print {
+  .app-header,
+  .header-actions,
+  button {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+    color: #000;
+  }
+
+  .stat-card,
+  .task-card {
+    break-inside: avoid;
+  }
+}
+
+/* ── Responsive (UI_GUIDE §7) ── */
+@media (max-width: 900px) {
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-content {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── SweetAlert2 overrides (UI_GUIDE compliance) ── */
+/* override: сторонний компонент, свои классы недоступны */
+.swal-popup {
+  background: var(--surface-1) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--hairline) !important;
+  border-radius: 12px !important;
+  box-shadow: var(--shadow) !important;
+}
+
+.swal-title {
+  color: var(--text-bright) !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+}
+
+.swal-html {
+  color: var(--text-dim) !important;
+  font-size: 13px !important;
+}
+
+.swal-confirm {
+  background: var(--accent) !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 8px !important;
+  padding: 8px 20px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}
+
+.swal-confirm:hover {
+  background: var(--accent-hover) !important;
+}
+
+.swal-cancel {
+  background: transparent !important;
+  color: var(--text-muted) !important;
+  border: 1px solid var(--hairline) !important;
+  border-radius: 8px !important;
+  padding: 8px 20px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}
+
+.swal-cancel:hover {
+  border-color: var(--text-faint) !important;
+  color: var(--text-bright) !important;
+}
+
+.swal2-timer-progress-bar {
+  background: var(--accent) !important;
+}

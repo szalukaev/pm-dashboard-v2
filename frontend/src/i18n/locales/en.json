@@ -1,0 +1,247 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "back": "Back",
+    "next": "Next",
+    "close": "Close",
+    "search": "Search",
+    "filter": "Filter",
+    "export": "Export",
+    "refresh": "Refresh",
+    "loading": "Loading…",
+    "empty": "Nothing here yet",
+    "error": "Failed to load data",
+    "retry": "Retry",
+    "confirm": "Confirm",
+    "yes": "Yes",
+    "no": "No",
+    "all": "All",
+    "toggle_theme": "Toggle theme",
+    "confirm_delete_title": "Delete {entity}?",
+    "confirm_delete_text": "This action cannot be undone.",
+    "success": "Success",
+    "copied": "Copied"
+  },
+  "auth": {
+    "login": "Sign in",
+    "logout": "Sign out",
+    "username": "Username",
+    "password": "Password",
+    "login_title": "Sign in",
+    "login_subtitle": "Enter your credentials to continue",
+    "error_invalid_credentials": "Invalid username or password"
+  },
+  "setup": {
+    "title": "Initial Setup",
+    "step_of": "Step {current} of {total}",
+    "db_connection": "Database Connection",
+    "db_dsn": "Connection String (DSN)",
+    "db_dsn_hint": "Example: postgres://user:pass@localhost:5432/pm_dashboard",
+    "test_connection": "Test Connection",
+    "connection_ok": "Connection established",
+    "connection_failed": "Failed to connect",
+    "datasource_connection": "Data Source Connection",
+    "datasource_type": "Source Type",
+    "datasource_url": "System URL",
+    "datasource_api_key": "API Key",
+    "create_admin": "Create Administrator",
+    "admin_created": "Administrator created",
+    "setup_complete": "Setup Complete",
+    "go_to_app": "Go to Application"
+  },
+  "navigation": {
+    "tasks": "Tasks",
+    "analytics": "Analytics",
+    "kanban": "Kanban",
+    "sprint": "Sprints",
+    "payments": "Payments",
+    "settings": "Settings",
+    "admin": "Administration"
+  },
+  "tasks": {
+    "title": "Tasks",
+    "filters": {
+      "open": "Open",
+      "testing": "Testing",
+      "closed": "Closed",
+      "all": "All",
+      "project": "Project",
+      "search_placeholder": "Search by name or number…",
+      "group_by_project": "By Projects",
+      "group_by_assignee": "By Assignees",
+      "categories": "Categories"
+    },
+    "table": {
+      "name": "Name",
+      "number": "Number",
+      "priority": "Priority",
+      "assignee": "Assignee",
+      "estimate": "Estimate, h",
+      "fact": "Actual, h",
+      "status": "Status",
+      "bug_fix": "Bug fix, h",
+      "bug_fix_pct": "Bug fix %",
+      "start_date": "Start Date",
+      "end_date": "End Date",
+      "category": "Category"
+    },
+    "accordions": {
+      "estimate": "Estimate",
+      "fact": "Actual"
+    }
+  },
+  "analytics": {
+    "title": "Analytics",
+    "stats": {
+      "active_projects": "Active Projects",
+      "completion": "Completion",
+      "open": "Open",
+      "in_test": "In Test",
+      "overdue": "Overdue",
+      "bugs": "Bugs",
+      "no_estimate": "No Estimate"
+    },
+    "team_load": "Team Workload",
+    "distribution": "Task Distribution by Project",
+    "deadlines": "Upcoming Deadlines",
+    "deadline_groups": {
+      "overdue": "Overdue",
+      "today": "Today",
+      "three_days": "3 Days",
+      "week": "Week"
+    }
+  },
+  "kanban": {
+    "title": "Kanban",
+    "mode_by_users": "By Members",
+    "mode_by_statuses": "By Statuses",
+    "unassigned": "Unassigned",
+    "select_project": "Select a project",
+    "total_tasks": "Tasks",
+    "card": {
+      "overdue": "Overdue"
+    }
+  },
+  "sprint": {
+    "title": "Sprints",
+    "backlog": "Backlog",
+    "new_sprint": "New Sprint",
+    "edit_sprint": "Edit Sprint",
+    "complete": "Complete",
+    "delete": "Delete",
+    "refresh_from_redmine": "Refresh from Redmine",
+    "form": {
+      "name": "Name",
+      "project": "Project",
+      "category": "Category",
+      "auto_fill": "Auto-fill by category",
+      "start_date": "Start Date",
+      "due_date": "Due Date",
+      "description": "Description",
+      "status": "Status"
+    },
+    "drag_hint": "Drag tasks from the backlog",
+    "no_tasks": "No tasks",
+    "no_data": "No data. Make sure projects are selected in the filter.",
+    "overdue": "Overdue",
+    "progress": {
+      "open": "Open",
+      "testing": "Testing",
+      "total": "Total"
+    }
+  },
+  "payments": {
+    "title": "Payments",
+    "stats": {
+      "contracts": "Contracts",
+      "total_amount": "Total Amount",
+      "invoiced": "Invoiced",
+      "debt": "Outstanding",
+      "paid": "Paid",
+      "closed": "Closed"
+    },
+    "filters": {
+      "all": "All",
+      "service": "Service",
+      "onetime": "One-time",
+      "show_closed": "Closed",
+      "search_placeholder": "Search by contract or organization…"
+    },
+    "export_csv": "Export CSV",
+    "add_organization": "Add Organization",
+    "add_contract": "Add Contract",
+    "issue_invoice": "Issue Invoice",
+    "without_org": "No Organization",
+    "contract_types": {
+      "service": "Service",
+      "onetime": "One-time"
+    },
+    "invoice": {
+      "number": "#",
+      "date": "Date",
+      "amount": "Amount",
+      "paid": "Paid",
+      "remainder": "Remaining",
+      "pay_date": "Pay Date",
+      "status": "Status",
+      "pay": "Pay",
+      "download": "Download",
+      "copy": "Copy",
+      "form_title": "Issue Invoice",
+      "service_name": "Service Name",
+      "quantity": "Quantity",
+      "price": "Price",
+      "add_row": "Add Row",
+      "total": "Total",
+      "pay_form_title": "Pay Invoice",
+      "amount_label": "Payment Amount",
+      "pay_date_label": "Payment Date"
+    },
+    "statuses": {
+      "unpaid": "Unpaid",
+      "partial": "Partial",
+      "paid": "Paid"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "tabs": {
+      "personal": "Personal",
+      "data": "Data",
+      "interface": "Interface",
+      "notifications": "Notifications",
+      "connections": "Connections",
+      "sync": "Sync",
+      "audit": "Audit",
+      "admin": "Administration"
+    },
+    "data": {
+      "title": "Dashboard Data Filtering",
+      "projects": "Projects",
+      "projects_hint": "Select projects to display. Data for unselected projects will be hidden in all sections.",
+      "team": "Team",
+      "reset": "Reset to Admin Defaults"
+    },
+    "interface": {
+      "theme": "Theme",
+      "language": "Language",
+      "tab_order": "Tab Order"
+    },
+    "notifications": {
+      "toast": "Toast Notifications",
+      "overdue_alerts": "Overdue Task Alerts"
+    }
+  },
+  "errors": {
+    "generic": "An error occurred",
+    "not_found": "Resource not found",
+    "unauthorized": "Authentication required",
+    "forbidden": "Access denied",
+    "network": "Network error",
+    "timeout": "Request timed out"
+  }
+}

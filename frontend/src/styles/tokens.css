@@ -1,0 +1,312 @@
+/* ═══════════════════════════════════════════════════════
+   PM Dashboard V3 — Design Tokens (UI_GUIDE §2)
+   All colors, surfaces, borders via CSS custom properties.
+   Hardcoded hex in components = violation.
+   ═══════════════════════════════════════════════════════ */
+
+:root,
+[data-theme="dark"] {
+  /* Surfaces */
+  --bg: #010102;
+  --bg-card: #0f1011;
+  --bg-card-alt: #141516;
+  --bg-hover: #18191a;
+  --surface-1: #0f1011;
+  --surface-2: #141516;
+  --surface-3: #18191a;
+  --surface-4: #191a1b;
+
+  /* Borders */
+  --border: #23252a;
+  --border-light: #1e2025;
+  --border-accent: #5e6ad244;
+  --hairline: #23252a;
+  --hairline-strong: #34343a;
+
+  /* Text */
+  --text: #d0d6e0;
+  --text-bright: #f7f8f8;
+  --text-dim: #d0d6e0;
+  --text-muted: #8a8f98;
+  --text-faint: #62666d;
+  --text-faintest: #555;
+
+  /* Accent */
+  --accent: #5e6ad2;
+  --accent-hover: #828fff;
+  --accent-bg: #5e6ad218;
+
+  /* Semantic statuses */
+  --success: #27a644;
+  --danger: #e74c3c;
+  --warning: #f0a500;
+  --critical: #ff4757;
+
+  /* Categorical (charts, tags — NOT statuses) */
+  --purple: #a855f7;
+  --orange: #f97316;
+  --cyan: #06b6d4;
+  --pink: #ec4899;
+  --teal: #14b8a6;
+  --lime: #84cc16;
+
+  --modal-overlay: rgba(0, 0, 0, .7);
+  --shadow: 0 20px 60px rgba(0, 0, 0, .5);
+  --tag-bg: #191a1b;
+
+  /* Priority colors (from Redmine) */
+  --priority-low: #888888;
+  --priority-normal: #4488ff;
+  --priority-high: #ffaa00;
+  --priority-urgent: #ff8800;
+  --priority-immediate: #ff4444;
+
+  /* Priority colors (from Redmine) */
+  --priority-low: #888888;
+  --priority-normal: #4488ff;
+  --priority-high: #ffaa00;
+  --priority-urgent: #ff8800;
+  --priority-immediate: #ff4444;
+
+  /* Focus ring (same in both themes) */
+  --focus-ring: 0 0 0 2px var(--accent-bg), 0 0 0 1px var(--accent);
+
+  /* z-index scale (UI_GUIDE §7) */
+  --z-base: 1;
+  --z-sticky-header: 5;
+  --z-dropdown: 100;
+  --z-modal: 10000;
+  --z-toast: 20000;
+  --z-login: 99999;
+}
+
+[data-theme="light"] {
+  --bg: #ffffff;
+  --bg-card: #f5f6f6;
+  --bg-card-alt: #f0f1f2;
+  --bg-hover: #ececec;
+  --surface-1: #f5f6f6;
+  --surface-2: #ebebec;
+  --surface-3: #e4e5e7;
+  --surface-4: #dddedf;
+
+  --border: #e0e2e6;
+  --border-light: #ececec;
+  --border-accent: #5e6ad233;
+  --hairline: #e0e2e6;
+  --hairline-strong: #c8cacc;
+
+  --text: #333;
+  --text-bright: #111;
+  --text-dim: #444;
+  --text-muted: #777;
+  --text-faint: #999;
+  --text-faintest: #bbb;
+
+  --accent: #5e6ad2;
+  --accent-hover: #7a82e0;
+  --accent-bg: #5e6ad212;
+
+  --success: #1a8a3a;
+  --danger: #d63031;
+  --warning: #d4920a;
+  --critical: #c62828;
+
+  --purple: #8b3fc7;
+  --orange: #e67e22;
+  --cyan: #0891b2;
+  --pink: #db2777;
+  --teal: #0d9488;
+  --lime: #65a30d;
+
+  --modal-overlay: rgba(0, 0, 0, .35);
+  --shadow: 0 20px 60px rgba(0, 0, 0, .1);
+  --tag-bg: #e4e5e7;
+
+  /* Priority colors (from Redmine) */
+  --priority-low: #888888;
+  --priority-normal: #4488ff;
+  --priority-high: #ffaa00;
+  --priority-urgent: #ff8800;
+  --priority-immediate: #ff4444;
+}
+
+[data-theme="nord"] {
+  --bg: #2e3440;
+  --bg-card: #3b4252;
+  --bg-card-alt: #434c5e;
+  --bg-hover: #4c566a;
+  --surface-1: #3b4252;
+  --surface-2: #434c5e;
+  --surface-3: #4c566a;
+  --surface-4: #4c566a;
+  --border: #4c566a;
+  --border-light: #434c5e;
+  --border-accent: #88c0d044;
+  --hairline: #4c566a;
+  --hairline-strong: #616e88;
+  --text: #d8dee9;
+  --text-bright: #eceff4;
+  --text-dim: #d8dee9;
+  --text-muted: #a3b1c4;
+  --text-faint: #7b8da0;
+  --text-faintest: #616e88;
+  --accent: #88c0d0;
+  --accent-hover: #8fbcbb;
+  --accent-bg: #88c0d018;
+  --success: #a3be8c;
+  --danger: #bf616a;
+  --warning: #ebcb8b;
+  --critical: #bf616a;
+  --purple: #b48ead;
+  --orange: #d08770;
+  --cyan: #88c0d0;
+  --pink: #b48ead;
+  --teal: #8fbcbb;
+  --lime: #a3be8c;
+  --modal-overlay: rgba(0, 0, 0, .6);
+  --shadow: 0 20px 60px rgba(0, 0, 0, .4);
+  --tag-bg: #434c5e;
+
+  /* Priority colors (from Redmine) */
+  --priority-low: #888888;
+  --priority-normal: #4488ff;
+  --priority-high: #ffaa00;
+  --priority-urgent: #ff8800;
+  --priority-immediate: #ff4444;
+}
+
+[data-theme="amber"] {
+  --bg: #0f0d0a;
+  --bg-card: #1a1814;
+  --bg-card-alt: #252019;
+  --bg-hover: #2d271e;
+  --surface-1: #1a1814;
+  --surface-2: #252019;
+  --surface-3: #2d271e;
+  --surface-4: #352e24;
+  --border: #3d362a;
+  --border-light: #2d271e;
+  --border-accent: #f59e0b44;
+  --hairline: #3d362a;
+  --hairline-strong: #544a3a;
+  --text: #d4c8b0;
+  --text-bright: #f5f0e0;
+  --text-dim: #d4c8b0;
+  --text-muted: #a09070;
+  --text-faint: #786a50;
+  --text-faintest: #5a4e3a;
+  --accent: #f59e0b;
+  --accent-hover: #fbbf24;
+  --accent-bg: #f59e0b18;
+  --success: #22c55e;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --critical: #ef4444;
+  --purple: #c084fc;
+  --orange: #f97316;
+  --cyan: #22d3ee;
+  --pink: #f472b6;
+  --teal: #2dd4bf;
+  --lime: #a3e635;
+  --modal-overlay: rgba(0, 0, 0, .7);
+  --shadow: 0 20px 60px rgba(0, 0, 0, .5);
+  --tag-bg: #252019;
+
+  /* Priority colors (from Redmine) */
+  --priority-low: #888888;
+  --priority-normal: #4488ff;
+  --priority-high: #ffaa00;
+  --priority-urgent: #ff8800;
+  --priority-immediate: #ff4444;
+}
+
+[data-theme="forest"] {
+  --bg: #060d09;
+  --bg-card: #0a120d;
+  --bg-card-alt: #0f1a13;
+  --bg-hover: #142118;
+  --surface-1: #0a120d;
+  --surface-2: #0f1a13;
+  --surface-3: #142118;
+  --surface-4: #19281e;
+  --border: #1f2f23;
+  --border-light: #142118;
+  --border-accent: #22c55e44;
+  --hairline: #1f2f23;
+  --hairline-strong: #2d4033;
+  --text: #c0d4c6;
+  --text-bright: #e8f5ec;
+  --text-dim: #c0d4c6;
+  --text-muted: #8aa090;
+  --text-faint: #607a68;
+  --text-faintest: #4a5e50;
+  --accent: #22c55e;
+  --accent-hover: #4ade80;
+  --accent-bg: #22c55e18;
+  --success: #22c55e;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --critical: #ef4444;
+  --purple: #a855f7;
+  --orange: #f97316;
+  --cyan: #06b6d4;
+  --pink: #ec4899;
+  --teal: #14b8a6;
+  --lime: #84cc16;
+  --modal-overlay: rgba(0, 0, 0, .7);
+  --shadow: 0 20px 60px rgba(0, 0, 0, .5);
+  --tag-bg: #0f1a13;
+
+  /* Priority colors (from Redmine) */
+  --priority-low: #888888;
+  --priority-normal: #4488ff;
+  --priority-high: #ffaa00;
+  --priority-urgent: #ff8800;
+  --priority-immediate: #ff4444;
+}
+
+[data-theme="dusk"] {
+  --bg: #080610;
+  --bg-card: #0d0a14;
+  --bg-card-alt: #15101e;
+  --bg-hover: #1a1526;
+  --surface-1: #0d0a14;
+  --surface-2: #15101e;
+  --surface-3: #1a1526;
+  --surface-4: #1f1a2e;
+  --border: #2a2240;
+  --border-light: #1a1526;
+  --border-accent: #a855f744;
+  --hairline: #2a2240;
+  --hairline-strong: #3a3055;
+  --text: #cec0e8;
+  --text-bright: #f0e8ff;
+  --text-dim: #cec0e8;
+  --text-muted: #9a88b8;
+  --text-faint: #70608a;
+  --text-faintest: #554570;
+  --accent: #a855f7;
+  --accent-hover: #c084fc;
+  --accent-bg: #a855f718;
+  --success: #22c55e;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --critical: #ef4444;
+  --purple: #a855f7;
+  --orange: #f97316;
+  --cyan: #06b6d4;
+  --pink: #ec4899;
+  --teal: #14b8a6;
+  --lime: #84cc16;
+  --modal-overlay: rgba(0, 0, 0, .7);
+  --shadow: 0 20px 60px rgba(0, 0, 0, .5);
+  --tag-bg: #15101e;
+
+  /* Priority colors (from Redmine) */
+  --priority-low: #888888;
+  --priority-normal: #4488ff;
+  --priority-high: #ffaa00;
+  --priority-urgent: #ff8800;
+  --priority-immediate: #ff4444;
+}

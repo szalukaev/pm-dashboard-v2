@@ -1,0 +1,39 @@
+# Environment
+.env
+*.env.local
+
+# Go
+backend/vendor/
+backend/tmp/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/.quasar/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Docker
+data/
+
+# Temp
+/tmp/
+*.log
+*.db
+
+# docs
+/docs
+/Additionally
+UI_GUIDE_PM_Dashboard.md
+/.mimocode
+ТЗ_PM_Dashboard_3.3.docx
