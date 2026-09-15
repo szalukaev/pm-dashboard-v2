@@ -67,8 +67,6 @@ import { ref, computed } from 'vue'
 import { ChevronDown, Flag, CheckCircle2, Pencil, RefreshCw, Trash2 } from 'lucide-vue-next'
 import SprintProgressBar from './SprintProgressBar.vue'
 import KanbanCard from '../kanban/KanbanCard.vue'
-import type { Sprint } from '../../stores/sprint'
-
 import type { Sprint, SprintTask } from '../../stores/sprint'
 import type { KanbanCard as KanbanCardType } from '../../stores/kanban'
 
