@@ -21,7 +21,7 @@
     "no": "No",
     "all": "All",
     "toggle_theme": "Toggle theme",
-    "confirm_delete_title": "Delete {entity}?",
+    "confirm_delete_title": "Delete {0}?",
     "confirm_delete_text": "This action cannot be undone.",
     "success": "Success",
     "copied": "Copied"
@@ -37,7 +37,7 @@
   },
   "setup": {
     "title": "Initial Setup",
-    "step_of": "Step {current} of {total}",
+    "step_of": "Step {0} of {1}",
     "db_connection": "Database Connection",
     "db_dsn": "Connection String (DSN)",
     "db_dsn_hint": "Example: postgres://user:pass@localhost:5432/pm_dashboard",

@@ -1,7 +1,7 @@
 <template>
   <div class="setup-overlay">
     <div class="setup-card">
-      <div class="step-indicator">{{ $t('setup.step_of', { current: step, total: 3 }) }}</div>
+      <div class="step-indicator">{{ $t('setup.step_of', [step, 3]) }}</div>
       <h2 class="setup-title">{{ stepTitle }}</h2>
 
       <!-- Step 1: Database -->

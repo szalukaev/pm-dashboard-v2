@@ -21,7 +21,7 @@
     "no": "Нет",
     "all": "Все",
     "toggle_theme": "Переключить тему",
-    "confirm_delete_title": "Удалить {entity}?",
+    "confirm_delete_title": "Удалить {0}?",
     "confirm_delete_text": "Действие необратимо.",
     "success": "Успешно",
     "copied": "Скопировано"
@@ -37,7 +37,7 @@
   },
   "setup": {
     "title": "Первоначальная настройка",
-    "step_of": "Шаг {current} из {total}",
+    "step_of": "Шаг {0} из {1}",
     "db_connection": "Подключение к базе данных",
     "db_dsn": "Строка подключения (DSN)",
     "db_dsn_hint": "Пример: postgres://user:pass@localhost:5432/pm_dashboard",

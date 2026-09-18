@@ -55,7 +55,7 @@
     <!-- Delete Confirm -->
     <AppConfirmDialog
       :model-value="showDeleteConfirm"
-      :title="$t('common.confirm_delete_title', { entity: 'спринт' })"
+      :title="$t('common.confirm_delete_title', ['спринт'])"
       @update:model-value="showDeleteConfirm = $event"
       @confirm="handleDelete"
     />
