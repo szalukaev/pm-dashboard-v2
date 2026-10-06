@@ -5,10 +5,14 @@ import (
 	"database/sql"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"time"
 )
+
+// maxAuditBodyBytes caps how much of a request body is read for the audit trail.
+const maxAuditBodyBytes = 1 << 20 // 1 MiB
 
 type AuditMiddleware struct {
 	DB **sql.DB
@@ -30,6 +34,26 @@ func (w *auditResponseWriter) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
+// ClientIP extracts the real client address:
+// X-Real-IP → first X-Forwarded-For hop → host part of RemoteAddr.
+func ClientIP(r *http.Request) string {
+	if ip := r.Header.Get("X-Real-IP"); ip != "" {
+		return ip
+	}
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		// First hop is the original client when the chain is built correctly.
+		if i := strings.IndexByte(xff, ','); i >= 0 {
+			return strings.TrimSpace(xff[:i])
+		}
+		return strings.TrimSpace(xff)
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
+
 func (m *AuditMiddleware) Log(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Only audit mutating requests
@@ -44,9 +68,10 @@ func (m *AuditMiddleware) Log(next http.Handler) http.Handler {
 			return
 		}
 
-		// Read request body
+		// Read request body (capped — a huge payload must not OOM the process)
 		var bodyBytes []byte
 		if r.Body != nil {
+			r.Body = http.MaxBytesReader(w, r.Body, maxAuditBodyBytes)
 			bodyBytes, _ = io.ReadAll(r.Body)
 			r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 		}
@@ -65,23 +90,24 @@ func (m *AuditMiddleware) Log(next http.Handler) http.Handler {
 		next.ServeHTTP(aw, r)
 
 		// Log after response
-		var beforeState, afterState interface{}
+		// before_state is a reserved column (JSONB) kept for future use;
+		// it is not populated yet and defaults to NULL in the DB.
+		var afterState interface{}
 		if len(bodyBytes) > 0 {
 			json.Unmarshal(bodyBytes, &afterState)
 		}
+		clientIP := ClientIP(r)
+		userAgent := r.UserAgent()
+		statusCode := aw.statusCode
 
 		go func() {
-			ctx := r.Context()
-			_ = ctx
-			beforeJSON, _ := json.Marshal(beforeState)
 			afterJSON, _ := json.Marshal(afterState)
 
 			(*m.DB).Exec(`INSERT INTO audit_log
-				(occurred_at, user_id, action, entity_type, entity_id, before_state, after_state, ip_address, user_agent)
+				(occurred_at, user_id, action, entity_type, entity_id, after_state, status_code, ip_address, user_agent)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
 				time.Now(), userID, action, entityType, entityID,
-				string(beforeJSON), string(afterJSON),
-				r.RemoteAddr, r.UserAgent())
+				string(afterJSON), statusCode, clientIP, userAgent)
 		}()
 	})
 }
@@ -95,14 +121,14 @@ func (m *AuditMiddleware) LogLogin(userID int, username string, success bool, r 
 	(*m.DB).Exec(`INSERT INTO audit_log
 		(occurred_at, user_id, action, entity_type, after_state, ip_address, user_agent)
 		VALUES ($1, $2, $3, 'auth', $4, $5, $6)`,
-		time.Now(), userID, action, string(afterData), r.RemoteAddr, r.UserAgent())
+		time.Now(), userID, action, string(afterData), ClientIP(r), r.UserAgent())
 }
 
 func (m *AuditMiddleware) LogLogout(userID int, r *http.Request) {
 	(*m.DB).Exec(`INSERT INTO audit_log
 		(occurred_at, user_id, action, entity_type, ip_address, user_agent)
 		VALUES ($1, $2, 'logout', 'auth', $3, $4)`,
-		time.Now(), userID, r.RemoteAddr, r.UserAgent())
+		time.Now(), userID, ClientIP(r), r.UserAgent())
 }
 
 func methodToAction(method string) string {
