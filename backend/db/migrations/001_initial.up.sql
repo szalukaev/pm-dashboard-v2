@@ -6,8 +6,11 @@ CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(100) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
+    display_name VARCHAR(255) DEFAULT '',
+    avatar TEXT DEFAULT '',
     role VARCHAR(20) DEFAULT 'user',
     force_password_change BOOLEAN DEFAULT false,
+    last_login TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -31,6 +34,7 @@ CREATE TABLE IF NOT EXISTS user_settings (
     kanban_column_order_users JSONB DEFAULT '[]',
     last_filters JSONB DEFAULT '{}',
     notifications_enabled BOOLEAN DEFAULT true,
+    overdue_alerts BOOLEAN DEFAULT false,
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -92,6 +96,7 @@ CREATE TABLE IF NOT EXISTS statuses (
     is_closed BOOLEAN DEFAULT false,
     group_name VARCHAR(50) DEFAULT 'open',
     data_source VARCHAR(50) DEFAULT 'redmine',
+    synced_at TIMESTAMPTZ,
     UNIQUE(external_id, data_source)
 );
 
@@ -103,6 +108,7 @@ CREATE TABLE IF NOT EXISTS priorities (
     sort_order INTEGER DEFAULT 0,
     color VARCHAR(20) DEFAULT '#888888',
     data_source VARCHAR(50) DEFAULT 'redmine',
+    synced_at TIMESTAMPTZ,
     UNIQUE(external_id, data_source)
 );
 
@@ -256,6 +262,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
     entity_id BIGINT,
     before_state JSONB,
     after_state JSONB,
+    status_code INTEGER,
     ip_address TEXT,
     user_agent TEXT
 );

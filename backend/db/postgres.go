@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(100) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    display_name VARCHAR(255),
+    display_name VARCHAR(255) DEFAULT '',
     avatar TEXT DEFAULT '',
     role VARCHAR(20) DEFAULT 'user',
     force_password_change BOOLEAN DEFAULT false,
@@ -109,7 +109,7 @@ CREATE TABLE IF NOT EXISTS users (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 DO $$ BEGIN
-    ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name VARCHAR(255);
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name VARCHAR(255) DEFAULT '';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT DEFAULT '';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMPTZ;
 EXCEPTION WHEN duplicate_column THEN NULL;
@@ -158,15 +158,15 @@ CREATE TABLE IF NOT EXISTS issues (
 CREATE TABLE IF NOT EXISTS statuses (
     id SERIAL PRIMARY KEY, external_id INTEGER NOT NULL, name VARCHAR(255) NOT NULL,
     is_closed BOOLEAN DEFAULT false, group_name VARCHAR(50) DEFAULT 'open',
-    data_source VARCHAR(50) DEFAULT 'redmine', synced_at TIMESTAMPTZ DEFAULT NOW(), UNIQUE(external_id, data_source)
+    data_source VARCHAR(50) DEFAULT 'redmine', synced_at TIMESTAMPTZ, UNIQUE(external_id, data_source)
 );
-ALTER TABLE statuses ADD COLUMN IF NOT EXISTS synced_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE statuses ADD COLUMN IF NOT EXISTS synced_at TIMESTAMPTZ;
 CREATE TABLE IF NOT EXISTS priorities (
     id SERIAL PRIMARY KEY, external_id INTEGER NOT NULL, name VARCHAR(255) NOT NULL,
     sort_order INTEGER DEFAULT 0, color VARCHAR(20) DEFAULT '#888888',
-    data_source VARCHAR(50) DEFAULT 'redmine', synced_at TIMESTAMPTZ DEFAULT NOW(), UNIQUE(external_id, data_source)
+    data_source VARCHAR(50) DEFAULT 'redmine', synced_at TIMESTAMPTZ, UNIQUE(external_id, data_source)
 );
-ALTER TABLE priorities ADD COLUMN IF NOT EXISTS synced_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE priorities ADD COLUMN IF NOT EXISTS synced_at TIMESTAMPTZ;
 CREATE TABLE IF NOT EXISTS organizations (
     id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(500) NOT NULL, address TEXT, inn VARCHAR(20),
@@ -233,8 +233,9 @@ CREATE TABLE IF NOT EXISTS audit_log (
     id BIGSERIAL PRIMARY KEY, occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     user_id INTEGER REFERENCES users(id) ON DELETE SET NULL, action VARCHAR(50) NOT NULL,
     entity_type VARCHAR(50), entity_id BIGINT, before_state JSONB, after_state JSONB,
-    ip_address TEXT, user_agent TEXT
+    status_code INTEGER, ip_address TEXT, user_agent TEXT
 );
+ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS status_code INTEGER;
 CREATE TABLE IF NOT EXISTS licenses (
     id BIGSERIAL PRIMARY KEY, license_blob TEXT NOT NULL, hwid_hash TEXT NOT NULL,
     first_activated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), last_check_ok_at TIMESTAMPTZ,
