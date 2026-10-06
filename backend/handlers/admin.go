@@ -101,7 +101,11 @@ func (h *AdminHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, _ := strconv.Atoi(mux.Vars(r)["id"])
+	userID, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
+		return
+	}
 	var body struct {
 		Role     *string `json:"role"`
 		Password *string `json:"password"`
@@ -109,12 +113,28 @@ func (h *AdminHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	json.NewDecoder(r.Body).Decode(&body)
 
 	if body.Role != nil {
-		(*h.DB).Exec("UPDATE users SET role=$1 WHERE id=$2", *body.Role, userID)
+		res, err := (*h.DB).Exec("UPDATE users SET role=$1 WHERE id=$2", *body.Role, userID)
+		if err != nil {
+			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+			return
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			utils.Error(w, http.StatusNotFound, "USER_NOT_FOUND")
+			return
+		}
 	}
 	if body.Password != nil && len(*body.Password) >= 6 {
 		hash, err := bcrypt.GenerateFromPassword([]byte(*body.Password), bcrypt.DefaultCost)
 		if err == nil {
-			(*h.DB).Exec("UPDATE users SET password_hash=$1 WHERE id=$2", string(hash), userID)
+			res, err := (*h.DB).Exec("UPDATE users SET password_hash=$1 WHERE id=$2", string(hash), userID)
+			if err != nil {
+				utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+				return
+			}
+			if n, _ := res.RowsAffected(); n == 0 {
+				utils.Error(w, http.StatusNotFound, "USER_NOT_FOUND")
+				return
+			}
 		}
 	}
 	utils.Success(w)
@@ -126,14 +146,26 @@ func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, _ := strconv.Atoi(mux.Vars(r)["id"])
+	userID, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
+		return
+	}
 	// Don't delete yourself
 	currentUserID := middleware.GetUserID(r)
 	if userID == currentUserID {
 		utils.Error(w, http.StatusBadRequest, "CANNOT_DELETE_SELF")
 		return
 	}
-	(*h.DB).Exec("DELETE FROM users WHERE id=$1", userID)
+	res, err := (*h.DB).Exec("DELETE FROM users WHERE id=$1", userID)
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "DELETE_FAILED")
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		utils.Error(w, http.StatusNotFound, "USER_NOT_FOUND")
+		return
+	}
 	utils.Success(w)
 }
 
@@ -177,7 +209,11 @@ func (h *AdminHandler) UpdateStatusGroup(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	statusID, _ := strconv.Atoi(mux.Vars(r)["id"])
+	statusID, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
+		return
+	}
 	var body struct {
 		Group string `json:"group"` // "open", "testing", "closed"
 	}
@@ -189,7 +225,15 @@ func (h *AdminHandler) UpdateStatusGroup(w http.ResponseWriter, r *http.Request)
 	}
 
 	isClosed := body.Group == "closed"
-	(*h.DB).Exec("UPDATE statuses SET group_name=$1, is_closed=$2 WHERE external_id=$3", body.Group, isClosed, statusID)
+	res, err := (*h.DB).Exec("UPDATE statuses SET group_name=$1, is_closed=$2 WHERE external_id=$3", body.Group, isClosed, statusID)
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		utils.Error(w, http.StatusNotFound, "STATUS_NOT_FOUND")
+		return
+	}
 	utils.Success(w)
 }
 
@@ -233,7 +277,11 @@ func (h *AdminHandler) UpdatePriority(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	priorityID, _ := strconv.Atoi(mux.Vars(r)["id"])
+	priorityID, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
+		return
+	}
 	var body struct {
 		SortOrder *int    `json:"sort_order"`
 		Color     *string `json:"color"`
@@ -241,10 +289,26 @@ func (h *AdminHandler) UpdatePriority(w http.ResponseWriter, r *http.Request) {
 	json.NewDecoder(r.Body).Decode(&body)
 
 	if body.SortOrder != nil {
-		(*h.DB).Exec("UPDATE priorities SET sort_order=$1 WHERE external_id=$2", *body.SortOrder, priorityID)
+		res, err := (*h.DB).Exec("UPDATE priorities SET sort_order=$1 WHERE external_id=$2", *body.SortOrder, priorityID)
+		if err != nil {
+			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+			return
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			utils.Error(w, http.StatusNotFound, "PRIORITY_NOT_FOUND")
+			return
+		}
 	}
 	if body.Color != nil {
-		(*h.DB).Exec("UPDATE priorities SET color=$1 WHERE external_id=$2", *body.Color, priorityID)
+		res, err := (*h.DB).Exec("UPDATE priorities SET color=$1 WHERE external_id=$2", *body.Color, priorityID)
+		if err != nil {
+			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+			return
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			utils.Error(w, http.StatusNotFound, "PRIORITY_NOT_FOUND")
+			return
+		}
 	}
 	utils.Success(w)
 }

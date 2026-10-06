@@ -93,10 +93,14 @@ func (h *SprintHandler) GetSprint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID := middleware.GetUserID(r)
-	sprintID, _ := strconv.Atoi(mux.Vars(r)["id"])
+	sprintID, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
+		return
+	}
 
 	var s Sprint
-	err := (*h.DB).QueryRow(`SELECT id, name, project_name, status, start_date, due_date,
+	err = (*h.DB).QueryRow(`SELECT id, name, project_name, status, start_date, due_date,
 		description, category_name, auto_fill_category
 		FROM sprints WHERE id = $1 AND user_id = $2`, sprintID, userID).Scan(
 		&s.ID, &s.Name, &s.ProjectName, &s.Status, &s.StartDate, &s.DueDate,
@@ -166,7 +170,11 @@ func (h *SprintHandler) UpdateSprint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID := middleware.GetUserID(r)
-	sprintID, _ := strconv.Atoi(mux.Vars(r)["id"])
+	sprintID, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
+		return
+	}
 
 	var body map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -198,9 +206,13 @@ func (h *SprintHandler) UpdateSprint(w http.ResponseWriter, r *http.Request) {
 
 	args = append(args, sprintID, userID)
 	query := "UPDATE sprints SET " + utils.JoinStrings(sets, ",") + " WHERE id = $" + strconv.Itoa(argIdx) + " AND user_id = $" + strconv.Itoa(argIdx+1)
-	_, err := (*h.DB).Exec(query, args...)
+	res, err := (*h.DB).Exec(query, args...)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		utils.Error(w, http.StatusNotFound, "SPRINT_NOT_FOUND")
 		return
 	}
 
@@ -214,11 +226,19 @@ func (h *SprintHandler) DeleteSprint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID := middleware.GetUserID(r)
-	sprintID, _ := strconv.Atoi(mux.Vars(r)["id"])
+	sprintID, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
+		return
+	}
 
-	_, err := (*h.DB).Exec("DELETE FROM sprints WHERE id = $1 AND user_id = $2", sprintID, userID)
+	res, err := (*h.DB).Exec("DELETE FROM sprints WHERE id = $1 AND user_id = $2", sprintID, userID)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "DELETE_FAILED")
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		utils.Error(w, http.StatusNotFound, "SPRINT_NOT_FOUND")
 		return
 	}
 
@@ -231,7 +251,11 @@ func (h *SprintHandler) AssignTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sprintID, _ := strconv.Atoi(mux.Vars(r)["id"])
+	sprintID, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
+		return
+	}
 
 	var body struct {
 		IssueExternalID int `json:"issue_external_id"`
@@ -241,7 +265,7 @@ func (h *SprintHandler) AssignTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err := (*h.DB).Exec(`INSERT INTO sprint_issues (sprint_id, issue_external_id) VALUES ($1, $2)
+	_, err = (*h.DB).Exec(`INSERT INTO sprint_issues (sprint_id, issue_external_id) VALUES ($1, $2)
 		ON CONFLICT DO NOTHING`, sprintID, body.IssueExternalID)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "ASSIGN_FAILED")
@@ -257,12 +281,24 @@ func (h *SprintHandler) UnassignTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sprintID, _ := strconv.Atoi(mux.Vars(r)["id"])
-	issueID, _ := strconv.Atoi(mux.Vars(r)["issueId"])
+	sprintID, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
+		return
+	}
+	issueID, err := strconv.Atoi(mux.Vars(r)["issueId"])
+	if err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
+		return
+	}
 
-	_, err := (*h.DB).Exec("DELETE FROM sprint_issues WHERE sprint_id = $1 AND issue_external_id = $2", sprintID, issueID)
+	res, err := (*h.DB).Exec("DELETE FROM sprint_issues WHERE sprint_id = $1 AND issue_external_id = $2", sprintID, issueID)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "UNASSIGN_FAILED")
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		utils.Error(w, http.StatusNotFound, "SPRINT_NOT_FOUND")
 		return
 	}
 
@@ -352,10 +388,14 @@ func (h *SprintHandler) RefreshSprint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID := middleware.GetUserID(r)
-	sprintID, _ := strconv.Atoi(mux.Vars(r)["id"])
+	sprintID, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
+		return
+	}
 
 	var s Sprint
-	err := (*h.DB).QueryRow(`SELECT id, project_name, category_name, auto_fill_category
+	err = (*h.DB).QueryRow(`SELECT id, project_name, category_name, auto_fill_category
 		FROM sprints WHERE id = $1 AND user_id = $2`, sprintID, userID).Scan(
 		&s.ID, &s.ProjectName, &s.CategoryName, &s.AutoFillCategory)
 	if err != nil {

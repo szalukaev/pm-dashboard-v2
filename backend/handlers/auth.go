@@ -326,7 +326,15 @@ func (h *AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	(*h.DB).Exec("UPDATE users SET display_name = $1 WHERE id = $2", displayName, userID)
+	res, err := (*h.DB).Exec("UPDATE users SET display_name = $1 WHERE id = $2", displayName, userID)
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		utils.Error(w, http.StatusNotFound, "USER_NOT_FOUND")
+		return
+	}
 
 	utils.JSON(w, http.StatusOK, map[string]interface{}{
 		"display_name": displayName,
@@ -385,7 +393,15 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	(*h.DB).Exec("UPDATE users SET password_hash = $1, force_password_change = false WHERE id = $2", string(newHash), userID)
+	res, err := (*h.DB).Exec("UPDATE users SET password_hash = $1, force_password_change = false WHERE id = $2", string(newHash), userID)
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		utils.Error(w, http.StatusNotFound, "USER_NOT_FOUND")
+		return
+	}
 	utils.Success(w)
 }
 
@@ -435,7 +451,15 @@ func (h *AuthHandler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
 	}
 
 	avatar := "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(data)
-	(*h.DB).Exec("UPDATE users SET avatar = $1 WHERE id = $2", avatar, userID)
+	res, err := (*h.DB).Exec("UPDATE users SET avatar = $1 WHERE id = $2", avatar, userID)
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		utils.Error(w, http.StatusNotFound, "USER_NOT_FOUND")
+		return
+	}
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"avatar": avatar})
 }
 
@@ -449,6 +473,14 @@ func (h *AuthHandler) DeleteAvatar(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusUnauthorized, "UNAUTHORIZED")
 		return
 	}
-	(*h.DB).Exec("UPDATE users SET avatar = '' WHERE id = $1", userID)
+	res, err := (*h.DB).Exec("UPDATE users SET avatar = '' WHERE id = $1", userID)
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		utils.Error(w, http.StatusNotFound, "USER_NOT_FOUND")
+		return
+	}
 	utils.Success(w)
 }

@@ -53,7 +53,10 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 
 	if err == sql.ErrNoRows {
 		// Create default settings
-		(*h.DB).Exec(`INSERT INTO user_settings (user_id) VALUES ($1) ON CONFLICT DO NOTHING`, userID)
+		if _, err := (*h.DB).Exec(`INSERT INTO user_settings (user_id) VALUES ($1) ON CONFLICT DO NOTHING`, userID); err != nil {
+			utils.Error(w, http.StatusInternalServerError, "CREATE_FAILED")
+			return
+		}
 		settings.Theme = "dark"
 		settings.Language = "ru"
 		settings.NotificationsEnabled = true
@@ -118,41 +121,74 @@ func (h *SettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request)
 
 	if v, ok := body["selected_projects"]; ok {
 		data, _ := json.Marshal(v)
-		(*h.DB).Exec("UPDATE user_settings SET selected_projects = $1 WHERE user_id = $2", data, userID)
+		if _, err := (*h.DB).Exec("UPDATE user_settings SET selected_projects = $1 WHERE user_id = $2", data, userID); err != nil {
+			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+			return
+		}
 	}
 	if v, ok := body["selected_team"]; ok {
 		data, _ := json.Marshal(v)
-		(*h.DB).Exec("UPDATE user_settings SET selected_team = $1 WHERE user_id = $2", data, userID)
+		if _, err := (*h.DB).Exec("UPDATE user_settings SET selected_team = $1 WHERE user_id = $2", data, userID); err != nil {
+			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+			return
+		}
 	}
 	if v, ok := body["theme"]; ok {
-		(*h.DB).Exec("UPDATE user_settings SET theme = $1 WHERE user_id = $2", v, userID)
+		if _, err := (*h.DB).Exec("UPDATE user_settings SET theme = $1 WHERE user_id = $2", v, userID); err != nil {
+			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+			return
+		}
 	}
 	if v, ok := body["language"]; ok {
-		(*h.DB).Exec("UPDATE user_settings SET language = $1 WHERE user_id = $2", v, userID)
+		if _, err := (*h.DB).Exec("UPDATE user_settings SET language = $1 WHERE user_id = $2", v, userID); err != nil {
+			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+			return
+		}
 	}
 	if v, ok := body["tab_order"]; ok {
 		data, _ := json.Marshal(v)
-		(*h.DB).Exec("UPDATE user_settings SET tab_order = $1 WHERE user_id = $2", data, userID)
+		if _, err := (*h.DB).Exec("UPDATE user_settings SET tab_order = $1 WHERE user_id = $2", data, userID); err != nil {
+			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+			return
+		}
 	}
 	if v, ok := body["last_filters"]; ok {
 		data, _ := json.Marshal(v)
-		(*h.DB).Exec("UPDATE user_settings SET last_filters = $1 WHERE user_id = $2", data, userID)
+		if _, err := (*h.DB).Exec("UPDATE user_settings SET last_filters = $1 WHERE user_id = $2", data, userID); err != nil {
+			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+			return
+		}
 	}
 	if v, ok := body["notifications_enabled"]; ok {
-		(*h.DB).Exec("UPDATE user_settings SET notifications_enabled = $1 WHERE user_id = $2", v, userID)
+		if _, err := (*h.DB).Exec("UPDATE user_settings SET notifications_enabled = $1 WHERE user_id = $2", v, userID); err != nil {
+			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+			return
+		}
 	}
 	if v, ok := body["overdue_alerts"]; ok {
-		(*h.DB).Exec("UPDATE user_settings SET overdue_alerts = $1 WHERE user_id = $2", v, userID)
+		if _, err := (*h.DB).Exec("UPDATE user_settings SET overdue_alerts = $1 WHERE user_id = $2", v, userID); err != nil {
+			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+			return
+		}
 	}
 	if v, ok := body["kanban_column_order_statuses"]; ok {
 		data, _ := json.Marshal(v)
-		(*h.DB).Exec("UPDATE user_settings SET kanban_column_order_statuses = $1 WHERE user_id = $2", data, userID)
+		if _, err := (*h.DB).Exec("UPDATE user_settings SET kanban_column_order_statuses = $1 WHERE user_id = $2", data, userID); err != nil {
+			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+			return
+		}
 	}
 	if v, ok := body["kanban_column_order_users"]; ok {
 		data, _ := json.Marshal(v)
-		(*h.DB).Exec("UPDATE user_settings SET kanban_column_order_users = $1 WHERE user_id = $2", data, userID)
+		if _, err := (*h.DB).Exec("UPDATE user_settings SET kanban_column_order_users = $1 WHERE user_id = $2", data, userID); err != nil {
+			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+			return
+		}
 	}
 
-	(*h.DB).Exec("UPDATE user_settings SET updated_at = NOW() WHERE user_id = $1", userID)
+	if _, err := (*h.DB).Exec("UPDATE user_settings SET updated_at = NOW() WHERE user_id = $1", userID); err != nil {
+		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+		return
+	}
 	utils.Success(w)
 }

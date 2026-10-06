@@ -95,7 +95,11 @@ func (h *PaymentsHandler) UpdateOrganization(w http.ResponseWriter, r *http.Requ
 	}
 
 	userID := middleware.GetUserID(r)
-	orgID, _ := strconv.Atoi(mux.Vars(r)["id"])
+	orgID, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
+		return
+	}
 	var body map[string]interface{}
 	json.NewDecoder(r.Body).Decode(&body)
 
@@ -107,7 +111,15 @@ func (h *PaymentsHandler) UpdateOrganization(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	args = append(args, orgID, userID)
-	(*h.DB).Exec("UPDATE organizations SET "+utils.JoinStrings(sets, ",")+" WHERE id=$"+utils.Itoa(idx)+" AND user_id=$"+utils.Itoa(idx+1), args...)
+	res, err := (*h.DB).Exec("UPDATE organizations SET "+utils.JoinStrings(sets, ",")+" WHERE id=$"+utils.Itoa(idx)+" AND user_id=$"+utils.Itoa(idx+1), args...)
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		utils.Error(w, http.StatusNotFound, "ORGANIZATION_NOT_FOUND")
+		return
+	}
 	utils.Success(w)
 }
 
@@ -118,10 +130,25 @@ func (h *PaymentsHandler) DeleteOrganization(w http.ResponseWriter, r *http.Requ
 	}
 
 	userID := middleware.GetUserID(r)
-	orgID, _ := strconv.Atoi(mux.Vars(r)["id"])
+	orgID, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
+		return
+	}
 	// Unlink contracts instead of deleting
-	(*h.DB).Exec("UPDATE contracts SET organization_id = NULL WHERE organization_id = $1 AND user_id = $2", orgID, userID)
-	(*h.DB).Exec("DELETE FROM organizations WHERE id = $1 AND user_id = $2", orgID, userID)
+	if _, err := (*h.DB).Exec("UPDATE contracts SET organization_id = NULL WHERE organization_id = $1 AND user_id = $2", orgID, userID); err != nil {
+		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+		return
+	}
+	res, err := (*h.DB).Exec("DELETE FROM organizations WHERE id = $1 AND user_id = $2", orgID, userID)
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "DELETE_FAILED")
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		utils.Error(w, http.StatusNotFound, "ORGANIZATION_NOT_FOUND")
+		return
+	}
 	utils.Success(w)
 }
 
@@ -295,7 +322,11 @@ func (h *PaymentsHandler) UpdateContract(w http.ResponseWriter, r *http.Request)
 	}
 
 	userID := middleware.GetUserID(r)
-	contractID, _ := strconv.Atoi(mux.Vars(r)["id"])
+	contractID, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
+		return
+	}
 	var body map[string]interface{}
 	json.NewDecoder(r.Body).Decode(&body)
 	sets, args, idx := buildUpdateSets(body, map[string]bool{
@@ -305,7 +336,15 @@ func (h *PaymentsHandler) UpdateContract(w http.ResponseWriter, r *http.Request)
 	}, 1)
 	if len(sets) == 0 { utils.Error(w, http.StatusBadRequest, "NO_FIELDS"); return }
 	args = append(args, contractID, userID)
-	(*h.DB).Exec("UPDATE contracts SET "+utils.JoinStrings(sets, ",")+" WHERE id=$"+utils.Itoa(idx)+" AND user_id=$"+utils.Itoa(idx+1), args...)
+	res, err := (*h.DB).Exec("UPDATE contracts SET "+utils.JoinStrings(sets, ",")+" WHERE id=$"+utils.Itoa(idx)+" AND user_id=$"+utils.Itoa(idx+1), args...)
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		utils.Error(w, http.StatusNotFound, "CONTRACT_NOT_FOUND")
+		return
+	}
 	utils.Success(w)
 }
 
@@ -316,8 +355,20 @@ func (h *PaymentsHandler) DeleteContract(w http.ResponseWriter, r *http.Request)
 	}
 
 	userID := middleware.GetUserID(r)
-	contractID, _ := strconv.Atoi(mux.Vars(r)["id"])
-	(*h.DB).Exec("DELETE FROM contracts WHERE id=$1 AND user_id=$2", contractID, userID)
+	contractID, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
+		return
+	}
+	res, err := (*h.DB).Exec("DELETE FROM contracts WHERE id=$1 AND user_id=$2", contractID, userID)
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "DELETE_FAILED")
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		utils.Error(w, http.StatusNotFound, "CONTRACT_NOT_FOUND")
+		return
+	}
 	utils.Success(w)
 }
 
@@ -330,7 +381,11 @@ func (h *PaymentsHandler) ListInvoices(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID := middleware.GetUserID(r)
-	contractID, _ := strconv.Atoi(mux.Vars(r)["id"])
+	contractID, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
+		return
+	}
 	// Ownership: invoices are visible only via a contract belonging to the caller.
 	rows, err := (*h.DB).Query(`SELECT i.id, i.amount, i.vat_rate, i.issued_at, i.paid_amount, i.status
 		FROM invoices i JOIN contracts c ON i.contract_id = c.id
@@ -374,10 +429,14 @@ func (h *PaymentsHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 	}
 
 	userID := middleware.GetUserID(r)
-	contractID, _ := strconv.Atoi(mux.Vars(r)["id"])
+	contractID, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
+		return
+	}
 
 	var contract struct{ Amount float64; VatRate string; Name string }
-	err := (*h.DB).QueryRow("SELECT amount, vat_rate, name FROM contracts WHERE id=$1 AND user_id=$2", contractID, userID).Scan(&contract.Amount, &contract.VatRate, &contract.Name)
+	err = (*h.DB).QueryRow("SELECT amount, vat_rate, name FROM contracts WHERE id=$1 AND user_id=$2", contractID, userID).Scan(&contract.Amount, &contract.VatRate, &contract.Name)
 	if err != nil { utils.Error(w, http.StatusNotFound, "CONTRACT_NOT_FOUND"); return }
 
 	var body struct {
@@ -416,7 +475,11 @@ func (h *PaymentsHandler) DeleteInvoice(w http.ResponseWriter, r *http.Request) 
 	}
 
 	userID := middleware.GetUserID(r)
-	invoiceID, _ := strconv.Atoi(mux.Vars(r)["invoiceId"])
+	invoiceID, err := strconv.Atoi(mux.Vars(r)["invoiceId"])
+	if err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
+		return
+	}
 	// Ownership: delete only an invoice of the caller's own contract.
 	res, err := (*h.DB).Exec(`DELETE FROM invoices WHERE id=$1 AND contract_id IN
 		(SELECT id FROM contracts WHERE user_id=$2)`, invoiceID, userID)
@@ -436,11 +499,15 @@ func (h *PaymentsHandler) PayInvoice(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID := middleware.GetUserID(r)
-	invoiceID, _ := strconv.Atoi(mux.Vars(r)["invoiceId"])
+	invoiceID, err := strconv.Atoi(mux.Vars(r)["invoiceId"])
+	if err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
+		return
+	}
 
 	// Ownership: pay only an invoice of the caller's own contract.
 	var inv struct{ Amount float64; VatRate string; PaidAmount float64 }
-	err := (*h.DB).QueryRow(`SELECT i.amount, i.vat_rate, i.paid_amount
+	err = (*h.DB).QueryRow(`SELECT i.amount, i.vat_rate, i.paid_amount
 		FROM invoices i JOIN contracts c ON i.contract_id = c.id
 		WHERE i.id=$1 AND c.user_id=$2`, invoiceID, userID).Scan(&inv.Amount, &inv.VatRate, &inv.PaidAmount)
 	if err != nil { utils.Error(w, http.StatusNotFound, "INVOICE_NOT_FOUND"); return }
@@ -509,7 +576,11 @@ func (h *PaymentsHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request
 	}
 
 	userID := middleware.GetUserID(r)
-	invoiceID, _ := strconv.Atoi(mux.Vars(r)["invoiceId"])
+	invoiceID, err := strconv.Atoi(mux.Vars(r)["invoiceId"])
+	if err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
+		return
+	}
 
 	// Get invoice + contract info (only the caller's own invoice)
 	var inv struct {
@@ -518,7 +589,7 @@ func (h *PaymentsHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request
 		VatRate    string
 		IssuedAt   string
 	}
-	err := (*h.DB).QueryRow(`SELECT i.contract_id, i.amount, i.vat_rate, i.issued_at
+	err = (*h.DB).QueryRow(`SELECT i.contract_id, i.amount, i.vat_rate, i.issued_at
 		FROM invoices i JOIN contracts c ON i.contract_id = c.id
 		WHERE i.id=$1 AND c.user_id=$2`, invoiceID, userID).Scan(
 		&inv.ContractID, &inv.Amount, &inv.VatRate, &inv.IssuedAt)

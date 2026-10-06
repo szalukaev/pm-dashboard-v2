@@ -243,13 +243,19 @@ func (h *KanbanHandler) MoveCard(w http.ResponseWriter, r *http.Request) {
 	case "users":
 		// Reassign
 		if body.TargetID == "Неназначенные" {
-			(*h.DB).Exec("UPDATE issues SET assigned_to_name = '', assigned_to_id = NULL, synced_at = NOW() WHERE external_id = $1", body.IssueID)
+			if _, err := (*h.DB).Exec("UPDATE issues SET assigned_to_name = '', assigned_to_id = NULL, synced_at = NOW() WHERE external_id = $1", body.IssueID); err != nil {
+				utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+				return
+			}
 		} else {
 			// Find member by name
 			var memberID *int
 			(*h.DB).QueryRow("SELECT external_id FROM members WHERE name = $1 LIMIT 1", body.TargetID).Scan(&memberID)
-			(*h.DB).Exec("UPDATE issues SET assigned_to_name = $1, assigned_to_id = $2, synced_at = NOW() WHERE external_id = $3",
-				body.TargetID, memberID, body.IssueID)
+			if _, err := (*h.DB).Exec("UPDATE issues SET assigned_to_name = $1, assigned_to_id = $2, synced_at = NOW() WHERE external_id = $3",
+				body.TargetID, memberID, body.IssueID); err != nil {
+				utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+				return
+			}
 		}
 	}
 
@@ -275,14 +281,23 @@ func (h *KanbanHandler) SaveColumnOrder(w http.ResponseWriter, r *http.Request) 
 
 	orderJSON, _ := json.Marshal(body.Order)
 
-	(*h.DB).Exec(`INSERT INTO user_settings (user_id, updated_at) VALUES ($1, NOW())
-		ON CONFLICT (user_id) DO NOTHING`, userID)
+	if _, err := (*h.DB).Exec(`INSERT INTO user_settings (user_id, updated_at) VALUES ($1, NOW())
+		ON CONFLICT (user_id) DO NOTHING`, userID); err != nil {
+		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+		return
+	}
 
 	switch body.Mode {
 	case "statuses":
-		(*h.DB).Exec("UPDATE user_settings SET kanban_column_order_statuses = $1 WHERE user_id = $2", orderJSON, userID)
+		if _, err := (*h.DB).Exec("UPDATE user_settings SET kanban_column_order_statuses = $1 WHERE user_id = $2", orderJSON, userID); err != nil {
+			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+			return
+		}
 	case "users":
-		(*h.DB).Exec("UPDATE user_settings SET kanban_column_order_users = $1 WHERE user_id = $2", orderJSON, userID)
+		if _, err := (*h.DB).Exec("UPDATE user_settings SET kanban_column_order_users = $1 WHERE user_id = $2", orderJSON, userID); err != nil {
+			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+			return
+		}
 	}
 
 	utils.Success(w)

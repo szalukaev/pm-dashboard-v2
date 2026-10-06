@@ -70,8 +70,11 @@ func (h *NotificationsHandler) UpdateSettings(w http.ResponseWriter, r *http.Req
 	json.NewDecoder(r.Body).Decode(&body)
 
 	data, _ := json.Marshal(body)
-	(*h.DB).Exec(`INSERT INTO admin_settings (key, value, updated_at) VALUES ($1, $2, NOW())
-		ON CONFLICT (key) DO UPDATE SET value=$2, updated_at=NOW()`, "user_notif_"+utils.Itoa(userID), data)
+	if _, err := (*h.DB).Exec(`INSERT INTO admin_settings (key, value, updated_at) VALUES ($1, $2, NOW())
+		ON CONFLICT (key) DO UPDATE SET value=$2, updated_at=NOW()`, "user_notif_"+utils.Itoa(userID), data); err != nil {
+		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+		return
+	}
 
 	utils.Success(w)
 }
@@ -113,8 +116,11 @@ func (h *NotificationsHandler) UpdateAlertThresholds(w http.ResponseWriter, r *h
 	json.NewDecoder(r.Body).Decode(&body)
 
 	data, _ := json.Marshal(body)
-	(*h.DB).Exec(`INSERT INTO admin_settings (key, value, updated_at) VALUES ('alert_thresholds', $1, NOW())
-		ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=NOW()`, data)
+	if _, err := (*h.DB).Exec(`INSERT INTO admin_settings (key, value, updated_at) VALUES ('alert_thresholds', $1, NOW())
+		ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=NOW()`, data); err != nil {
+		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+		return
+	}
 
 	utils.Success(w)
 }
