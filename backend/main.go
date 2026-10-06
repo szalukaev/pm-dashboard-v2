@@ -254,8 +254,8 @@ func main() {
 	admin.HandleFunc("/sync-log", adminH.GetSyncLog).Methods("GET")
 	admin.HandleFunc("/audit-log", adminH.GetAuditLog).Methods("GET")
 
-	// WebSocket
-	r.HandleFunc("/ws", wsHub.HandleWebSocket)
+	// WebSocket (session cookie required — not public)
+	r.HandleFunc("/ws", middleware.RequireWSSession(sessionStore, wsHub.HandleWebSocket))
 
 	// Serve static files (frontend build)
 	frontendDir := "../frontend/dist"

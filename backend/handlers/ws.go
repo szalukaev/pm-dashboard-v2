@@ -4,21 +4,69 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"os"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
 
+const (
+	wsWriteWait  = 10 * time.Second
+	wsPingPeriod = 30 * time.Second
+	// Pong is expected within 10s after a ping; read deadline covers the
+	// full ping interval plus that grace.
+	wsPongWait   = wsPingPeriod + 10*time.Second
+	wsMaxMsgSize = 64 * 1024
+	// Per-client outbound buffer; when full the client is dropped.
+	wsSendBuffer = 64
+)
+
+// checkWSOrigin allows only known frontend origins (CSWSH protection).
+func checkWSOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	// Non-browser clients send no Origin header.
+	if origin == "" {
+		return true
+	}
+	allowed := map[string]bool{
+		"http://localhost:82":   true,
+		"http://localhost:5173": true,
+	}
+	if fo := os.Getenv("FRONTEND_ORIGIN"); fo != "" {
+		allowed[fo] = true
+	}
+	return allowed[origin]
+}
+
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
+	CheckOrigin: checkWSOrigin,
+}
+
+// wsClient is one connection with a dedicated outbound buffer.
+// Only writePump writes to the websocket.Conn (gorilla allows a single writer).
+type wsClient struct {
+	conn      *websocket.Conn
+	send      chan []byte
+	closeOnce sync.Once
+}
+
+// close is idempotent: closes the send channel and the connection once.
+func (c *wsClient) close() {
+	c.closeOnce.Do(func() {
+		close(c.send)
+		if c.conn != nil {
+			c.conn.Close()
+		}
+	})
 }
 
 type WSHub struct {
-	clients    map[*websocket.Conn]bool
-	mu         sync.RWMutex
+	clients    map[*wsClient]bool
+	mu         sync.Mutex
 	broadcast  chan []byte
-	register   chan *websocket.Conn
-	unregister chan *websocket.Conn
+	register   chan *wsClient
+	unregister chan *wsClient
 }
 
 type WSMessage struct {
@@ -28,13 +76,28 @@ type WSMessage struct {
 
 func NewWSHub() *WSHub {
 	hub := &WSHub{
-		clients:    make(map[*websocket.Conn]bool),
+		clients:    make(map[*wsClient]bool),
 		broadcast:  make(chan []byte, 256),
-		register:   make(chan *websocket.Conn),
-		unregister: make(chan *websocket.Conn),
+		register:   make(chan *wsClient),
+		unregister: make(chan *wsClient),
 	}
 	go hub.run()
 	return hub
+}
+
+// removeClient drops the client from the set and closes it. Idempotent.
+func (h *WSHub) removeClient(client *wsClient) {
+	h.mu.Lock()
+	_, ok := h.clients[client]
+	if ok {
+		delete(h.clients, client)
+	}
+	total := len(h.clients)
+	h.mu.Unlock()
+	if ok {
+		client.close()
+		slog.Info("WS client disconnected", "total", total)
+	}
 }
 
 func (h *WSHub) run() {
@@ -43,26 +106,35 @@ func (h *WSHub) run() {
 		case client := <-h.register:
 			h.mu.Lock()
 			h.clients[client] = true
+			total := len(h.clients)
 			h.mu.Unlock()
-			slog.Info("WS client connected", "total", len(h.clients))
+			slog.Info("WS client connected", "total", total)
 
 		case client := <-h.unregister:
-			h.mu.Lock()
-			if _, ok := h.clients[client]; ok {
-				delete(h.clients, client)
-				client.Close()
-			}
-			h.mu.Unlock()
-			slog.Info("WS client disconnected", "total", len(h.clients))
+			h.removeClient(client)
 
 		case message := <-h.broadcast:
-			h.mu.RLock()
+			// Non-blocking send per client: a slow/dead client must not
+			// stall the hub (the old code sent to h.unregister from here
+			// and deadlocked). Dead clients are removed after the loop.
+			h.mu.Lock()
+			var dead []*wsClient
 			for client := range h.clients {
-				if err := client.WriteMessage(websocket.TextMessage, message); err != nil {
-					h.unregister <- client
+				select {
+				case client.send <- message:
+				default:
+					dead = append(dead, client)
+					delete(h.clients, client)
 				}
 			}
-			h.mu.RUnlock()
+			total := len(h.clients)
+			h.mu.Unlock()
+			for _, client := range dead {
+				client.close()
+			}
+			if len(dead) > 0 {
+				slog.Warn("WS dropped slow clients", "dropped", len(dead), "total", total)
+			}
 		}
 	}
 }
@@ -77,6 +149,47 @@ func (h *WSHub) BroadcastEvent(event string, data interface{}) {
 	h.broadcast <- jsonData
 }
 
+// writePump is the only writer to the connection.
+func (c *wsClient) writePump() {
+	ticker := time.NewTicker(wsPingPeriod)
+	defer ticker.Stop()
+	for {
+		select {
+		case msg, ok := <-c.send:
+			c.conn.SetWriteDeadline(time.Now().Add(wsWriteWait))
+			if !ok {
+				// Hub closed the channel — client is being removed.
+				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				return
+			}
+			if err := c.conn.WriteMessage(websocket.TextMessage, msg); err != nil {
+				return
+			}
+		case <-ticker.C:
+			c.conn.SetWriteDeadline(time.Now().Add(wsWriteWait))
+			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				return
+			}
+		}
+	}
+}
+
+// readPump keeps the connection alive, enforces read limits and pong deadlines.
+func (c *wsClient) readPump(h *WSHub) {
+	defer func() { h.unregister <- c }()
+	c.conn.SetReadLimit(wsMaxMsgSize)
+	c.conn.SetReadDeadline(time.Now().Add(wsPongWait))
+	c.conn.SetPongHandler(func(string) error {
+		c.conn.SetReadDeadline(time.Now().Add(wsPongWait))
+		return nil
+	})
+	for {
+		if _, _, err := c.conn.ReadMessage(); err != nil {
+			break
+		}
+	}
+}
+
 func (h *WSHub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -84,16 +197,12 @@ func (h *WSHub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.register <- conn
+	client := &wsClient{
+		conn: conn,
+		send: make(chan []byte, wsSendBuffer),
+	}
+	h.register <- client
 
-	// Read loop (keep connection alive, handle pong)
-	go func() {
-		defer func() { h.unregister <- conn }()
-		for {
-			_, _, err := conn.ReadMessage()
-			if err != nil {
-				break
-			}
-		}
-	}()
+	go client.writePump()
+	go client.readPump(h)
 }

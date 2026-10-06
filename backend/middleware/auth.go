@@ -52,6 +52,23 @@ func RequireAuth(sessionStore db.SessionStore, pgDB **sql.DB) func(http.Handler)
 	}
 }
 
+// RequireWSSession authenticates a WebSocket upgrade via the session cookie.
+// DB role lookup is skipped — presence of a valid session is enough for events.
+func RequireWSSession(sessionStore db.SessionStore, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie("session_id")
+		if err != nil || cookie.Value == "" {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		if _, err := sessionStore.Get(r.Context(), cookie.Value); err != nil {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		next(w, r)
+	}
+}
+
 func RequireAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		role, ok := r.Context().Value(UserRoleKey).(string)
