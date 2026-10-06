@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"pm-dashboard/utils"
@@ -18,7 +19,14 @@ import (
 
 type LicenseHandler struct {
 	DB **sql.DB
+
+	// cache of the last successful checkLicense() result (public status endpoint)
+	cacheMu       sync.Mutex
+	cachedStatus  *LicenseStatus
+	cacheExpires  time.Time
 }
+
+const licenseStatusCacheTTL = 5 * time.Minute
 
 // Vendor public key — hardcoded, not from config (ТЗ requirement)
 // Set at build time: go build -ldflags "-X pm-dashboard/handlers.vendorPublicKeyHex=<hex>"
@@ -60,15 +68,36 @@ type LicenseStatus struct {
 }
 
 func (h *LicenseHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
+	// Public endpoint — cache the expensive check (file IO + signature verify)
+	// for a few minutes so probes don't hammer the disk/DB.
+	h.cacheMu.Lock()
+	if h.cachedStatus != nil && time.Now().Before(h.cacheExpires) {
+		cached := *h.cachedStatus
+		h.cacheMu.Unlock()
+		utils.JSON(w, http.StatusOK, cached)
+		return
+	}
+	h.cacheMu.Unlock()
+
 	status := h.checkLicense()
+
+	h.cacheMu.Lock()
+	h.cachedStatus = &status
+	h.cacheExpires = time.Now().Add(licenseStatusCacheTTL)
+	h.cacheMu.Unlock()
+
 	utils.JSON(w, http.StatusOK, status)
 }
 
 // RunPeriodicCheck performs a full license check outside of HTTP handling.
 // Called from a background ticker so the grace period can start even if
-// nobody opens the license page.
+// nobody opens the license page. Also refreshes the status cache.
 func (h *LicenseHandler) RunPeriodicCheck() {
-	h.checkLicense()
+	status := h.checkLicense()
+	h.cacheMu.Lock()
+	h.cachedStatus = &status
+	h.cacheExpires = time.Now().Add(licenseStatusCacheTTL)
+	h.cacheMu.Unlock()
 }
 
 func (h *LicenseHandler) Activate(w http.ResponseWriter, r *http.Request) {
@@ -133,6 +162,11 @@ func (h *LicenseHandler) Activate(w http.ResponseWriter, r *http.Request) {
 	(*h.DB).Exec(`DELETE FROM licenses`)
 	(*h.DB).Exec(`INSERT INTO licenses (license_blob, hwid_hash, first_activated_at, last_check_ok_at)
 		VALUES ($1, $2, NOW(), NOW())`, body.LicenseBlob, hwidCombined)
+
+	// Invalidate the status cache so the UI sees the new license immediately.
+	h.cacheMu.Lock()
+	h.cachedStatus = nil
+	h.cacheMu.Unlock()
 
 	utils.JSON(w, http.StatusOK, map[string]interface{}{
 		"success": true,
