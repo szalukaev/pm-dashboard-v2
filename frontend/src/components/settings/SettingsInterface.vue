@@ -46,10 +46,10 @@ const currentLang = ref(locale.value)
 const themes = [
   { value: 'dark', label: 'Dark', preview: '#010102' },
   { value: 'light', label: 'Light', preview: '#ffffff' },
-  { value: 'nord', label: 'Nord', preview: '#2e3440' },
-  { value: 'amber', label: 'Amber', preview: '#1a1814' },
-  { value: 'forest', label: 'Forest', preview: '#0a120d' },
-  { value: 'dusk', label: 'Dusk', preview: '#0d0a14' },
+  { value: 'nord', label: 'Nord', preview: '#1a1d23' },
+  { value: 'amber', label: 'Amber', preview: '#1c1710' },
+  { value: 'forest', label: 'Forest', preview: '#171c1a' },
+  { value: 'dusk', label: 'Dusk', preview: '#1a1920' },
 ]
 
 async function changeTheme(theme: string) {

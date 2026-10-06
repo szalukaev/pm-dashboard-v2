@@ -10,7 +10,7 @@ import (
 )
 
 type NotificationsHandler struct {
-	DB *sql.DB
+	DB **sql.DB
 }
 
 // GetNotificationSettings returns user notification preferences
@@ -25,7 +25,7 @@ func (h *NotificationsHandler) GetSettings(w http.ResponseWriter, r *http.Reques
 	}
 
 	var notifJSON []byte
-	err := h.DB.QueryRow(`SELECT value FROM admin_settings WHERE key='notification_config'`).Scan(&notifJSON)
+	err := (*h.DB).QueryRow(`SELECT value FROM admin_settings WHERE key='notification_config'`).Scan(&notifJSON)
 	if err == nil && len(notifJSON) > 0 {
 		json.Unmarshal(notifJSON, &settings)
 	} else {
@@ -35,7 +35,7 @@ func (h *NotificationsHandler) GetSettings(w http.ResponseWriter, r *http.Reques
 
 	// Override with user settings
 	var userNotifs []byte
-	h.DB.QueryRow(`SELECT value FROM admin_settings WHERE key='user_notif_' || $1`, userID).Scan(&userNotifs)
+	(*h.DB).QueryRow(`SELECT value FROM admin_settings WHERE key='user_notif_' || $1`, userID).Scan(&userNotifs)
 	if len(userNotifs) > 0 {
 		var userSettings struct {
 			ToastsEnabled *bool `json:"toasts_enabled"`
@@ -60,7 +60,7 @@ func (h *NotificationsHandler) UpdateSettings(w http.ResponseWriter, r *http.Req
 	json.NewDecoder(r.Body).Decode(&body)
 
 	data, _ := json.Marshal(body)
-	h.DB.Exec(`INSERT INTO admin_settings (key, value, updated_at) VALUES ($1, $2, NOW())
+	(*h.DB).Exec(`INSERT INTO admin_settings (key, value, updated_at) VALUES ($1, $2, NOW())
 		ON CONFLICT (key) DO UPDATE SET value=$2, updated_at=NOW()`, "user_notif_"+utils.Itoa(userID), data)
 
 	utils.Success(w)
@@ -69,7 +69,7 @@ func (h *NotificationsHandler) UpdateSettings(w http.ResponseWriter, r *http.Req
 // GetAlertThresholds returns configured alert thresholds
 func (h *NotificationsHandler) GetAlertThresholds(w http.ResponseWriter, r *http.Request) {
 	var thresholdsJSON []byte
-	err := h.DB.QueryRow("SELECT value FROM admin_settings WHERE key='alert_thresholds'").Scan(&thresholdsJSON)
+	err := (*h.DB).QueryRow("SELECT value FROM admin_settings WHERE key='alert_thresholds'").Scan(&thresholdsJSON)
 	if err == sql.ErrNoRows {
 		// Default thresholds
 		defaults := map[string]interface{}{
@@ -93,7 +93,7 @@ func (h *NotificationsHandler) UpdateAlertThresholds(w http.ResponseWriter, r *h
 	json.NewDecoder(r.Body).Decode(&body)
 
 	data, _ := json.Marshal(body)
-	h.DB.Exec(`INSERT INTO admin_settings (key, value, updated_at) VALUES ('alert_thresholds', $1, NOW())
+	(*h.DB).Exec(`INSERT INTO admin_settings (key, value, updated_at) VALUES ('alert_thresholds', $1, NOW())
 		ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=NOW()`, data)
 
 	utils.Success(w)

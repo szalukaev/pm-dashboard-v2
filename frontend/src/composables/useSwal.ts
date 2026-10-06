@@ -35,15 +35,35 @@ export function useSwal() {
     })
   }
 
-  function showChange(oldValue: string, newValue: string) {
-    return fire({
-      icon: 'info',
-      title: 'Изменение',
-      html: `<span style="color:var(--text-muted)">${oldValue}</span> → <span style="color:var(--success)">${newValue}</span>`,
+  function showChange(oldValue: string, newValue: string, header?: string) {
+    return Swal.fire({
+      toast: true,
+      position: 'top-end',
+      icon: 'success',
+      title: `${header ? `<div style="font-size:11px;color:#94a3b8;margin-bottom:2px">${header}</div>` : ''}<div style="font-size:13px"><span style="color:#999;text-decoration:line-through">${oldValue}</span> <span style="color:#fff;margin:0 4px">→</span> <span style="color:#4ade80;font-weight:600">${newValue}</span></div>`,
+      showConfirmButton: false,
       timer: 3000,
       timerProgressBar: true,
+      background: '#1e293b',
+      color: '#f1f5f9',
+      customClass: { popup: 'toast-beautiful' },
     })
   }
 
-  return { fire, success, error, confirm, showChange, Swal }
+  function toast(message: string, type: 'success' | 'error' | 'info' = 'success') {
+    return Swal.fire({
+      toast: true,
+      position: 'top-end',
+      icon: type,
+      title: `<div style="font-size:13px">${message}</div>`,
+      showConfirmButton: false,
+      timer: 2500,
+      timerProgressBar: true,
+      background: type === 'error' ? '#7f1d1d' : '#1e293b',
+      color: '#f1f5f9',
+      customClass: { popup: 'toast-beautiful' },
+    })
+  }
+
+  return { fire, success, error, confirm, showChange, toast, Swal }
 }

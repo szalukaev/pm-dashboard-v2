@@ -101,10 +101,19 @@ CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(100) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
+    display_name VARCHAR(255),
+    avatar TEXT DEFAULT '',
     role VARCHAR(20) DEFAULT 'user',
     force_password_change BOOLEAN DEFAULT false,
+    last_login TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+DO $$ BEGIN
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name VARCHAR(255);
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT DEFAULT '';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMPTZ;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
 CREATE TABLE IF NOT EXISTS sessions (
     id VARCHAR(64) PRIMARY KEY,
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -122,8 +131,10 @@ CREATE TABLE IF NOT EXISTS user_settings (
     kanban_column_order_users JSONB DEFAULT '[]',
     last_filters JSONB DEFAULT '{}',
     notifications_enabled BOOLEAN DEFAULT true,
+    overdue_alerts BOOLEAN DEFAULT false,
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS overdue_alerts BOOLEAN DEFAULT false;
 CREATE TABLE IF NOT EXISTS projects (
     id SERIAL PRIMARY KEY, external_id INTEGER NOT NULL, name VARCHAR(500) NOT NULL,
     parent_id INTEGER, data_source VARCHAR(50) DEFAULT 'redmine', synced_at TIMESTAMPTZ DEFAULT NOW(),
@@ -147,13 +158,15 @@ CREATE TABLE IF NOT EXISTS issues (
 CREATE TABLE IF NOT EXISTS statuses (
     id SERIAL PRIMARY KEY, external_id INTEGER NOT NULL, name VARCHAR(255) NOT NULL,
     is_closed BOOLEAN DEFAULT false, group_name VARCHAR(50) DEFAULT 'open',
-    data_source VARCHAR(50) DEFAULT 'redmine', UNIQUE(external_id, data_source)
+    data_source VARCHAR(50) DEFAULT 'redmine', synced_at TIMESTAMPTZ DEFAULT NOW(), UNIQUE(external_id, data_source)
 );
+ALTER TABLE statuses ADD COLUMN IF NOT EXISTS synced_at TIMESTAMPTZ DEFAULT NOW();
 CREATE TABLE IF NOT EXISTS priorities (
     id SERIAL PRIMARY KEY, external_id INTEGER NOT NULL, name VARCHAR(255) NOT NULL,
     sort_order INTEGER DEFAULT 0, color VARCHAR(20) DEFAULT '#888888',
-    data_source VARCHAR(50) DEFAULT 'redmine', UNIQUE(external_id, data_source)
+    data_source VARCHAR(50) DEFAULT 'redmine', synced_at TIMESTAMPTZ DEFAULT NOW(), UNIQUE(external_id, data_source)
 );
+ALTER TABLE priorities ADD COLUMN IF NOT EXISTS synced_at TIMESTAMPTZ DEFAULT NOW();
 CREATE TABLE IF NOT EXISTS organizations (
     id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(500) NOT NULL, address TEXT, inn VARCHAR(20),

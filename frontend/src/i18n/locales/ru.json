@@ -21,7 +21,7 @@
     "no": "Нет",
     "all": "Все",
     "toggle_theme": "Переключить тему",
-    "confirm_delete_title": "Удалить {0}?",
+    "confirm_delete_title": "Удалить {entity}?",
     "confirm_delete_text": "Действие необратимо.",
     "success": "Успешно",
     "copied": "Скопировано"
@@ -37,10 +37,13 @@
   },
   "setup": {
     "title": "Первоначальная настройка",
-    "step_of": "Шаг {0} из {1}",
+    "step_of": "Шаг {current} из {total}",
     "db_connection": "Подключение к базе данных",
-    "db_dsn": "Строка подключения (DSN)",
-    "db_dsn_hint": "Пример: postgres://user:pass@localhost:5432/pm_dashboard",
+    "db_host": "Хост",
+    "db_port": "Порт",
+    "db_user": "Пользователь",
+    "db_password": "Пароль",
+    "db_name": "Имя базы данных",
     "test_connection": "Проверить доступ",
     "connection_ok": "Соединение установлено",
     "connection_failed": "Не удалось подключиться",
@@ -48,6 +51,14 @@
     "datasource_type": "Тип источника",
     "datasource_url": "URL системы",
     "datasource_api_key": "API-ключ",
+    "use_basic_auth": "Использовать Basic Authentication",
+    "basic_login": "Basic login",
+    "basic_password": "Basic password",
+    "confirm_password": "Подтверждение пароля",
+    "passwords_mismatch": "Пароли не совпадают",
+    "display_name": "Отображаемое имя",
+    "default_language": "Язык по умолчанию",
+    "finish": "Завершить",
     "create_admin": "Создание администратора",
     "admin_created": "Администратор создан",
     "setup_complete": "Настройка завершена",
@@ -227,11 +238,13 @@
       "reset": "Сбросить к настройкам администратора"
     },
     "interface": {
+      "title": "Настройки интерфейса",
       "theme": "Тема оформления",
       "language": "Язык",
       "tab_order": "Порядок вкладок"
     },
     "notifications": {
+      "title": "Уведомления",
       "toast": "Toast-уведомления",
       "overdue_alerts": "Уведомления о просроченных задачах"
     }

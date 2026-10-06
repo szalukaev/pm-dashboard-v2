@@ -13,7 +13,7 @@ import (
 )
 
 type KanbanHandler struct {
-	DB *sql.DB
+	DB **sql.DB
 }
 
 type KanbanCard struct {
@@ -46,7 +46,7 @@ type KanbanBoard struct {
 }
 
 func (h *KanbanHandler) GetBoard(w http.ResponseWriter, r *http.Request) {
-	if h.DB == nil {
+	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
 		return
 	}
@@ -61,13 +61,13 @@ func (h *KanbanHandler) GetBoard(w http.ResponseWriter, r *http.Request) {
 
 	// Get user settings for column order
 	var columnOrderStatuses, columnOrderUsers []byte
-	h.DB.QueryRow(`SELECT kanban_column_order_statuses, kanban_column_order_users
+	(*h.DB).QueryRow(`SELECT kanban_column_order_statuses, kanban_column_order_users
 		FROM user_settings WHERE user_id = $1`, userID).Scan(&columnOrderStatuses, &columnOrderUsers)
 
 	// Get user's selected projects
 	var selectedProjects []int64
 	var spJSON []byte
-	h.DB.QueryRow("SELECT selected_projects FROM user_settings WHERE user_id = $1", userID).Scan(&spJSON)
+	(*h.DB).QueryRow("SELECT selected_projects FROM user_settings WHERE user_id = $1", userID).Scan(&spJSON)
 	if len(spJSON) > 0 {
 		json.Unmarshal(spJSON, &selectedProjects)
 	}
@@ -97,7 +97,7 @@ func (h *KanbanHandler) GetBoard(w http.ResponseWriter, r *http.Request) {
 		FROM issues WHERE ` + strings.Join(where, " AND ") + `
 		ORDER BY priority_id DESC, external_id`
 
-	rows, err := h.DB.Query(query, args...)
+	rows, err := (*h.DB).Query(query, args...)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
@@ -209,7 +209,7 @@ func applyColumnOrder(colMap map[string]*KanbanColumn, order []string) []KanbanC
 }
 
 func (h *KanbanHandler) MoveCard(w http.ResponseWriter, r *http.Request) {
-	if h.DB == nil {
+	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
 		return
 	}
@@ -228,12 +228,12 @@ func (h *KanbanHandler) MoveCard(w http.ResponseWriter, r *http.Request) {
 	case "statuses":
 		// Update status
 		var statusName string
-		err := h.DB.QueryRow("SELECT name FROM statuses WHERE external_id = $1", body.TargetID).Scan(&statusName)
+		err := (*h.DB).QueryRow("SELECT name FROM statuses WHERE external_id = $1", body.TargetID).Scan(&statusName)
 		if err != nil {
 			utils.Error(w, http.StatusBadRequest, "STATUS_NOT_FOUND")
 			return
 		}
-		_, err = h.DB.Exec("UPDATE issues SET status_name = $1, status_id = $2, synced_at = NOW() WHERE external_id = $3",
+		_, err = (*h.DB).Exec("UPDATE issues SET status_name = $1, status_id = $2, synced_at = NOW() WHERE external_id = $3",
 			statusName, body.TargetID, body.IssueID)
 		if err != nil {
 			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
@@ -243,12 +243,12 @@ func (h *KanbanHandler) MoveCard(w http.ResponseWriter, r *http.Request) {
 	case "users":
 		// Reassign
 		if body.TargetID == "Неназначенные" {
-			h.DB.Exec("UPDATE issues SET assigned_to_name = '', assigned_to_id = NULL, synced_at = NOW() WHERE external_id = $1", body.IssueID)
+			(*h.DB).Exec("UPDATE issues SET assigned_to_name = '', assigned_to_id = NULL, synced_at = NOW() WHERE external_id = $1", body.IssueID)
 		} else {
 			// Find member by name
 			var memberID *int
-			h.DB.QueryRow("SELECT external_id FROM members WHERE name = $1 LIMIT 1", body.TargetID).Scan(&memberID)
-			h.DB.Exec("UPDATE issues SET assigned_to_name = $1, assigned_to_id = $2, synced_at = NOW() WHERE external_id = $3",
+			(*h.DB).QueryRow("SELECT external_id FROM members WHERE name = $1 LIMIT 1", body.TargetID).Scan(&memberID)
+			(*h.DB).Exec("UPDATE issues SET assigned_to_name = $1, assigned_to_id = $2, synced_at = NOW() WHERE external_id = $3",
 				body.TargetID, memberID, body.IssueID)
 		}
 	}
@@ -257,7 +257,7 @@ func (h *KanbanHandler) MoveCard(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *KanbanHandler) SaveColumnOrder(w http.ResponseWriter, r *http.Request) {
-	if h.DB == nil {
+	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
 		return
 	}
@@ -275,14 +275,14 @@ func (h *KanbanHandler) SaveColumnOrder(w http.ResponseWriter, r *http.Request) 
 
 	orderJSON, _ := json.Marshal(body.Order)
 
-	h.DB.Exec(`INSERT INTO user_settings (user_id, updated_at) VALUES ($1, NOW())
+	(*h.DB).Exec(`INSERT INTO user_settings (user_id, updated_at) VALUES ($1, NOW())
 		ON CONFLICT (user_id) DO NOTHING`, userID)
 
 	switch body.Mode {
 	case "statuses":
-		h.DB.Exec("UPDATE user_settings SET kanban_column_order_statuses = $1 WHERE user_id = $2", orderJSON, userID)
+		(*h.DB).Exec("UPDATE user_settings SET kanban_column_order_statuses = $1 WHERE user_id = $2", orderJSON, userID)
 	case "users":
-		h.DB.Exec("UPDATE user_settings SET kanban_column_order_users = $1 WHERE user_id = $2", orderJSON, userID)
+		(*h.DB).Exec("UPDATE user_settings SET kanban_column_order_users = $1 WHERE user_id = $2", orderJSON, userID)
 	}
 
 	utils.Success(w)

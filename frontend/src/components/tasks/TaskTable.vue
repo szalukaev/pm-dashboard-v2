@@ -7,7 +7,7 @@
             v-for="col in columns"
             :key="col.key"
             class="th-cell"
-            :class="{ sortable: col.sortable, sorted: sortBy === col.key }"
+            :class="{ sortable: col.sortable, sorted: sortBy === col.key, 'center-cell': ['priority_name','estimate','fact','status_name','bug_fix_hours','bug_fix_pct','start_date','due_date'].includes(col.key) }"
             @click="col.sortable && toggleSort(col.key)"
             :data-testid="'col-' + col.key"
           >
@@ -24,7 +24,6 @@
           :key="task.external_id"
           class="task-row"
           :class="{ 'overdue-row': isOverdue(task) }"
-          @click="$emit('open-task', task.external_id)"
           :data-testid="'task-row-' + task.external_id"
         >
           <td class="td-cell name-cell">
@@ -37,9 +36,9 @@
             >
               {{ task.external_id }}
             </a>
-            <span class="task-subject" :title="task.subject">{{ task.subject }}</span>
+            <span class="task-subject" :title="task.subject" @click.stop="$emit('open-task', task.external_id)">{{ task.subject }}</span>
           </td>
-          <td class="td-cell priority-cell" @dblclick.stop="startInlineEdit(task, 'priority_name')">
+          <td class="td-cell priority-cell center-cell" @dblclick.stop="startInlineEdit(task, 'priority_name')">
             <template v-if="isEditing(task.external_id, 'priority_name')">
               <select
                 :value="task.priority_name"
@@ -48,7 +47,7 @@
                 class="inline-select"
                 autofocus
               >
-                <option v-for="p in ['Low','Normal','High','Urgent','Immediate']" :key="p" :value="p">{{ p }}</option>
+                <option v-for="p in priorityNames" :key="p" :value="p">{{ p }}</option>
               </select>
             </template>
             <template v-else>
@@ -58,19 +57,20 @@
           </td>
           <td class="td-cell" @dblclick.stop="startInlineEdit(task, 'assigned_to_name')">
             <template v-if="isEditing(task.external_id, 'assigned_to_name')">
-              <input
-                type="text"
+              <select
                 :value="task.assigned_to_name"
-                @blur="saveInlineEdit(task, 'assigned_to_name', ($event.target as HTMLInputElement).value)"
-                @keyup.enter="saveInlineEdit(task, 'assigned_to_name', ($event.target as HTMLInputElement).value)"
-                @keyup.escape="cancelInlineEdit"
-                class="inline-input"
+                @change="saveInlineEdit(task, 'assigned_to_name', ($event.target as HTMLSelectElement).value)"
+                @blur="cancelInlineEdit"
+                class="inline-select"
                 autofocus
-              />
+              >
+                <option value="">Без ответственного</option>
+                <option v-for="m in memberNames" :key="m" :value="m">{{ m }}</option>
+              </select>
             </template>
-            <template v-else>{{ task.assigned_to_name || '—' }}</template>
+            <template v-else>{{ task.assigned_to_name || 'Без ответственного' }}</template>
           </td>
-          <td class="td-cell num-cell" @dblclick.stop="startInlineEdit(task, 'estimated_hours')">
+          <td class="td-cell num-cell center-cell" @dblclick.stop="startInlineEdit(task, 'estimated_hours')">
             <template v-if="isEditing(task.external_id, 'estimated_hours')">
               <input
                 type="number"
@@ -84,13 +84,26 @@
             </template>
             <template v-else>{{ formatEstimate(task.estimated_hours) }}</template>
           </td>
-          <td class="td-cell num-cell">{{ formatHours(task.spent_hours) }}</td>
-          <td class="td-cell">
-            <span class="status-badge" :class="statusClass(task.status_name)">{{ task.status_name }}</span>
+          <td class="td-cell num-cell center-cell">{{ formatHours(task.spent_hours) }}</td>
+          <td class="td-cell center-cell" @dblclick.stop="startInlineEdit(task, 'status_name')">
+            <template v-if="isEditing(task.external_id, 'status_name')">
+              <select
+                :value="task.status_name"
+                @change="saveInlineEdit(task, 'status_name', ($event.target as HTMLSelectElement).value)"
+                @blur="cancelInlineEdit"
+                class="inline-select"
+                autofocus
+              >
+                <option v-for="s in statusNames" :key="s" :value="s">{{ s }}</option>
+              </select>
+            </template>
+            <template v-else>
+              <span class="status-badge" :class="statusClass(task.status_name)">{{ task.status_name }}</span>
+            </template>
           </td>
-          <td class="td-cell num-cell">{{ formatHours(task.bug_fix_hours) }}</td>
-          <td class="td-cell num-cell">{{ task.bug_fix_pct > 0 ? task.bug_fix_pct.toFixed(1) + '%' : '—' }}</td>
-          <td class="td-cell date-cell" @dblclick.stop="startInlineEdit(task, 'start_date')">
+          <td class="td-cell num-cell center-cell">{{ formatHours(task.bug_fix_hours) }}</td>
+          <td class="td-cell num-cell center-cell">{{ task.bug_fix_pct > 0 ? task.bug_fix_pct.toFixed(1) + '%' : '—' }}</td>
+          <td class="td-cell date-cell center-cell" @dblclick.stop="startInlineEdit(task, 'start_date')">
             <template v-if="isEditing(task.external_id, 'start_date')">
               <input
                 type="date"
@@ -101,9 +114,9 @@
                 autofocus
               />
             </template>
-            <template v-else>{{ task.start_date || '—' }}</template>
+            <template v-else>{{ formatDate(task.start_date) }}</template>
           </td>
-          <td class="td-cell date-cell" :class="{ 'overdue-date': isOverdue(task) }" @dblclick.stop="startInlineEdit(task, 'due_date')">
+          <td class="td-cell date-cell center-cell" :class="{ 'overdue-date': isOverdue(task) }" @dblclick.stop="startInlineEdit(task, 'due_date')">
             <template v-if="isEditing(task.external_id, 'due_date')">
               <input
                 type="date"
@@ -114,19 +127,20 @@
                 autofocus
               />
             </template>
-            <template v-else>{{ task.due_date || '—' }}</template>
+            <template v-else>{{ formatDate(task.due_date) }}</template>
           </td>
           <td class="td-cell" @dblclick.stop="startInlineEdit(task, 'category_name')">
             <template v-if="isEditing(task.external_id, 'category_name')">
-              <input
-                type="text"
+              <select
                 :value="task.category_name"
-                @blur="saveInlineEdit(task, 'category_name', ($event.target as HTMLInputElement).value)"
-                @keyup.enter="saveInlineEdit(task, 'category_name', ($event.target as HTMLInputElement).value)"
-                @keyup.escape="cancelInlineEdit"
-                class="inline-input"
+                @change="saveInlineEdit(task, 'category_name', ($event.target as HTMLSelectElement).value)"
+                @blur="cancelInlineEdit"
+                class="inline-select"
                 autofocus
-              />
+              >
+                <option value="">—</option>
+                <option v-for="c in projectCategories(task)" :key="c" :value="c">{{ c }}</option>
+              </select>
             </template>
             <template v-else>{{ task.category_name || '—' }}</template>
           </td>
@@ -137,15 +151,28 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import axios from 'axios'
 import { storeToRefs } from 'pinia'
 import type { Task } from '../../stores/tasks'
 import { useSettingsStore } from '../../stores/settings'
+import { useSwal } from '../../composables/useSwal'
+import { useTasksStore } from '../../stores/tasks'
 
 const settingsStore = useSettingsStore()
+const tasksStore = useTasksStore()
+const { showChange, toast } = useSwal()
 const { settings } = storeToRefs(settingsStore)
 
-defineProps<{ tasks: Task[] }>()
+const props = defineProps<{ tasks: Task[] }>()
+
+// Load team members for assignee dropdown
+onMounted(async () => {
+  try {
+    const { data } = await axios.get('/api/tasks/members')
+    members.value = data.members || []
+  } catch {}
+})
 const emit = defineEmits(['open-task', 'sort-change', 'inline-edit'])
 
 // Inline edit state
@@ -163,15 +190,54 @@ function cancelInlineEdit() {
   editingCell.value = null
 }
 
-function saveInlineEdit(task: Task, field: string, value: string) {
+async function saveInlineEdit(task: Task, field: string, value: string) {
   editingCell.value = null
   const oldValue = (task as any)[field]
   if (value === oldValue || (value === '' && oldValue === null)) return
-  emit('inline-edit', { taskId: task.external_id, field, value: value || null })
+  const oldDisplay = String(oldValue || '—')
+  const newDisplay = String(value || '—')
+  // Optimistic update — change field in place without reloading table
+  const savedValue = value || null
+  ;(task as any)[field] = savedValue
+  try {
+    const result = await tasksStore.updateTask(task.external_id, { [field]: savedValue }, true)
+    const fieldLabels: Record<string, string> = {
+      status_name: 'Статус',
+      priority_name: 'Приоритет',
+      assigned_to_name: 'Исполнитель',
+      category_name: 'Категория',
+      start_date: 'Дата начала',
+      due_date: 'Дедлайн',
+      estimated_hours: 'Оценка',
+    }
+    showChange(oldDisplay, newDisplay, `#${task.external_id} — ${fieldLabels[field] || field}`)
+    if (result && result.redmine_ok === false) {
+      // Revert on Redmine error
+      ;(task as any)[field] = oldValue
+      toast('Ошибка синхронизации с Redmine: ' + (result.redmine_error || ''), 'error')
+    }
+  } catch {
+    // Revert on error
+    ;(task as any)[field] = oldValue
+    toast('Ошибка сохранения', 'error')
+  }
 }
 
 const sortBy = ref('')
 const sortDir = ref('asc')
+
+const { statuses, categories, priorities } = storeToRefs(tasksStore)
+const members = ref<{ id: number; name: string }[]>([])
+
+const statusNames = computed(() => {
+  return statuses.value.map((s: any) => s.name) // already sorted by external_id ASC from API
+})
+
+const memberNames = computed(() => {
+  const selectedTeam = settings.value.selected_team || []
+  if (selectedTeam.length === 0) return members.value.map(m => m.name).sort()
+  return members.value.filter(m => selectedTeam.includes(m.id)).map(m => m.name).sort()
+})
 
 const columns = [
   { key: 'subject', label: 'tasks.table.name', sortable: true },
@@ -204,17 +270,19 @@ function isOverdue(task: Task): boolean {
 }
 
 function priorityColor(id: number): string {
+  // Highest priority (largest id) = bright red
   const style = getComputedStyle(document.documentElement)
-  const colors: Record<number, string> = {
-    1: style.getPropertyValue('--priority-low').trim(),
-    2: style.getPropertyValue('--priority-low').trim(),
-    3: style.getPropertyValue('--priority-normal').trim(),
-    4: style.getPropertyValue('--priority-high').trim(),
-    5: style.getPropertyValue('--priority-urgent').trim(),
-    6: style.getPropertyValue('--priority-immediate').trim(),
-  }
-  return colors[id] || style.getPropertyValue('--priority-low').trim()
+  // Map: lowest = gray, highest = bright red
+  if (id >= 6) return '#ff2222' // Immediate — bright red
+  if (id >= 5) return '#ff4444' // Urgent — red
+  if (id >= 4) return '#ff8800' // High — orange
+  if (id >= 3) return '#ffaa00' // Normal — yellow
+  return '#888888' // Low/lowest — gray
 }
+
+const priorityNames = computed(() => {
+  return priorities.value.map((p: any) => p.name) // already sorted DESC from API
+})
 
 function statusClass(name: string): string {
   const n = name.toLowerCase()
@@ -225,11 +293,27 @@ function statusClass(name: string): string {
 }
 
 function taskLink(id: number): string {
-  const base = settings.value.data_source_url || ''
+  const base = settings.value.data_source_url || settings.value.redmine_url || ''
   if (base) {
     return base.replace(/\/$/, '') + '/issues/' + id
   }
   return '#'
+}
+
+function formatDate(d?: string | null): string {
+  if (!d) return '—'
+  return d.slice(0, 10)
+}
+
+function projectCategories(task: Task): string[] {
+  // Only return categories that belong to this task's project
+  const projectCats = new Set<string>()
+  for (const t of props.tasks) {
+    if (t.project_id === task.project_id && t.category_name) {
+      projectCats.add(t.category_name)
+    }
+  }
+  return [...projectCats].sort()
 }
 
 function formatEstimate(h: number | null): string {
@@ -297,8 +381,11 @@ function formatHours(h: number): string {
   white-space: nowrap;
 }
 
+.center-cell {
+  text-align: center;
+}
+
 .task-row {
-  cursor: pointer;
   transition: background 0.15s;
 }
 
@@ -312,9 +399,7 @@ function formatHours(h: number): string {
 
 .name-cell {
   max-width: 300px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  white-space: nowrap;
 }
 
 .task-link {
@@ -322,7 +407,9 @@ function formatHours(h: number): string {
   font-weight: 500;
   font-size: 12px;
   text-decoration: none;
-  flex-shrink: 0;
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 8px;
 }
 
 .task-link:hover {
@@ -330,23 +417,32 @@ function formatHours(h: number): string {
 }
 
 .task-subject {
+  display: inline-block;
+  vertical-align: middle;
+  max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text);
+  cursor: pointer;
+}
+
+.task-subject:hover {
+  color: var(--accent);
+  text-decoration: underline;
 }
 
 .priority-cell {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  white-space: nowrap;
 }
 
 .priority-dot {
+  display: inline-block;
+  vertical-align: middle;
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  flex-shrink: 0;
+  margin-right: 6px;
 }
 
 .num-cell {

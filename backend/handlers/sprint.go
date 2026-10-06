@@ -13,7 +13,7 @@ import (
 )
 
 type SprintHandler struct {
-	DB *sql.DB
+	DB **sql.DB
 }
 
 type Sprint struct {
@@ -48,14 +48,14 @@ type SprintTask struct {
 }
 
 func (h *SprintHandler) ListSprints(w http.ResponseWriter, r *http.Request) {
-	if h.DB == nil {
+	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
 		return
 	}
 
 	userID := middleware.GetUserID(r)
 
-	rows, err := h.DB.Query(`SELECT id, name, project_name, status, start_date, due_date,
+	rows, err := (*h.DB).Query(`SELECT id, name, project_name, status, start_date, due_date,
 		description, category_name, auto_fill_category
 		FROM sprints WHERE user_id = $1 ORDER BY
 		CASE status WHEN 'active' THEN 0 WHEN 'open' THEN 1 ELSE 2 END,
@@ -87,7 +87,7 @@ func (h *SprintHandler) ListSprints(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SprintHandler) GetSprint(w http.ResponseWriter, r *http.Request) {
-	if h.DB == nil {
+	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
 		return
 	}
@@ -96,7 +96,7 @@ func (h *SprintHandler) GetSprint(w http.ResponseWriter, r *http.Request) {
 	sprintID, _ := strconv.Atoi(mux.Vars(r)["id"])
 
 	var s Sprint
-	err := h.DB.QueryRow(`SELECT id, name, project_name, status, start_date, due_date,
+	err := (*h.DB).QueryRow(`SELECT id, name, project_name, status, start_date, due_date,
 		description, category_name, auto_fill_category
 		FROM sprints WHERE id = $1 AND user_id = $2`, sprintID, userID).Scan(
 		&s.ID, &s.Name, &s.ProjectName, &s.Status, &s.StartDate, &s.DueDate,
@@ -114,7 +114,7 @@ func (h *SprintHandler) GetSprint(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SprintHandler) CreateSprint(w http.ResponseWriter, r *http.Request) {
-	if h.DB == nil {
+	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
 		return
 	}
@@ -141,7 +141,7 @@ func (h *SprintHandler) CreateSprint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var sprintID int
-	err := h.DB.QueryRow(`INSERT INTO sprints (user_id, name, project_name, start_date, due_date,
+	err := (*h.DB).QueryRow(`INSERT INTO sprints (user_id, name, project_name, start_date, due_date,
 		description, category_name, auto_fill_category)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
 		userID, body.Name, body.ProjectName, body.StartDate, body.DueDate,
@@ -160,7 +160,7 @@ func (h *SprintHandler) CreateSprint(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SprintHandler) UpdateSprint(w http.ResponseWriter, r *http.Request) {
-	if h.DB == nil {
+	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
 		return
 	}
@@ -198,7 +198,7 @@ func (h *SprintHandler) UpdateSprint(w http.ResponseWriter, r *http.Request) {
 
 	args = append(args, sprintID, userID)
 	query := "UPDATE sprints SET " + utils.JoinStrings(sets, ",") + " WHERE id = $" + strconv.Itoa(argIdx) + " AND user_id = $" + strconv.Itoa(argIdx+1)
-	_, err := h.DB.Exec(query, args...)
+	_, err := (*h.DB).Exec(query, args...)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 		return
@@ -208,7 +208,7 @@ func (h *SprintHandler) UpdateSprint(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SprintHandler) DeleteSprint(w http.ResponseWriter, r *http.Request) {
-	if h.DB == nil {
+	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
 		return
 	}
@@ -216,7 +216,7 @@ func (h *SprintHandler) DeleteSprint(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.GetUserID(r)
 	sprintID, _ := strconv.Atoi(mux.Vars(r)["id"])
 
-	_, err := h.DB.Exec("DELETE FROM sprints WHERE id = $1 AND user_id = $2", sprintID, userID)
+	_, err := (*h.DB).Exec("DELETE FROM sprints WHERE id = $1 AND user_id = $2", sprintID, userID)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "DELETE_FAILED")
 		return
@@ -226,7 +226,7 @@ func (h *SprintHandler) DeleteSprint(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SprintHandler) AssignTask(w http.ResponseWriter, r *http.Request) {
-	if h.DB == nil {
+	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
 		return
 	}
@@ -241,7 +241,7 @@ func (h *SprintHandler) AssignTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err := h.DB.Exec(`INSERT INTO sprint_issues (sprint_id, issue_external_id) VALUES ($1, $2)
+	_, err := (*h.DB).Exec(`INSERT INTO sprint_issues (sprint_id, issue_external_id) VALUES ($1, $2)
 		ON CONFLICT DO NOTHING`, sprintID, body.IssueExternalID)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "ASSIGN_FAILED")
@@ -252,7 +252,7 @@ func (h *SprintHandler) AssignTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SprintHandler) UnassignTask(w http.ResponseWriter, r *http.Request) {
-	if h.DB == nil {
+	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
 		return
 	}
@@ -260,7 +260,7 @@ func (h *SprintHandler) UnassignTask(w http.ResponseWriter, r *http.Request) {
 	sprintID, _ := strconv.Atoi(mux.Vars(r)["id"])
 	issueID, _ := strconv.Atoi(mux.Vars(r)["issueId"])
 
-	_, err := h.DB.Exec("DELETE FROM sprint_issues WHERE sprint_id = $1 AND issue_external_id = $2", sprintID, issueID)
+	_, err := (*h.DB).Exec("DELETE FROM sprint_issues WHERE sprint_id = $1 AND issue_external_id = $2", sprintID, issueID)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "UNASSIGN_FAILED")
 		return
@@ -270,7 +270,7 @@ func (h *SprintHandler) UnassignTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SprintHandler) GetBacklog(w http.ResponseWriter, r *http.Request) {
-	if h.DB == nil {
+	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
 		return
 	}
@@ -280,7 +280,7 @@ func (h *SprintHandler) GetBacklog(w http.ResponseWriter, r *http.Request) {
 	// Get user's selected projects
 	var selectedProjects []int64
 	var spJSON []byte
-	h.DB.QueryRow("SELECT selected_projects FROM user_settings WHERE user_id = $1", userID).Scan(&spJSON)
+	(*h.DB).QueryRow("SELECT selected_projects FROM user_settings WHERE user_id = $1", userID).Scan(&spJSON)
 	if len(spJSON) > 0 {
 		json.Unmarshal(spJSON, &selectedProjects)
 	}
@@ -307,7 +307,7 @@ func (h *SprintHandler) GetBacklog(w http.ResponseWriter, r *http.Request) {
 		AND i.external_id NOT IN (SELECT issue_external_id FROM sprint_issues)
 		ORDER BY i.project_name, i.priority_id DESC`
 
-	rows, err := h.DB.Query(query, args...)
+	rows, err := (*h.DB).Query(query, args...)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
@@ -346,7 +346,7 @@ func (h *SprintHandler) GetBacklog(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SprintHandler) RefreshSprint(w http.ResponseWriter, r *http.Request) {
-	if h.DB == nil {
+	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
 		return
 	}
@@ -355,7 +355,7 @@ func (h *SprintHandler) RefreshSprint(w http.ResponseWriter, r *http.Request) {
 	sprintID, _ := strconv.Atoi(mux.Vars(r)["id"])
 
 	var s Sprint
-	err := h.DB.QueryRow(`SELECT id, project_name, category_name, auto_fill_category
+	err := (*h.DB).QueryRow(`SELECT id, project_name, category_name, auto_fill_category
 		FROM sprints WHERE id = $1 AND user_id = $2`, sprintID, userID).Scan(
 		&s.ID, &s.ProjectName, &s.CategoryName, &s.AutoFillCategory)
 	if err != nil {
@@ -371,7 +371,7 @@ func (h *SprintHandler) RefreshSprint(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SprintHandler) getSprintTasks(sprintID int) []SprintTask {
-	rows, err := h.DB.Query(`SELECT i.external_id, i.subject, i.project_name, i.status_name,
+	rows, err := (*h.DB).Query(`SELECT i.external_id, i.subject, i.project_name, i.status_name,
 		i.priority_name, i.priority_id, i.assigned_to_name, i.due_date, i.estimated_hours
 		FROM sprint_issues si JOIN issues i ON si.issue_external_id = i.external_id
 		WHERE si.sprint_id = $1 ORDER BY i.priority_id DESC`, sprintID)
@@ -396,7 +396,7 @@ func (h *SprintHandler) getSprintTasks(sprintID int) []SprintTask {
 
 func (h *SprintHandler) autoFill(sprintID int, projectName, categoryName string) {
 	// Find issues matching project + category not already in sprint
-	rows, err := h.DB.Query(`SELECT external_id FROM issues
+	rows, err := (*h.DB).Query(`SELECT external_id FROM issues
 		WHERE project_name = $1 AND category_name = $2
 		AND LOWER(status_name) NOT IN ('closed', 'rejected', 'resolved', 'tested')
 		AND external_id NOT IN (SELECT issue_external_id FROM sprint_issues WHERE sprint_id = $3)`,
@@ -410,7 +410,7 @@ func (h *SprintHandler) autoFill(sprintID int, projectName, categoryName string)
 	for rows.Next() {
 		var issueID int
 		if rows.Scan(&issueID) == nil {
-			h.DB.Exec(`INSERT INTO sprint_issues (sprint_id, issue_external_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+			(*h.DB).Exec(`INSERT INTO sprint_issues (sprint_id, issue_external_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
 				sprintID, issueID)
 			count++
 		}

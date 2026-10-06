@@ -23,7 +23,7 @@
           data-testid="filter-project"
         >
           <option value="">{{ $t('common.all') }}</option>
-          <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
+          <option v-for="p in visibleProjects" :key="p.id" :value="p.id">{{ p.name }}</option>
         </select>
       </div>
 
@@ -42,6 +42,7 @@
     <!-- Row 2: Grouping, Categories -->
     <div class="filter-row">
       <div class="filter-group">
+        <span class="filter-label">Группировать:</span>
         <button
           class="pill-btn"
           :class="{ active: useGrouping && filters.group_by === 'project' }"
@@ -68,7 +69,8 @@
         </button>
       </div>
 
-      <div class="filter-group" v-if="categories.length > 0">
+      <div class="filter-group" v-if="categories.length > 0 && filters.project_id">
+        <span class="filter-label">Категории:</span>
         <button
           v-for="cat in categories"
           :key="cat"
@@ -85,14 +87,27 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTasksStore } from '../../stores/tasks'
+import { useSettingsStore } from '../../stores/settings'
 
 const store = useTasksStore()
+const settingsStore = useSettingsStore()
 const { filters, projects, categories, useGrouping } = storeToRefs(store)
+const { settings } = storeToRefs(settingsStore)
+
+// Show only projects selected in user settings (if any selected)
+const visibleProjects = computed(() => {
+  const selected = settings.value.selected_projects || []
+  if (selected.length === 0) return projects.value
+  return projects.value.filter(p => selected.includes(p.id))
+})
 
 const searchInput = ref(filters.value.search)
+
+// Load settings to get selected_projects for filtering
+settingsStore.fetchSettings()
 
 const typeOptions = [
   { value: 'open', label: 'tasks.filters.open' },
@@ -117,6 +132,7 @@ function setGrouping(mode: string) {
 }
 
 function onProjectChange() {
+  store.fetchCategories(filters.value.project_id || undefined)
   store.fetchTasks()
 }
 
@@ -152,11 +168,17 @@ watch(searchInput, (val) => {
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-wrap: wrap;
 }
 
-.search-group {
-  flex: 1;
-  min-width: 200px;
+.filter-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-faintest);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  margin-right: 4px;
 }
 
 .pill-btn {
@@ -197,6 +219,10 @@ watch(searchInput, (val) => {
 
 .filter-select:focus {
   border-color: var(--accent);
+}
+
+.search-group {
+  flex: 0 0 200px;
 }
 
 .search-input {

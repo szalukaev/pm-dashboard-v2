@@ -13,7 +13,7 @@ import (
 )
 
 type AnalyticsHandler struct {
-	DB *sql.DB
+	DB **sql.DB
 }
 
 type StatCard struct {
@@ -50,7 +50,7 @@ type AssigneeCount struct {
 }
 
 func (h *AnalyticsHandler) GetStats(w http.ResponseWriter, r *http.Request) {
-	if h.DB == nil {
+	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
 		return
 	}
@@ -67,7 +67,7 @@ func (h *AnalyticsHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	q := `SELECT COUNT(DISTINCT project_id) FROM issues WHERE ` + projectFilter + `
 		AND (LOWER(status_name) NOT IN ('closed', 'rejected', 'resolved', 'tested')
 		OR LOWER(status_name) LIKE '%test%')`
-	h.DB.QueryRow(q, args...).Scan(&activeProjects)
+	(*h.DB).QueryRow(q, args...).Scan(&activeProjects)
 	stats = append(stats, StatCard{Label: "active_projects", Value: float64(activeProjects)})
 
 	// Completion: closed / (open + testing*0.5 + closed)
@@ -77,7 +77,7 @@ func (h *AnalyticsHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 		COUNT(CASE WHEN LOWER(status_name) NOT IN ('closed','rejected','resolved','tested') AND LOWER(status_name) NOT LIKE '%test%' THEN 1 END),
 		COUNT(CASE WHEN LOWER(status_name) LIKE '%test%' THEN 1 END)
 		FROM issues WHERE ` + projectFilter
-	h.DB.QueryRow(q, args...).Scan(&closed, &open, &testing)
+	(*h.DB).QueryRow(q, args...).Scan(&closed, &open, &testing)
 	denom := float64(open) + float64(testing)*0.5 + float64(closed)
 	completion := 0.0
 	if denom > 0 {
@@ -97,14 +97,14 @@ func (h *AnalyticsHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 		AND due_date IS NOT NULL AND due_date < $` + itoa(len(args)+1) + `
 		AND LOWER(status_name) NOT IN ('closed', 'rejected', 'resolved', 'tested')`
 	overdueArgs := append(args, today)
-	h.DB.QueryRow(q, overdueArgs...).Scan(&overdue)
+	(*h.DB).QueryRow(q, overdueArgs...).Scan(&overdue)
 	stats = append(stats, StatCard{Label: "overdue", Value: float64(overdue), Variant: "danger"})
 
 	// Bugs
 	var bugs int
 	q = `SELECT COUNT(*) FROM issues WHERE ` + projectFilter + `
 		AND LOWER(status_name) LIKE '%bug%'`
-	h.DB.QueryRow(q, args...).Scan(&bugs)
+	(*h.DB).QueryRow(q, args...).Scan(&bugs)
 	stats = append(stats, StatCard{Label: "bugs", Value: float64(bugs)})
 
 	// No estimate
@@ -112,14 +112,14 @@ func (h *AnalyticsHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	q = `SELECT COUNT(*) FROM issues WHERE ` + projectFilter + `
 		AND (estimated_hours IS NULL OR estimated_hours = 0)
 		AND LOWER(status_name) NOT IN ('closed', 'rejected', 'resolved', 'tested')`
-	h.DB.QueryRow(q, args...).Scan(&noEstimate)
+	(*h.DB).QueryRow(q, args...).Scan(&noEstimate)
 	stats = append(stats, StatCard{Label: "no_estimate", Value: float64(noEstimate)})
 
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"stats": stats})
 }
 
 func (h *AnalyticsHandler) GetTeamLoad(w http.ResponseWriter, r *http.Request) {
-	if h.DB == nil {
+	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
 		return
 	}
@@ -133,7 +133,7 @@ func (h *AnalyticsHandler) GetTeamLoad(w http.ResponseWriter, r *http.Request) {
 
 	// Get max priority ID for "high priority" check
 	var maxPriorityID int
-	h.DB.QueryRow("SELECT COALESCE(MAX(external_id), 0) FROM priorities").Scan(&maxPriorityID)
+	(*h.DB).QueryRow("SELECT COALESCE(MAX(external_id), 0) FROM priorities").Scan(&maxPriorityID)
 
 	// Build team filter
 	teamFilter := ""
@@ -160,7 +160,7 @@ func (h *AnalyticsHandler) GetTeamLoad(w http.ResponseWriter, r *http.Request) {
 		ORDER BY assigned_to_name`
 
 	args = append(args, today, maxPriorityID)
-	rows, err := h.DB.Query(q, args...)
+	rows, err := (*h.DB).Query(q, args...)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
@@ -182,7 +182,7 @@ func (h *AnalyticsHandler) GetTeamLoad(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AnalyticsHandler) GetDistribution(w http.ResponseWriter, r *http.Request) {
-	if h.DB == nil {
+	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
 		return
 	}
@@ -197,7 +197,7 @@ func (h *AnalyticsHandler) GetDistribution(w http.ResponseWriter, r *http.Reques
 		GROUP BY project_name, assigned_to_name
 		ORDER BY project_name, assigned_to_name`
 
-	rows, err := h.DB.Query(q, args...)
+	rows, err := (*h.DB).Query(q, args...)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
@@ -228,7 +228,7 @@ func (h *AnalyticsHandler) GetDistribution(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *AnalyticsHandler) GetDeadlines(w http.ResponseWriter, r *http.Request) {
-	if h.DB == nil {
+	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
 		return
 	}
@@ -265,7 +265,7 @@ func (h *AnalyticsHandler) GetDeadlines(w http.ResponseWriter, r *http.Request) 
 		ORDER BY due_date ASC`
 
 	_ = argIdx
-	rows, err := h.DB.Query(q, args...)
+	rows, err := (*h.DB).Query(q, args...)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
@@ -323,7 +323,7 @@ func (h *AnalyticsHandler) GetDeadlines(w http.ResponseWriter, r *http.Request) 
 
 func (h *AnalyticsHandler) getSelectedProjects(userID int) []int64 {
 	var spJSON []byte
-	h.DB.QueryRow("SELECT selected_projects FROM user_settings WHERE user_id = $1", userID).Scan(&spJSON)
+	(*h.DB).QueryRow("SELECT selected_projects FROM user_settings WHERE user_id = $1", userID).Scan(&spJSON)
 	var projects []int64
 	if len(spJSON) > 0 {
 		json.Unmarshal(spJSON, &projects)
@@ -333,7 +333,7 @@ func (h *AnalyticsHandler) getSelectedProjects(userID int) []int64 {
 
 func (h *AnalyticsHandler) getSelectedTeam(userID int) []int64 {
 	var stJSON []byte
-	h.DB.QueryRow("SELECT selected_team FROM user_settings WHERE user_id = $1", userID).Scan(&stJSON)
+	(*h.DB).QueryRow("SELECT selected_team FROM user_settings WHERE user_id = $1", userID).Scan(&stJSON)
 	var team []int64
 	if len(stJSON) > 0 {
 		json.Unmarshal(stJSON, &team)

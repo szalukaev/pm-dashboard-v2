@@ -2,6 +2,7 @@ package redmine
 
 import (
 	"encoding/json"
+	"strings"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,8 +10,10 @@ import (
 )
 
 type Client struct {
-	BaseURL   string
-	APIKey    string
+	BaseURL    string
+	APIKey     string
+	BasicLogin string
+	BasicPass  string
 	HTTPClient *http.Client
 }
 
@@ -67,7 +70,7 @@ type statusResp struct {
 		ID      int    `json:"id"`
 		Name    string `json:"name"`
 		IsClosed bool  `json:"is_closed"`
-	} `json:"statuses"`
+	} `json:"issue_statuses"`
 }
 
 type memberResp struct {
@@ -80,10 +83,12 @@ type memberResp struct {
 	} `json:"memberships"`
 }
 
-func NewClient(baseURL, apiKey string) *Client {
+func NewClient(baseURL, apiKey, basicLogin, basicPass string) *Client {
 	return &Client{
-		BaseURL: baseURL,
-		APIKey:  apiKey,
+		BaseURL:    baseURL,
+		APIKey:     apiKey,
+		BasicLogin: basicLogin,
+		BasicPass:  basicPass,
 		HTTPClient: &http.Client{Timeout: 30 * time.Second},
 	}
 }
@@ -94,7 +99,12 @@ func (c *Client) doRequest(path string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("X-Redmine-API-Key", c.APIKey)
+	if c.APIKey != "" {
+		req.Header.Set("X-Redmine-API-Key", c.APIKey)
+	}
+	if c.BasicLogin != "" {
+		req.SetBasicAuth(c.BasicLogin, c.BasicPass)
+	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.HTTPClient.Do(req)
@@ -195,6 +205,82 @@ func (c *Client) GetIssues(projectID int) ([]Issue, error) {
 	return all, nil
 }
 
+type Comment struct {
+	ID        int    `json:"id"`
+	Author    string `json:"author"`
+	Text      string `json:"text"`
+	CreatedOn string `json:"created_on"`
+}
+
+type commentsResp struct {
+	Issue struct {
+		Journals []struct {
+			ID        int    `json:"id"`
+			User      struct {
+				Name string `json:"name"`
+			} `json:"user"`
+			Notes     string `json:"notes"`
+			CreatedOn string `json:"created_on"`
+		} `json:"journals"`
+	} `json:"issue"`
+}
+
+func (c *Client) GetIssueComments(issueID int) ([]Comment, error) {
+	data, err := c.doRequest(fmt.Sprintf("/issues/%d.json?include=journals", issueID))
+	if err != nil {
+		return nil, err
+	}
+	var resp commentsResp
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return nil, err
+	}
+	var all []Comment
+	for _, j := range resp.Issue.Journals {
+		if j.Notes == "" {
+			continue
+		}
+		all = append(all, Comment{
+			ID:        j.ID,
+			Author:    j.User.Name,
+			Text:      j.Notes,
+			CreatedOn: j.CreatedOn,
+		})
+	}
+	return all, nil
+}
+
+func (c *Client) AddIssueComment(issueID int, text string) error {
+	body := map[string]interface{}{
+		"issue": map[string]interface{}{
+			"notes": text,
+		},
+	}
+	b, _ := json.Marshal(body)
+	url := fmt.Sprintf("%s/issues/%d.json", c.BaseURL, issueID)
+	req, err := http.NewRequest("PUT", url, nil)
+	if err != nil {
+		return err
+	}
+	if c.APIKey != "" {
+		req.Header.Set("X-Redmine-API-Key", c.APIKey)
+	}
+	if c.BasicLogin != "" {
+		req.SetBasicAuth(c.BasicLogin, c.BasicPass)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Body = io.NopCloser(bytesReader(b))
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("redmine comment returned %d", resp.StatusCode)
+	}
+	return nil
+}
+
 func (c *Client) UpdateIssue(id int, fields map[string]interface{}) error {
 	issue := map[string]interface{}{"issue": fields}
 	body, _ := json.Marshal(issue)
@@ -203,7 +289,12 @@ func (c *Client) UpdateIssue(id int, fields map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
-	req.Header.Set("X-Redmine-API-Key", c.APIKey)
+	if c.APIKey != "" {
+		req.Header.Set("X-Redmine-API-Key", c.APIKey)
+	}
+	if c.BasicLogin != "" {
+		req.SetBasicAuth(c.BasicLogin, c.BasicPass)
+	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Body = io.NopCloser(bytesReader(body))
 
@@ -216,6 +307,34 @@ func (c *Client) UpdateIssue(id int, fields map[string]interface{}) error {
 		return fmt.Errorf("redmine update returned %d", resp.StatusCode)
 	}
 	return nil
+}
+
+type priorityResp struct {
+	Priorities []struct {
+		ID       int    `json:"id"`
+		Name     string `json:"name"`
+		IsDefault bool  `json:"is_default"`
+	} `json:"issue_priorities"`
+	TotalCount int `json:"total_count"`
+}
+
+func (c *Client) GetPriorities() ([]Priority, error) {
+	data, err := c.doRequest("/enumerations/issue_priorities.json")
+	if err != nil {
+		return nil, err
+	}
+	var resp priorityResp
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return nil, err
+	}
+	var all []Priority
+	for _, p := range resp.Priorities {
+		all = append(all, Priority{
+			ExternalID: p.ID,
+			Name:       p.Name,
+		})
+	}
+	return all, nil
 }
 
 func (c *Client) GetStatuses() ([]Status, error) {
@@ -236,6 +355,46 @@ func (c *Client) GetStatuses() ([]Status, error) {
 		})
 	}
 	return statuses, nil
+}
+
+type userResp struct {
+	Users []struct {
+		ID        int    `json:"id"`
+		FirstName string `json:"firstname"`
+		LastName  string `json:"lastname"`
+		Login     string `json:"login"`
+		Status    int    `json:"status"`
+	} `json:"users"`
+	TotalCount int `json:"total_count"`
+}
+
+// GetUsers returns all active users from Redmine.
+func (c *Client) GetUsers() ([]Member, error) {
+	var all []Member
+	offset := 0
+	for {
+		data, err := c.doRequest(fmt.Sprintf("/users.json?limit=100&offset=%d&status=1", offset))
+		if err != nil {
+			return nil, err
+		}
+		var resp userResp
+		if err := json.Unmarshal(data, &resp); err != nil {
+			return nil, err
+		}
+		for _, u := range resp.Users {
+			name := strings.TrimSpace(u.FirstName + " " + u.LastName)
+			all = append(all, Member{
+				ExternalID: u.ID,
+				Name:       name,
+				Login:      u.Login,
+			})
+		}
+		offset += len(resp.Users)
+		if offset >= resp.TotalCount || len(resp.Users) == 0 {
+			break
+		}
+	}
+	return all, nil
 }
 
 func (c *Client) GetProjectMembers(projectID int) ([]Member, error) {

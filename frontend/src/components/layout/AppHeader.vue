@@ -44,6 +44,10 @@
       >
         <SettingsIcon :size="18" />
       </button>
+      <div class="header-avatar" @click="router.push('/settings')" :title="auth.user?.display_name || auth.user?.username">
+        <img v-if="auth.user?.avatar" :src="auth.user.avatar" class="avatar-img" />
+        <span v-else class="avatar-initials">{{ avatarInitials }}</span>
+      </div>
       <button
         class="action-btn"
         @click="handleLogout"
@@ -57,7 +61,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
   Users,
@@ -79,6 +83,10 @@ const router = useRouter()
 const route = useRoute()
 const { currentTheme, setTheme } = useTheme()
 const auth = useAuthStore()
+const avatarInitials = computed(() => {
+  const name = auth.user?.display_name || auth.user?.username || '?'
+  return name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
+})
 
 const tabs = ref([
   { path: '/tasks', icon: ListChecks, label: 'navigation.tasks', testId: 'tasks' },
@@ -249,5 +257,66 @@ function handleLogout() {
     padding: 0 12px;
     gap: 12px;
   }
+}
+</style>
+
+<style scoped>
+.header-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: border-color 0.15s;
+}
+
+.header-avatar:hover {
+  border-color: var(--accent);
+}
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-initials {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.header-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: border-color 0.15s;
+}
+.header-avatar:hover {
+  border-color: var(--accent);
+}
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.avatar-initials {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
 }
 </style>

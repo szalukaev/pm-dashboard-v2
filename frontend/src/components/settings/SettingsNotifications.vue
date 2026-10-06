@@ -38,11 +38,13 @@ const overdueAlerts = ref(false)
 
 onMounted(() => {
   notificationsEnabled.value = settingsStore.settings.notifications_enabled
+  overdueAlerts.value = settingsStore.settings.overdue_alerts
 })
 
 async function save() {
   await settingsStore.updateSettings({
     notifications_enabled: notificationsEnabled.value,
+    overdue_alerts: overdueAlerts.value,
   } as any)
 }
 </script>

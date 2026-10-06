@@ -16,7 +16,7 @@ import (
 )
 
 type LicenseHandler struct {
-	DB *sql.DB
+	DB **sql.DB
 }
 
 // Vendor public key — hardcoded, not from config (ТЗ requirement)
@@ -117,8 +117,8 @@ func (h *LicenseHandler) Activate(w http.ResponseWriter, r *http.Request) {
 	hwidCombined := hashString(machineIDHash + boardSerialHash)
 
 	// Store license
-	h.DB.Exec(`DELETE FROM licenses`)
-	h.DB.Exec(`INSERT INTO licenses (license_blob, hwid_hash, first_activated_at, last_check_ok_at)
+	(*h.DB).Exec(`DELETE FROM licenses`)
+	(*h.DB).Exec(`INSERT INTO licenses (license_blob, hwid_hash, first_activated_at, last_check_ok_at)
 		VALUES ($1, $2, NOW(), NOW())`, body.LicenseBlob, hwidCombined)
 
 	utils.JSON(w, http.StatusOK, map[string]interface{}{
@@ -132,7 +132,7 @@ func (h *LicenseHandler) checkLicense() LicenseStatus {
 	var blob, hwidHash string
 	var firstActivated, lastCheckOK, graceStarted *time.Time
 
-	err := h.DB.QueryRow(`SELECT license_blob, hwid_hash, first_activated_at, last_check_ok_at, grace_started_at
+	err := (*h.DB).QueryRow(`SELECT license_blob, hwid_hash, first_activated_at, last_check_ok_at, grace_started_at
 		FROM licenses ORDER BY id DESC LIMIT 1`).Scan(&blob, &hwidHash, &firstActivated, &lastCheckOK, &graceStarted)
 
 	if err == sql.ErrNoRows {
@@ -194,7 +194,7 @@ func (h *LicenseHandler) checkLicense() LicenseStatus {
 		// Start grace period if not already started
 		if graceStarted == nil {
 			now := time.Now()
-			h.DB.Exec("UPDATE licenses SET grace_started_at = $1 WHERE license_blob = $2", now, blob)
+			(*h.DB).Exec("UPDATE licenses SET grace_started_at = $1 WHERE license_blob = $2", now, blob)
 			graceStarted = &now
 		}
 		graceDays := payload.GracePeriodDays
@@ -209,7 +209,7 @@ func (h *LicenseHandler) checkLicense() LicenseStatus {
 	}
 
 	// All good — update last check
-	h.DB.Exec("UPDATE licenses SET last_check_ok_at = NOW(), grace_started_at = NULL WHERE license_blob = $1", blob)
+	(*h.DB).Exec("UPDATE licenses SET last_check_ok_at = NOW(), grace_started_at = NULL WHERE license_blob = $1", blob)
 
 	return LicenseStatus{
 		IsActive:    true,

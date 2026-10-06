@@ -11,7 +11,7 @@ import (
 )
 
 type AuditMiddleware struct {
-	DB *sql.DB
+	DB **sql.DB
 }
 
 type auditResponseWriter struct {
@@ -76,7 +76,7 @@ func (m *AuditMiddleware) Log(next http.Handler) http.Handler {
 			beforeJSON, _ := json.Marshal(beforeState)
 			afterJSON, _ := json.Marshal(afterState)
 
-			m.DB.Exec(`INSERT INTO audit_log
+			(*m.DB).Exec(`INSERT INTO audit_log
 				(occurred_at, user_id, action, entity_type, entity_id, before_state, after_state, ip_address, user_agent)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
 				time.Now(), userID, action, entityType, entityID,
@@ -92,14 +92,14 @@ func (m *AuditMiddleware) LogLogin(userID int, username string, success bool, r 
 		action = "login_failed"
 	}
 	afterData, _ := json.Marshal(map[string]interface{}{"username": username, "success": success})
-	m.DB.Exec(`INSERT INTO audit_log
+	(*m.DB).Exec(`INSERT INTO audit_log
 		(occurred_at, user_id, action, entity_type, after_state, ip_address, user_agent)
 		VALUES ($1, $2, $3, 'auth', $4, $5, $6)`,
 		time.Now(), userID, action, string(afterData), r.RemoteAddr, r.UserAgent())
 }
 
 func (m *AuditMiddleware) LogLogout(userID int, r *http.Request) {
-	m.DB.Exec(`INSERT INTO audit_log
+	(*m.DB).Exec(`INSERT INTO audit_log
 		(occurred_at, user_id, action, entity_type, ip_address, user_agent)
 		VALUES ($1, $2, 'logout', 'auth', $3, $4)`,
 		time.Now(), userID, r.RemoteAddr, r.UserAgent())

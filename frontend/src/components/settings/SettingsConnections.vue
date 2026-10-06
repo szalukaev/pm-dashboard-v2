@@ -37,6 +37,22 @@
         <label>API-токен</label>
         <input v-model="dsApiKey" type="text" placeholder="API key" @input="dsDirty = true" />
       </div>
+      <div class="form-field checkbox-field">
+        <label class="checkbox-label">
+          <input v-model="dsUseBasic" type="checkbox" @change="dsDirty = true" />
+          Использовать Basic Authentication
+        </label>
+      </div>
+      <template v-if="dsUseBasic">
+        <div class="form-field">
+          <label>Basic login</label>
+          <input v-model="dsBasicLogin" type="text" @input="dsDirty = true" />
+        </div>
+        <div class="form-field">
+          <label>Basic password</label>
+          <input v-model="dsBasicPass" type="password" @input="dsDirty = true" />
+        </div>
+      </template>
       <div class="status-message" :class="dsStatus">
         <span v-if="dsMessage">{{ dsMessage }}</span>
       </div>
@@ -70,7 +86,7 @@ async function testDb() {
   testingDb.value = true
   dbDirty.value = false
   try {
-    const { data } = await axios.post('/api/setup/database/test', { dsn: dbDsn.value })
+    const { data } = await axios.post('/api/admin/db-config/test', { dsn: dbDsn.value })
     dbOk.value = data.success
     dbMessage.value = data.success ? 'Соединение установлено' : data.error
     dbStatus.value = data.success ? 'success' : 'error'
@@ -87,19 +103,29 @@ async function saveDb() {
 // Data Source
 const dsUrl = ref('')
 const dsApiKey = ref('')
+const dsUseBasic = ref(false)
+const dsBasicLogin = ref('')
+const dsBasicPass = ref('')
 const testingDs = ref(false)
 const dsOk = ref(false)
 const dsDirty = ref(false)
 const dsMessage = ref('')
 const dsStatus = ref('')
 
+function dsPayload() {
+  const p: any = { type: 'redmine', url: dsUrl.value, api_key: dsApiKey.value }
+  if (dsUseBasic.value) {
+    p.basic_login = dsBasicLogin.value
+    p.basic_password = dsBasicPass.value
+  }
+  return p
+}
+
 async function testDs() {
   testingDs.value = true
   dsDirty.value = false
   try {
-    const { data } = await axios.post('/api/setup/datasource/test', {
-      type: 'redmine', url: dsUrl.value, api_key: dsApiKey.value,
-    })
+    const { data } = await axios.post('/api/admin/datasource-config/test', dsPayload())
     dsOk.value = data.success
     dsMessage.value = data.success ? 'Соединение установлено' : data.error
     dsStatus.value = data.success ? 'success' : 'error'
@@ -111,20 +137,30 @@ async function testDs() {
 
 async function saveDs() {
   try {
-    await axios.put('/api/admin/datasource-config', {
-      url: dsUrl.value, api_key: dsApiKey.value, type: 'redmine',
-    })
+    await axios.put('/api/admin/datasource-config', dsPayload())
     dsMessage.value = 'Сохранено. Изменения применятся при следующей синхронизации.'
     dsStatus.value = 'success'
   } catch {}
 }
 
 onMounted(async () => {
+  // Load DB config
+  try {
+    const { data } = await axios.get('/api/admin/db-config')
+    if (data.config) {
+      dbDsn.value = data.config.dsn || ''
+    }
+  } catch {}
+
+  // Load Data Source config
   try {
     const { data } = await axios.get('/api/admin/datasource-config')
     if (data.config) {
       dsUrl.value = data.config.url || ''
       dsApiKey.value = data.config.api_key || ''
+      dsUseBasic.value = !!data.config.basic_login
+      dsBasicLogin.value = data.config.basic_login || ''
+      dsBasicPass.value = data.config.basic_password || ''
     }
   } catch {}
 })
@@ -199,6 +235,27 @@ onMounted(async () => {
 .form-actions {
   display: flex;
   gap: 8px;
+}
+
+.checkbox-field {
+  margin-bottom: 12px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
 }
 
 .warning-hint {

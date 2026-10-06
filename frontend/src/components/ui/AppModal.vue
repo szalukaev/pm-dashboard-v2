@@ -4,7 +4,7 @@
       <div v-if="modelValue" class="modal-overlay" @click.self="close">
         <div class="modal-content" :style="{ width: width || '520px' }">
           <div class="modal-header">
-            <h3>{{ title }}</h3>
+            <h3><slot name="title">{{ title }}</slot></h3>
             <button class="modal-close" data-testid="modal-close" @click="close">
               <X :size="18" />
             </button>

@@ -18,14 +18,14 @@ import (
 )
 
 type PaymentsHandler struct {
-	DB *sql.DB
+	DB **sql.DB
 }
 
 // ─── Organization ───
 
 func (h *PaymentsHandler) ListOrganizations(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.GetUserID(r)
-	rows, err := h.DB.Query(`SELECT id, name, address, inn, contact_name, contact_phone
+	rows, err := (*h.DB).Query(`SELECT id, name, address, inn, contact_name, contact_phone
 		FROM organizations WHERE user_id = $1 ORDER BY name`, userID)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
@@ -68,7 +68,7 @@ func (h *PaymentsHandler) CreateOrganization(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	var id int
-	err := h.DB.QueryRow(`INSERT INTO organizations (user_id, name, address, inn, contact_name, contact_phone)
+	err := (*h.DB).QueryRow(`INSERT INTO organizations (user_id, name, address, inn, contact_name, contact_phone)
 		VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
 		userID, body.Name, body.Address, body.INN, body.ContactName, body.ContactPhone).Scan(&id)
 	if err != nil {
@@ -92,7 +92,7 @@ func (h *PaymentsHandler) UpdateOrganization(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	args = append(args, orgID, userID)
-	h.DB.Exec("UPDATE organizations SET "+utils.JoinStrings(sets, ",")+" WHERE id=$"+utils.Itoa(idx)+" AND user_id=$"+utils.Itoa(idx+1), args...)
+	(*h.DB).Exec("UPDATE organizations SET "+utils.JoinStrings(sets, ",")+" WHERE id=$"+utils.Itoa(idx)+" AND user_id=$"+utils.Itoa(idx+1), args...)
 	utils.Success(w)
 }
 
@@ -100,8 +100,8 @@ func (h *PaymentsHandler) DeleteOrganization(w http.ResponseWriter, r *http.Requ
 	userID := middleware.GetUserID(r)
 	orgID, _ := strconv.Atoi(mux.Vars(r)["id"])
 	// Unlink contracts instead of deleting
-	h.DB.Exec("UPDATE contracts SET organization_id = NULL WHERE organization_id = $1 AND user_id = $2", orgID, userID)
-	h.DB.Exec("DELETE FROM organizations WHERE id = $1 AND user_id = $2", orgID, userID)
+	(*h.DB).Exec("UPDATE contracts SET organization_id = NULL WHERE organization_id = $1 AND user_id = $2", orgID, userID)
+	(*h.DB).Exec("DELETE FROM organizations WHERE id = $1 AND user_id = $2", orgID, userID)
 	utils.Success(w)
 }
 
@@ -136,7 +136,7 @@ func (h *PaymentsHandler) ListContracts(w http.ResponseWriter, r *http.Request) 
 		FROM contracts c LEFT JOIN organizations o ON c.organization_id = o.id
 		WHERE ` + utils.JoinStrings(where, " AND ") + ` ORDER BY c.created_at DESC`
 
-	rows, err := h.DB.Query(query, args...)
+	rows, err := (*h.DB).Query(query, args...)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
@@ -228,7 +228,7 @@ func (h *PaymentsHandler) CreateContract(w http.ResponseWriter, r *http.Request)
 	// Inherit from org if provided
 	if body.OrganizationID != nil {
 		var orgName, orgAddr, orgContact, orgPhone sql.NullString
-		h.DB.QueryRow("SELECT name, address, contact_name, contact_phone FROM organizations WHERE id=$1", *body.OrganizationID).Scan(&orgName, &orgAddr, &orgContact, &orgPhone)
+		(*h.DB).QueryRow("SELECT name, address, contact_name, contact_phone FROM organizations WHERE id=$1", *body.OrganizationID).Scan(&orgName, &orgAddr, &orgContact, &orgPhone)
 		if body.CompanyName == nil && orgName.Valid { body.CompanyName = &orgName.String }
 		if body.CompanyAddress == nil && orgAddr.Valid { body.CompanyAddress = &orgAddr.String }
 		if body.ContactName == nil && orgContact.Valid { body.ContactName = &orgContact.String }
@@ -240,7 +240,7 @@ func (h *PaymentsHandler) CreateContract(w http.ResponseWriter, r *http.Request)
 	if body.Amount != nil { amount = *body.Amount }
 
 	var id int
-	err := h.DB.QueryRow(`INSERT INTO contracts (user_id, organization_id, contract_type, name, company_name,
+	err := (*h.DB).QueryRow(`INSERT INTO contracts (user_id, organization_id, contract_type, name, company_name,
 		company_address, amount, vat_rate, contact_name, contact_phone, start_date, end_date)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,
 		userID, body.OrganizationID, body.ContractType, body.Name, body.CompanyName,
@@ -265,14 +265,14 @@ func (h *PaymentsHandler) UpdateContract(w http.ResponseWriter, r *http.Request)
 	}, 1)
 	if len(sets) == 0 { utils.Error(w, http.StatusBadRequest, "NO_FIELDS"); return }
 	args = append(args, contractID, userID)
-	h.DB.Exec("UPDATE contracts SET "+utils.JoinStrings(sets, ",")+" WHERE id=$"+utils.Itoa(idx)+" AND user_id=$"+utils.Itoa(idx+1), args...)
+	(*h.DB).Exec("UPDATE contracts SET "+utils.JoinStrings(sets, ",")+" WHERE id=$"+utils.Itoa(idx)+" AND user_id=$"+utils.Itoa(idx+1), args...)
 	utils.Success(w)
 }
 
 func (h *PaymentsHandler) DeleteContract(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.GetUserID(r)
 	contractID, _ := strconv.Atoi(mux.Vars(r)["id"])
-	h.DB.Exec("DELETE FROM contracts WHERE id=$1 AND user_id=$2", contractID, userID)
+	(*h.DB).Exec("DELETE FROM contracts WHERE id=$1 AND user_id=$2", contractID, userID)
 	utils.Success(w)
 }
 
@@ -280,7 +280,7 @@ func (h *PaymentsHandler) DeleteContract(w http.ResponseWriter, r *http.Request)
 
 func (h *PaymentsHandler) ListInvoices(w http.ResponseWriter, r *http.Request) {
 	contractID, _ := strconv.Atoi(mux.Vars(r)["id"])
-	rows, err := h.DB.Query(`SELECT id, amount, vat_rate, issued_at, paid_amount, status
+	rows, err := (*h.DB).Query(`SELECT id, amount, vat_rate, issued_at, paid_amount, status
 		FROM invoices WHERE contract_id=$1 ORDER BY issued_at DESC`, contractID)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED"); return
@@ -319,7 +319,7 @@ func (h *PaymentsHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 	contractID, _ := strconv.Atoi(mux.Vars(r)["id"])
 
 	var contract struct{ Amount float64; VatRate string; Name string }
-	err := h.DB.QueryRow("SELECT amount, vat_rate, name FROM contracts WHERE id=$1 AND user_id=$2", contractID, userID).Scan(&contract.Amount, &contract.VatRate, &contract.Name)
+	err := (*h.DB).QueryRow("SELECT amount, vat_rate, name FROM contracts WHERE id=$1 AND user_id=$2", contractID, userID).Scan(&contract.Amount, &contract.VatRate, &contract.Name)
 	if err != nil { utils.Error(w, http.StatusNotFound, "CONTRACT_NOT_FOUND"); return }
 
 	var body struct {
@@ -339,12 +339,12 @@ func (h *PaymentsHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 
 	today := time.Now().Format("2006-01-02")
 	var invoiceID int
-	err = h.DB.QueryRow(`INSERT INTO invoices (contract_id, amount, vat_rate, issued_at, paid_amount, status)
+	err = (*h.DB).QueryRow(`INSERT INTO invoices (contract_id, amount, vat_rate, issued_at, paid_amount, status)
 		VALUES ($1,$2,$3,$4,0,'unpaid') RETURNING id`, contractID, totalAmount, contract.VatRate, today).Scan(&invoiceID)
 	if err != nil { utils.Error(w, http.StatusInternalServerError, "CREATE_FAILED"); return }
 
 	for _, item := range body.Items {
-		h.DB.Exec("INSERT INTO invoice_items (invoice_id, name, quantity, price) VALUES ($1,$2,$3,$4)",
+		(*h.DB).Exec("INSERT INTO invoice_items (invoice_id, name, quantity, price) VALUES ($1,$2,$3,$4)",
 			invoiceID, item.Name, item.Quantity, item.Price)
 	}
 
@@ -353,7 +353,7 @@ func (h *PaymentsHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 
 func (h *PaymentsHandler) DeleteInvoice(w http.ResponseWriter, r *http.Request) {
 	invoiceID, _ := strconv.Atoi(mux.Vars(r)["invoiceId"])
-	h.DB.Exec("DELETE FROM invoices WHERE id=$1", invoiceID)
+	(*h.DB).Exec("DELETE FROM invoices WHERE id=$1", invoiceID)
 	utils.Success(w)
 }
 
@@ -361,7 +361,7 @@ func (h *PaymentsHandler) PayInvoice(w http.ResponseWriter, r *http.Request) {
 	invoiceID, _ := strconv.Atoi(mux.Vars(r)["invoiceId"])
 
 	var inv struct{ Amount float64; VatRate string; PaidAmount float64 }
-	err := h.DB.QueryRow("SELECT amount, vat_rate, paid_amount FROM invoices WHERE id=$1", invoiceID).Scan(&inv.Amount, &inv.VatRate, &inv.PaidAmount)
+	err := (*h.DB).QueryRow("SELECT amount, vat_rate, paid_amount FROM invoices WHERE id=$1", invoiceID).Scan(&inv.Amount, &inv.VatRate, &inv.PaidAmount)
 	if err != nil { utils.Error(w, http.StatusNotFound, "INVOICE_NOT_FOUND"); return }
 
 	vatMul := 1.0
@@ -385,8 +385,8 @@ func (h *PaymentsHandler) PayInvoice(w http.ResponseWriter, r *http.Request) {
 	status := "partial"
 	if newPaid >= totalObligation { status = "paid" }
 
-	h.DB.Exec("UPDATE invoices SET paid_amount=$1, status=$2 WHERE id=$3", newPaid, status, invoiceID)
-	h.DB.Exec("INSERT INTO contract_payments (invoice_id, amount, paid_at) VALUES ($1,$2,$3)", invoiceID, payAmount, payDate)
+	(*h.DB).Exec("UPDATE invoices SET paid_amount=$1, status=$2 WHERE id=$3", newPaid, status, invoiceID)
+	(*h.DB).Exec("INSERT INTO contract_payments (invoice_id, amount, paid_at) VALUES ($1,$2,$3)", invoiceID, payAmount, payDate)
 
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"success": true, "paid_amount": newPaid, "status": status})
 }
@@ -401,7 +401,7 @@ func (h *PaymentsHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request
 		VatRate    string
 		IssuedAt   string
 	}
-	err := h.DB.QueryRow("SELECT contract_id, amount, vat_rate, issued_at FROM invoices WHERE id=$1", invoiceID).Scan(
+	err := (*h.DB).QueryRow("SELECT contract_id, amount, vat_rate, issued_at FROM invoices WHERE id=$1", invoiceID).Scan(
 		&inv.ContractID, &inv.Amount, &inv.VatRate, &inv.IssuedAt)
 	if err != nil {
 		utils.Error(w, http.StatusNotFound, "INVOICE_NOT_FOUND")
@@ -416,14 +416,14 @@ func (h *PaymentsHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request
 		VatRate        string
 		Name           string
 	}
-	h.DB.QueryRow(`SELECT COALESCE(company_name,''), COALESCE(company_address,''),
+	(*h.DB).QueryRow(`SELECT COALESCE(company_name,''), COALESCE(company_address,''),
 		COALESCE(contact_phone,''), COALESCE(contact_name,''), vat_rate, name
 		FROM contracts WHERE id=$1`, inv.ContractID).Scan(
 		&contract.CompanyName, &contract.CompanyAddress, &contract.ContactPhone,
 		&contract.ContactName, &contract.VatRate, &contract.Name)
 
 	// Get invoice items
-	rows, err := h.DB.Query("SELECT name, quantity, price FROM invoice_items WHERE invoice_id=$1", invoiceID)
+	rows, err := (*h.DB).Query("SELECT name, quantity, price FROM invoice_items WHERE invoice_id=$1", invoiceID)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
@@ -477,15 +477,15 @@ func (h *PaymentsHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	var totalAmount, totalInvoiced, totalPaid, totalDebt float64
 	var closedCount int
 
-	h.DB.QueryRow("SELECT COUNT(*) FROM contracts WHERE user_id=$1", userID).Scan(&contractCount)
-	h.DB.QueryRow("SELECT COALESCE(SUM(amount),0) FROM contracts WHERE user_id=$1", userID).Scan(&totalAmount)
+	(*h.DB).QueryRow("SELECT COUNT(*) FROM contracts WHERE user_id=$1", userID).Scan(&contractCount)
+	(*h.DB).QueryRow("SELECT COALESCE(SUM(amount),0) FROM contracts WHERE user_id=$1", userID).Scan(&totalAmount)
 
 	// Total invoiced
-	h.DB.QueryRow(`SELECT COALESCE(SUM(i.amount),0) FROM invoices i
+	(*h.DB).QueryRow(`SELECT COALESCE(SUM(i.amount),0) FROM invoices i
 		JOIN contracts c ON i.contract_id=c.id WHERE c.user_id=$1`, userID).Scan(&totalInvoiced)
 
 	// Total paid
-	h.DB.QueryRow(`SELECT COALESCE(SUM(p.amount),0) FROM contract_payments p
+	(*h.DB).QueryRow(`SELECT COALESCE(SUM(p.amount),0) FROM contract_payments p
 		JOIN invoices i ON p.invoice_id=i.id JOIN contracts c ON i.contract_id=c.id WHERE c.user_id=$1`, userID).Scan(&totalPaid)
 
 	// Debt = total obligation - total paid (simplified)
@@ -493,7 +493,7 @@ func (h *PaymentsHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	if totalDebt < 0 { totalDebt = 0 }
 
 	// Closed count (simplified)
-	h.DB.QueryRow(`SELECT COUNT(*) FROM contracts WHERE user_id=$1 AND (
+	(*h.DB).QueryRow(`SELECT COUNT(*) FROM contracts WHERE user_id=$1 AND (
 		(contract_type='onetime' AND id IN (SELECT contract_id FROM invoices GROUP BY contract_id HAVING SUM(paid_amount) >= SUM(amount)))
 		OR (contract_type='service' AND end_date <= CURRENT_DATE)
 	)`, userID).Scan(&closedCount)
@@ -513,7 +513,7 @@ func (h *PaymentsHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 
 func (h *PaymentsHandler) ExportCSV(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.GetUserID(r)
-	rows, err := h.DB.Query(`SELECT c.contract_type, c.name, COALESCE(c.company_name,''), COALESCE(c.company_address,''),
+	rows, err := (*h.DB).Query(`SELECT c.contract_type, c.name, COALESCE(c.company_name,''), COALESCE(c.company_address,''),
 		c.amount, c.vat_rate, COALESCE(c.contact_name,''), COALESCE(c.contact_phone,''),
 		COALESCE(c.start_date::text,''), COALESCE(c.end_date::text,'')
 		FROM contracts c WHERE c.user_id=$1 ORDER BY c.name`, userID)

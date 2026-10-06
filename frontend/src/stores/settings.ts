@@ -12,7 +12,9 @@ interface Settings {
   kanban_column_order_users: string[]
   last_filters: Record<string, any>
   notifications_enabled: boolean
+  overdue_alerts: boolean
   data_source_url: string
+  redmine_url: string
 }
 
 const defaultSettings: Settings = {
@@ -25,7 +27,9 @@ const defaultSettings: Settings = {
   kanban_column_order_users: [],
   last_filters: {},
   notifications_enabled: true,
+  overdue_alerts: false,
   data_source_url: '',
+  redmine_url: '',
 }
 
 export const useSettingsStore = defineStore('settings', () => {

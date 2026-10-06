@@ -59,14 +59,15 @@ export const useTasksStore = defineStore('tasks', () => {
     search: '',
     group_by: 'project',
     category: '',
-    sort_by: '',
-    sort_dir: 'asc',
+    sort_by: 'external_id',
+    sort_dir: 'desc',
   })
 
   // Reference data
   const projects = ref<{ id: number; name: string; parent_id: number | null }[]>([])
   const categories = ref<string[]>([])
   const statuses = ref<{ id: number; name: string; is_closed: boolean; group: string }[]>([])
+  const priorities = ref<{ id: number; name: string; sort_order: number }[]>([])
 
   async function fetchTasks() {
     loading.value = true
@@ -109,9 +110,12 @@ export const useTasksStore = defineStore('tasks', () => {
     }
   }
 
-  async function updateTask(id: number, fields: Record<string, any>) {
-    await axios.put(`/api/tasks/${id}`, fields)
-    await fetchTasks()
+  async function updateTask(id: number, fields: Record<string, any>, skipReload = false): Promise<{ old_values: any; new_values: any; redmine_ok: boolean; redmine_error: string }> {
+    const { data } = await axios.put(`/api/tasks/${id}`, fields)
+    if (!skipReload) {
+      await fetchTasks()
+    }
+    return data
   }
 
   async function fetchProjects() {
@@ -121,10 +125,18 @@ export const useTasksStore = defineStore('tasks', () => {
     } catch {}
   }
 
-  async function fetchCategories() {
+  async function fetchCategories(projectId?: string | number) {
     try {
-      const { data } = await axios.get('/api/tasks/categories')
+      const url = projectId ? `/api/tasks/categories?project_id=${projectId}` : '/api/tasks/categories'
+      const { data } = await axios.get(url)
       categories.value = data.categories || []
+    } catch {}
+  }
+
+  async function fetchPriorities() {
+    try {
+      const { data } = await axios.get('/api/tasks/priorities')
+      priorities.value = data.priorities || []
     } catch {}
   }
 
@@ -164,8 +176,8 @@ export const useTasksStore = defineStore('tasks', () => {
 
   return {
     tasks, groups, loading, error, total, useGrouping, filters,
-    projects, categories, statuses,
+    projects, categories, statuses, priorities,
     fetchTasks, fetchTask, updateTask,
-    fetchProjects, fetchCategories, fetchStatuses, setFilter, restoreFilters,
+    fetchProjects, fetchCategories, fetchStatuses, fetchPriorities, setFilter, restoreFilters,
   }
 })

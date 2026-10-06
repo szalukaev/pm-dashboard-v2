@@ -21,7 +21,7 @@ type UserClaims struct {
 	Role     string
 }
 
-func RequireAuth(sessionStore db.SessionStore, pgDB *sql.DB) func(http.Handler) http.Handler {
+func RequireAuth(sessionStore db.SessionStore, pgDB **sql.DB) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			cookie, err := r.Cookie("session_id")
@@ -39,7 +39,7 @@ func RequireAuth(sessionStore db.SessionStore, pgDB *sql.DB) func(http.Handler) 
 
 			// Get user role from DB
 			var role string
-			err = pgDB.QueryRow("SELECT role FROM users WHERE id = $1", userID).Scan(&role)
+			err = (*pgDB).QueryRow("SELECT role FROM users WHERE id = $1", userID).Scan(&role)
 			if err != nil {
 				http.Error(w, `{"error":"UNAUTHORIZED"}`, http.StatusUnauthorized)
 				return

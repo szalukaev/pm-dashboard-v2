@@ -11,7 +11,7 @@ import (
 )
 
 type LicenseChecker struct {
-	DB *sql.DB
+	DB **sql.DB
 
 	mu            sync.RWMutex
 	isReadOnly    bool
@@ -19,7 +19,7 @@ type LicenseChecker struct {
 	checkInterval time.Duration
 }
 
-func NewLicenseChecker(db *sql.DB) *LicenseChecker {
+func NewLicenseChecker(db **sql.DB) *LicenseChecker {
 	lc := &LicenseChecker{
 		DB:            db,
 		checkInterval: 1 * time.Hour,
@@ -35,7 +35,7 @@ func (lc *LicenseChecker) check() {
 	var blob string
 	var graceStarted *time.Time
 
-	err := lc.DB.QueryRow(`SELECT license_blob, grace_started_at FROM licenses ORDER BY id DESC LIMIT 1`).Scan(&blob, &graceStarted)
+	err := (*lc.DB).QueryRow(`SELECT license_blob, grace_started_at FROM licenses ORDER BY id DESC LIMIT 1`).Scan(&blob, &graceStarted)
 	if err != nil {
 		// No license — not read-only (let activation screen work)
 		lc.isReadOnly = false
