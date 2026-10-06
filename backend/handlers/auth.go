@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -158,11 +159,14 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// SECURE_COOKIES=true в продакшене за HTTPS (кука не уйдёт по http).
+	secureCookies := os.Getenv("SECURE_COOKIES") == "true"
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session_id",
 		Value:    sessionID,
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   secureCookies,
 		SameSite: http.SameSiteLaxMode,
 		Expires:  time.Now().Add(expiresAt),
 	})
@@ -193,11 +197,13 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	if h.Audit != nil {
 		h.Audit.LogLogout(middleware.GetUserID(r), r)
 	}
+	secureCookies := os.Getenv("SECURE_COOKIES") == "true"
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session_id",
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   secureCookies,
 		MaxAge:   -1,
 	})
 	utils.Success(w)
