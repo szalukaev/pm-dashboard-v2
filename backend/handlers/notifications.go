@@ -15,6 +15,11 @@ type NotificationsHandler struct {
 
 // GetNotificationSettings returns user notification preferences
 func (h *NotificationsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
 	userID := middleware.GetUserID(r)
 
 	var settings struct {
@@ -55,6 +60,11 @@ func (h *NotificationsHandler) GetSettings(w http.ResponseWriter, r *http.Reques
 
 // UpdateNotificationSettings updates user notification preferences
 func (h *NotificationsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
 	userID := middleware.GetUserID(r)
 	var body map[string]interface{}
 	json.NewDecoder(r.Body).Decode(&body)
@@ -68,6 +78,11 @@ func (h *NotificationsHandler) UpdateSettings(w http.ResponseWriter, r *http.Req
 
 // GetAlertThresholds returns configured alert thresholds
 func (h *NotificationsHandler) GetAlertThresholds(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
 	var thresholdsJSON []byte
 	err := (*h.DB).QueryRow("SELECT value FROM admin_settings WHERE key='alert_thresholds'").Scan(&thresholdsJSON)
 	if err == sql.ErrNoRows {
@@ -89,6 +104,11 @@ func (h *NotificationsHandler) GetAlertThresholds(w http.ResponseWriter, r *http
 
 // UpdateAlertThresholds updates alert thresholds (admin only)
 func (h *NotificationsHandler) UpdateAlertThresholds(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
 	var body map[string]interface{}
 	json.NewDecoder(r.Body).Decode(&body)
 

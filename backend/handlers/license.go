@@ -72,6 +72,11 @@ func (h *LicenseHandler) RunPeriodicCheck() {
 }
 
 func (h *LicenseHandler) Activate(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
 	var body struct {
 		LicenseBlob string `json:"license_blob"`
 	}
@@ -137,6 +142,10 @@ func (h *LicenseHandler) Activate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *LicenseHandler) checkLicense() LicenseStatus {
+	if h.DB == nil || *h.DB == nil {
+		return LicenseStatus{IsActive: false}
+	}
+
 	var blob, hwidHash string
 	var firstActivated, lastCheckOK, graceStarted *time.Time
 

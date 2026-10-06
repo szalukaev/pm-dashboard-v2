@@ -89,6 +89,10 @@ func clearAttempts(username string) {
 }
 
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
@@ -170,6 +174,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
 	cookie, err := r.Cookie("session_id")
 	if err == nil {
 		h.Sessions.Delete(r.Context(), cookie.Value)
@@ -188,6 +196,10 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
 	userID := middleware.GetUserID(r)
 	if userID == 0 {
 		utils.Error(w, http.StatusUnauthorized, "UNAUTHORIZED")
@@ -215,6 +227,10 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
 	userID := middleware.GetUserID(r)
 	if userID == 0 {
 		utils.Error(w, http.StatusUnauthorized, "UNAUTHORIZED")
@@ -247,6 +263,10 @@ func (h *AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
 	userID := middleware.GetUserID(r)
 	if userID == 0 {
 		utils.Error(w, http.StatusUnauthorized, "UNAUTHORIZED")
@@ -299,6 +319,10 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
 	userID := middleware.GetUserID(r)
 	if userID == 0 {
 		utils.Error(w, http.StatusUnauthorized, "UNAUTHORIZED")
@@ -345,6 +369,10 @@ func (h *AuthHandler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) DeleteAvatar(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
 	userID := middleware.GetUserID(r)
 	if userID == 0 {
 		utils.Error(w, http.StatusUnauthorized, "UNAUTHORIZED")

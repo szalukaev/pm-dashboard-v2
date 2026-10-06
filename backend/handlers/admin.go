@@ -26,6 +26,11 @@ type AdminHandler struct {
 // ─── User Management ───
 
 func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
 	rows, err := (*h.DB).Query("SELECT id, username, role, created_at FROM users ORDER BY id")
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
@@ -53,6 +58,11 @@ func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AdminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
 	var body struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
@@ -86,6 +96,11 @@ func (h *AdminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AdminHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
 	userID, _ := strconv.Atoi(mux.Vars(r)["id"])
 	var body struct {
 		Role     *string `json:"role"`
@@ -106,6 +121,11 @@ func (h *AdminHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
 	userID, _ := strconv.Atoi(mux.Vars(r)["id"])
 	// Don't delete yourself
 	currentUserID := middleware.GetUserID(r)
@@ -120,6 +140,11 @@ func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 // ─── Status Mapping ───
 
 func (h *AdminHandler) ListStatuses(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
 	rows, err := (*h.DB).Query("SELECT external_id, name, is_closed, group_name FROM statuses ORDER BY name")
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
@@ -147,6 +172,11 @@ func (h *AdminHandler) ListStatuses(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AdminHandler) UpdateStatusGroup(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
 	statusID, _ := strconv.Atoi(mux.Vars(r)["id"])
 	var body struct {
 		Group string `json:"group"` // "open", "testing", "closed"
@@ -166,6 +196,11 @@ func (h *AdminHandler) UpdateStatusGroup(w http.ResponseWriter, r *http.Request)
 // ─── Priorities ───
 
 func (h *AdminHandler) ListPriorities(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
 	rows, err := (*h.DB).Query("SELECT external_id, name, sort_order, color FROM priorities ORDER BY sort_order")
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
@@ -193,6 +228,11 @@ func (h *AdminHandler) ListPriorities(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AdminHandler) UpdatePriority(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
 	priorityID, _ := strconv.Atoi(mux.Vars(r)["id"])
 	var body struct {
 		SortOrder *int    `json:"sort_order"`
@@ -384,6 +424,11 @@ func (h *AdminHandler) TestDBConfig(w http.ResponseWriter, r *http.Request) {
 // ─── Sync Log ───
 
 func (h *AdminHandler) GetSyncLog(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
 	rows, err := (*h.DB).Query(`SELECT id, started_at, finished_at, duration_ms, issues_collected, status, COALESCE(error_text, '')
 		FROM collection_log ORDER BY started_at DESC LIMIT 50`)
 	if err != nil {
@@ -417,6 +462,11 @@ func (h *AdminHandler) GetSyncLog(w http.ResponseWriter, r *http.Request) {
 // ─── Audit Log ───
 
 func (h *AdminHandler) GetAuditLog(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
 	actionFilter := r.URL.Query().Get("action")
 	entityFilter := r.URL.Query().Get("entity")
 

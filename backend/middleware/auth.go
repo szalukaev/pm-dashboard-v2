@@ -24,6 +24,10 @@ type UserClaims struct {
 func RequireAuth(sessionStore db.SessionStore, pgDB **sql.DB) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if pgDB == nil || *pgDB == nil {
+				http.Error(w, `{"error":"DATABASE_NOT_AVAILABLE"}`, http.StatusServiceUnavailable)
+				return
+			}
 			cookie, err := r.Cookie("session_id")
 			if err != nil || cookie.Value == "" {
 				http.Error(w, `{"error":"UNAUTHORIZED"}`, http.StatusUnauthorized)

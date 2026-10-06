@@ -24,6 +24,11 @@ type PaymentsHandler struct {
 // ─── Organization ───
 
 func (h *PaymentsHandler) ListOrganizations(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
 	userID := middleware.GetUserID(r)
 	rows, err := (*h.DB).Query(`SELECT id, name, address, inn, contact_name, contact_phone
 		FROM organizations WHERE user_id = $1 ORDER BY name`, userID)
@@ -55,6 +60,11 @@ func (h *PaymentsHandler) ListOrganizations(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *PaymentsHandler) CreateOrganization(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
 	userID := middleware.GetUserID(r)
 	var body struct {
 		Name         string  `json:"name"`
@@ -79,6 +89,11 @@ func (h *PaymentsHandler) CreateOrganization(w http.ResponseWriter, r *http.Requ
 }
 
 func (h *PaymentsHandler) UpdateOrganization(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
 	userID := middleware.GetUserID(r)
 	orgID, _ := strconv.Atoi(mux.Vars(r)["id"])
 	var body map[string]interface{}
@@ -97,6 +112,11 @@ func (h *PaymentsHandler) UpdateOrganization(w http.ResponseWriter, r *http.Requ
 }
 
 func (h *PaymentsHandler) DeleteOrganization(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
 	userID := middleware.GetUserID(r)
 	orgID, _ := strconv.Atoi(mux.Vars(r)["id"])
 	// Unlink contracts instead of deleting
@@ -108,6 +128,11 @@ func (h *PaymentsHandler) DeleteOrganization(w http.ResponseWriter, r *http.Requ
 // ─── Contract ───
 
 func (h *PaymentsHandler) ListContracts(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
 	userID := middleware.GetUserID(r)
 	filterType := r.URL.Query().Get("type")      // "service", "onetime"
 	showClosed := r.URL.Query().Get("show_closed") // "true"
@@ -206,6 +231,11 @@ func (h *PaymentsHandler) ListContracts(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *PaymentsHandler) CreateContract(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
 	userID := middleware.GetUserID(r)
 	var body struct {
 		ContractType   string   `json:"contract_type"`
@@ -259,6 +289,11 @@ func (h *PaymentsHandler) CreateContract(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *PaymentsHandler) UpdateContract(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
 	userID := middleware.GetUserID(r)
 	contractID, _ := strconv.Atoi(mux.Vars(r)["id"])
 	var body map[string]interface{}
@@ -275,6 +310,11 @@ func (h *PaymentsHandler) UpdateContract(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *PaymentsHandler) DeleteContract(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
 	userID := middleware.GetUserID(r)
 	contractID, _ := strconv.Atoi(mux.Vars(r)["id"])
 	(*h.DB).Exec("DELETE FROM contracts WHERE id=$1 AND user_id=$2", contractID, userID)
@@ -284,6 +324,11 @@ func (h *PaymentsHandler) DeleteContract(w http.ResponseWriter, r *http.Request)
 // ─── Invoice ───
 
 func (h *PaymentsHandler) ListInvoices(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
 	userID := middleware.GetUserID(r)
 	contractID, _ := strconv.Atoi(mux.Vars(r)["id"])
 	// Ownership: invoices are visible only via a contract belonging to the caller.
@@ -323,6 +368,11 @@ func (h *PaymentsHandler) ListInvoices(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PaymentsHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
 	userID := middleware.GetUserID(r)
 	contractID, _ := strconv.Atoi(mux.Vars(r)["id"])
 
@@ -360,6 +410,11 @@ func (h *PaymentsHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *PaymentsHandler) DeleteInvoice(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
 	userID := middleware.GetUserID(r)
 	invoiceID, _ := strconv.Atoi(mux.Vars(r)["invoiceId"])
 	// Ownership: delete only an invoice of the caller's own contract.
@@ -375,6 +430,11 @@ func (h *PaymentsHandler) DeleteInvoice(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *PaymentsHandler) PayInvoice(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
 	userID := middleware.GetUserID(r)
 	invoiceID, _ := strconv.Atoi(mux.Vars(r)["invoiceId"])
 
@@ -443,6 +503,11 @@ func (h *PaymentsHandler) PayInvoice(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PaymentsHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
 	userID := middleware.GetUserID(r)
 	invoiceID, _ := strconv.Atoi(mux.Vars(r)["invoiceId"])
 
@@ -525,6 +590,11 @@ func (h *PaymentsHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request
 // ─── Statistics ───
 
 func (h *PaymentsHandler) GetStats(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
 	userID := middleware.GetUserID(r)
 
 	var contractCount int
@@ -586,6 +656,11 @@ func (h *PaymentsHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 // ─── CSV Export ───
 
 func (h *PaymentsHandler) ExportCSV(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
 	userID := middleware.GetUserID(r)
 	rows, err := (*h.DB).Query(`SELECT c.contract_type, c.name, COALESCE(c.company_name,''), COALESCE(c.company_address,''),
 		c.amount, c.vat_rate, COALESCE(c.contact_name,''), COALESCE(c.contact_phone,''),
