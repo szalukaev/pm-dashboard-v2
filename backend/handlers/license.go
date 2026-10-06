@@ -158,10 +158,16 @@ func (h *LicenseHandler) Activate(w http.ResponseWriter, r *http.Request) {
 	// Store the combined HWID hash for later comparison
 	hwidCombined := hashString(machineIDHash + boardSerialHash)
 
-	// Store license
-	(*h.DB).Exec(`DELETE FROM licenses`)
-	(*h.DB).Exec(`INSERT INTO licenses (license_blob, hwid_hash, first_activated_at, last_check_ok_at)
-		VALUES ($1, $2, NOW(), NOW())`, body.LicenseBlob, hwidCombined)
+	// Store license — errors here must not be reported as success.
+	if _, err := (*h.DB).Exec(`DELETE FROM licenses`); err != nil {
+		utils.Error(w, http.StatusInternalServerError, "SAVE_FAILED")
+		return
+	}
+	if _, err := (*h.DB).Exec(`INSERT INTO licenses (license_blob, hwid_hash, first_activated_at, last_check_ok_at)
+		VALUES ($1, $2, NOW(), NOW())`, body.LicenseBlob, hwidCombined); err != nil {
+		utils.Error(w, http.StatusInternalServerError, "SAVE_FAILED")
+		return
+	}
 
 	// Invalidate the status cache so the UI sees the new license immediately.
 	h.cacheMu.Lock()
