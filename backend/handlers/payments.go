@@ -455,14 +455,33 @@ func (h *PaymentsHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 	totalAmount = utils.Round2(totalAmount)
 
 	today := time.Now().Format("2006-01-02")
-	var invoiceID int
-	err = (*h.DB).QueryRow(`INSERT INTO invoices (contract_id, amount, vat_rate, issued_at, paid_amount, status)
-		VALUES ($1,$2,$3,$4,0,'unpaid') RETURNING id`, contractID, totalAmount, contract.VatRate, today).Scan(&invoiceID)
-	if err != nil { utils.Error(w, http.StatusInternalServerError, "CREATE_FAILED"); return }
 
+	// Invoice header + items must be written atomically — otherwise a partial
+	// failure leaves an invoice without its line items.
+	tx, err := (*h.DB).Begin()
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "CREATE_FAILED")
+		return
+	}
+	var invoiceID int
+	err = tx.QueryRow(`INSERT INTO invoices (contract_id, amount, vat_rate, issued_at, paid_amount, status)
+		VALUES ($1,$2,$3,$4,0,'unpaid') RETURNING id`, contractID, totalAmount, contract.VatRate, today).Scan(&invoiceID)
+	if err != nil {
+		tx.Rollback()
+		utils.Error(w, http.StatusInternalServerError, "CREATE_FAILED")
+		return
+	}
 	for _, item := range body.Items {
-		(*h.DB).Exec("INSERT INTO invoice_items (invoice_id, name, quantity, price) VALUES ($1,$2,$3,$4)",
-			invoiceID, item.Name, item.Quantity, item.Price)
+		if _, err := tx.Exec("INSERT INTO invoice_items (invoice_id, name, quantity, price) VALUES ($1,$2,$3,$4)",
+			invoiceID, item.Name, item.Quantity, item.Price); err != nil {
+			tx.Rollback()
+			utils.Error(w, http.StatusInternalServerError, "CREATE_FAILED")
+			return
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		utils.Error(w, http.StatusInternalServerError, "CREATE_FAILED")
+		return
 	}
 
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"id": invoiceID, "success": true})
