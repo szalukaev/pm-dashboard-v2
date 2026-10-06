@@ -40,6 +40,8 @@ services:
       dockerfile: ../Dockerfile.frontend
     ports:
       - "82:82"
+    networks:
+      - backend
     depends_on:
       - backend
 
