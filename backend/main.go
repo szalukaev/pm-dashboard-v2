@@ -141,6 +141,9 @@ func main() {
 	// CORS
 	r.Use(middleware.CORSMiddleware)
 
+	// Cap JSON request bodies (1 MiB)
+	r.Use(middleware.LimitJSONBody)
+
 	// Setup endpoints (no auth required)
 	r.HandleFunc("/api/setup/status", setupH.Status).Methods("GET")
 	r.HandleFunc("/api/setup/database/test", setupH.TestDatabase).Methods("POST")

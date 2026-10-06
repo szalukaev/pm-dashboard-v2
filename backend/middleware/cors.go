@@ -39,3 +39,16 @@ func CORSMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+// maxJSONBodyBytes is the maximum accepted JSON request body size.
+const maxJSONBodyBytes = 1 << 20 // 1 MiB
+
+// LimitJSONBody wraps r.Body with a size cap for application/json requests.
+func LimitJSONBody(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Body != nil && strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+			r.Body = http.MaxBytesReader(w, r.Body, maxJSONBodyBytes)
+		}
+		next.ServeHTTP(w, r)
+	})
+}
