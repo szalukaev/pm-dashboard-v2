@@ -141,6 +141,9 @@ func main() {
 	// CORS
 	r.Use(middleware.CORSMiddleware)
 
+	// Security headers (after CORS so ACAO is not overwritten)
+	r.Use(middleware.SecurityHeaders)
+
 	// Cap JSON request bodies (1 MiB)
 	r.Use(middleware.LimitJSONBody)
 
