@@ -78,6 +78,12 @@ func (s *SQLiteStore) LoadAppConfig() *AppConfig {
 	if v, _ := s.Get("redmine_api_key"); v != "" {
 		cfg.RedmineAPIKey = v
 	}
+	if v, _ := s.Get("redmine_basic_login"); v != "" {
+		cfg.RedmineBasicLogin = v
+	}
+	if v, _ := s.Get("redmine_basic_password"); v != "" {
+		cfg.RedmineBasicPass = v
+	}
 	if v, _ := s.Get("data_source_type"); v != "" {
 		cfg.DataSourceType = v
 	} else {

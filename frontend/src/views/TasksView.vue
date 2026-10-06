@@ -84,6 +84,7 @@ onMounted(async () => {
     store.fetchProjects(),
     store.fetchCategories(),
     store.fetchStatuses(),
+    store.fetchPriorities(),
   ])
 })
 </script>

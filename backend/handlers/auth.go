@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"strings"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"sync"
@@ -16,7 +18,7 @@ import (
 )
 
 type AuthHandler struct {
-	DB       *sql.DB
+	DB **sql.DB
 	Sessions db.SessionStore
 	Audit    *middleware.AuditMiddleware
 }
@@ -105,10 +107,11 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var id int
-	var passwordHash, role string
+	var passwordHash, role, displayName, avatar string
+	var lastLogin *string
 	var forcePasswordChange bool
-	err := h.DB.QueryRow("SELECT id, password_hash, role, COALESCE(force_password_change, false) FROM users WHERE username = $1", req.Username).
-		Scan(&id, &passwordHash, &role, &forcePasswordChange)
+	err := (*h.DB).QueryRow("SELECT id, password_hash, role, COALESCE(display_name,''), COALESCE(avatar,''), COALESCE(force_password_change, false), last_login FROM users WHERE username = $1", req.Username).
+		Scan(&id, &passwordHash, &role, &displayName, &avatar, &forcePasswordChange, &lastLogin)
 	if err != nil {
 		recordFailure(req.Username)
 		if h.Audit != nil {
@@ -129,6 +132,9 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	// Successful login — clear attempts
 	clearAttempts(req.Username)
+	(*h.DB).Exec("UPDATE users SET last_login = NOW() WHERE id = $1", id)
+	// Re-read last_login so response has fresh value
+	(*h.DB).QueryRow("SELECT last_login FROM users WHERE id = $1", id).Scan(&lastLogin)
 	if h.Audit != nil {
 		h.Audit.LogLogin(id, req.Username, true, r)
 	}
@@ -154,7 +160,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		"user": map[string]interface{}{
 			"id":                    id,
 			"username":              req.Username,
+			"display_name":          displayName,
 			"role":                  role,
+			"avatar":                avatar,
+			"last_login":            lastLogin,
 			"force_password_change": forcePasswordChange,
 		},
 	})
@@ -185,9 +194,10 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var username, role string
+	var username, role, displayName, avatar string
+	var lastLogin *string
 	var forcePasswordChange bool
-	err := h.DB.QueryRow("SELECT username, role, COALESCE(force_password_change, false) FROM users WHERE id = $1", userID).Scan(&username, &role, &forcePasswordChange)
+	err := (*h.DB).QueryRow("SELECT username, role, COALESCE(display_name,''), COALESCE(avatar,''), COALESCE(force_password_change, false), last_login FROM users WHERE id = $1", userID).Scan(&username, &role, &displayName, &avatar, &forcePasswordChange, &lastLogin)
 	if err != nil {
 		utils.Error(w, http.StatusNotFound, "USER_NOT_FOUND")
 		return
@@ -196,8 +206,43 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	utils.JSON(w, http.StatusOK, map[string]interface{}{
 		"id":                    userID,
 		"username":              username,
+		"display_name":          displayName,
 		"role":                  role,
+		"avatar":                avatar,
+		"last_login":            lastLogin,
 		"force_password_change": forcePasswordChange,
+	})
+}
+
+func (h *AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r)
+	if userID == 0 {
+		utils.Error(w, http.StatusUnauthorized, "UNAUTHORIZED")
+		return
+	}
+
+	var body struct {
+		DisplayName string `json:"display_name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
+		return
+	}
+
+	displayName := strings.TrimSpace(body.DisplayName)
+	if displayName == "" {
+		utils.Error(w, http.StatusBadRequest, "DISPLAY_NAME_REQUIRED")
+		return
+	}
+	if len(displayName) > 255 {
+		utils.Error(w, http.StatusBadRequest, "DISPLAY_NAME_TOO_LONG")
+		return
+	}
+
+	(*h.DB).Exec("UPDATE users SET display_name = $1 WHERE id = $2", displayName, userID)
+
+	utils.JSON(w, http.StatusOK, map[string]interface{}{
+		"display_name": displayName,
 	})
 }
 
@@ -222,7 +267,7 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var passwordHash string
-	err := h.DB.QueryRow("SELECT password_hash FROM users WHERE id = $1", userID).Scan(&passwordHash)
+	err := (*h.DB).QueryRow("SELECT password_hash FROM users WHERE id = $1", userID).Scan(&passwordHash)
 	if err != nil {
 		utils.Error(w, http.StatusNotFound, "USER_NOT_FOUND")
 		return
@@ -230,7 +275,7 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 
 	// If current_password is provided, verify it (skip if force_password_change)
 	var forcePasswordChange bool
-	h.DB.QueryRow("SELECT COALESCE(force_password_change, false) FROM users WHERE id = $1", userID).Scan(&forcePasswordChange)
+	(*h.DB).QueryRow("SELECT COALESCE(force_password_change, false) FROM users WHERE id = $1", userID).Scan(&forcePasswordChange)
 
 	if !forcePasswordChange {
 		if body.CurrentPassword == "" {
@@ -249,6 +294,62 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.DB.Exec("UPDATE users SET password_hash = $1, force_password_change = false WHERE id = $2", string(newHash), userID)
+	(*h.DB).Exec("UPDATE users SET password_hash = $1, force_password_change = false WHERE id = $2", string(newHash), userID)
+	utils.Success(w)
+}
+
+func (h *AuthHandler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r)
+	if userID == 0 {
+		utils.Error(w, http.StatusUnauthorized, "UNAUTHORIZED")
+		return
+	}
+	if err := r.ParseMultipartForm(2 << 20); err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
+		return
+	}
+	file, _, err := r.FormFile("avatar")
+	if err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
+		return
+	}
+	defer file.Close()
+
+	buf := make([]byte, 512)
+	n, _ := file.Read(buf)
+	mime := http.DetectContentType(buf[:n])
+	if mime != "image/jpeg" && mime != "image/png" && mime != "image/webp" && mime != "image/gif" {
+		utils.Error(w, http.StatusBadRequest, "INVALID_IMAGE")
+		return
+	}
+
+	data := buf[:n]
+	tmp := make([]byte, 4096)
+	for {
+		n, err := file.Read(tmp)
+		if n > 0 {
+			data = append(data, tmp[:n]...)
+		}
+		if err != nil {
+			break
+		}
+	}
+	if len(data) > 2<<20 {
+		utils.Error(w, http.StatusBadRequest, "FILE_TOO_LARGE")
+		return
+	}
+
+	avatar := "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(data)
+	(*h.DB).Exec("UPDATE users SET avatar = $1 WHERE id = $2", avatar, userID)
+	utils.JSON(w, http.StatusOK, map[string]interface{}{"avatar": avatar})
+}
+
+func (h *AuthHandler) DeleteAvatar(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r)
+	if userID == 0 {
+		utils.Error(w, http.StatusUnauthorized, "UNAUTHORIZED")
+		return
+	}
+	(*h.DB).Exec("UPDATE users SET avatar = '' WHERE id = $1", userID)
 	utils.Success(w)
 }

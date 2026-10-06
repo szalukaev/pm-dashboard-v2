@@ -1,7 +1,7 @@
 <template>
   <div class="task-accordion">
     <div
-      v-for="group in groups"
+      v-for="group in sortedGroups"
       :key="group.name"
       class="accordion-group"
     >
@@ -35,12 +35,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { ChevronDown } from 'lucide-vue-next'
 import TaskTable from './TaskTable.vue'
 import type { TaskGroup } from '../../stores/tasks'
 
-defineProps<{ groups: TaskGroup[] }>()
+const props = defineProps<{ groups: TaskGroup[] }>()
+
+const sortedGroups = computed(() => {
+  return [...props.groups].sort((a, b) => a.name.localeCompare(b.name))
+})
 defineEmits(['open-task'])
 
 const openGroups = ref<Set<string>>(new Set())
@@ -114,20 +118,20 @@ function formatHours(h: number): string {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 24px;
-  height: 20px;
-  padding: 0 6px;
-  font-size: 11px;
-  font-weight: 500;
+  min-width: 28px;
+  height: 22px;
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: 700;
   border-radius: 9999px;
-  background: var(--tag-bg);
-  color: var(--text-muted);
+  background: var(--accent);
+  color: var(--text-bright);
 }
 
 .group-metric {
   font-size: 12px;
   color: var(--text-faint);
-  margin-left: auto;
+  margin-left: 8px;
 }
 
 .group-metric + .group-metric {

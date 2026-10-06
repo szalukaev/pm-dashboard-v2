@@ -5,6 +5,8 @@ type AppConfig struct {
 	DSN            string // PostgreSQL connection string
 	SessionSecret  string
 	RedmineURL     string
-	RedmineAPIKey  string
+	RedmineAPIKey     string
+	RedmineBasicLogin string
+	RedmineBasicPass  string
 	DataSourceType string // "redmine", etc.
 }

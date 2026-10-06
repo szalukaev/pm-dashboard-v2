@@ -5,7 +5,10 @@ import axios from 'axios'
 interface User {
   id: number
   username: string
+  display_name?: string
   role: string
+  avatar?: string
+  last_login?: string
   force_password_change?: boolean
 }
 
@@ -49,5 +52,12 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { user, isAuthenticated, login, logout, fetchMe, changePassword }
+  async function updateMe(displayName: string) {
+    const { data } = await axios.put('/api/auth/me', { display_name: displayName })
+    if (user.value) {
+      user.value.display_name = data.display_name
+    }
+  }
+
+  return { user, isAuthenticated, login, logout, fetchMe, changePassword, updateMe }
 })

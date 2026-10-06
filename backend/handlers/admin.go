@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"strconv"
 
+	"pm-dashboard/config"
 	"pm-dashboard/middleware"
 	"pm-dashboard/utils"
 
@@ -14,13 +16,14 @@ import (
 )
 
 type AdminHandler struct {
-	DB *sql.DB
+	DB     **sql.DB
+	SQLite *config.SQLiteStore
 }
 
 // ─── User Management ───
 
 func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.DB.Query("SELECT id, username, role, created_at FROM users ORDER BY id")
+	rows, err := (*h.DB).Query("SELECT id, username, role, created_at FROM users ORDER BY id")
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
@@ -70,7 +73,7 @@ func (h *AdminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = h.DB.Exec("INSERT INTO users (username, password_hash, role, force_password_change) VALUES ($1, $2, $3, true)",
+	_, err = (*h.DB).Exec("INSERT INTO users (username, password_hash, role, force_password_change) VALUES ($1, $2, $3, true)",
 		body.Username, string(hash), body.Role)
 	if err != nil {
 		utils.Error(w, http.StatusConflict, "USER_EXISTS")
@@ -88,12 +91,12 @@ func (h *AdminHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	json.NewDecoder(r.Body).Decode(&body)
 
 	if body.Role != nil {
-		h.DB.Exec("UPDATE users SET role=$1 WHERE id=$2", *body.Role, userID)
+		(*h.DB).Exec("UPDATE users SET role=$1 WHERE id=$2", *body.Role, userID)
 	}
 	if body.Password != nil && len(*body.Password) >= 6 {
 		hash, err := bcrypt.GenerateFromPassword([]byte(*body.Password), bcrypt.DefaultCost)
 		if err == nil {
-			h.DB.Exec("UPDATE users SET password_hash=$1 WHERE id=$2", string(hash), userID)
+			(*h.DB).Exec("UPDATE users SET password_hash=$1 WHERE id=$2", string(hash), userID)
 		}
 	}
 	utils.Success(w)
@@ -107,14 +110,14 @@ func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusBadRequest, "CANNOT_DELETE_SELF")
 		return
 	}
-	h.DB.Exec("DELETE FROM users WHERE id=$1", userID)
+	(*h.DB).Exec("DELETE FROM users WHERE id=$1", userID)
 	utils.Success(w)
 }
 
 // ─── Status Mapping ───
 
 func (h *AdminHandler) ListStatuses(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.DB.Query("SELECT external_id, name, is_closed, group_name FROM statuses ORDER BY name")
+	rows, err := (*h.DB).Query("SELECT external_id, name, is_closed, group_name FROM statuses ORDER BY name")
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
@@ -153,14 +156,14 @@ func (h *AdminHandler) UpdateStatusGroup(w http.ResponseWriter, r *http.Request)
 	}
 
 	isClosed := body.Group == "closed"
-	h.DB.Exec("UPDATE statuses SET group_name=$1, is_closed=$2 WHERE external_id=$3", body.Group, isClosed, statusID)
+	(*h.DB).Exec("UPDATE statuses SET group_name=$1, is_closed=$2 WHERE external_id=$3", body.Group, isClosed, statusID)
 	utils.Success(w)
 }
 
 // ─── Priorities ───
 
 func (h *AdminHandler) ListPriorities(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.DB.Query("SELECT external_id, name, sort_order, color FROM priorities ORDER BY sort_order")
+	rows, err := (*h.DB).Query("SELECT external_id, name, sort_order, color FROM priorities ORDER BY sort_order")
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
@@ -195,46 +198,128 @@ func (h *AdminHandler) UpdatePriority(w http.ResponseWriter, r *http.Request) {
 	json.NewDecoder(r.Body).Decode(&body)
 
 	if body.SortOrder != nil {
-		h.DB.Exec("UPDATE priorities SET sort_order=$1 WHERE external_id=$2", *body.SortOrder, priorityID)
+		(*h.DB).Exec("UPDATE priorities SET sort_order=$1 WHERE external_id=$2", *body.SortOrder, priorityID)
 	}
 	if body.Color != nil {
-		h.DB.Exec("UPDATE priorities SET color=$1 WHERE external_id=$2", *body.Color, priorityID)
+		(*h.DB).Exec("UPDATE priorities SET color=$1 WHERE external_id=$2", *body.Color, priorityID)
 	}
 	utils.Success(w)
 }
 
 // ─── Data Source Config ───
 
-func (h *AdminHandler) GetDataSourceConfig(w http.ResponseWriter, r *http.Request) {
-	// This reads from admin_settings
-	var configJSON []byte
-	err := h.DB.QueryRow("SELECT value FROM admin_settings WHERE key='data_source_config'").Scan(&configJSON)
-	if err == sql.ErrNoRows {
-		utils.JSON(w, http.StatusOK, map[string]interface{}{"config": nil})
+func (h *AdminHandler) TestDataSourceConfig(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Type        string `json:"type"`
+		URL         string `json:"url"`
+		APIKey      string `json:"api_key"`
+		BasicLogin  string `json:"basic_login"`
+		BasicPasswd string `json:"basic_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
 		return
 	}
+
+	client := &http.Client{}
+	httpReq, err := http.NewRequest("GET", req.URL+"/projects.json?limit=1", nil)
 	if err != nil {
-		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
+		utils.JSON(w, http.StatusOK, map[string]interface{}{"success": false, "error": err.Error()})
 		return
 	}
-	var config interface{}
-	json.Unmarshal(configJSON, &config)
-	utils.JSON(w, http.StatusOK, map[string]interface{}{"config": config})
+	if req.APIKey != "" {
+		httpReq.Header.Set("X-Redmine-API-Key", req.APIKey)
+	}
+	if req.BasicLogin != "" {
+		cred := base64.StdEncoding.EncodeToString([]byte(req.BasicLogin + ":" + req.BasicPasswd))
+		httpReq.Header.Set("Authorization", "Basic "+cred)
+	}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		utils.JSON(w, http.StatusOK, map[string]interface{}{"success": false, "error": err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		utils.JSON(w, http.StatusOK, map[string]interface{}{"success": false, "error": "HTTP " + resp.Status})
+		return
+	}
+	utils.JSON(w, http.StatusOK, map[string]interface{}{"success": true})
+}
+
+func (h *AdminHandler) GetDataSourceConfig(w http.ResponseWriter, r *http.Request) {
+	get := func(key string) string {
+		v, _ := h.SQLite.Get(key)
+		return v
+	}
+	utils.JSON(w, http.StatusOK, map[string]interface{}{
+		"config": map[string]interface{}{
+			"type":           get("data_source_type"),
+			"url":            get("redmine_url"),
+			"api_key":        get("redmine_api_key"),
+			"basic_login":    get("redmine_basic_login"),
+			"basic_password": get("redmine_basic_password"),
+		},
+	})
 }
 
 func (h *AdminHandler) SaveDataSourceConfig(w http.ResponseWriter, r *http.Request) {
-	var body map[string]interface{}
-	json.NewDecoder(r.Body).Decode(&body)
-	data, _ := json.Marshal(body)
-	h.DB.Exec(`INSERT INTO admin_settings (key, value, updated_at) VALUES ('data_source_config', $1, NOW())
-		ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=NOW()`, data)
+	var body struct {
+		Type        string `json:"type"`
+		URL         string `json:"url"`
+		APIKey      string `json:"api_key"`
+		BasicLogin  string `json:"basic_login"`
+		BasicPasswd string `json:"basic_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
+		return
+	}
+
+	h.SQLite.Set("data_source_type", body.Type)
+	h.SQLite.Set("redmine_url", body.URL)
+	h.SQLite.Set("redmine_api_key", body.APIKey)
+	h.SQLite.Set("redmine_basic_login", body.BasicLogin)
+	h.SQLite.Set("redmine_basic_password", body.BasicPasswd)
+
 	utils.Success(w)
+}
+
+// ─── DB Config ───
+
+func (h *AdminHandler) GetDBConfig(w http.ResponseWriter, r *http.Request) {
+	dsn, _ := h.SQLite.Get("db_dsn")
+	// Parse DSN to return separate fields (don't expose password in full DSN)
+	// Format: postgres://user:pass@host:port/dbname?sslmode=disable
+	cfg := map[string]string{"dsn": dsn}
+	utils.JSON(w, http.StatusOK, map[string]interface{}{"config": cfg})
+}
+
+func (h *AdminHandler) TestDBConfig(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		DSN string `json:"dsn"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
+		return
+	}
+	testDB, err := sql.Open("postgres", req.DSN)
+	if err != nil {
+		utils.JSON(w, http.StatusOK, map[string]interface{}{"success": false, "error": err.Error()})
+		return
+	}
+	defer testDB.Close()
+	if err := testDB.Ping(); err != nil {
+		utils.JSON(w, http.StatusOK, map[string]interface{}{"success": false, "error": err.Error()})
+		return
+	}
+	utils.JSON(w, http.StatusOK, map[string]interface{}{"success": true})
 }
 
 // ─── Sync Log ───
 
 func (h *AdminHandler) GetSyncLog(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.DB.Query(`SELECT id, started_at, finished_at, duration_ms, issues_collected, status, COALESCE(error_text, '')
+	rows, err := (*h.DB).Query(`SELECT id, started_at, finished_at, duration_ms, issues_collected, status, COALESCE(error_text, '')
 		FROM collection_log ORDER BY started_at DESC LIMIT 50`)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
@@ -292,7 +377,7 @@ func (h *AdminHandler) GetAuditLog(w http.ResponseWriter, r *http.Request) {
 		WHERE ` + utils.JoinStrings(where, " AND ") + `
 		ORDER BY a.occurred_at DESC LIMIT 100`
 
-	rows, err := h.DB.Query(query, args...)
+	rows, err := (*h.DB).Query(query, args...)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return

@@ -66,11 +66,17 @@ router.beforeEach(async (to, _from, next) => {
     } catch {}
   }
 
-  // Auth check
+  // Auth check — fetchMe stores user data in the auth store
   if (to.meta.requiresAuth) {
     try {
-      await axios.get('/api/auth/me')
-      next()
+      const { useAuthStore } = await import('../stores/auth')
+      const authStore = useAuthStore()
+      await authStore.fetchMe()
+      if (authStore.isAuthenticated) {
+        next()
+      } else {
+        next({ name: 'login' })
+      }
     } catch {
       next({ name: 'login' })
     }

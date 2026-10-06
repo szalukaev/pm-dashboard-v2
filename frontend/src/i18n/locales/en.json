@@ -39,8 +39,11 @@
     "title": "Initial Setup",
     "step_of": "Step {current} of {total}",
     "db_connection": "Database Connection",
-    "db_dsn": "Connection String (DSN)",
-    "db_dsn_hint": "Example: postgres://user:pass@localhost:5432/pm_dashboard",
+    "db_host": "Host",
+    "db_port": "Port",
+    "db_user": "User",
+    "db_password": "Password",
+    "db_name": "Database Name",
     "test_connection": "Test Connection",
     "connection_ok": "Connection established",
     "connection_failed": "Failed to connect",
@@ -48,6 +51,14 @@
     "datasource_type": "Source Type",
     "datasource_url": "System URL",
     "datasource_api_key": "API Key",
+    "use_basic_auth": "Use Basic Authentication",
+    "basic_login": "Basic login",
+    "basic_password": "Basic password",
+    "confirm_password": "Confirm Password",
+    "passwords_mismatch": "Passwords do not match",
+    "display_name": "Full Name",
+    "default_language": "Default Language",
+    "finish": "Finish",
     "create_admin": "Create Administrator",
     "admin_created": "Administrator created",
     "setup_complete": "Setup Complete",
@@ -227,11 +238,13 @@
       "reset": "Reset to Admin Defaults"
     },
     "interface": {
+      "title": "Interface Settings",
       "theme": "Theme",
       "language": "Language",
       "tab_order": "Tab Order"
     },
     "notifications": {
+      "title": "Notifications",
       "toast": "Toast Notifications",
       "overdue_alerts": "Overdue Task Alerts"
     }

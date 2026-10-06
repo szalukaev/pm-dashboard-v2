@@ -6,14 +6,29 @@
 
       <!-- Step 1: Database -->
       <form v-if="step === 1" @submit.prevent="testDb" class="setup-form">
+        <div class="form-row">
+          <div class="form-field flex-1">
+            <label>{{ $t('setup.db_host') }}</label>
+            <input v-model="dbHost" type="text" placeholder="localhost" @input="onDbFormChange" />
+          </div>
+          <div class="form-field" style="width:100px">
+            <label>{{ $t('setup.db_port') }}</label>
+            <input v-model="dbPort" type="text" placeholder="5432" @input="onDbFormChange" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field flex-1">
+            <label>{{ $t('setup.db_user') }}</label>
+            <input v-model="dbUser" type="text" placeholder="pm_user" @input="onDbFormChange" />
+          </div>
+          <div class="form-field flex-1">
+            <label>{{ $t('setup.db_password') }}</label>
+            <input v-model="dbPassword" type="password" @input="onDbFormChange" />
+          </div>
+        </div>
         <div class="form-field">
-          <label>{{ $t('setup.db_dsn') }}</label>
-          <input
-            v-model="dbDsn"
-            type="text"
-            :placeholder="$t('setup.db_dsn_hint')"
-            @input="onDbFormChange"
-          />
+          <label>{{ $t('setup.db_name') }}</label>
+          <input v-model="dbName" type="text" placeholder="pm_dashboard" @input="onDbFormChange" />
         </div>
         <div class="status-message" :class="dbStatus">
           <span v-if="dbMessage">{{ dbMessage }}</span>
@@ -22,11 +37,7 @@
           <AppButton variant="primary" :loading="testingDb" @click="testDb">
             {{ $t('setup.test_connection') }}
           </AppButton>
-          <AppButton
-            variant="primary"
-            :disabled="!dbOk || dbFormDirty"
-            @click="saveDb"
-          >
+          <AppButton variant="primary" :disabled="!dbOk || dbFormDirty" @click="saveDb">
             {{ $t('common.next') }}
           </AppButton>
         </div>
@@ -42,44 +53,28 @@
         </div>
         <div class="form-field">
           <label>{{ $t('setup.datasource_url') }}</label>
-          <input
-            v-model="dsUrl"
-            type="text"
-            placeholder="https://redmine.example.com"
-            @input="onDsFormChange"
-          />
+          <input v-model="dsUrl" type="text" placeholder="https://redmine.example.com" @input="onDsFormChange" />
         </div>
-
-        <!-- Auth type selection -->
         <div class="form-field">
-          <label>Тип авторизации</label>
-          <select v-model="dsAuthType" @input="onDsFormChange">
-            <option value="token">API-токен</option>
-            <option value="basic">Логин + пароль (Basic Auth)</option>
-          </select>
+          <label>{{ $t('setup.datasource_api_key') }}</label>
+          <input v-model="dsApiKey" type="text" placeholder="API key" @input="onDsFormChange" />
         </div>
-
-        <div v-if="dsAuthType === 'token'" class="form-field">
-          <label>API-токен</label>
-          <input
-            v-model="dsApiKey"
-            type="text"
-            placeholder="API key"
-            @input="onDsFormChange"
-          />
+        <div class="form-field checkbox-field">
+          <label class="checkbox-label">
+            <input v-model="dsUseBasic" type="checkbox" @change="onDsFormChange" />
+            {{ $t('setup.use_basic_auth') }}
+          </label>
         </div>
-
-        <template v-if="dsAuthType === 'basic'">
+        <template v-if="dsUseBasic">
           <div class="form-field">
-            <label>Логин</label>
+            <label>{{ $t('setup.basic_login') }}</label>
             <input v-model="dsBasicLogin" type="text" @input="onDsFormChange" />
           </div>
           <div class="form-field">
-            <label>Пароль</label>
+            <label>{{ $t('setup.basic_password') }}</label>
             <input v-model="dsBasicPass" type="password" @input="onDsFormChange" />
           </div>
         </template>
-
         <div class="status-message" :class="dsStatus">
           <span v-if="dsMessage">{{ dsMessage }}</span>
         </div>
@@ -88,11 +83,7 @@
           <AppButton variant="primary" :loading="testingDs" @click="testDs">
             {{ $t('setup.test_connection') }}
           </AppButton>
-          <AppButton
-            variant="primary"
-            :disabled="!dsOk || dsFormDirty"
-            @click="saveDs"
-          >
+          <AppButton variant="primary" :disabled="!dsOk || dsFormDirty" @click="saveDs">
             {{ $t('common.next') }}
           </AppButton>
         </div>
@@ -100,6 +91,10 @@
 
       <!-- Step 3: Create Admin -->
       <form v-if="step === 3" @submit.prevent="createAdmin" class="setup-form">
+        <div class="form-field">
+          <label>{{ $t('setup.display_name') }}</label>
+          <input v-model="adminName" type="text" />
+        </div>
         <div class="form-field">
           <label>{{ $t('auth.username') }}</label>
           <input v-model="adminUser" type="text" />
@@ -109,18 +104,18 @@
           <input v-model="adminPass" type="password" />
         </div>
         <div class="form-field">
-          <label>Подтверждение пароля</label>
+          <label>{{ $t('setup.confirm_password') }}</label>
           <input v-model="adminPassConfirm" type="password" />
         </div>
         <div class="form-field">
-          <label>Язык по умолчанию</label>
+          <label>{{ $t('setup.default_language') }}</label>
           <select v-model="adminLang">
             <option value="ru">Русский</option>
             <option value="en">English</option>
           </select>
         </div>
         <div v-if="adminPassConfirm && adminPass !== adminPassConfirm" class="status-message error">
-          Пароли не совпадают
+          {{ $t('setup.passwords_mismatch') }}
         </div>
         <div class="status-message" :class="adminStatus">
           <span v-if="adminMessage">{{ adminMessage }}</span>
@@ -133,7 +128,7 @@
             :disabled="adminUser.length < 3 || adminPass.length < 6 || adminPass !== adminPassConfirm"
             @click="createAdmin"
           >
-            Завершить
+            {{ $t('setup.finish') }}
           </AppButton>
         </div>
       </form>
@@ -151,7 +146,11 @@ const router = useRouter()
 const step = ref(1)
 
 // Step 1: DB
-const dbDsn = ref('postgres://pm_user:pm_secret_pass@localhost:5432/pm_dashboard')
+const dbHost = ref('host.docker.internal')
+const dbPort = ref('5432')
+const dbUser = ref('pm_user')
+const dbPassword = ref('')
+const dbName = ref('pm_dashboard')
 const testingDb = ref(false)
 const dbOk = ref(false)
 const dbMessage = ref('')
@@ -167,12 +166,18 @@ async function testDb() {
   testingDb.value = true
   dbFormDirty.value = false
   try {
-    const { data } = await axios.post('/api/setup/database/test', { dsn: dbDsn.value })
+    const { data } = await axios.post('/api/setup/database/test', {
+      host: dbHost.value,
+      port: dbPort.value,
+      user: dbUser.value,
+      password: dbPassword.value,
+      dbname: dbName.value,
+    })
     dbOk.value = data.success
     if (data.success) {
       dbMessage.value = data.db_exists
-        ? `Указанная база данных уже существует. По завершению настроек будет произведена актуализация её структуры.`
-        : `Будет создана новая БД.`
+        ? 'Указанная база данных уже существует. По завершению настроек будет произведена актуализация её структуры.'
+        : 'Будет создана новая БД.'
       dbStatus.value = 'success'
     } else {
       dbMessage.value = data.error || 'Не удалось подключиться к БД.'
@@ -188,7 +193,13 @@ async function testDb() {
 
 async function saveDb() {
   try {
-    await axios.post('/api/setup/database', { dsn: dbDsn.value })
+    await axios.post('/api/setup/database', {
+      host: dbHost.value,
+      port: dbPort.value,
+      user: dbUser.value,
+      password: dbPassword.value,
+      dbname: dbName.value,
+    })
     step.value = 2
   } catch {}
 }
@@ -196,8 +207,8 @@ async function saveDb() {
 // Step 2: Data Source
 const dsType = ref('redmine')
 const dsUrl = ref('')
-const dsAuthType = ref('token')
 const dsApiKey = ref('')
+const dsUseBasic = ref(false)
 const dsBasicLogin = ref('')
 const dsBasicPass = ref('')
 const testingDs = ref(false)
@@ -218,11 +229,9 @@ async function testDs() {
     const payload: any = {
       type: dsType.value,
       url: dsUrl.value,
-      auth_type: dsAuthType.value,
+      api_key: dsApiKey.value,
     }
-    if (dsAuthType.value === 'token') {
-      payload.api_key = dsApiKey.value
-    } else {
+    if (dsUseBasic.value) {
       payload.basic_login = dsBasicLogin.value
       payload.basic_password = dsBasicPass.value
     }
@@ -243,11 +252,9 @@ async function saveDs() {
     const payload: any = {
       type: dsType.value,
       url: dsUrl.value,
-      auth_type: dsAuthType.value,
+      api_key: dsApiKey.value,
     }
-    if (dsAuthType.value === 'token') {
-      payload.api_key = dsApiKey.value
-    } else {
+    if (dsUseBasic.value) {
       payload.basic_login = dsBasicLogin.value
       payload.basic_password = dsBasicPass.value
     }
@@ -257,6 +264,7 @@ async function saveDs() {
 }
 
 // Step 3: Admin
+const adminName = ref('')
 const adminUser = ref('')
 const adminPass = ref('')
 const adminPassConfirm = ref('')
@@ -271,6 +279,7 @@ async function createAdmin() {
   try {
     await axios.post('/api/setup/admin', {
       username: adminUser.value,
+      display_name: adminName.value || adminUser.value,
       password: adminPass.value,
       language: adminLang.value,
     })
@@ -341,6 +350,15 @@ const stepTitle = computed(() => {
   gap: 16px;
 }
 
+.form-row {
+  display: flex;
+  gap: 12px;
+}
+
+.flex-1 {
+  flex: 1;
+}
+
 .form-field label {
   display: block;
   font-size: 12px;
@@ -385,5 +403,26 @@ const stepTitle = computed(() => {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
+}
+
+.checkbox-field {
+  margin: -4px 0;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
 }
 </style>

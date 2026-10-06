@@ -65,37 +65,44 @@ func main() {
 	// License checker (read-only middleware)
 	var licenseChecker *middleware.LicenseChecker
 	if pgDB != nil {
-		licenseChecker = middleware.NewLicenseChecker(pgDB)
+		licenseChecker = middleware.NewLicenseChecker(&pgDB)
 	}
 
 	// Audit middleware
 	var auditMW *middleware.AuditMiddleware
 	if pgDB != nil {
-		auditMW = &middleware.AuditMiddleware{DB: pgDB}
+		auditMW = &middleware.AuditMiddleware{DB: &pgDB}
 	}
 
 	// Handlers
 	setupH := &handlers.SetupHandler{SQLite: sqliteStore, PGDB: &pgDB}
-	authH := &handlers.AuthHandler{DB: pgDB, Sessions: sessionStore, Audit: auditMW}
-	settingsH := &handlers.SettingsHandler{DB: pgDB}
-	taskH := &handlers.TaskHandler{DB: pgDB}
-	analyticsH := &handlers.AnalyticsHandler{DB: pgDB}
-	kanbanH := &handlers.KanbanHandler{DB: pgDB}
-	sprintH := &handlers.SprintHandler{DB: pgDB}
-	paymentsH := &handlers.PaymentsHandler{DB: pgDB}
-	adminH := &handlers.AdminHandler{DB: pgDB}
-	licenseH := &handlers.LicenseHandler{DB: pgDB}
-	notifH := &handlers.NotificationsHandler{DB: pgDB}
+	authH := &handlers.AuthHandler{DB: &pgDB, Sessions: sessionStore, Audit: auditMW}
+	settingsH := &handlers.SettingsHandler{DB: &pgDB, SQLite: sqliteStore}
+	taskH := &handlers.TaskHandler{DB: &pgDB}
+	analyticsH := &handlers.AnalyticsHandler{DB: &pgDB}
+	kanbanH := &handlers.KanbanHandler{DB: &pgDB}
+	sprintH := &handlers.SprintHandler{DB: &pgDB}
+	paymentsH := &handlers.PaymentsHandler{DB: &pgDB}
+	adminH := &handlers.AdminHandler{DB: &pgDB, SQLite: sqliteStore}
+	licenseH := &handlers.LicenseHandler{DB: &pgDB}
+	notifH := &handlers.NotificationsHandler{DB: &pgDB}
 	wsHub := handlers.NewWSHub()
 
+	// Create Redmine client for task sync
+	var redmineClient *redmine.Client
+	if cfg.RedmineURL != "" && cfg.RedmineAPIKey != "" {
+		redmineClient = redmine.NewClient(cfg.RedmineURL, cfg.RedmineAPIKey, cfg.RedmineBasicLogin, cfg.RedmineBasicPass)
+		taskH.RedmineClient = redmineClient
+	}
+
 	// Start Redmine sync if configured (checks read-only before each sync)
-	if cfg.RedmineURL != "" && cfg.RedmineAPIKey != "" && pgDB != nil {
-		client := redmine.NewClient(cfg.RedmineURL, cfg.RedmineAPIKey)
+	if redmineClient != nil && pgDB != nil {
+		client := redmineClient
 		syncer := redmine.NewSyncer(client)
 		go func() {
 			time.Sleep(2 * time.Second)
 			if licenseChecker == nil || !licenseChecker.IsReadOnly() {
-				if err := syncer.SyncAll(context.Background(), pgDB); err != nil {
+				if err := syncer.SyncAll(context.Background(), &pgDB); err != nil {
 					slog.Error("Initial sync failed", "error", err)
 				}
 			} else {
@@ -109,7 +116,7 @@ func main() {
 					slog.Warn("Skipping periodic sync — system is in read-only mode")
 					continue
 				}
-				if err := syncer.SyncAll(context.Background(), pgDB); err != nil {
+				if err := syncer.SyncAll(context.Background(), &pgDB); err != nil {
 					slog.Error("Periodic sync failed", "error", err)
 				}
 			}
@@ -150,7 +157,7 @@ func main() {
 
 	// Protected routes
 	api := r.PathPrefix("/api").Subrouter()
-	api.Use(middleware.RequireAuth(sessionStore, pgDB))
+	api.Use(middleware.RequireAuth(sessionStore, &pgDB))
 
 	// Wire audit middleware — logs all mutating requests
 	if auditMW != nil {
@@ -164,7 +171,10 @@ func main() {
 
 	api.HandleFunc("/auth/logout", authH.Logout).Methods("POST")
 	api.HandleFunc("/auth/me", authH.Me).Methods("GET")
+	api.HandleFunc("/auth/me", authH.UpdateMe).Methods("PUT")
 	api.HandleFunc("/auth/change-password", authH.ChangePassword).Methods("POST")
+	api.HandleFunc("/auth/avatar", authH.UploadAvatar).Methods("POST")
+	api.HandleFunc("/auth/avatar", authH.DeleteAvatar).Methods("DELETE")
 	api.HandleFunc("/settings", settingsH.GetSettings).Methods("GET")
 	api.HandleFunc("/settings", settingsH.UpdateSettings).Methods("PUT")
 
@@ -176,11 +186,15 @@ func main() {
 
 	// Tasks
 	api.HandleFunc("/tasks", taskH.ListTasks).Methods("GET")
-	api.HandleFunc("/tasks/{id}", taskH.GetTask).Methods("GET")
-	api.HandleFunc("/tasks/{id}", taskH.UpdateTask).Methods("PUT")
 	api.HandleFunc("/tasks/categories", taskH.GetCategories).Methods("GET")
 	api.HandleFunc("/tasks/projects", taskH.GetProjects).Methods("GET")
+	api.HandleFunc("/tasks/members", taskH.GetMembers).Methods("GET")
 	api.HandleFunc("/tasks/statuses", taskH.GetStatuses).Methods("GET")
+	api.HandleFunc("/tasks/priorities", taskH.GetPriorities).Methods("GET")
+	api.HandleFunc("/tasks/{id}/comments", taskH.GetComments).Methods("GET")
+	api.HandleFunc("/tasks/{id}/comments", taskH.AddComment).Methods("POST")
+	api.HandleFunc("/tasks/{id}", taskH.GetTask).Methods("GET")
+	api.HandleFunc("/tasks/{id}", taskH.UpdateTask).Methods("PUT")
 
 	// Analytics
 	api.HandleFunc("/analytics/stats", analyticsH.GetStats).Methods("GET")
@@ -234,6 +248,9 @@ func main() {
 	admin.HandleFunc("/priorities/{id}", adminH.UpdatePriority).Methods("PUT")
 	admin.HandleFunc("/datasource-config", adminH.GetDataSourceConfig).Methods("GET")
 	admin.HandleFunc("/datasource-config", adminH.SaveDataSourceConfig).Methods("PUT")
+	admin.HandleFunc("/datasource-config/test", adminH.TestDataSourceConfig).Methods("POST")
+	admin.HandleFunc("/db-config", adminH.GetDBConfig).Methods("GET")
+	admin.HandleFunc("/db-config/test", adminH.TestDBConfig).Methods("POST")
 	admin.HandleFunc("/sync-log", adminH.GetSyncLog).Methods("GET")
 	admin.HandleFunc("/audit-log", adminH.GetAuditLog).Methods("GET")
 

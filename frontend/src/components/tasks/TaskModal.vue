@@ -5,6 +5,12 @@
     width="720px"
     @update:model-value="!$event && $emit('close')"
   >
+    <template #title>
+      <template v-if="task">
+        <a :href="taskLink(task.external_id)" target="_blank" class="modal-task-link" @click.stop>#{{ task.external_id }}</a>
+        {{ task.subject }}
+      </template>
+    </template>
     <template v-if="task">
       <!-- Header info -->
       <div class="task-header">
@@ -23,8 +29,8 @@
         <div class="header-field">
           <span class="field-label">{{ $t('tasks.table.assignee') }}</span>
           <select v-model="editFields.assigned_to_name" class="field-select" @change="saveField('assigned_to_name')">
-            <option value="">—</option>
-            <option v-for="m in members" :key="m" :value="m">{{ m }}</option>
+            <option value="">Без ответственного</option>
+            <option v-for="m in memberNames" :key="m" :value="m">{{ m }}</option>
           </select>
         </div>
       </div>
@@ -34,9 +40,12 @@
           <span class="meta-label">Проект:</span>
           <span>{{ task.project_name }}</span>
         </div>
-        <div class="meta-item" v-if="task.category_name">
+        <div class="meta-item">
           <span class="meta-label">Категория:</span>
-          <span>{{ task.category_name }}</span>
+          <select v-model="editFields.category_name" class="field-select" @change="saveField('category_name')">
+            <option value="">—</option>
+            <option v-for="c in taskCategories" :key="c" :value="c">{{ c }}</option>
+          </select>
         </div>
         <div class="meta-item" v-if="task.tracker_name">
           <span class="meta-label">Тип:</span>
@@ -76,24 +85,61 @@
       <div class="loading-state">
         <AppSpinner :size="32" />
       </div>
+      <!-- Comments section -->
+      <div class="comments-section">
+        <h4 class="comments-title">Комментарии</h4>
+        <div class="comments-list">
+          <div v-if="comments.length === 0" class="no-comments">Нет комментариев</div>
+          <div v-for="c in comments" :key="c.id" class="comment-item">
+            <div class="comment-header">
+              <span class="comment-author">{{ c.author }}</span>
+              <span class="comment-date">{{ formatDate(c.created_on) }}</span>
+            </div>
+            <div class="comment-text">{{ c.text }}</div>
+          </div>
+        </div>
+        <div class="comment-form">
+          <textarea
+            v-model="newComment"
+            class="comment-input"
+            placeholder="Добавить комментарий..."
+            rows="3"
+          ></textarea>
+          <AppButton
+            variant="primary"
+            size="sm"
+            :disabled="!newComment.trim()"
+            :loading="sendingComment"
+            @click="submitComment"
+          >
+            Сохранить
+          </AppButton>
+        </div>
+      </div>
     </template>
   </AppModal>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, reactive } from 'vue'
+import { ref, computed, watch, reactive, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import AppModal from '../ui/AppModal.vue'
 import AppSpinner from '../ui/AppSpinner.vue'
+import AppButton from '../ui/AppButton.vue'
 import { useTasksStore, type Task } from '../../stores/tasks'
+import { useSettingsStore } from '../../stores/settings'
+import axios from 'axios'
 import { useSwal } from '../../composables/useSwal'
 
 const props = defineProps<{ taskId: number | null }>()
 defineEmits(['close'])
 
 const store = useTasksStore()
+const settingsStore = useSettingsStore()
+const { settings } = storeToRefs(settingsStore)
+const { tasks } = storeToRefs(store)
 const { statuses } = storeToRefs(store)
-const { showChange, error: swalError } = useSwal()
+const { showChange, error: swalError, toast } = useSwal()
 
 const task = ref<Task | null>(null)
 const loading = ref(false)
@@ -103,12 +149,71 @@ const editFields = reactive({
   status_name: '',
   priority_name: '',
   assigned_to_name: '',
+  category_name: '',
   start_date: '',
   due_date: '',
 })
 
-const priorities = ['Low', 'Normal', 'High', 'Urgent', 'Immediate']
-const members = ref<string[]>([])
+const priorities = computed(() => store.priorities.map((p: any) => p.name))
+const members = ref<{ id: number; name: string }[]>([])
+const memberNames = computed(() => {
+  const selectedTeam = settings.value.selected_team || []
+  const all = members.value
+  if (selectedTeam.length === 0) return all.map(m => m.name).sort()
+  return all.filter(m => selectedTeam.includes(m.id)).map(m => m.name).sort()
+})
+
+const comments = ref<any[]>([])
+const newComment = ref('')
+const sendingComment = ref(false)
+
+function taskLink(id: number): string {
+  const base = settings.value.data_source_url || settings.value.redmine_url || ''
+  if (base) {
+    return base.replace(/\/$/, '') + '/issues/' + id
+  }
+  return '#'
+}
+
+function formatDate(d?: string): string {
+  if (!d) return ''
+  return new Date(d).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+async function loadComments(id: number) {
+  try {
+    const { data } = await axios.get(`/api/tasks/${id}/comments`)
+    comments.value = data.comments || []
+  } catch {
+    comments.value = []
+  }
+}
+
+async function submitComment() {
+  if (!newComment.value.trim() || !task.value) return
+  sendingComment.value = true
+  try {
+    await axios.post(`/api/tasks/${task.value.external_id}/comments`, { text: newComment.value.trim() })
+    newComment.value = ''
+    await loadComments(task.value.external_id)
+    toast('Комментарий добавлен', 'success')
+  } catch {
+    toast('Ошибка добавления комментария', 'error')
+  } finally {
+    sendingComment.value = false
+  }
+}
+
+const taskCategories = computed(() => {
+  if (!task.value) return []
+  const cats = new Set<string>()
+  for (const t of tasks.value) {
+    if (t.project_id === task.value.project_id && t.category_name) {
+      cats.add(t.category_name)
+    }
+  }
+  return [...cats].sort()
+})
 
 watch(() => props.taskId, async (id) => {
   if (!id) {
@@ -121,10 +226,20 @@ watch(() => props.taskId, async (id) => {
     editFields.status_name = task.value.status_name
     editFields.priority_name = task.value.priority_name
     editFields.assigned_to_name = task.value.assigned_to_name || ''
-    editFields.start_date = task.value.start_date || ''
-    editFields.due_date = task.value.due_date || ''
+    editFields.category_name = task.value.category_name || ''
+    loadComments(task.value.external_id)
+    editFields.start_date = (task.value.start_date || '').slice(0, 10)
+    editFields.due_date = (task.value.due_date || '').slice(0, 10)
   }
   loading.value = false
+}, { immediate: true })
+
+// Load team members for assignee dropdown
+onMounted(async () => {
+  try {
+    const { data } = await axios.get('/api/tasks/members')
+    members.value = data.members || []
+  } catch {}
 })
 
 async function saveField(field: string) {
@@ -133,9 +248,22 @@ async function saveField(field: string) {
   const newValue = (editFields as any)[field] || '—'
 
   try {
-    await store.updateTask(task.value.external_id, { [field]: newValue === '—' ? null : newValue })
-    // SweetAlert2 notification per ТЗ: "Старое значение → Новое значение"
-    showChange(String(oldValue), String(newValue))
+    const result = await store.updateTask(task.value.external_id, { [field]: newValue === '—' ? null : newValue }, true)
+    // Toast notification: "Старое значение → Новое значение"
+    const fieldLabels: Record<string, string> = {
+      status_name: 'Статус',
+      priority_name: 'Приоритет',
+      assigned_to_name: 'Исполнитель',
+      category_name: 'Категория',
+      start_date: 'Дата начала',
+      due_date: 'Дедлайн',
+      estimated_hours: 'Оценка',
+    }
+    showChange(String(oldValue), String(newValue), `#${task.value.external_id} — ${fieldLabels[field] || field}`)
+    // Check Redmine sync result
+    if (result && result.redmine_ok === false) {
+      toast('Ошибка синхронизации с Redmine', 'error')
+    }
   } catch {
     swalError('Ошибка сохранения')
   }
@@ -207,6 +335,97 @@ function formatHours(h: number): string {
 .meta-label {
   color: var(--text-muted);
   font-size: 12px;
+}
+
+.modal-task-link {
+  color: var(--accent);
+  text-decoration: none;
+  margin-right: 4px;
+}
+
+.modal-task-link:hover {
+  text-decoration: underline;
+}
+
+.comments-section {
+  margin-top: 20px;
+  border-top: 1px solid var(--hairline);
+  padding-top: 16px;
+}
+
+.comments-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-bright);
+  margin-bottom: 12px;
+}
+
+.comments-list {
+  max-height: 250px;
+  overflow-y: auto;
+  margin-bottom: 12px;
+}
+
+.no-comments {
+  font-size: 12px;
+  color: var(--text-faintest);
+  padding: 8px 0;
+}
+
+.comment-item {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.comment-item:last-child {
+  border-bottom: none;
+}
+
+.comment-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.comment-author {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-bright);
+}
+
+.comment-date {
+  font-size: 11px;
+  color: var(--text-faintest);
+}
+
+.comment-text {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.comment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.comment-input {
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 10px;
+  font-size: 12px;
+  resize: vertical;
+  min-height: 60px;
+  outline: none;
+  font-family: inherit;
+}
+
+.comment-input:focus {
+  border-color: var(--accent);
 }
 
 .date-input {
