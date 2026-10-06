@@ -1,11 +1,11 @@
 package handlers
 
 import (
-	"strings"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -27,6 +27,11 @@ type loginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
+
+// dummyPasswordHash is a precomputed bcrypt hash used when the username does
+// not exist, so the response time does not reveal whether the account is real
+// (user-enumeration via timing).
+var dummyPasswordHash = []byte("$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy")
 
 // Rate limiter: 5 failed attempts per 15 minutes per username
 type loginAttempt struct {
@@ -117,6 +122,9 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	err := (*h.DB).QueryRow("SELECT id, password_hash, role, COALESCE(display_name,''), COALESCE(avatar,''), COALESCE(force_password_change, false), last_login FROM users WHERE username = $1", req.Username).
 		Scan(&id, &passwordHash, &role, &displayName, &avatar, &forcePasswordChange, &lastLogin)
 	if err != nil {
+		// Unknown user: still run bcrypt against a dummy hash so the timing
+		// matches a real failed password check (blocks account enumeration).
+		_ = bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(req.Password))
 		recordFailure(req.Username)
 		if h.Audit != nil {
 			h.Audit.LogLogin(0, req.Username, false, r)
