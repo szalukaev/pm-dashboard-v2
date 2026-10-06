@@ -30,6 +30,7 @@ const routes = [
       { path: 'sprint', name: 'sprint', component: () => import('../views/SprintView.vue') },
       { path: 'payments', name: 'payments', component: () => import('../views/PaymentsView.vue') },
       { path: 'settings', name: 'settings', component: () => import('../views/SettingsView.vue') },
+      { path: 'license', name: 'license', component: () => import('../views/LicenseView.vue') },
     ]
   }
 ]
