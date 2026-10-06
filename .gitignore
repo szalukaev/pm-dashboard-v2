@@ -37,3 +37,6 @@ data/
 UI_GUIDE_PM_Dashboard.md
 /.mimocode
 ТЗ_PM_Dashboard_3.3.docx
+
+# Agent sidecar noise
+.agent-context/
