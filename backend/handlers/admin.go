@@ -5,8 +5,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"pm-dashboard/config"
 	"pm-dashboard/middleware"
@@ -222,7 +224,18 @@ func (h *AdminHandler) TestDataSourceConfig(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	client := &http.Client{}
+	// Validate URL scheme — only http/https are allowed.
+	warning := ""
+	u, err := url.Parse(req.URL)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		utils.JSON(w, http.StatusOK, map[string]interface{}{"success": false, "error": "URL must start with http:// or https://"})
+		return
+	}
+	if u.Scheme == "http" {
+		warning = "HTTP is not encrypted; use HTTPS in production"
+	}
+
+	client := &http.Client{Timeout: 8 * time.Second}
 	httpReq, err := http.NewRequest("GET", req.URL+"/projects.json?limit=1", nil)
 	if err != nil {
 		utils.JSON(w, http.StatusOK, map[string]interface{}{"success": false, "error": err.Error()})
@@ -245,7 +258,7 @@ func (h *AdminHandler) TestDataSourceConfig(w http.ResponseWriter, r *http.Reque
 		utils.JSON(w, http.StatusOK, map[string]interface{}{"success": false, "error": "HTTP " + resp.Status})
 		return
 	}
-	utils.JSON(w, http.StatusOK, map[string]interface{}{"success": true})
+	utils.JSON(w, http.StatusOK, map[string]interface{}{"success": true, "warning": warning})
 }
 
 // secretMask is returned for stored secrets so the UI can round-trip the form
@@ -346,7 +359,16 @@ func (h *AdminHandler) TestDBConfig(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
 		return
 	}
-	testDB, err := sql.Open("postgres", req.DSN)
+	// Cap connection setup time so a black-hole host can't hang the handler.
+	dsn := req.DSN
+	if strings.Contains(dsn, "connect_timeout=") {
+		// already set by caller — leave as-is
+	} else if strings.Contains(dsn, "?") {
+		dsn += "&connect_timeout=5"
+	} else {
+		dsn += "?connect_timeout=5"
+	}
+	testDB, err := sql.Open("postgres", dsn)
 	if err != nil {
 		utils.JSON(w, http.StatusOK, map[string]interface{}{"success": false, "error": err.Error()})
 		return

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"pm-dashboard/config"
 	"pm-dashboard/db"
@@ -44,12 +45,12 @@ type adminCreateRequest struct {
 }
 
 func buildDSN(r dbTestRequest) string {
-	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable&connect_timeout=5",
 		r.User, r.Password, r.Host, portOrDefault(r.Port), r.DBName)
 }
 
 func buildMaintDSN(r dbTestRequest) string {
-	return fmt.Sprintf("postgres://%s:%s@%s:%s/postgres?sslmode=disable",
+	return fmt.Sprintf("postgres://%s:%s@%s:%s/postgres?sslmode=disable&connect_timeout=5",
 		r.User, r.Password, r.Host, portOrDefault(r.Port))
 }
 
@@ -191,7 +192,7 @@ func (h *SetupHandler) TestDataSource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: 8 * time.Second}
 	httpReq, err := http.NewRequest("GET", req.URL+"/projects.json?limit=1", nil)
 	if err != nil {
 		utils.JSON(w, http.StatusOK, map[string]interface{}{"success": false, "error": err.Error()})
