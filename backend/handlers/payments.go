@@ -225,10 +225,15 @@ func (h *PaymentsHandler) CreateContract(w http.ResponseWriter, r *http.Request)
 		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
 		return
 	}
-	// Inherit from org if provided
+	// Inherit from org if provided (only the caller's own organization)
 	if body.OrganizationID != nil {
 		var orgName, orgAddr, orgContact, orgPhone sql.NullString
-		(*h.DB).QueryRow("SELECT name, address, contact_name, contact_phone FROM organizations WHERE id=$1", *body.OrganizationID).Scan(&orgName, &orgAddr, &orgContact, &orgPhone)
+		err := (*h.DB).QueryRow("SELECT name, address, contact_name, contact_phone FROM organizations WHERE id=$1 AND user_id=$2", *body.OrganizationID, userID).Scan(&orgName, &orgAddr, &orgContact, &orgPhone)
+		if err != nil {
+			// Foreign or missing organization — refuse rather than cross-link.
+			utils.Error(w, http.StatusNotFound, "ORGANIZATION_NOT_FOUND")
+			return
+		}
 		if body.CompanyName == nil && orgName.Valid { body.CompanyName = &orgName.String }
 		if body.CompanyAddress == nil && orgAddr.Valid { body.CompanyAddress = &orgAddr.String }
 		if body.ContactName == nil && orgContact.Valid { body.ContactName = &orgContact.String }
@@ -279,9 +284,12 @@ func (h *PaymentsHandler) DeleteContract(w http.ResponseWriter, r *http.Request)
 // ─── Invoice ───
 
 func (h *PaymentsHandler) ListInvoices(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r)
 	contractID, _ := strconv.Atoi(mux.Vars(r)["id"])
-	rows, err := (*h.DB).Query(`SELECT id, amount, vat_rate, issued_at, paid_amount, status
-		FROM invoices WHERE contract_id=$1 ORDER BY issued_at DESC`, contractID)
+	// Ownership: invoices are visible only via a contract belonging to the caller.
+	rows, err := (*h.DB).Query(`SELECT i.id, i.amount, i.vat_rate, i.issued_at, i.paid_amount, i.status
+		FROM invoices i JOIN contracts c ON i.contract_id = c.id
+		WHERE i.contract_id=$1 AND c.user_id=$2 ORDER BY i.issued_at DESC`, contractID, userID)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED"); return
 	}
@@ -352,16 +360,29 @@ func (h *PaymentsHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *PaymentsHandler) DeleteInvoice(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r)
 	invoiceID, _ := strconv.Atoi(mux.Vars(r)["invoiceId"])
-	(*h.DB).Exec("DELETE FROM invoices WHERE id=$1", invoiceID)
+	// Ownership: delete only an invoice of the caller's own contract.
+	res, err := (*h.DB).Exec(`DELETE FROM invoices WHERE id=$1 AND contract_id IN
+		(SELECT id FROM contracts WHERE user_id=$2)`, invoiceID, userID)
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "DELETE_FAILED"); return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		utils.Error(w, http.StatusNotFound, "INVOICE_NOT_FOUND"); return
+	}
 	utils.Success(w)
 }
 
 func (h *PaymentsHandler) PayInvoice(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r)
 	invoiceID, _ := strconv.Atoi(mux.Vars(r)["invoiceId"])
 
+	// Ownership: pay only an invoice of the caller's own contract.
 	var inv struct{ Amount float64; VatRate string; PaidAmount float64 }
-	err := (*h.DB).QueryRow("SELECT amount, vat_rate, paid_amount FROM invoices WHERE id=$1", invoiceID).Scan(&inv.Amount, &inv.VatRate, &inv.PaidAmount)
+	err := (*h.DB).QueryRow(`SELECT i.amount, i.vat_rate, i.paid_amount
+		FROM invoices i JOIN contracts c ON i.contract_id = c.id
+		WHERE i.id=$1 AND c.user_id=$2`, invoiceID, userID).Scan(&inv.Amount, &inv.VatRate, &inv.PaidAmount)
 	if err != nil { utils.Error(w, http.StatusNotFound, "INVOICE_NOT_FOUND"); return }
 
 	vatMul := 1.0
@@ -392,16 +413,19 @@ func (h *PaymentsHandler) PayInvoice(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PaymentsHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r)
 	invoiceID, _ := strconv.Atoi(mux.Vars(r)["invoiceId"])
 
-	// Get invoice + contract info
+	// Get invoice + contract info (only the caller's own invoice)
 	var inv struct {
 		ContractID int
 		Amount     float64
 		VatRate    string
 		IssuedAt   string
 	}
-	err := (*h.DB).QueryRow("SELECT contract_id, amount, vat_rate, issued_at FROM invoices WHERE id=$1", invoiceID).Scan(
+	err := (*h.DB).QueryRow(`SELECT i.contract_id, i.amount, i.vat_rate, i.issued_at
+		FROM invoices i JOIN contracts c ON i.contract_id = c.id
+		WHERE i.id=$1 AND c.user_id=$2`, invoiceID, userID).Scan(
 		&inv.ContractID, &inv.Amount, &inv.VatRate, &inv.IssuedAt)
 	if err != nil {
 		utils.Error(w, http.StatusNotFound, "INVOICE_NOT_FOUND")
@@ -418,7 +442,7 @@ func (h *PaymentsHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request
 	}
 	(*h.DB).QueryRow(`SELECT COALESCE(company_name,''), COALESCE(company_address,''),
 		COALESCE(contact_phone,''), COALESCE(contact_name,''), vat_rate, name
-		FROM contracts WHERE id=$1`, inv.ContractID).Scan(
+		FROM contracts WHERE id=$1 AND user_id=$2`, inv.ContractID, userID).Scan(
 		&contract.CompanyName, &contract.CompanyAddress, &contract.ContactPhone,
 		&contract.ContactName, &contract.VatRate, &contract.Name)
 
