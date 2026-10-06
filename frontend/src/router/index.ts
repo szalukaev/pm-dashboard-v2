@@ -3,6 +3,9 @@ import axios from 'axios'
 
 const APP_VERSION = '3.0.0'
 let versionWarningShown = false
+// /api/setup/status is stable for the lifetime of the SPA — fetch once.
+let setupStatusChecked = false
+let setupIsComplete = false
 
 const routes = [
   {
@@ -37,17 +40,23 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to, _from, next) => {
-  // Check setup status
-  try {
-    const { data } = await axios.get('/api/setup/status')
-    if (!data.isComplete && to.name !== 'setup') {
+  // Check setup status (once per session — value cannot change without a reload)
+  if (!setupStatusChecked) {
+    try {
+      const { data } = await axios.get('/api/setup/status')
+      setupIsComplete = !!data.isComplete
+      setupStatusChecked = true
+    } catch {
+      // API not available — allow navigation, retry on next nav
+    }
+  }
+  if (setupStatusChecked) {
+    if (!setupIsComplete && to.name !== 'setup') {
       return next({ name: 'setup' })
     }
-    if (data.isComplete && to.name === 'setup') {
+    if (setupIsComplete && to.name === 'setup') {
       return next({ name: 'tasks' })
     }
-  } catch {
-    // API not available — allow navigation
   }
 
   // Version check (once per session) — show visible warning
