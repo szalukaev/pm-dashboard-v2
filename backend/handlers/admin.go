@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"pm-dashboard/config"
 	"pm-dashboard/middleware"
@@ -247,6 +248,44 @@ func (h *AdminHandler) TestDataSourceConfig(w http.ResponseWriter, r *http.Reque
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"success": true})
 }
 
+// secretMask is returned for stored secrets so the UI can round-trip the form
+// without exposing the real value. Save* ignores this mask and keeps the old value.
+const secretMask = "••••••••"
+
+// maskSecret returns secretMask if v is set, otherwise an empty string.
+func maskSecret(v string) string {
+	if v == "" {
+		return ""
+	}
+	return secretMask
+}
+
+// isSecretMask reports whether the incoming value is the UI placeholder.
+func isSecretMask(v string) bool {
+	return v == secretMask
+}
+
+// maskDSNPassword replaces the password part of a postgres URL DSN with ****.
+// Non-URL DSNs are returned as-is (cannot reliably locate the password).
+func maskDSNPassword(dsn string) string {
+	if dsn == "" {
+		return ""
+	}
+	// postgres://user:pass@host:port/db?opts
+	if i := strings.Index(dsn, "://"); i >= 0 {
+		rest := dsn[i+3:]
+		if at := strings.Index(rest, "@"); at >= 0 {
+			cred := rest[:at]
+			if colon := strings.Index(cred, ":"); colon >= 0 {
+				return dsn[:i+3] + cred[:colon+1] + "****" + rest[at:]
+			}
+			// no password in userinfo
+			return dsn
+		}
+	}
+	return dsn
+}
+
 func (h *AdminHandler) GetDataSourceConfig(w http.ResponseWriter, r *http.Request) {
 	get := func(key string) string {
 		v, _ := h.SQLite.Get(key)
@@ -256,9 +295,9 @@ func (h *AdminHandler) GetDataSourceConfig(w http.ResponseWriter, r *http.Reques
 		"config": map[string]interface{}{
 			"type":           get("data_source_type"),
 			"url":            get("redmine_url"),
-			"api_key":        get("redmine_api_key"),
+			"api_key":        maskSecret(get("redmine_api_key")),
 			"basic_login":    get("redmine_basic_login"),
-			"basic_password": get("redmine_basic_password"),
+			"basic_password": maskSecret(get("redmine_basic_password")),
 		},
 	})
 }
@@ -278,9 +317,14 @@ func (h *AdminHandler) SaveDataSourceConfig(w http.ResponseWriter, r *http.Reque
 
 	h.SQLite.Set("data_source_type", body.Type)
 	h.SQLite.Set("redmine_url", body.URL)
-	h.SQLite.Set("redmine_api_key", body.APIKey)
 	h.SQLite.Set("redmine_basic_login", body.BasicLogin)
-	h.SQLite.Set("redmine_basic_password", body.BasicPasswd)
+	// Masked values mean "unchanged" — don't overwrite real secrets.
+	if !isSecretMask(body.APIKey) {
+		h.SQLite.Set("redmine_api_key", body.APIKey)
+	}
+	if !isSecretMask(body.BasicPasswd) {
+		h.SQLite.Set("redmine_basic_password", body.BasicPasswd)
+	}
 
 	utils.Success(w)
 }
@@ -289,9 +333,8 @@ func (h *AdminHandler) SaveDataSourceConfig(w http.ResponseWriter, r *http.Reque
 
 func (h *AdminHandler) GetDBConfig(w http.ResponseWriter, r *http.Request) {
 	dsn, _ := h.SQLite.Get("db_dsn")
-	// Parse DSN to return separate fields (don't expose password in full DSN)
-	// Format: postgres://user:pass@host:port/dbname?sslmode=disable
-	cfg := map[string]string{"dsn": dsn}
+	// Never return the raw password — mask it inside the DSN.
+	cfg := map[string]string{"dsn": maskDSNPassword(dsn)}
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"config": cfg})
 }
 
