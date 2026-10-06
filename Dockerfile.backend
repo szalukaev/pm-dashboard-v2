@@ -10,7 +10,11 @@ FROM alpine:3.19
 RUN apk add --no-cache ca-certificates
 COPY --from=builder /pm-dashboard /usr/local/bin/
 COPY --from=builder /app/invoice /app/invoice
+# File migrations must ship with the image; otherwise RunMigrations
+# falls back to embedded SQL and future NNN_*.up.sql never apply.
+COPY --from=builder /app/db/migrations /app/db/migrations
+WORKDIR /app
 RUN mkdir -p /data
 EXPOSE 8080
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -qO- http://localhost:8080/api/setup/status || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -qO- http://127.0.0.1:8080/api/setup/status || exit 1
 CMD ["pm-dashboard"]
