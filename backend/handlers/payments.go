@@ -391,11 +391,22 @@ func (h *PaymentsHandler) PayInvoice(w http.ResponseWriter, r *http.Request) {
 	remainder := totalObligation - inv.PaidAmount
 
 	var body struct{ Amount *float64 `json:"amount"`; PaidAt *string `json:"paid_at"` }
-	json.NewDecoder(r.Body).Decode(&body)
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
+		return
+	}
 
 	payAmount := remainder
 	if body.Amount != nil { payAmount = *body.Amount }
-	if payAmount > remainder { payAmount = remainder }
+	// Reject non-positive and over-payment amounts instead of clamping silently.
+	if payAmount <= 0 {
+		utils.Error(w, http.StatusBadRequest, "INVALID_AMOUNT")
+		return
+	}
+	if payAmount > remainder {
+		utils.Error(w, http.StatusBadRequest, "INVALID_AMOUNT")
+		return
+	}
 	payAmount = utils.Round2(payAmount)
 
 	payDate := time.Now().Format("2006-01-02")
@@ -406,8 +417,27 @@ func (h *PaymentsHandler) PayInvoice(w http.ResponseWriter, r *http.Request) {
 	status := "partial"
 	if newPaid >= totalObligation { status = "paid" }
 
-	(*h.DB).Exec("UPDATE invoices SET paid_amount=$1, status=$2 WHERE id=$3", newPaid, status, invoiceID)
-	(*h.DB).Exec("INSERT INTO contract_payments (invoice_id, amount, paid_at) VALUES ($1,$2,$3)", invoiceID, payAmount, payDate)
+	// Atomic update of invoice + payment row (avoids lost updates on
+	// concurrent payments and inconsistent state if one statement fails).
+	tx, err := (*h.DB).Begin()
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "TX_FAILED")
+		return
+	}
+	if _, err := tx.Exec("UPDATE invoices SET paid_amount=$1, status=$2 WHERE id=$3", newPaid, status, invoiceID); err != nil {
+		tx.Rollback()
+		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+		return
+	}
+	if _, err := tx.Exec("INSERT INTO contract_payments (invoice_id, amount, paid_at) VALUES ($1,$2,$3)", invoiceID, payAmount, payDate); err != nil {
+		tx.Rollback()
+		utils.Error(w, http.StatusInternalServerError, "INSERT_FAILED")
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		utils.Error(w, http.StatusInternalServerError, "COMMIT_FAILED")
+		return
+	}
 
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"success": true, "paid_amount": newPaid, "status": status})
 }
