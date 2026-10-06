@@ -100,6 +100,7 @@ func main() {
 		}()
 	}
 
+
 	// Create Redmine client for task sync
 	var redmineClient *redmine.Client
 	if cfg.RedmineURL != "" && cfg.RedmineAPIKey != "" {
