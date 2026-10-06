@@ -34,17 +34,45 @@ type loginRequest struct {
 // (user-enumeration via timing).
 var dummyPasswordHash = []byte("$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy")
 
-// Rate limiter: 5 failed attempts per 15 minutes per username
+// Rate limiter: 5 failed attempts per 15 minutes per username,
+// 20 failed attempts per 15 minutes per client IP.
 type loginAttempt struct {
-	Count     int
-	FirstFail time.Time
+	Count       int
+	FirstFail   time.Time
 	LockedUntil time.Time
 }
 
-var (
-	loginAttempts = make(map[string]*loginAttempt)
-	loginMu       sync.Mutex
+const (
+	loginMaxPerUser = 5
+	loginMaxPerIP   = 20
+	loginWindow     = 15 * time.Minute
+	loginLockTime   = 15 * time.Minute
 )
+
+var (
+	loginAttempts  = make(map[string]*loginAttempt)
+	loginIPAttempts = make(map[string]*loginAttempt)
+	loginMu        sync.Mutex
+)
+
+// attemptLocked reports whether the entry is currently locked or its window expired.
+// Caller must hold loginMu. Returns locked, expired.
+func attemptLocked(a *loginAttempt) (bool, bool) {
+	if a == nil {
+		return false, false
+	}
+	if !a.LockedUntil.IsZero() {
+		if time.Now().Before(a.LockedUntil) {
+			return true, false
+		}
+		// lock expired
+		return false, true
+	}
+	if time.Since(a.FirstFail) > loginWindow {
+		return false, true
+	}
+	return false, false
+}
 
 func isLocked(username string) bool {
 	loginMu.Lock()
@@ -53,20 +81,28 @@ func isLocked(username string) bool {
 	if !ok {
 		return false
 	}
-	if !a.LockedUntil.IsZero() && time.Now().Before(a.LockedUntil) {
-		return true
-	}
-	// Reset if lock expired
-	if !a.LockedUntil.IsZero() && time.Now().After(a.LockedUntil) {
+	locked, expired := attemptLocked(a)
+	if expired {
 		delete(loginAttempts, username)
 		return false
 	}
-	// Reset if window expired
-	if time.Now().Sub(a.FirstFail) > 15*time.Minute {
-		delete(loginAttempts, username)
+	return locked
+}
+
+// isIPLocked blocks a client IP after too many failures from many usernames.
+func isIPLocked(ip string) bool {
+	loginMu.Lock()
+	defer loginMu.Unlock()
+	a, ok := loginIPAttempts[ip]
+	if !ok {
 		return false
 	}
-	return false
+	locked, expired := attemptLocked(a)
+	if expired {
+		delete(loginIPAttempts, ip)
+		return false
+	}
+	return locked
 }
 
 func recordFailure(username string) {
@@ -77,14 +113,32 @@ func recordFailure(username string) {
 		loginAttempts[username] = &loginAttempt{Count: 1, FirstFail: time.Now()}
 		return
 	}
-	// Reset if window expired
-	if time.Now().Sub(a.FirstFail) > 15*time.Minute {
+	if _, expired := attemptLocked(a); expired {
 		loginAttempts[username] = &loginAttempt{Count: 1, FirstFail: time.Now()}
 		return
 	}
 	a.Count++
-	if a.Count >= 5 {
-		a.LockedUntil = time.Now().Add(15 * time.Minute)
+	if a.Count >= loginMaxPerUser {
+		a.LockedUntil = time.Now().Add(loginLockTime)
+	}
+}
+
+// recordIPFailure counts a failed login against the client IP.
+func recordIPFailure(ip string) {
+	loginMu.Lock()
+	defer loginMu.Unlock()
+	a, ok := loginIPAttempts[ip]
+	if !ok {
+		loginIPAttempts[ip] = &loginAttempt{Count: 1, FirstFail: time.Now()}
+		return
+	}
+	if _, expired := attemptLocked(a); expired {
+		loginIPAttempts[ip] = &loginAttempt{Count: 1, FirstFail: time.Now()}
+		return
+	}
+	a.Count++
+	if a.Count >= loginMaxPerIP {
+		a.LockedUntil = time.Now().Add(loginLockTime)
 	}
 }
 
@@ -110,8 +164,9 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check rate limit
-	if isLocked(req.Username) {
+	// Check rate limit (username + client IP)
+	clientIP := middleware.ClientIP(r)
+	if isLocked(req.Username) || isIPLocked(clientIP) {
 		utils.Error(w, http.StatusTooManyRequests, "TOO_MANY_ATTEMPTS")
 		return
 	}
@@ -127,6 +182,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		// matches a real failed password check (blocks account enumeration).
 		_ = bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(req.Password))
 		recordFailure(req.Username)
+		recordIPFailure(clientIP)
 		if h.Audit != nil {
 			h.Audit.LogLogin(0, req.Username, false, r)
 		}
@@ -136,6 +192,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(req.Password)); err != nil {
 		recordFailure(req.Username)
+		recordIPFailure(clientIP)
 		if h.Audit != nil {
 			h.Audit.LogLogin(0, req.Username, false, r)
 		}
