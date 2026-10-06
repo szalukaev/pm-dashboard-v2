@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -17,6 +18,7 @@ type LicenseChecker struct {
 	isReadOnly    bool
 	lastCheck     time.Time
 	checkInterval time.Duration
+	checkRunning  atomic.Bool
 }
 
 func NewLicenseChecker(db **sql.DB) *LicenseChecker {
@@ -62,9 +64,14 @@ func (lc *LicenseChecker) check() {
 func (lc *LicenseChecker) IsReadOnly() bool {
 	lc.mu.RLock()
 	defer lc.mu.RUnlock()
-	// Periodic re-check
+	// Periodic re-check — at most one in-flight goroutine.
 	if time.Since(lc.lastCheck) > lc.checkInterval {
-		go lc.check()
+		if lc.checkRunning.CompareAndSwap(false, true) {
+			go func() {
+				defer lc.checkRunning.Store(false)
+				lc.check()
+			}()
+		}
 	}
 	return lc.isReadOnly
 }

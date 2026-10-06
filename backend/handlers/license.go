@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -61,6 +62,13 @@ type LicenseStatus struct {
 func (h *LicenseHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 	status := h.checkLicense()
 	utils.JSON(w, http.StatusOK, status)
+}
+
+// RunPeriodicCheck performs a full license check outside of HTTP handling.
+// Called from a background ticker so the grace period can start even if
+// nobody opens the license page.
+func (h *LicenseHandler) RunPeriodicCheck() {
+	h.checkLicense()
 }
 
 func (h *LicenseHandler) Activate(w http.ResponseWriter, r *http.Request) {
@@ -238,12 +246,24 @@ func readHWID() string {
 	return strings.TrimSpace(string(data))
 }
 
+// readMachineID returns a stable machine identifier.
+// Order: /etc/machine-id → env PM_HWID → hostname (with a warning).
+// The hostname fallback is unstable across renames — set PM_HWID in production.
 func readMachineID() string {
 	data, err := os.ReadFile("/etc/machine-id")
-	if err != nil {
+	if err == nil {
+		return strings.TrimSpace(string(data))
+	}
+	if hwid := os.Getenv("PM_HWID"); hwid != "" {
+		return hwid
+	}
+	host, herr := os.Hostname()
+	if herr != nil || host == "" {
+		slog.Warn("HWID: /etc/machine-id unavailable, PM_HWID unset, hostname failed — license may not activate")
 		return ""
 	}
-	return strings.TrimSpace(string(data))
+	slog.Warn("HWID: /etc/machine-id unavailable, falling back to hostname; set PM_HWID for a stable license binding", "hostname", host)
+	return host
 }
 
 func readBoardSerial() string {

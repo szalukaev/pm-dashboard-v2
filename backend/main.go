@@ -88,6 +88,18 @@ func main() {
 	notifH := &handlers.NotificationsHandler{DB: &pgDB}
 	wsHub := handlers.NewWSHub()
 
+	// License periodic check — starts grace period without visiting the license page
+	if pgDB != nil {
+		go func() {
+			licenseH.RunPeriodicCheck()
+			ticker := time.NewTicker(6 * time.Hour)
+			defer ticker.Stop()
+			for range ticker.C {
+				licenseH.RunPeriodicCheck()
+			}
+		}()
+	}
+
 	// Create Redmine client for task sync
 	var redmineClient *redmine.Client
 	if cfg.RedmineURL != "" && cfg.RedmineAPIKey != "" {
