@@ -534,7 +534,7 @@ func (h *PaymentsHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	(*h.DB).QueryRow("SELECT COUNT(*) FROM contracts WHERE user_id=$1", userID).Scan(&contractCount)
 	(*h.DB).QueryRow("SELECT COALESCE(SUM(amount),0) FROM contracts WHERE user_id=$1", userID).Scan(&totalAmount)
 
-	// Total invoiced
+	// Total invoiced (net)
 	(*h.DB).QueryRow(`SELECT COALESCE(SUM(i.amount),0) FROM invoices i
 		JOIN contracts c ON i.contract_id=c.id WHERE c.user_id=$1`, userID).Scan(&totalInvoiced)
 
@@ -542,14 +542,34 @@ func (h *PaymentsHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	(*h.DB).QueryRow(`SELECT COALESCE(SUM(p.amount),0) FROM contract_payments p
 		JOIN invoices i ON p.invoice_id=i.id JOIN contracts c ON i.contract_id=c.id WHERE c.user_id=$1`, userID).Scan(&totalPaid)
 
-	// Debt = total obligation - total paid (simplified)
-	totalDebt = totalInvoiced*1.025 - totalPaid // approximate with VAT
-	if totalDebt < 0 { totalDebt = 0 }
+	// Debt = Σ(total_amount * (1 + vat_rate/100)) − totalPaid, по фактическому НДС каждого счёта
+	// (раньше стояло грубое *1.025 на всю сумму).
+	_ = (*h.DB).QueryRow(`SELECT COALESCE(SUM(i.amount * (1 + CASE
+			WHEN i.vat_rate = '5' THEN 0.05
+			ELSE 0
+		END)), 0)
+		FROM invoices i JOIN contracts c ON i.contract_id=c.id WHERE c.user_id=$1`, userID).Scan(&totalDebt)
+	totalDebt = totalDebt - totalPaid
+	if totalDebt < 0 {
+		totalDebt = 0
+	}
 
-	// Closed count (simplified)
-	(*h.DB).QueryRow(`SELECT COUNT(*) FROM contracts WHERE user_id=$1 AND (
-		(contract_type='onetime' AND id IN (SELECT contract_id FROM invoices GROUP BY contract_id HAVING SUM(paid_amount) >= SUM(amount)))
-		OR (contract_type='service' AND end_date <= CURRENT_DATE)
+	// Closed count — та же логика закрытия, что в ListContracts:
+	// onetime: оплачено полностью; service: дата окончания прошла и долга нет.
+	(*h.DB).QueryRow(`SELECT COUNT(*) FROM contracts c WHERE c.user_id=$1 AND (
+		(c.contract_type = 'onetime' AND EXISTS (
+			SELECT 1 FROM invoices i WHERE i.contract_id = c.id
+		) AND COALESCE((SELECT SUM(p.amount) FROM contract_payments p
+			JOIN invoices i ON p.invoice_id = i.id WHERE i.contract_id = c.id), 0) >=
+			COALESCE((SELECT SUM(i.amount * (1 + CASE WHEN i.vat_rate = '5' THEN 0.05 ELSE 0 END))
+				FROM invoices i WHERE i.contract_id = c.id), 0)
+			AND COALESCE((SELECT SUM(p.amount) FROM contract_payments p
+			JOIN invoices i ON p.invoice_id = i.id WHERE i.contract_id = c.id), 0) > 0)
+		OR (c.contract_type = 'service' AND c.end_date IS NOT NULL AND c.end_date <= CURRENT_DATE
+			AND COALESCE((SELECT SUM(p.amount) FROM contract_payments p
+				JOIN invoices i ON p.invoice_id = i.id WHERE i.contract_id = c.id), 0) >=
+				COALESCE((SELECT SUM(i.amount * (1 + CASE WHEN i.vat_rate = '5' THEN 0.05 ELSE 0 END))
+					FROM invoices i WHERE i.contract_id = c.id), 0))
 	)`, userID).Scan(&closedCount)
 
 	stats := []map[string]interface{}{
