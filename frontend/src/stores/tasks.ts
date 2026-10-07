@@ -152,6 +152,30 @@ export const useTasksStore = defineStore('tasks', () => {
     saveFilters()
   }
 
+  // Active query filters that narrow the result set (grouping/sort are view prefs).
+  function hasActiveFilters(): boolean {
+    return !!(
+      filters.value.project_id ||
+      filters.value.search ||
+      filters.value.category ||
+      (filters.value.type && filters.value.type !== 'all')
+    )
+  }
+
+  async function resetFilters() {
+    filters.value = {
+      type: 'open',
+      project_id: '',
+      search: '',
+      group_by: filters.value.group_by,
+      category: '',
+      sort_by: 'external_id',
+      sort_dir: 'desc',
+    }
+    await saveFilters()
+    await fetchTasks()
+  }
+
   async function saveFilters() {
     try {
       await axios.put('/api/settings', { last_filters: { tasks: { ...filters.value, useGrouping: useGrouping.value } } })
@@ -178,6 +202,7 @@ export const useTasksStore = defineStore('tasks', () => {
     tasks, groups, loading, error, total, useGrouping, filters,
     projects, categories, statuses, priorities,
     fetchTasks, fetchTask, updateTask,
-    fetchProjects, fetchCategories, fetchStatuses, fetchPriorities, setFilter, restoreFilters,
+    fetchProjects, fetchCategories, fetchStatuses, fetchPriorities,
+    setFilter, restoreFilters, resetFilters, hasActiveFilters,
   }
 })

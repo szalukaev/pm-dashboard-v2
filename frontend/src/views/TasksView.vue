@@ -20,6 +20,15 @@
     <!-- Error state -->
     <AppEmptyState v-else-if="error" state="error" @retry="fetchTasks" />
 
+    <!-- Empty state: no rows because of active filters -->
+    <div v-else-if="total === 0 && !loading && hasActiveFilters()" class="filtered-empty" data-testid="filtered-empty">
+      <p class="filtered-empty-title">Нет задач по текущим фильтрам</p>
+      <p class="filtered-empty-hint">Сбросьте фильтры, чтобы увидеть все задачи</p>
+      <button class="reset-filters-btn" data-testid="reset-filters" @click="resetFilters">
+        Сбросить фильтры
+      </button>
+    </div>
+
     <!-- Empty state -->
     <AppEmptyState v-else-if="total === 0 && !loading" state="empty" />
 
@@ -59,7 +68,7 @@ import AppEmptyState from '../components/ui/AppEmptyState.vue'
 
 const store = useTasksStore()
 const { tasks, groups, loading, error, total, useGrouping } = storeToRefs(store)
-const { fetchTasks } = store
+const { fetchTasks, resetFilters, hasActiveFilters } = store
 
 const selectedTaskId = ref<number | null>(null)
 
@@ -118,6 +127,42 @@ onMounted(async () => {
   background: var(--surface-2);
   border-radius: 4px;
   animation: skeleton-pulse 1.2s ease-in-out infinite;
+}
+
+.filtered-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  gap: 10px;
+}
+
+.filtered-empty-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-bright);
+}
+
+.filtered-empty-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.reset-filters-btn {
+  margin-top: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: var(--accent-bg);
+  color: var(--text-bright);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.reset-filters-btn:hover {
+  filter: brightness(1.1);
 }
 
 @keyframes skeleton-pulse {
