@@ -169,9 +169,8 @@ func main() {
 		})
 	}).Methods("GET")
 
-	// License endpoints (public — no auth required)
+	// License status is public (banner for every user); activation is admin-only, see below
 	r.HandleFunc("/api/license/status", licenseH.GetStatus).Methods("GET")
-	r.HandleFunc("/api/license/activate", licenseH.Activate).Methods("POST")
 
 	// Auth endpoints (no auth required for login)
 	r.HandleFunc("/api/auth/login", authH.Login).Methods("POST")
@@ -189,6 +188,8 @@ func main() {
 	if licenseChecker != nil {
 		api.Use(licenseChecker.ReadOnlyMiddleware)
 	}
+
+	api.Handle("/license/activate", middleware.RequireAdmin(http.HandlerFunc(licenseH.Activate))).Methods("POST")
 
 	api.HandleFunc("/auth/logout", authH.Logout).Methods("POST")
 	api.HandleFunc("/auth/me", authH.Me).Methods("GET")
