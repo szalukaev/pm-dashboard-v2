@@ -36,6 +36,7 @@
     <TaskAccordion
       v-else-if="useGrouping && groups.length > 0"
       :groups="groups"
+      :group-by="filters.group_by"
       @open-task="openTask"
     />
 
@@ -67,7 +68,7 @@ import TaskModal from '../components/tasks/TaskModal.vue'
 import AppEmptyState from '../components/ui/AppEmptyState.vue'
 
 const store = useTasksStore()
-const { tasks, groups, loading, error, total, useGrouping } = storeToRefs(store)
+const { tasks, groups, loading, error, total, useGrouping, filters } = storeToRefs(store)
 const { fetchTasks, resetFilters, hasActiveFilters } = store
 
 const selectedTaskId = ref<number | null>(null)
@@ -101,11 +102,11 @@ onMounted(async () => {
 
 <style scoped>
 .page-title {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--text-bright);
   letter-spacing: -0.4px;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 
 .skeleton-list {

@@ -1,71 +1,87 @@
 <template>
   <div class="task-accordion">
-    <div
-      v-for="group in sortedGroups"
-      :key="group.name"
-      class="accordion-group"
-    >
-      <div
-        class="accordion-header"
-        @click="toggle(group.name)"
-        :data-testid="'accordion-' + group.name"
-      >
-        <ChevronDown
-          :size="16"
-          class="chevron"
-          :class="{ collapsed: !isOpen(group.name) }"
-        />
-        <span class="group-name">{{ group.name }}</span>
-        <span class="group-count">{{ group.task_count }}</span>
-        <span class="group-metric">
-          <span class="metric-label">{{ $t('tasks.accordions.estimate') }}:</span>
-          {{ formatHours(group.estimate_total) }}
-        </span>
-        <span class="group-metric">
-          <span class="metric-label">{{ $t('tasks.accordions.fact') }}:</span>
-          {{ formatHours(group.fact_total) }}
-        </span>
-      </div>
+    <!-- By project: a heading above each project's table -->
+    <template v-if="groupBy === 'project'">
+      <section v-for="group in sortedGroups" :key="group.name" class="project-group">
+        <h2
+          class="project-title"
+          @click="toggle(group.name)"
+          :data-testid="'accordion-' + group.name"
+        >
+          <ChevronDown :size="18" class="chevron" :class="{ collapsed: !isOpen(group.name) }" />
+          {{ group.name }}
+          <span class="project-count">({{ group.task_count }})</span>
+          <span class="group-metric">
+            Оценка: <b class="estimate">{{ formatTotal(group.estimate_total) }}</b>
+          </span>
+          <span class="group-metric">
+            Факт: <b class="fact">{{ formatTotal(group.fact_total) }}</b>
+          </span>
+        </h2>
+        <TaskTable v-if="isOpen(group.name)" :tasks="group.tasks" @open-task="$emit('open-task', $event)" />
+      </section>
+    </template>
 
-      <div v-if="isOpen(group.name)" class="accordion-body">
-        <TaskTable :tasks="group.tasks" @open-task="$emit('open-task', $event)" />
+    <!-- By assignee: framed blocks with a compact header -->
+    <template v-else>
+      <div v-for="group in sortedGroups" :key="group.name" class="assignee-group">
+        <div
+          class="assignee-header"
+          @click="toggle(group.name)"
+          :data-testid="'accordion-' + group.name"
+        >
+          <ChevronDown :size="18" class="chevron" :class="{ collapsed: !isOpen(group.name) }" />
+          <User :size="18" class="person" />
+          <span class="assignee-name">{{ group.name }}</span>
+          <span class="count-badge">{{ group.task_count }}</span>
+          <span class="group-metric">
+            Оценка: <b class="estimate">{{ formatTotal(group.estimate_total) }}</b>
+          </span>
+          <span class="group-metric">
+            Факт: <b class="fact">{{ formatTotal(group.fact_total) }}</b>
+          </span>
+        </div>
+        <TaskTable v-if="isOpen(group.name)" :tasks="group.tasks" flat @open-task="$emit('open-task', $event)" />
       </div>
-    </div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { ChevronDown } from 'lucide-vue-next'
+import { ChevronDown, User } from 'lucide-vue-next'
 import TaskTable from './TaskTable.vue'
 import type { TaskGroup } from '../../stores/tasks'
 
-const props = defineProps<{ groups: TaskGroup[] }>()
-
-const sortedGroups = computed(() => {
-  return [...props.groups].sort((a, b) => a.name.localeCompare(b.name))
-})
+const props = defineProps<{ groups: TaskGroup[]; groupBy: string }>()
 defineEmits(['open-task'])
 
-const openGroups = ref<Set<string>>(new Set())
+const NO_ASSIGNEE = 'Без исполнителя'
+
+const sortedGroups = computed(() =>
+  [...props.groups].sort((a, b) => {
+    if (a.name === NO_ASSIGNEE) return 1
+    if (b.name === NO_ASSIGNEE) return -1
+    return a.name.localeCompare(b.name, 'ru')
+  })
+)
+
+// Groups are expanded by default; only collapsed ones are remembered.
+const collapsed = ref<Set<string>>(new Set())
 
 function toggle(name: string) {
-  if (openGroups.value.has(name)) {
-    openGroups.value.delete(name)
-  } else {
-    openGroups.value.add(name)
-  }
+  const next = new Set(collapsed.value)
+  if (next.has(name)) next.delete(name)
+  else next.add(name)
+  collapsed.value = next
 }
 
 function isOpen(name: string): boolean {
-  return openGroups.value.has(name)
+  return !collapsed.value.has(name)
 }
 
-function formatHours(h: number): string {
-  if (!h) return '0:00 ч.'
-  const hours = Math.floor(h)
-  const mins = Math.round((h - hours) * 60)
-  return `${hours}:${mins.toString().padStart(2, '0')} ч.`
+function formatTotal(h: number): string {
+  return `${(h || 0).toFixed(1)}ч`
 }
 </script>
 
@@ -73,79 +89,115 @@ function formatHours(h: number): string {
 .task-accordion {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-}
-
-.accordion-group {
-  border: 1px solid var(--hairline);
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.accordion-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  background: var(--surface-1);
-  cursor: pointer;
-  transition: background 0.15s;
-  user-select: none;
-}
-
-.accordion-header:hover {
-  background: var(--bg-hover);
 }
 
 .chevron {
-  color: var(--text-faint);
-  transition: transform 0.2s;
   flex-shrink: 0;
+  color: var(--text-muted);
+  transition: transform 0.2s;
 }
 
 .chevron.collapsed {
   transform: rotate(-90deg);
 }
 
-.group-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-bright);
-  letter-spacing: -0.2px;
+/* By project */
+.project-group {
+  margin-top: 16px;
 }
 
-.group-count {
+.project-group:first-child {
+  margin-top: 0;
+}
+
+.project-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-bright);
+  letter-spacing: -0.4px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.project-count {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-faint);
+}
+
+/* By assignee */
+.assignee-group {
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.assignee-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg-card);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.1s;
+}
+
+.assignee-header:hover {
+  background: var(--bg-hover);
+}
+
+.person {
+  color: var(--accent);
+}
+
+.assignee-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.count-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 28px;
-  height: 22px;
-  padding: 0 8px;
-  font-size: 13px;
-  font-weight: 700;
-  border-radius: 9999px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 4px;
   background: var(--accent);
-  color: var(--text-bright);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
 }
 
+/* Totals */
 .group-metric {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-bright);
-  font-variant-numeric: tabular-nums;
-  margin-left: 8px;
-}
-
-.group-metric + .group-metric {
-  margin-left: 0;
-}
-
-.metric-label {
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0;
   color: var(--text-muted);
 }
 
-.accordion-body {
-  border-top: 1px solid var(--border-light);
+.project-title .group-metric:first-of-type {
+  margin-left: 8px;
+}
+
+.group-metric b {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.group-metric .estimate {
+  color: var(--cyan);
+}
+
+.group-metric .fact {
+  color: var(--success);
 }
 </style>

@@ -1,152 +1,121 @@
 <template>
-  <div class="task-table-wrapper">
-    <table class="task-table" data-testid="task-table">
-      <thead>
-        <tr>
-          <th
-            v-for="col in columns"
-            :key="col.key"
-            class="th-cell"
-            :class="{ sortable: col.sortable, sorted: sortBy === col.key, 'center-cell': ['estimate','fact','status_name','bug_fix_hours','bug_fix_pct','start_date','due_date'].includes(col.key) }"
-            @click="col.sortable && toggleSort(col.key)"
-            :data-testid="'col-' + col.key"
-          >
-            <span>{{ $t(col.label) }}</span>
-            <span v-if="col.sortable && sortBy === col.key" class="sort-icon">
-              {{ sortDir === 'asc' ? '↑' : '↓' }}
-            </span>
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr
-          v-for="task in tasks"
-          :key="task.external_id"
-          class="task-row"
-          :class="{ 'overdue-row': isOverdue(task) }"
-          :data-testid="'task-row-' + task.external_id"
-        >
-          <td class="td-cell name-cell">
-            <a
-              :href="taskLink(task.external_id)"
-              target="_blank"
-              class="task-link"
-              @click.stop
-              :data-testid="'task-link-' + task.external_id"
+  <div class="table-card" :class="{ flat }">
+    <div class="table-scroll">
+      <table class="task-table" data-testid="task-table">
+        <thead>
+          <tr>
+            <th
+              v-for="col in columns"
+              :key="col.key"
+              :class="{ sortable: col.sortable, sorted: sortBy === col.key, center: col.center }"
+              @click="col.sortable && toggleSort(col.key)"
+              :data-testid="'col-' + col.key"
             >
-              {{ task.external_id }}
-            </a>
-            <span class="task-subject" :title="task.subject" @click.stop="$emit('open-task', task.external_id)">{{ task.subject }}</span>
-          </td>
-          <td class="td-cell priority-cell" @dblclick.stop="startInlineEdit(task, 'priority_name')">
-            <template v-if="isEditing(task.external_id, 'priority_name')">
+              {{ col.label }}
+              <span v-if="col.sortable && sortBy === col.key" class="sort-icon">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="task in tasks"
+            :key="task.external_id"
+            :class="{ overdue: isOverdue(task) }"
+            :data-testid="'task-row-' + task.external_id"
+          >
+            <td class="subject" @click="$emit('open-task', task.external_id)">{{ task.subject }}</td>
+
+            <td class="center">
+              <a :href="taskLink(task.external_id)" target="_blank" class="issue-link" :data-testid="'task-link-' + task.external_id">
+                #{{ task.external_id }}
+              </a>
+            </td>
+
+            <td class="center">
               <select
+                class="cell-input priority"
+                :style="{ color: priorityColor(task.priority_name) }"
                 :value="task.priority_name"
                 @change="saveInlineEdit(task, 'priority_name', ($event.target as HTMLSelectElement).value)"
-                @blur="cancelInlineEdit"
-                class="inline-select"
-                autofocus
               >
-                <option v-for="p in priorityNames" :key="p" :value="p">{{ p }}</option>
+                <option v-for="p in withCurrent(priorityNames, task.priority_name)" :key="p" :value="p">{{ p }}</option>
               </select>
-            </template>
-            <template v-else>
-              <span class="priority-dot" :style="{ background: priorityColor(task.priority_id) }"></span>
-              {{ task.priority_name }}
-            </template>
-          </td>
-          <td class="td-cell" @dblclick.stop="startInlineEdit(task, 'assigned_to_name')">
-            <template v-if="isEditing(task.external_id, 'assigned_to_name')">
+            </td>
+
+            <td>
               <select
-                :value="task.assigned_to_name"
+                class="cell-input assignee"
+                :value="task.assigned_to_name || ''"
                 @change="saveInlineEdit(task, 'assigned_to_name', ($event.target as HTMLSelectElement).value)"
-                @blur="cancelInlineEdit"
-                class="inline-select"
-                autofocus
               >
-                <option value="">Без ответственного</option>
-                <option v-for="m in memberNames" :key="m" :value="m">{{ m }}</option>
+                <option value="">Не назначен</option>
+                <option v-for="m in withCurrent(memberNames, task.assigned_to_name)" :key="m" :value="m">{{ m }}</option>
               </select>
-            </template>
-            <template v-else>{{ task.assigned_to_name || 'Без ответственного' }}</template>
-          </td>
-          <td class="td-cell num-cell center-cell" @dblclick.stop="startInlineEdit(task, 'estimated_hours')">
-            <template v-if="isEditing(task.external_id, 'estimated_hours')">
+            </td>
+
+            <td class="center">
               <input
-                type="number"
-                :value="task.estimated_hours"
-                @blur="saveInlineEdit(task, 'estimated_hours', ($event.target as HTMLInputElement).value)"
-                @keyup.enter="saveInlineEdit(task, 'estimated_hours', ($event.target as HTMLInputElement).value)"
-                @keyup.escape="cancelInlineEdit"
-                class="inline-input num-input"
-                autofocus
+                class="cell-input estimate"
+                type="text"
+                inputmode="decimal"
+                :value="task.estimated_hours ?? ''"
+                placeholder="—"
+                @change="saveInlineEdit(task, 'estimated_hours', ($event.target as HTMLInputElement).value.trim().replace(',', '.'))"
+                @keyup.enter="($event.target as HTMLInputElement).blur()"
               />
-            </template>
-            <template v-else>{{ formatEstimate(task.estimated_hours) }}</template>
-          </td>
-          <td class="td-cell num-cell center-cell">{{ formatHours(task.spent_hours) }}</td>
-          <td class="td-cell center-cell" @dblclick.stop="startInlineEdit(task, 'status_name')">
-            <template v-if="isEditing(task.external_id, 'status_name')">
+            </td>
+
+            <td class="center num">{{ formatHours(task.spent_hours) }}</td>
+
+            <td>
               <select
+                class="cell-input status-select"
+                :style="badgeStyle(statusColor(task.status_name))"
                 :value="task.status_name"
                 @change="saveInlineEdit(task, 'status_name', ($event.target as HTMLSelectElement).value)"
-                @blur="cancelInlineEdit"
-                class="inline-select"
-                autofocus
               >
-                <option v-for="s in statusNames" :key="s" :value="s">{{ s }}</option>
+                <option v-for="s in withCurrent(statusNames, task.status_name)" :key="s" :value="s">{{ s }}</option>
               </select>
-            </template>
-            <template v-else>
-              <span class="status-badge" :class="statusClass(task.status_name)">{{ task.status_name }}</span>
-            </template>
-          </td>
-          <td class="td-cell num-cell center-cell">{{ formatHours(task.bug_fix_hours) }}</td>
-          <td class="td-cell num-cell center-cell">{{ formatBugFixPct(task) }}</td>
-          <td class="td-cell date-cell center-cell" @dblclick.stop="startInlineEdit(task, 'start_date')">
-            <template v-if="isEditing(task.external_id, 'start_date')">
+            </td>
+
+            <td class="center num" :class="task.bug_fix_hours > 0 ? 'bug' : 'faint'">{{ formatHours(task.bug_fix_hours) }}</td>
+            <td class="center num" :class="task.bug_fix_hours > 0 ? 'bug' : 'faint'">{{ formatBugFixPct(task) }}</td>
+
+            <td class="center">
               <input
+                class="cell-input date"
                 type="date"
-                :value="task.start_date"
-                @blur="saveInlineEdit(task, 'start_date', ($event.target as HTMLInputElement).value)"
-                @keyup.escape="cancelInlineEdit"
-                class="inline-input"
-                autofocus
+                :value="(task.start_date || '').slice(0, 10)"
+                @change="saveInlineEdit(task, 'start_date', ($event.target as HTMLInputElement).value)"
               />
-            </template>
-            <template v-else>{{ formatDate(task.start_date) }}</template>
-          </td>
-          <td class="td-cell date-cell center-cell" :class="{ 'overdue-date': isOverdue(task) }" @dblclick.stop="startInlineEdit(task, 'due_date')">
-            <template v-if="isEditing(task.external_id, 'due_date')">
+            </td>
+
+            <td class="center">
               <input
+                class="cell-input date"
+                :class="{ overdue: isOverdue(task) }"
                 type="date"
-                :value="task.due_date"
-                @blur="saveInlineEdit(task, 'due_date', ($event.target as HTMLInputElement).value)"
-                @keyup.escape="cancelInlineEdit"
-                class="inline-input"
-                autofocus
+                :value="(task.due_date || '').slice(0, 10)"
+                @change="saveInlineEdit(task, 'due_date', ($event.target as HTMLInputElement).value)"
               />
-            </template>
-            <template v-else>{{ formatDate(task.due_date) }}</template>
-          </td>
-          <td class="td-cell" @dblclick.stop="startInlineEdit(task, 'category_name')">
-            <template v-if="isEditing(task.external_id, 'category_name')">
+            </td>
+
+            <td>
               <select
-                :value="task.category_name"
+                class="cell-input category"
+                :value="task.category_name || ''"
+                @focus="tasksStore.fetchProjectCategories(task.project_id)"
+                @mousedown="tasksStore.fetchProjectCategories(task.project_id)"
                 @change="saveInlineEdit(task, 'category_name', ($event.target as HTMLSelectElement).value)"
-                @blur="cancelInlineEdit"
-                class="inline-select"
-                autofocus
               >
                 <option value="">—</option>
                 <option v-for="c in projectCategories(task)" :key="c" :value="c">{{ c }}</option>
               </select>
-            </template>
-            <template v-else>{{ task.category_name || '—' }}</template>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </template>
 
@@ -163,57 +132,40 @@ const tasksStore = useTasksStore()
 const { showChange, toast } = useSwal()
 const { settings } = storeToRefs(settingsStore)
 
-defineProps<{ tasks: Task[] }>()
+// flat: no own frame (the table sits inside a framed group)
+defineProps<{ tasks: Task[]; flat?: boolean }>()
 
 // Team members for the assignee dropdown — loaded once for all tables
 // (every accordion group renders its own TaskTable).
 onMounted(() => tasksStore.fetchMembers())
 const emit = defineEmits(['open-task', 'sort-change', 'inline-edit'])
 
-// Inline edit state
-const editingCell = ref<{ taskId: number; field: string } | null>(null)
-
-function startInlineEdit(task: Task, field: string) {
-  if (field === 'category_name') tasksStore.fetchProjectCategories(task.project_id)
-  editingCell.value = { taskId: task.external_id, field }
-}
-
-function isEditing(taskId: number, field: string): boolean {
-  return editingCell.value?.taskId === taskId && editingCell.value?.field === field
-}
-
-function cancelInlineEdit() {
-  editingCell.value = null
+const fieldLabels: Record<string, string> = {
+  status_name: 'Статус',
+  priority_name: 'Приоритет',
+  assigned_to_name: 'Исполнитель',
+  category_name: 'Категория',
+  start_date: 'Дата начала',
+  due_date: 'Дедлайн',
+  estimated_hours: 'Оценка',
 }
 
 async function saveInlineEdit(task: Task, field: string, value: string) {
-  editingCell.value = null
   const oldValue = (task as any)[field]
-  if (value === oldValue || (value === '' && oldValue === null)) return
-  const oldDisplay = String(oldValue || '—')
-  const newDisplay = String(value || '—')
+  const oldNormalized = oldValue === null || oldValue === undefined ? '' : String(oldValue).slice(0, field.endsWith('_date') ? 10 : undefined)
+  if (value === oldNormalized) return
+  const savedValue = value === '' ? null : value
   // Optimistic update — change field in place without reloading table
-  const savedValue = value || null
-  ;(task as any)[field] = savedValue
+  ;(task as any)[field] = field === 'estimated_hours' && savedValue !== null ? Number(savedValue) : savedValue
   try {
     const result = await tasksStore.updateTask(task.external_id, { [field]: savedValue }, true)
-    const fieldLabels: Record<string, string> = {
-      status_name: 'Статус',
-      priority_name: 'Приоритет',
-      assigned_to_name: 'Исполнитель',
-      category_name: 'Категория',
-      start_date: 'Дата начала',
-      due_date: 'Дедлайн',
-      estimated_hours: 'Оценка',
-    }
-    showChange(oldDisplay, newDisplay, `#${task.external_id} — ${fieldLabels[field] || field}`)
     if (result && result.redmine_ok === false) {
-      // Revert on Redmine error
       ;(task as any)[field] = oldValue
       toast('Ошибка синхронизации с Redmine: ' + (result.redmine_error || ''), 'error')
+      return
     }
+    showChange(oldNormalized || '—', value || '—', `#${task.external_id} — ${fieldLabels[field] || field}`)
   } catch {
-    // Revert on error
     ;(task as any)[field] = oldValue
     toast('Ошибка сохранения', 'error')
   }
@@ -224,9 +176,8 @@ const sortDir = ref('asc')
 
 const { statuses, priorities, members, projectCategories: projectCategoriesMap } = storeToRefs(tasksStore)
 
-const statusNames = computed(() => {
-  return statuses.value.map((s: any) => s.name) // already sorted by external_id ASC from API
-})
+const statusNames = computed(() => statuses.value.map(s => s.name))
+const priorityNames = computed(() => priorities.value.map(p => p.name))
 
 const memberNames = computed(() => {
   const selectedTeam = settings.value.selected_team || []
@@ -234,18 +185,24 @@ const memberNames = computed(() => {
   return members.value.filter(m => selectedTeam.includes(m.id)).map(m => m.name).sort()
 })
 
+// The current value must stay selectable even if it is not in the list.
+function withCurrent(list: string[], current?: string | null): string[] {
+  return current && !list.includes(current) ? [current, ...list] : list
+}
+
 const columns = [
-  { key: 'subject', label: 'tasks.table.name', sortable: true },
-  { key: 'priority_name', label: 'tasks.table.priority', sortable: true },
-  { key: 'assigned_to', label: 'tasks.table.assignee', sortable: true },
-  { key: 'estimate', label: 'tasks.table.estimate', sortable: true },
-  { key: 'fact', label: 'tasks.table.fact', sortable: true },
-  { key: 'status_name', label: 'tasks.table.status', sortable: true },
-  { key: 'bug_fix_hours', label: 'tasks.table.bug_fix', sortable: true },
-  { key: 'bug_fix_pct', label: 'tasks.table.bug_fix_pct', sortable: true },
-  { key: 'start_date', label: 'tasks.table.start_date', sortable: true },
-  { key: 'due_date', label: 'tasks.table.end_date', sortable: true },
-  { key: 'category_name', label: 'tasks.table.category', sortable: true },
+  { key: 'subject', label: 'Наименование', sortable: true },
+  { key: 'external_id', label: 'Redmine', sortable: true, center: true },
+  { key: 'priority_name', label: 'Приоритет', sortable: true, center: true },
+  { key: 'assigned_to', label: 'Ответственный', sortable: true },
+  { key: 'estimate', label: 'Оценка, ч', sortable: true, center: true },
+  { key: 'fact', label: 'Факт, ч', sortable: true, center: true },
+  { key: 'status_name', label: 'Статус', sortable: true },
+  { key: 'bug_fix_hours', label: 'Bug fix, ч', sortable: true, center: true },
+  { key: 'bug_fix_pct', label: 'Bug fix, %', sortable: true, center: true },
+  { key: 'start_date', label: 'Дата старта', sortable: true, center: true },
+  { key: 'due_date', label: 'Дата окончания', sortable: true, center: true },
+  { key: 'category_name', label: 'Категория', sortable: true },
 ]
 
 function toggleSort(key: string) {
@@ -260,42 +217,50 @@ function toggleSort(key: string) {
 
 function isOverdue(task: Task): boolean {
   if (!task.due_date) return false
-  return task.due_date < new Date().toISOString().slice(0, 10) &&
+  return task.due_date.slice(0, 10) < new Date().toISOString().slice(0, 10) &&
     !['closed', 'rejected', 'resolved', 'tested'].includes(task.status_name.toLowerCase())
 }
 
-function priorityColor(id: number): string {
-  // Highest priority (largest id) = bright red, lowest = gray
-  if (id >= 6) return '#ff2222' // Immediate — bright red
-  if (id >= 5) return '#ff4444' // Urgent — red
-  if (id >= 4) return '#ff8800' // High — orange
-  if (id >= 3) return '#ffaa00' // Normal — yellow
-  return '#888888' // Low/lowest — gray
+// Colors as in the previous version of the dashboard
+const priorityColors: Record<string, string> = {
+  immediate: '#ff4444',
+  urgent: '#ff8800',
+  high: '#ffaa00',
+  normal: '#4488ff',
+  low: '#888888',
 }
 
-const priorityNames = computed(() => {
-  return priorities.value.map((p: any) => p.name) // already sorted DESC from API
-})
+function priorityColor(name: string): string {
+  return priorityColors[(name || '').toLowerCase()] || '#888888'
+}
 
-function statusClass(name: string): string {
-  const n = name.toLowerCase()
-  if (['closed', 'rejected', 'resolved', 'tested'].includes(n)) return 'status-closed'
-  if (n.includes('test')) return 'status-testing'
-  if (n.includes('bug')) return 'status-bug'
-  return 'status-open'
+const statusColors: Record<string, string> = {
+  'new': '#5e6ad2',
+  'in progress': '#ffd93d',
+  'review': '#a855f7',
+  'feedback': '#f97316',
+  'bugs': '#ff6b6b',
+  'testing': '#06b6d4',
+  'closed': '#6bcb77',
+  'tested': '#6bcb77',
+  'resolved': '#6bcb77',
+}
+
+function statusColor(name: string): string {
+  const n = (name || '').toLowerCase()
+  if (statusColors[n]) return statusColors[n]
+  if (n.includes('test')) return statusColors.testing
+  if (n.includes('bug')) return statusColors.bugs
+  return '#888888'
+}
+
+function badgeStyle(color: string) {
+  return { color, background: color + '22' }
 }
 
 function taskLink(id: number): string {
   const base = settings.value.data_source_url || settings.value.redmine_url || ''
-  if (base) {
-    return base.replace(/\/$/, '') + '/issues/' + id
-  }
-  return '#'
-}
-
-function formatDate(d?: string | null): string {
-  if (!d) return '—'
-  return d.slice(0, 10)
+  return base ? base.replace(/\/$/, '') + '/issues/' + id : '#'
 }
 
 function projectCategories(task: Task): string[] {
@@ -312,21 +277,29 @@ function formatBugFixPct(task: Task): string {
   return (task.bug_fix_hours / task.spent_hours * 100).toFixed(1) + '%'
 }
 
-function formatEstimate(h: number | null): string {
-  if (h === null || h === undefined) return '—'
-  return h.toFixed(1)
-}
-
 function formatHours(h: number): string {
   if (!h) return '—'
-  const hours = Math.floor(h)
-  const mins = Math.round((h - hours) * 60)
-  return `${hours}:${mins.toString().padStart(2, '0')} ч.`
+  return Number(h).toFixed(2)
 }
 </script>
 
 <style scoped>
-.task-table-wrapper {
+.table-card {
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+
+.table-card.flat {
+  border: none;
+  border-top: 1px solid var(--hairline);
+  border-radius: 0;
+  margin-bottom: 0;
+}
+
+.table-scroll {
   overflow-x: auto;
 }
 
@@ -334,182 +307,176 @@ function formatHours(h: number): string {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
+  table-layout: auto;
 }
 
-.th-cell {
-  background: var(--surface-2);
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  padding: 10px 12px;
-  text-align: left;
-  border-bottom: 1px solid var(--border-light);
+th {
   position: sticky;
   top: 0;
   z-index: var(--z-sticky-header);
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--hairline);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  text-transform: uppercase;
   white-space: nowrap;
   user-select: none;
 }
 
-.th-cell.sortable {
+th.sortable {
   cursor: pointer;
 }
 
-.th-cell.sortable:hover {
+th.sortable:hover,
+th.sorted {
   color: var(--text-bright);
-}
-
-.th-cell.sorted {
-  color: var(--accent);
 }
 
 .sort-icon {
   margin-left: 4px;
-  font-size: 10px;
+  font-size: 9px;
 }
 
-.td-cell {
-  padding: 10px 12px;
+td {
+  padding: 10px 14px;
   border-bottom: 1px solid var(--border-light);
   color: var(--text-dim);
-  white-space: nowrap;
+  vertical-align: middle;
 }
 
-.center-cell {
-  text-align: center;
+tbody tr:last-child td {
+  border-bottom: none;
 }
 
-.task-row {
-  transition: background 0.15s;
-}
-
-.task-row:hover {
+tbody tr:hover td {
   background: var(--bg-hover);
 }
 
-.overdue-row {
-  border-left: 3px solid var(--critical);
+tr.overdue td:first-child {
+  box-shadow: inset 3px 0 0 var(--critical);
 }
 
-.name-cell {
-  max-width: 300px;
-  white-space: nowrap;
+.center {
+  text-align: center;
 }
 
-.task-link {
-  color: var(--accent);
-  font-weight: 500;
-  font-size: 12px;
-  text-decoration: none;
-  display: inline-block;
-  vertical-align: middle;
-  margin-right: 8px;
-}
-
-.task-link:hover {
-  text-decoration: underline;
-}
-
-.task-subject {
-  display: inline-block;
-  vertical-align: middle;
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--text);
-  cursor: pointer;
-}
-
-.task-subject:hover {
-  color: var(--accent);
-  text-decoration: underline;
-}
-
-.priority-cell {
-  white-space: nowrap;
-  text-align: left;
-}
-
-.priority-dot {
-  display: inline-block;
-  vertical-align: middle;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-right: 6px;
-}
-
-.num-cell {
-  text-align: right;
+.num {
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-.date-cell {
-  font-size: 12px;
+.faint {
   color: var(--text-faint);
 }
 
-.overdue-date {
-  color: var(--critical);
+.bug {
+  color: var(--danger);
 }
 
-.status-badge {
-  display: inline-block;
+.subject {
+  min-width: 180px;
+  max-width: 350px;
+  color: var(--accent);
+  white-space: normal;
+  word-break: break-word;
+  cursor: pointer;
+}
+
+.subject:hover {
+  text-decoration: underline;
+}
+
+.issue-link {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.issue-link:hover {
+  text-decoration: underline;
+}
+
+/* Inline editors look like plain text until hovered */
+.cell-input {
+  padding: 4px 6px;
+  font-size: 12px;
+  font-family: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-bright);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.cell-input:hover {
+  border-color: var(--hairline);
+}
+
+.cell-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+
+.cell-input option {
+  background: var(--surface-1);
+  color: var(--text);
+}
+
+.priority {
+  width: 100px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.assignee {
+  width: 160px;
+}
+
+.estimate {
+  width: 60px;
+  text-align: center;
+  cursor: text;
+}
+
+.estimate::placeholder {
+  color: var(--text-faint);
+}
+
+.status-select {
   padding: 2px 8px;
   font-size: 11px;
   font-weight: 500;
   border-radius: 9999px;
 }
 
-.status-open {
-  background: var(--accent-bg);
-  color: var(--accent);
+.date {
+  width: 130px;
+  color-scheme: dark;
 }
 
-.status-testing {
-  background: var(--teal)22;
-  color: var(--teal);
+[data-mode="light"] .date {
+  color-scheme: light;
 }
 
-.status-closed {
-  background: var(--success)22;
-  color: var(--success);
+.date.overdue {
+  color: var(--critical);
 }
 
-.status-bug {
-  background: var(--danger)22;
-  color: var(--danger);
-}
-
-.inline-select,
-.inline-input {
-  padding: 2px 6px;
-  font-size: 12px;
-  background: var(--surface-2);
-  border: 1px solid var(--accent);
-  border-radius: 4px;
-  color: var(--text);
-  width: 100%;
-  min-width: 60px;
-}
-
-.inline-input.num-input {
-  width: 80px;
-  text-align: right;
-}
-
-.inline-select:focus,
-.inline-input:focus {
-  outline: none;
-  box-shadow: var(--focus-ring);
+.category {
+  width: 140px;
+  font-size: 11px;
+  color: var(--text-muted);
 }
 
 @media (max-width: 768px) {
-  .th-cell,
-  .td-cell {
+  th,
+  td {
     padding: 8px;
     font-size: 11px;
   }

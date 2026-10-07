@@ -1,87 +1,85 @@
 <template>
   <div class="task-filters">
-    <!-- Row 1: Type buttons, Project, Search -->
-    <div class="filter-row">
-      <div class="filter-group">
-        <button
-          v-for="t in typeOptions"
-          :key="t.value"
-          class="pill-btn"
-          :class="{ active: filters.type === t.value }"
-          @click="setFilter('type', t.value)"
-          :data-testid="'filter-type-' + t.value"
-        >
-          {{ $t(t.label) }}
-        </button>
-      </div>
+    <!-- Row 1: status, project, search, reset, counter -->
+    <div class="filter-bar">
+      <button
+        v-for="t in typeOptions"
+        :key="t.value"
+        class="pill-btn"
+        :class="{ active: filters.type === t.value }"
+        @click="setFilter('type', t.value)"
+        :data-testid="'filter-type-' + t.value"
+      >
+        {{ $t(t.label) }}
+      </button>
 
-      <div class="filter-group">
-        <select
-          v-model="filters.project_id"
-          @change="onProjectChange"
-          class="filter-select"
-          data-testid="filter-project"
-        >
-          <option value="">{{ $t('common.all') }}</option>
-          <option v-for="p in visibleProjects" :key="p.id" :value="p.id">{{ p.name }}</option>
-        </select>
-      </div>
+      <select
+        v-model="filters.project_id"
+        @change="onProjectChange"
+        class="field filter-select"
+        data-testid="filter-project"
+      >
+        <option value="">Все проекты</option>
+        <option v-for="p in visibleProjects" :key="p.id" :value="p.id">{{ p.name }}</option>
+      </select>
 
-      <div class="filter-group search-group">
-        <input
-          v-model="searchInput"
-          type="text"
-          :placeholder="$t('tasks.filters.search_placeholder')"
-          class="search-input"
-          data-testid="filter-search"
-          @keyup.enter="doSearch"
-        />
-      </div>
+      <input
+        v-model="searchInput"
+        type="text"
+        :placeholder="$t('tasks.filters.search_placeholder')"
+        class="field search-input"
+        data-testid="filter-search"
+        @keyup.enter="doSearch"
+      />
+
+      <button class="reset-btn" data-testid="filter-reset" @click="resetAll">
+        <RotateCcw :size="14" /> Сбросить
+      </button>
+
+      <span class="found">Найдено: <strong>{{ total }}</strong></span>
     </div>
 
-    <!-- Row 2: Grouping, Categories -->
-    <div class="filter-row">
-      <div class="filter-group">
-        <span class="filter-label">Группировать:</span>
-        <button
-          class="pill-btn"
-          :class="{ active: useGrouping && filters.group_by === 'project' }"
-          @click="setGrouping('project')"
-          data-testid="filter-group-project"
-        >
-          {{ $t('tasks.filters.group_by_project') }}
-        </button>
-        <button
-          class="pill-btn"
-          :class="{ active: useGrouping && filters.group_by === 'assignee' }"
-          @click="setGrouping('assignee')"
-          data-testid="filter-group-assignee"
-        >
-          {{ $t('tasks.filters.group_by_assignee') }}
-        </button>
-        <button
-          class="pill-btn"
-          :class="{ active: !useGrouping }"
-          @click="setGrouping('')"
-          data-testid="filter-no-group"
-        >
-          {{ $t('common.all') }}
-        </button>
-      </div>
+    <!-- Row 2: grouping, categories -->
+    <div class="filter-bar small">
+      <span class="filter-label">Группировка:</span>
+      <button
+        class="pill-btn sm"
+        :class="{ active: useGrouping && filters.group_by === 'project' }"
+        @click="setGrouping('project')"
+        data-testid="filter-group-project"
+      >
+        {{ $t('tasks.filters.group_by_project') }}
+      </button>
+      <button
+        class="pill-btn sm"
+        :class="{ active: useGrouping && filters.group_by === 'assignee' }"
+        @click="setGrouping('assignee')"
+        data-testid="filter-group-assignee"
+      >
+        {{ $t('tasks.filters.group_by_assignee') }}
+      </button>
+      <button
+        class="pill-btn sm"
+        :class="{ active: !useGrouping }"
+        @click="setGrouping('')"
+        data-testid="filter-no-group"
+      >
+        Без группировки
+      </button>
 
-      <div class="filter-group" v-if="categories.length > 0 && filters.project_id">
-        <span class="filter-label">Категории:</span>
+      <template v-if="categories.length > 0 && filters.project_id">
+        <span class="filter-label spaced">Категория:</span>
         <button
           v-for="cat in categories"
           :key="cat"
-          class="pill-btn"
+          class="pill-btn sm"
           :class="{ active: filters.category === cat }"
           @click="setFilter('category', filters.category === cat ? '' : cat)"
-          data-testid="'filter-cat-' + cat"
+          :data-testid="'filter-cat-' + cat"
         >
           {{ cat }}
         </button>
-      </div>
+      </template>
     </div>
   </div>
 </template>
@@ -89,12 +87,13 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { storeToRefs } from 'pinia'
+import { RotateCcw } from 'lucide-vue-next'
 import { useTasksStore } from '../../stores/tasks'
 import { useSettingsStore } from '../../stores/settings'
 
 const store = useTasksStore()
 const settingsStore = useSettingsStore()
-const { filters, projects, categories, useGrouping } = storeToRefs(store)
+const { filters, projects, categories, useGrouping, total } = storeToRefs(store)
 const { settings } = storeToRefs(settingsStore)
 
 // Show only projects selected in user settings (if any selected)
@@ -132,6 +131,7 @@ function setGrouping(mode: string) {
 }
 
 function onProjectChange() {
+  store.setFilter('category', '')
   store.fetchCategories(filters.value.project_id || undefined)
   store.fetchTasks()
 }
@@ -141,8 +141,13 @@ function doSearch() {
   store.fetchTasks()
 }
 
+function resetAll() {
+  searchInput.value = ''
+  store.resetFilters()
+}
+
 watch(searchInput, (val) => {
-  if (val === '') {
+  if (val === '' && filters.value.search) {
     store.setFilter('search', '')
     store.fetchTasks()
   }
@@ -157,95 +162,118 @@ watch(searchInput, (val) => {
   margin-bottom: 20px;
 }
 
-.filter-row {
+.filter-bar {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
-.filter-group {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-wrap: wrap;
+.filter-bar.small {
+  gap: 6px;
 }
 
 .filter-label {
   font-size: 11px;
-  font-weight: 600;
-  color: var(--text-faintest);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  white-space: nowrap;
-  margin-right: 4px;
+  color: var(--text-muted);
+  margin-right: 2px;
+}
+
+.filter-label.spaced {
+  margin-left: 8px;
 }
 
 .pill-btn {
-  padding: 6px 12px;
-  font-size: 12px;
+  padding: 6px 14px;
+  font-size: 13px;
   font-weight: 500;
   border-radius: 9999px;
-  background: transparent;
   border: 1px solid var(--hairline);
+  background: var(--surface-1);
   color: var(--text-muted);
   cursor: pointer;
   transition: all 0.15s;
   white-space: nowrap;
 }
 
+.pill-btn.sm {
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
 .pill-btn:hover {
-  border-color: var(--text-faint);
+  border-color: var(--accent);
   color: var(--text-bright);
 }
 
 .pill-btn.active {
-  background: var(--accent-bg);
+  background: var(--accent);
   border-color: var(--accent);
-  color: var(--accent);
+  color: #fff;
+}
+
+.field {
+  padding: 8px 12px;
+  font-size: 13px;
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  color: var(--text);
+  min-width: 200px;
+  transition: border-color 0.1s;
+}
+
+.field:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 
 .filter-select {
-  padding: 6px 12px;
+  margin-left: 12px;
+  cursor: pointer;
+}
+
+.reset-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
   font-size: 12px;
   font-weight: 500;
-  background: var(--surface-2);
+  background: transparent;
+  color: var(--text-muted);
   border: 1px solid var(--hairline);
   border-radius: 8px;
-  color: var(--text);
   cursor: pointer;
-  min-width: 150px;
+  transition: all 0.15s;
 }
 
-.filter-select:focus {
-  border-color: var(--accent);
+.reset-btn:hover {
+  border-color: var(--text-faint);
+  color: var(--text-dim);
 }
 
-.search-group {
-  flex: 0 0 200px;
-}
-
-.search-input {
-  width: 100%;
-  padding: 6px 12px;
+.found {
+  margin-left: auto;
   font-size: 12px;
-  background: var(--surface-2);
-  border: 1px solid var(--hairline);
-  border-radius: 8px;
-  color: var(--text);
+  color: var(--text-faint);
 }
 
-.search-input:focus {
-  border-color: var(--accent);
+.found strong {
+  font-weight: 500;
+  color: var(--text-muted);
 }
 
 @media (max-width: 768px) {
-  .filter-row {
-    flex-direction: column;
-    align-items: flex-start;
+  .filter-select {
+    margin-left: 0;
   }
-  .search-group {
+  .field {
+    min-width: 0;
     width: 100%;
+  }
+  .found {
+    margin-left: 0;
   }
 }
 </style>
