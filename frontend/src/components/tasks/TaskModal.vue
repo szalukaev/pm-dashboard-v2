@@ -33,9 +33,8 @@
             <div class="param-control">
               <input
                 v-model="editFields.estimated_hours"
-                type="number"
-                min="0"
-                step="0.5"
+                type="text"
+                inputmode="decimal"
                 class="field-input num-input"
                 placeholder="—"
                 @change="saveField('estimated_hours')"
@@ -185,6 +184,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, reactive } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import { FileText } from 'lucide-vue-next'
 import AppModal from '../ui/AppModal.vue'
@@ -220,6 +220,8 @@ const settingsStore = useSettingsStore()
 const { settings } = storeToRefs(settingsStore)
 const { statuses, priorities, members, projectCategories } = storeToRefs(store)
 const { showChange, error: swalError, toast } = useSwal()
+// "t" is taken by a local variable in saveField
+const i18n = useI18n()
 
 const task = ref<Task | null>(null)
 const loading = ref(false)
@@ -370,8 +372,17 @@ async function saveField(field: keyof typeof editFields) {
   if (!task.value) return
   const t = task.value as any
   const raw = editFields[field]
-  const value = raw === '' || raw === null ? null : String(raw)
+  let value = raw === '' || raw === null ? null : String(raw)
   const old = t[field] ?? null
+  if (field === 'estimated_hours' && value !== null) {
+    // Plain text field: accept both "1,5" and "1.5"
+    value = value.trim().replace(',', '.') || null
+    if (value !== null && !(Number(value) >= 0)) {
+      editFields[field] = old ?? ''
+      toast(i18n.t('tasks.messages.invalid_number'), 'error')
+      return
+    }
+  }
   if (String(old ?? '') === String(value ?? '')) return
 
   try {
