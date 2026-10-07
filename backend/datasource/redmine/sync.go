@@ -88,6 +88,11 @@ func (s *Syncer) syncStatuses(_ context.Context, db **sql.DB) error {
 		return err
 	}
 	for _, st := range statuses {
+		// group_name is user configuration (Настройки → Данные: Открытые/
+		// Тестирование/Закрытые). Redmine only knows is_closed — overwriting
+		// group_name on every sync used to wipe the custom layout (and the
+		// "testing" group entirely), which emptied the Tasks tab filters.
+		// On first insert only, seed a default group from is_closed.
 		group := "open"
 		if st.IsClosed {
 			group = "closed"
@@ -98,7 +103,7 @@ func (s *Syncer) syncStatuses(_ context.Context, db **sql.DB) error {
 			ON CONFLICT (external_id, data_source) DO UPDATE SET
 				name = EXCLUDED.name,
 				is_closed = EXCLUDED.is_closed,
-				group_name = EXCLUDED.group_name,
+				group_name = COALESCE(statuses.group_name, EXCLUDED.group_name),
 				synced_at = NOW()
 		`, st.ExternalID, st.Name, st.IsClosed, group)
 		if err != nil {
