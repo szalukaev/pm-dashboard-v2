@@ -20,7 +20,7 @@ interface Settings {
 const defaultSettings: Settings = {
   selected_projects: [],
   selected_team: [],
-  theme: 'dark',
+  theme: 'nord-dark',
   language: 'ru',
   tab_order: [],
   kanban_column_order_statuses: [],

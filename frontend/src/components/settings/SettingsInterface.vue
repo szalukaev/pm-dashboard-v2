@@ -5,17 +5,32 @@
     <!-- Theme -->
     <div class="setting-block">
       <h4 class="block-title">{{ $t('settings.interface.theme') }}</h4>
+      <div class="mode-switch">
+        <button class="mode-btn" :class="{ active: currentMode === 'dark' }" @click="changeMode('dark')" data-testid="mode-dark">
+          <Moon :size="14" /> Тёмная
+        </button>
+        <button class="mode-btn" :class="{ active: currentMode === 'light' }" @click="changeMode('light')" data-testid="mode-light">
+          <Sun :size="14" /> Светлая
+        </button>
+      </div>
       <div class="theme-grid">
         <button
-          v-for="t in themes"
-          :key="t.value"
+          v-for="t in THEMES"
+          :key="t.id"
           class="theme-option"
-          :class="{ active: currentTheme === t.value }"
-          @click="changeTheme(t.value)"
-          :data-testid="'theme-' + t.value"
+          :class="{ active: currentTheme === t.id }"
+          @click="changeTheme(t.id)"
+          :data-testid="'theme-' + t.id"
         >
-          <div class="theme-preview" :style="{ background: t.preview }"></div>
-          <span class="theme-name">{{ t.label }}</span>
+          <span class="theme-swatches">
+            <span class="swatch" :style="{ background: t.preview.accent }"></span>
+            <span class="swatch" :style="{ background: t.preview.bg }"></span>
+            <span class="swatch" :style="{ background: t.preview.surface }"></span>
+          </span>
+          <span class="theme-text">
+            <span class="theme-name">{{ t.name }}</span>
+            <span class="theme-desc">{{ t.description }}</span>
+          </span>
         </button>
       </div>
     </div>
@@ -34,27 +49,29 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useTheme } from '../../composables/useTheme'
+import { Moon, Sun } from 'lucide-vue-next'
+import { useTheme, THEMES, type ThemeName, type ThemeMode } from '../../composables/useTheme'
 import { useSettingsStore } from '../../stores/settings'
 
-const { currentTheme, setTheme } = useTheme()
+const { currentTheme, currentMode, setTheme, setMode } = useTheme()
 const { locale } = useI18n()
 const settingsStore = useSettingsStore()
 
 const currentLang = ref(locale.value)
 
-const themes = [
-  { value: 'dark', label: 'Dark', preview: '#010102' },
-  { value: 'light', label: 'Light', preview: '#ffffff' },
-  { value: 'nord', label: 'Nord', preview: '#1a1d23' },
-  { value: 'amber', label: 'Amber', preview: '#1c1710' },
-  { value: 'forest', label: 'Forest', preview: '#171c1a' },
-  { value: 'dusk', label: 'Dusk', preview: '#1a1920' },
-]
+// Stored on the server as "<theme>-<mode>", e.g. "nord-dark".
+function persist() {
+  return settingsStore.updateSettings({ theme: `${currentTheme.value}-${currentMode.value}` } as any)
+}
 
-async function changeTheme(theme: string) {
+async function changeTheme(theme: ThemeName) {
   setTheme(theme)
-  await settingsStore.updateSettings({ theme } as any)
+  await persist()
+}
+
+async function changeMode(mode: ThemeMode) {
+  setMode(mode)
+  await persist()
 }
 
 async function changeLanguage() {
@@ -83,20 +100,50 @@ async function changeLanguage() {
   margin-bottom: 12px;
 }
 
+.mode-switch {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  margin-bottom: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  border-radius: 9999px;
+}
+
+.mode-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.mode-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+
 .theme-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 10px;
 }
 
 .theme-option {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 12px;
+  gap: 12px;
+  padding: 12px 14px;
+  text-align: left;
   background: var(--surface-2);
-  border: 2px solid transparent;
+  border: 2px solid var(--hairline);
   border-radius: 10px;
   cursor: pointer;
   transition: all 0.15s;
@@ -110,16 +157,34 @@ async function changeLanguage() {
   border-color: var(--accent);
 }
 
-.theme-preview {
-  width: 48px;
-  height: 32px;
-  border-radius: 6px;
-  border: 1px solid var(--hairline);
+.theme-swatches {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, .1);
+}
+
+.theme-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .theme-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-bright);
+}
+
+.theme-desc {
   font-size: 11px;
-  font-weight: 500;
   color: var(--text-muted);
 }
 

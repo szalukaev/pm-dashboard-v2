@@ -29,11 +29,11 @@
       <AppSyncStatus />
       <button
         class="action-btn"
-        @click="toggleTheme"
+        @click="toggleMode"
         :title="$t('common.toggle_theme')"
         data-testid="theme-toggle"
       >
-        <Moon v-if="currentTheme === 'dark'" :size="18" />
+        <Moon v-if="currentMode === 'dark'" :size="18" />
         <Sun v-else :size="18" />
       </button>
       <button
@@ -81,7 +81,7 @@ import AppSyncStatus from '../ui/AppSyncStatus.vue'
 
 const router = useRouter()
 const route = useRoute()
-const { currentTheme, setTheme } = useTheme()
+const { currentMode, toggleMode } = useTheme()
 const auth = useAuthStore()
 const avatarInitials = computed(() => {
   const name = auth.user?.display_name || auth.user?.username || '?'
@@ -134,13 +134,6 @@ if (savedOrder) {
 
 function isActive(path: string) {
   return route.path === path
-}
-
-function toggleTheme() {
-  const themes = ['dark', 'light', 'nord', 'amber', 'forest', 'dusk']
-  const idx = themes.indexOf(currentTheme.value)
-  const next = themes[(idx + 1) % themes.length]
-  setTheme(next)
 }
 
 function handleLogout() {
