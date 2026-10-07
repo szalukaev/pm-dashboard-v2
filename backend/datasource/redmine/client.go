@@ -2,6 +2,7 @@ package redmine
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
 	"fmt"
 	"io"
@@ -61,8 +62,91 @@ type issueResp struct {
 		Author struct {
 			Name string `json:"name"`
 		} `json:"author"`
+		CustomFields []customFieldValue `json:"custom_fields"`
 	} `json:"issues"`
 	TotalCount int `json:"total_count"`
+}
+
+type customFieldValue struct {
+	ID    int         `json:"id"`
+	Value interface{} `json:"value"`
+}
+
+// developerEstimateFieldID is the Redmine custom field "Оценка разработчика".
+const developerEstimateFieldID = 18
+
+// issueEstimate prefers the developer estimate when it is set and positive,
+// otherwise falls back to the standard estimated_hours.
+func issueEstimate(estimated *float64, fields []customFieldValue) *float64 {
+	for _, f := range fields {
+		if f.ID != developerEstimateFieldID {
+			continue
+		}
+		s, ok := f.Value.(string)
+		if !ok {
+			break
+		}
+		v, err := strconv.ParseFloat(strings.TrimSpace(strings.Replace(s, ",", ".", 1)), 64)
+		if err == nil && v > 0 {
+			return &v
+		}
+		break
+	}
+	return estimated
+}
+
+type timeEntryResp struct {
+	TimeEntries []struct {
+		ID    int `json:"id"`
+		Issue *struct {
+			ID int `json:"id"`
+		} `json:"issue"`
+		Activity struct {
+			Name string `json:"name"`
+		} `json:"activity"`
+		Hours float64 `json:"hours"`
+	} `json:"time_entries"`
+	TotalCount int `json:"total_count"`
+}
+
+// TimeEntry is a single spent-time record linked to an issue.
+type TimeEntry struct {
+	ID           int
+	IssueID      int
+	ActivityName string
+	Hours        float64
+}
+
+// GetTimeEntries returns the time entries of a project that are linked to issues.
+func (c *Client) GetTimeEntries(projectID int) ([]TimeEntry, error) {
+	var all []TimeEntry
+	offset := 0
+	for {
+		data, err := c.doRequest(fmt.Sprintf("/time_entries.json?project_id=%d&limit=100&offset=%d", projectID, offset))
+		if err != nil {
+			return nil, err
+		}
+		var resp timeEntryResp
+		if err := json.Unmarshal(data, &resp); err != nil {
+			return nil, err
+		}
+		for _, e := range resp.TimeEntries {
+			if e.Issue == nil {
+				continue
+			}
+			all = append(all, TimeEntry{
+				ID:           e.ID,
+				IssueID:      e.Issue.ID,
+				ActivityName: e.Activity.Name,
+				Hours:        e.Hours,
+			})
+		}
+		offset += len(resp.TimeEntries)
+		if offset >= resp.TotalCount || len(resp.TimeEntries) == 0 {
+			break
+		}
+	}
+	return all, nil
 }
 
 type statusResp struct {
@@ -182,7 +266,7 @@ func (c *Client) GetIssues(projectID int) ([]Issue, error) {
 				StartDate:      i.StartDate,
 				DueDate:        i.DueDate,
 				DoneRatio:      i.DoneRatio,
-				EstimatedHours: i.EstimatedHours,
+				EstimatedHours: issueEstimate(i.EstimatedHours, i.CustomFields),
 				SpentHours:     i.SpentHours,
 				TrackerName:    i.Tracker.Name,
 				AuthorName:     i.Author.Name,

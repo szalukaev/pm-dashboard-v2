@@ -265,6 +265,27 @@ func (s *Syncer) syncIssues(_ context.Context, db **sql.DB) error {
 	}
 
 	slog.Info("Syncing issues for selected projects", "count", len(projectIDs), "expanded", true)
+	// Fact = sum of the time entries of an issue. A project's time entries
+	// include its subprojects, so entries are de-duplicated by id.
+	seenEntries := make(map[int]bool)
+	spentByIssue := make(map[int]float64)
+	timeLoaded := make(map[int]bool)
+	for _, pid := range projectIDs {
+		entries, err := s.client.GetTimeEntries(pid)
+		if err != nil {
+			slog.Warn("Failed to get time entries for project", "project_id", pid, "error", err)
+			continue
+		}
+		timeLoaded[pid] = true
+		for _, e := range entries {
+			if seenEntries[e.ID] {
+				continue
+			}
+			seenEntries[e.ID] = true
+			spentByIssue[e.IssueID] += e.Hours
+		}
+	}
+
 	totalSynced := 0
 	for _, pid := range projectIDs {
 		issues, err := s.client.GetIssues(pid)
@@ -274,6 +295,10 @@ func (s *Syncer) syncIssues(_ context.Context, db **sql.DB) error {
 		}
 		count := 0
 		for _, iss := range issues {
+			// Without time entries keep the value Redmine reported for the issue.
+			if timeLoaded[iss.ProjectID] {
+				iss.SpentHours = spentByIssue[iss.ExternalID]
+			}
 			_, err := (*db).Exec(`
 				INSERT INTO issues (
 					external_id, project_id, project_name, subject, description,
