@@ -209,9 +209,19 @@ function handleLogout() {
   opacity: 1;
 }
 
+.tab {
+  border: 1px solid transparent;
+}
+
 .tab.active {
   background: var(--surface-2);
+  border-color: var(--hairline);
   color: var(--text-bright);
+  font-weight: 600;
+}
+
+.tab.active :deep(svg:not(.tab-grip)) {
+  color: var(--accent);
 }
 
 .header-actions {
