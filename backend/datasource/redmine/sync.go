@@ -292,30 +292,102 @@ func (s *Syncer) syncIssues(_ context.Context, db **sql.DB) error {
 		}
 	}
 
-	totalSynced := 0
+	// Collect the issues of all projects first: an issue is written once even
+	// if Redmine returns it for both a parent project and its subproject.
+	var all []syncedIssue
+	seenIssues := make(map[int]bool)
 	for _, pid := range projectIDs {
 		issues, err := s.client.GetIssues(pid)
 		if err != nil {
 			slog.Warn("Failed to get issues for project", "project_id", pid, "error", err)
 			continue
 		}
-		count := 0
 		for _, iss := range issues {
-			// Without time entries keep the value Redmine reported for the issue.
-			var bugFixHours *float64
-			if timeLoaded[iss.ProjectID] {
-				iss.SpentHours = spentByIssue[iss.ExternalID]
-				bf := bugFixByIssue[iss.ExternalID]
-				bugFixHours = &bf
+			if seenIssues[iss.ExternalID] {
+				continue
 			}
-			_, err := (*db).Exec(`
+			seenIssues[iss.ExternalID] = true
+			// Without time entries keep the value Redmine reported for the issue.
+			item := syncedIssue{Issue: iss}
+			if timeLoaded[iss.ProjectID] {
+				item.SpentHours = spentByIssue[iss.ExternalID]
+				bf := bugFixByIssue[iss.ExternalID]
+				item.bugFixHours = &bf
+			}
+			all = append(all, item)
+		}
+	}
+	slog.Info("Loaded issues from Redmine", "count", len(all))
+
+	totalSynced := 0
+	for start := 0; start < len(all); start += issueBatchSize {
+		end := start + issueBatchSize
+		if end > len(all) {
+			end = len(all)
+		}
+		if err := upsertIssues(*db, all[start:end]); err != nil {
+			slog.Warn("Failed to upsert issues batch", "from", start, "to", end, "error", err)
+			continue
+		}
+		totalSynced += end - start
+	}
+	slog.Info("Synced issues total", "synced", totalSynced, "projects", len(projectIDs))
+
+	// Clean up issues from projects that are no longer selected by any user
+	placeholders := make([]string, len(projectIDs))
+	args := make([]interface{}, len(projectIDs))
+	for i, pid := range projectIDs {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		args[i] = pid
+	}
+	delQuery := fmt.Sprintf(`DELETE FROM issues WHERE data_source = 'redmine' AND project_id NOT IN (%s)`,
+		strings.Join(placeholders, ","))
+	res, err := (*db).Exec(delQuery, args...)
+	if err != nil {
+		slog.Warn("Failed to cleanup old issues", "error", err)
+	} else if n, _ := res.RowsAffected(); n > 0 {
+		slog.Info("Cleaned up issues from unselected projects", "deleted", n)
+	}
+
+	return nil
+}
+
+// syncedIssue is an issue ready to be stored; a nil bugFixHours keeps the
+// stored value (time entries of its project could not be loaded).
+type syncedIssue struct {
+	Issue
+	bugFixHours *float64
+}
+
+// issueBatchSize rows per INSERT: 20 params each, well below the 65535 limit.
+const issueBatchSize = 500
+
+// upsertIssues writes a batch of issues with a single multi-row statement —
+// the database is remote, so one round trip per issue made the sync slow.
+func upsertIssues(db *sql.DB, batch []syncedIssue) error {
+	const cols = 20
+	values := make([]string, len(batch))
+	args := make([]interface{}, 0, len(batch)*cols)
+	for i, it := range batch {
+		ph := make([]string, cols)
+		for j := range ph {
+			ph[j] = fmt.Sprintf("$%d", i*cols+j+1)
+		}
+		values[i] = "(" + strings.Join(ph, ",") + ",'redmine',NOW())"
+		args = append(args, it.ExternalID, it.ProjectID, it.ProjectName, it.Subject, it.Description,
+			it.StatusName, it.StatusID, it.PriorityName, it.PriorityID,
+			it.AssignedToName, it.AssignedToID, it.CategoryName,
+			it.StartDate, it.DueDate, it.EstimatedHours, it.SpentHours,
+			it.DoneRatio, it.TrackerName, it.AuthorName, it.bugFixHours)
+	}
+	_, err := db.Exec(`
 				INSERT INTO issues (
 					external_id, project_id, project_name, subject, description,
 					status_name, status_id, priority_name, priority_id,
 					assigned_to_name, assigned_to_id, category_name,
 					start_date, due_date, estimated_hours, spent_hours,
 					done_ratio, tracker_name, author_name, bug_fix_hours, data_source, synced_at
-				) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,'redmine',NOW())
+				) VALUES `+strings.Join(values, ",")+`
 				ON CONFLICT (external_id, data_source) DO UPDATE SET
 					project_id = EXCLUDED.project_id,
 					project_name = EXCLUDED.project_name,
@@ -337,39 +409,8 @@ func (s *Syncer) syncIssues(_ context.Context, db **sql.DB) error {
 					author_name = EXCLUDED.author_name,
 					bug_fix_hours = COALESCE(EXCLUDED.bug_fix_hours, issues.bug_fix_hours),
 					synced_at = NOW()
-			`, iss.ExternalID, iss.ProjectID, iss.ProjectName, iss.Subject, iss.Description,
-				iss.StatusName, iss.StatusID, iss.PriorityName, iss.PriorityID,
-				iss.AssignedToName, iss.AssignedToID, iss.CategoryName,
-				iss.StartDate, iss.DueDate, iss.EstimatedHours, iss.SpentHours,
-				iss.DoneRatio, iss.TrackerName, iss.AuthorName, bugFixHours)
-			if err != nil {
-				slog.Warn("Failed to upsert issue", "issue_id", iss.ExternalID, "error", err)
-				continue
-			}
-			count++
-		}
-		totalSynced += count
-		slog.Info("Synced issues for project", "project_id", pid, "synced", count)
-	}
-	slog.Info("Synced issues total", "synced", totalSynced, "projects", len(projectIDs))
-
-	// Clean up issues from projects that are no longer selected by any user
-	placeholders := make([]string, len(projectIDs))
-	args := make([]interface{}, len(projectIDs))
-	for i, pid := range projectIDs {
-		placeholders[i] = fmt.Sprintf("$%d", i+1)
-		args[i] = pid
-	}
-	delQuery := fmt.Sprintf(`DELETE FROM issues WHERE data_source = 'redmine' AND project_id NOT IN (%s)`,
-		strings.Join(placeholders, ","))
-	res, err := (*db).Exec(delQuery, args...)
-	if err != nil {
-		slog.Warn("Failed to cleanup old issues", "error", err)
-	} else if n, _ := res.RowsAffected(); n > 0 {
-		slog.Info("Cleaned up issues from unselected projects", "deleted", n)
-	}
-
-	return nil
+			`, args...)
+	return err
 }
 
 // isBugFixActivity reports whether a time entry activity is "Fixing bugs".

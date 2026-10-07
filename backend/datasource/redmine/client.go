@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -120,13 +121,12 @@ type TimeEntry struct {
 // GetTimeEntries returns the time entries of a project that are linked to
 // issues. Subprojects are excluded: they are requested on their own.
 func (c *Client) GetTimeEntries(projectID int) ([]TimeEntry, error) {
+	pages, err := c.getPages(fmt.Sprintf("/time_entries.json?project_id=%d&subproject_id=!*", projectID))
+	if err != nil {
+		return nil, err
+	}
 	var all []TimeEntry
-	offset := 0
-	for {
-		data, err := c.doRequest(fmt.Sprintf("/time_entries.json?project_id=%d&subproject_id=!*&limit=100&offset=%d", projectID, offset))
-		if err != nil {
-			return nil, err
-		}
+	for _, data := range pages {
 		var resp timeEntryResp
 		if err := json.Unmarshal(data, &resp); err != nil {
 			return nil, err
@@ -141,10 +141,6 @@ func (c *Client) GetTimeEntries(projectID int) ([]TimeEntry, error) {
 				ActivityName: e.Activity.Name,
 				Hours:        e.Hours,
 			})
-		}
-		offset += len(resp.TimeEntries)
-		if offset >= resp.TotalCount || len(resp.TimeEntries) == 0 {
-			break
 		}
 	}
 	return all, nil
@@ -204,6 +200,65 @@ func (c *Client) doRequest(path string) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
+const (
+	pageSize    = 100
+	pageWorkers = 6
+)
+
+// getPages loads every page of a paginated list. The first page gives
+// total_count, the rest are requested concurrently and returned in order.
+func (c *Client) getPages(path string) ([][]byte, error) {
+	page := func(offset int) ([]byte, error) {
+		return c.doRequest(fmt.Sprintf("%s&limit=%d&offset=%d", path, pageSize, offset))
+	}
+	first, err := page(0)
+	if err != nil {
+		return nil, err
+	}
+	var meta struct {
+		TotalCount int `json:"total_count"`
+	}
+	if err := json.Unmarshal(first, &meta); err != nil {
+		return nil, err
+	}
+	pages := (meta.TotalCount + pageSize - 1) / pageSize
+	if pages < 1 {
+		pages = 1
+	}
+	out := make([][]byte, pages)
+	out[0] = first
+
+	var (
+		wg       sync.WaitGroup
+		mu       sync.Mutex
+		firstErr error
+		sem      = make(chan struct{}, pageWorkers)
+	)
+	for i := 1; i < pages; i++ {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(i int) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			data, err := page(i * pageSize)
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				if firstErr == nil {
+					firstErr = err
+				}
+				return
+			}
+			out[i] = data
+		}(i)
+	}
+	wg.Wait()
+	if firstErr != nil {
+		return nil, firstErr
+	}
+	return out, nil
+}
+
 func (c *Client) TestConnection() error {
 	_, err := c.doRequest("/projects.json?limit=1")
 	return err
@@ -237,18 +292,19 @@ func (c *Client) GetProjects() ([]Project, error) {
 	return all, nil
 }
 
+// GetIssues returns the issues of a project without its subprojects (they
+// are requested on their own); projectID 0 means all projects.
 func (c *Client) GetIssues(projectID int) ([]Issue, error) {
+	path := "/issues.json?status_id=*"
+	if projectID > 0 {
+		path += fmt.Sprintf("&project_id=%d&subproject_id=!*", projectID)
+	}
+	pages, err := c.getPages(path)
+	if err != nil {
+		return nil, err
+	}
 	var all []Issue
-	offset := 0
-	for {
-		path := fmt.Sprintf("/issues.json?limit=100&offset=%d&status_id=*", offset)
-		if projectID > 0 {
-			path += fmt.Sprintf("&project_id=%d", projectID)
-		}
-		data, err := c.doRequest(path)
-		if err != nil {
-			return nil, err
-		}
+	for _, data := range pages {
 		var resp issueResp
 		if err := json.Unmarshal(data, &resp); err != nil {
 			return nil, err
@@ -281,10 +337,6 @@ func (c *Client) GetIssues(projectID int) ([]Issue, error) {
 				iss.CategoryName = i.Category.Name
 			}
 			all = append(all, iss)
-		}
-		offset += len(resp.Issues)
-		if offset >= resp.TotalCount || len(resp.Issues) == 0 {
-			break
 		}
 	}
 	return all, nil
