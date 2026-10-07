@@ -444,3 +444,28 @@ func (r *bytesReaderData) Close() error { return nil }
 func bytesReader(data []byte) io.ReadCloser {
 	return &bytesReaderData{data: data}
 }
+
+type categoryResp struct {
+	Categories []struct {
+		ID   int    `json:"id"`
+		Name string `json:"name"`
+	} `json:"issue_categories"`
+}
+
+// FindCategoryID resolves an issue category name to its id within a project.
+func (c *Client) FindCategoryID(projectID int, name string) (int, error) {
+	data, err := c.doRequest(fmt.Sprintf("/projects/%d/issue_categories.json", projectID))
+	if err != nil {
+		return 0, err
+	}
+	var resp categoryResp
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return 0, err
+	}
+	for _, cat := range resp.Categories {
+		if cat.Name == name {
+			return cat.ID, nil
+		}
+	}
+	return 0, fmt.Errorf("category %q not found in project %d", name, projectID)
+}

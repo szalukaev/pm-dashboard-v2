@@ -153,7 +153,7 @@ func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 			"fact":           "spent_hours",
 			"status_name":    "status_name",
 			"bug_fix_hours":  "bug_fix_hours",
-			"bug_fix_pct":    "bug_fix_pct",
+			"bug_fix_pct":    "COALESCE(bug_fix_hours, 0) / NULLIF(spent_hours, 0)",
 			"start_date":     "start_date",
 			"due_date":       "due_date",
 			"category_name":  "category_name",
@@ -317,111 +317,180 @@ func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Build update fields
-	allowed := map[string]string{
-		"status_name":     "status_name",
-		"priority_name":   "priority_name",
-		"assigned_to_name": "assigned_to_name",
-		"start_date":      "start_date",
-		"due_date":        "due_date",
-		"estimated_hours": "estimated_hours",
-		"category_name":   "category_name",
-		"external_id":     "external_id",
+	// The category is resolved within the project of the issue.
+	var projectID int
+	if err := (*h.DB).QueryRow("SELECT COALESCE(project_id, 0) FROM issues WHERE external_id = $1", externalID).Scan(&projectID); err != nil {
+		utils.Error(w, http.StatusNotFound, "TASK_NOT_FOUND")
+		return
+	}
+
+	client := h.getRedmineClient()
+
+	// localSets: column -> new value for the local cache;
+	// redmineFields: payload for the data source. An empty string clears a field in Redmine.
+	localSets := map[string]interface{}{}
+	redmineFields := map[string]interface{}{}
+	editable := []string{}
+
+	for field, value := range body {
+		strValue, _ := value.(string)
+		switch field {
+		case "status_name":
+			var statusID int
+			if err := (*h.DB).QueryRow("SELECT external_id FROM statuses WHERE name = $1 AND data_source = 'redmine'", strValue).Scan(&statusID); err != nil {
+				utils.Error(w, http.StatusBadRequest, "STATUS_NOT_FOUND")
+				return
+			}
+			localSets["status_name"] = strValue
+			localSets["status_id"] = statusID
+			redmineFields["status_id"] = statusID
+		case "priority_name":
+			var priorityID int
+			if err := (*h.DB).QueryRow("SELECT external_id FROM priorities WHERE name = $1 AND data_source = 'redmine'", strValue).Scan(&priorityID); err != nil {
+				utils.Error(w, http.StatusBadRequest, "PRIORITY_NOT_FOUND")
+				return
+			}
+			localSets["priority_name"] = strValue
+			localSets["priority_id"] = priorityID
+			redmineFields["priority_id"] = priorityID
+		case "assigned_to_name":
+			if strValue == "" {
+				localSets["assigned_to_name"] = ""
+				localSets["assigned_to_id"] = nil
+				redmineFields["assigned_to_id"] = ""
+				break
+			}
+			var assigneeID int
+			if err := (*h.DB).QueryRow("SELECT external_id FROM members WHERE name = $1 AND data_source = 'redmine' LIMIT 1", strValue).Scan(&assigneeID); err != nil {
+				utils.Error(w, http.StatusBadRequest, "MEMBER_NOT_FOUND")
+				return
+			}
+			localSets["assigned_to_name"] = strValue
+			localSets["assigned_to_id"] = assigneeID
+			redmineFields["assigned_to_id"] = assigneeID
+		case "start_date", "due_date":
+			if strValue == "" {
+				localSets[field] = nil
+			} else {
+				localSets[field] = strValue
+			}
+			redmineFields[field] = strValue
+		case "estimated_hours":
+			hours, ok := parseHours(value)
+			if !ok {
+				utils.Error(w, http.StatusBadRequest, "INVALID_VALUE")
+				return
+			}
+			if hours == nil {
+				localSets[field] = nil
+				redmineFields[field] = ""
+			} else {
+				localSets[field] = *hours
+				redmineFields[field] = *hours
+			}
+		case "category_name":
+			localSets["category_name"] = strValue
+			if strValue == "" {
+				redmineFields["category_id"] = ""
+				break
+			}
+			if client == nil {
+				break
+			}
+			categoryID, err := client.FindCategoryID(projectID, strValue)
+			if err != nil {
+				utils.Error(w, http.StatusBadRequest, "CATEGORY_NOT_FOUND")
+				return
+			}
+			redmineFields["category_id"] = categoryID
+		default:
+			continue
+		}
+		editable = append(editable, field)
+	}
+
+	if len(localSets) == 0 {
+		utils.Error(w, http.StatusBadRequest, "NO_FIELDS_TO_UPDATE")
+		return
+	}
+
+	// Old values for the change notification. Field names come from the switch above.
+	oldValues := make(map[string]interface{})
+	for _, field := range editable {
+		var oldVal sql.NullString
+		(*h.DB).QueryRow("SELECT "+field+"::text FROM issues WHERE external_id = $1", externalID).Scan(&oldVal)
+		if oldVal.Valid {
+			oldValues[field] = oldVal.String
+		} else {
+			oldValues[field] = nil
+		}
+	}
+
+	// The data source is the system of record: write there first and touch
+	// the local cache only on success, otherwise the next sync would silently
+	// roll the change back.
+	if client != nil {
+		if err := client.UpdateIssue(externalID, redmineFields); err != nil {
+			slog.Warn("Failed to update issue in Redmine", "issue", externalID, "error", err)
+			utils.JSON(w, http.StatusOK, map[string]interface{}{
+				"success":       false,
+				"old_values":    oldValues,
+				"new_values":    body,
+				"redmine_ok":    false,
+				"redmine_error": err.Error(),
+			})
+			return
+		}
 	}
 
 	setClauses := []string{}
 	args := []interface{}{}
 	argIdx := 1
-
-	for field, value := range body {
-		if col, ok := allowed[field]; ok {
-			setClauses = append(setClauses, col+" = $"+strconv.Itoa(argIdx))
-			args = append(args, value)
-			argIdx++
-		}
+	for col, value := range localSets {
+		setClauses = append(setClauses, col+" = $"+strconv.Itoa(argIdx))
+		args = append(args, value)
+		argIdx++
 	}
-
-	if len(setClauses) == 0 {
-		utils.Error(w, http.StatusBadRequest, "NO_FIELDS_TO_UPDATE")
-		return
-	}
-
 	args = append(args, externalID)
 	query := "UPDATE issues SET " + strings.Join(setClauses, ", ") + ", synced_at = NOW() WHERE external_id = $" + strconv.Itoa(argIdx)
-
-	// Get old values before update for change notification
-	oldValues := make(map[string]interface{})
-	for field := range body {
-		if _, ok := allowed[field]; ok {
-			var oldVal interface{}
-			(*h.DB).QueryRow("SELECT "+field+" FROM issues WHERE external_id = $1", externalID).Scan(&oldVal)
-			oldValues[field] = oldVal
-		}
-	}
-
-	_, err = (*h.DB).Exec(query, args...)
-	if err != nil {
+	if _, err := (*h.DB).Exec(query, args...); err != nil {
 		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 		return
 	}
 
-	// Sync to Redmine
-	redmineFields := make(map[string]interface{})
-	for field, value := range body {
-		switch field {
-		case "status_name":
-			// Find status ID by name
-			var statusID int
-			if err := (*h.DB).QueryRow("SELECT external_id FROM statuses WHERE name = $1 AND data_source = 'redmine'", value).Scan(&statusID); err == nil {
-				redmineFields["status_id"] = statusID
-			}
-		case "priority_name":
-			var prioID int
-			if err := (*h.DB).QueryRow("SELECT external_id FROM priorities WHERE name = $1 AND data_source = 'redmine'", value).Scan(&prioID); err == nil {
-				redmineFields["priority_id"] = prioID
-			}
-		case "assigned_to_name":
-			var assigneeID int
-			if value == nil || value == "" {
-				redmineFields["assigned_to_id"] = nil
-			} else if err := (*h.DB).QueryRow("SELECT external_id FROM members WHERE name = $1 AND data_source = 'redmine'", value).Scan(&assigneeID); err == nil {
-				redmineFields["assigned_to_id"] = assigneeID
-			}
-		case "start_date":
-			redmineFields["start_date"] = value
-		case "due_date":
-			redmineFields["due_date"] = value
-		case "estimated_hours":
-			redmineFields["estimated_hours"] = value
-		case "category_name":
-			redmineFields["category_name"] = value
-		}
-	}
-
-	redmineErr := error(nil)
-	if len(redmineFields) > 0 {
-		// Build redmine client from config
-		client := h.getRedmineClient()
-		if client != nil {
-			redmineErr = client.UpdateIssue(externalID, redmineFields)
-			if redmineErr != nil {
-				slog.Warn("Failed to sync to Redmine", "issue", externalID, "error", redmineErr)
-			}
-		}
-	}
-
 	utils.JSON(w, http.StatusOK, map[string]interface{}{
-		"success":    true,
-		"old_values": oldValues,
-		"new_values": body,
-		"redmine_ok": redmineErr == nil,
-		"redmine_error": func() string {
-			if redmineErr != nil {
-				return redmineErr.Error()
-			}
-			return ""
-		}(),
+		"success":       true,
+		"old_values":    oldValues,
+		"new_values":    body,
+		"redmine_ok":    true,
+		"redmine_error": "",
 	})
+}
+
+// parseHours accepts a JSON number, a numeric string ("1.5" / "1,5") or an
+// empty value. A nil result with ok=true means "clear the estimate".
+func parseHours(value interface{}) (*float64, bool) {
+	switch v := value.(type) {
+	case nil:
+		return nil, true
+	case float64:
+		if v < 0 {
+			return nil, false
+		}
+		return &v, true
+	case string:
+		s := strings.TrimSpace(strings.Replace(v, ",", ".", 1))
+		if s == "" {
+			return nil, true
+		}
+		f, err := strconv.ParseFloat(s, 64)
+		if err != nil || f < 0 {
+			return nil, false
+		}
+		return &f, true
+	default:
+		return nil, false
+	}
 }
 
 func (h *TaskHandler) getRedmineClient() *redmine.Client {
