@@ -214,6 +214,8 @@ func main() {
 	api.HandleFunc("/tasks/members", taskH.GetMembers).Methods("GET")
 	api.HandleFunc("/tasks/statuses", taskH.GetStatuses).Methods("GET")
 	api.HandleFunc("/tasks/priorities", taskH.GetPriorities).Methods("GET")
+	api.HandleFunc("/tasks/{id}/details", taskH.GetTaskDetails).Methods("GET")
+	api.HandleFunc("/tasks/{id}/attachments/{attachment_id}", taskH.GetTaskAttachment).Methods("GET")
 	api.HandleFunc("/tasks/{id}/comments", taskH.GetComments).Methods("GET")
 	api.HandleFunc("/tasks/{id}/comments", taskH.AddComment).Methods("POST")
 	api.HandleFunc("/tasks/{id}", taskH.GetTask).Methods("GET")

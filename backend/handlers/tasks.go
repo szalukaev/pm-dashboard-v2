@@ -4,6 +4,8 @@ import (
 	"log/slog"
 	"database/sql"
 	"encoding/json"
+	"io"
+	"mime"
 	"net/http"
 	"sort"
 	"strconv"
@@ -530,6 +532,96 @@ func (h *TaskHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 		comments = []redmine.Comment{}
 	}
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"comments": comments})
+}
+
+// GetTaskDetails returns the live part of the task card from Redmine:
+// raw description markup, attached files and comment history.
+func (h *TaskHandler) GetTaskDetails(w http.ResponseWriter, r *http.Request) {
+	externalID, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
+		return
+	}
+	client := h.getRedmineClient()
+	if client == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "REDMINE_NOT_CONFIGURED")
+		return
+	}
+	details, err := client.GetIssueDetails(externalID)
+	if err != nil {
+		slog.Warn("Failed to get issue details", "issue", externalID, "error", err)
+		utils.Error(w, http.StatusBadGateway, "REDMINE_ERROR")
+		return
+	}
+	utils.JSON(w, http.StatusOK, details)
+}
+
+// inlineImageTypes may be shown in the page; anything else is served as a
+// download so that an uploaded HTML/SVG file cannot run in our origin.
+var inlineImageTypes = map[string]bool{
+	"image/png":  true,
+	"image/jpeg": true,
+	"image/gif":  true,
+	"image/webp": true,
+	"image/bmp":  true,
+}
+
+// GetTaskAttachment proxies a file of the task from Redmine (the browser has
+// no Redmine credentials). Only attachments of that task are served.
+func (h *TaskHandler) GetTaskAttachment(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	externalID, err1 := strconv.Atoi(vars["id"])
+	attachmentID, err2 := strconv.Atoi(vars["attachment_id"])
+	if err1 != nil || err2 != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
+		return
+	}
+	client := h.getRedmineClient()
+	if client == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "REDMINE_NOT_CONFIGURED")
+		return
+	}
+	details, err := client.GetIssueDetails(externalID)
+	if err != nil {
+		utils.Error(w, http.StatusBadGateway, "REDMINE_ERROR")
+		return
+	}
+	var att *redmine.Attachment
+	for i := range details.Attachments {
+		if details.Attachments[i].ID == attachmentID {
+			att = &details.Attachments[i]
+			break
+		}
+	}
+	if att == nil {
+		utils.Error(w, http.StatusNotFound, "ATTACHMENT_NOT_FOUND")
+		return
+	}
+
+	body, err := client.DownloadAttachment(attachmentID)
+	if err != nil {
+		slog.Warn("Failed to download attachment", "issue", externalID, "attachment", attachmentID, "error", err)
+		utils.Error(w, http.StatusBadGateway, "REDMINE_ERROR")
+		return
+	}
+	defer body.Close()
+
+	contentType := strings.ToLower(att.ContentType)
+	disposition := "attachment"
+	if inlineImageTypes[contentType] {
+		disposition = "inline"
+	} else {
+		contentType = "application/octet-stream"
+	}
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Disposition", mime.FormatMediaType(disposition, map[string]string{"filename": att.Filename}))
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Security-Policy", "sandbox")
+	w.Header().Set("Cache-Control", "private, max-age=3600")
+	if att.Filesize > 0 {
+		w.Header().Set("Content-Length", strconv.FormatInt(att.Filesize, 10))
+	}
+	io.Copy(w, body)
 }
 
 func (h *TaskHandler) AddComment(w http.ResponseWriter, r *http.Request) {
