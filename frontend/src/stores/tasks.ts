@@ -66,6 +66,7 @@ export const useTasksStore = defineStore('tasks', () => {
   // Reference data
   const projects = ref<{ id: number; name: string; parent_id: number | null }[]>([])
   const categories = ref<string[]>([])
+  const projectCategories = ref<Record<number, string[]>>({})
   const statuses = ref<{ id: number; name: string; is_closed: boolean; group: string }[]>([])
   const priorities = ref<{ id: number; name: string; sort_order: number }[]>([])
 
@@ -138,6 +139,15 @@ export const useTasksStore = defineStore('tasks', () => {
     } catch {}
   }
 
+  // All categories defined in a project, for inline editing; cached per project.
+  async function fetchProjectCategories(projectId: number) {
+    if (projectCategories.value[projectId]) return
+    try {
+      const { data } = await axios.get('/api/tasks/project-categories', { params: { project_id: projectId } })
+      projectCategories.value = { ...projectCategories.value, [projectId]: data.categories || [] }
+    } catch {}
+  }
+
   async function fetchPriorities() {
     try {
       const { data } = await axios.get('/api/tasks/priorities')
@@ -205,9 +215,9 @@ export const useTasksStore = defineStore('tasks', () => {
 
   return {
     tasks, groups, loading, error, total, useGrouping, filters,
-    projects, categories, statuses, priorities,
+    projects, categories, projectCategories, statuses, priorities,
     fetchTasks, fetchTask, updateTask,
-    fetchProjects, fetchCategories, fetchStatuses, fetchPriorities,
+    fetchProjects, fetchCategories, fetchProjectCategories, fetchStatuses, fetchPriorities,
     setFilter, restoreFilters, resetFilters, hasActiveFilters,
   }
 })

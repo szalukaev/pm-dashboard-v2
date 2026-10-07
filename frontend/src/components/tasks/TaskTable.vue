@@ -164,7 +164,7 @@ const tasksStore = useTasksStore()
 const { showChange, toast } = useSwal()
 const { settings } = storeToRefs(settingsStore)
 
-const props = defineProps<{ tasks: Task[] }>()
+defineProps<{ tasks: Task[] }>()
 
 // Load team members for assignee dropdown
 onMounted(async () => {
@@ -179,6 +179,7 @@ const emit = defineEmits(['open-task', 'sort-change', 'inline-edit'])
 const editingCell = ref<{ taskId: number; field: string } | null>(null)
 
 function startInlineEdit(task: Task, field: string) {
+  if (field === 'category_name') tasksStore.fetchProjectCategories(task.project_id)
   editingCell.value = { taskId: task.external_id, field }
 }
 
@@ -226,7 +227,7 @@ async function saveInlineEdit(task: Task, field: string, value: string) {
 const sortBy = ref('')
 const sortDir = ref('asc')
 
-const { statuses, categories, priorities } = storeToRefs(tasksStore)
+const { statuses, priorities, projectCategories: projectCategoriesMap } = storeToRefs(tasksStore)
 const members = ref<{ id: number; name: string }[]>([])
 
 const statusNames = computed(() => {
@@ -306,13 +307,10 @@ function formatDate(d?: string | null): string {
 }
 
 function projectCategories(task: Task): string[] {
-  // Only return categories that belong to this task's project
-  const projectCats = new Set<string>()
-  for (const t of props.tasks) {
-    if (t.project_id === task.project_id && t.category_name) {
-      projectCats.add(t.category_name)
-    }
-  }
+  // All categories of the task's project; the current value stays selectable
+  // even while the list is loading or if it was removed in Redmine.
+  const projectCats = new Set<string>(projectCategoriesMap.value[task.project_id] || [])
+  if (task.category_name) projectCats.add(task.category_name)
   return [...projectCats].sort()
 }
 

@@ -536,17 +536,36 @@ type categoryResp struct {
 	} `json:"issue_categories"`
 }
 
-// FindCategoryID resolves an issue category name to its id within a project.
-func (c *Client) FindCategoryID(projectID int, name string) (int, error) {
+// Category is an issue category of a Redmine project.
+type Category struct {
+	ID   int
+	Name string
+}
+
+// GetCategories returns all issue categories defined for a project.
+func (c *Client) GetCategories(projectID int) ([]Category, error) {
 	data, err := c.doRequest(fmt.Sprintf("/projects/%d/issue_categories.json", projectID))
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	var resp categoryResp
 	if err := json.Unmarshal(data, &resp); err != nil {
+		return nil, err
+	}
+	all := make([]Category, 0, len(resp.Categories))
+	for _, cat := range resp.Categories {
+		all = append(all, Category{ID: cat.ID, Name: cat.Name})
+	}
+	return all, nil
+}
+
+// FindCategoryID resolves an issue category name to its id within a project.
+func (c *Client) FindCategoryID(projectID int, name string) (int, error) {
+	categories, err := c.GetCategories(projectID)
+	if err != nil {
 		return 0, err
 	}
-	for _, cat := range resp.Categories {
+	for _, cat := range categories {
 		if cat.Name == name {
 			return cat.ID, nil
 		}

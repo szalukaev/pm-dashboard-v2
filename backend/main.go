@@ -209,6 +209,7 @@ func main() {
 	// Tasks
 	api.HandleFunc("/tasks", taskH.ListTasks).Methods("GET")
 	api.HandleFunc("/tasks/categories", taskH.GetCategories).Methods("GET")
+	api.HandleFunc("/tasks/project-categories", taskH.GetProjectCategories).Methods("GET")
 	api.HandleFunc("/tasks/projects", taskH.GetProjects).Methods("GET")
 	api.HandleFunc("/tasks/members", taskH.GetMembers).Methods("GET")
 	api.HandleFunc("/tasks/statuses", taskH.GetStatuses).Methods("GET")

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -593,6 +594,37 @@ func (h *TaskHandler) GetCategories(w http.ResponseWriter, r *http.Request) {
 	if categories == nil {
 		categories = []string{}
 	}
+
+	utils.JSON(w, http.StatusOK, map[string]interface{}{"categories": categories})
+}
+
+// GetProjectCategories returns every category defined in the project (not
+// only the ones already used by issues) — the choices for editing a task.
+func (h *TaskHandler) GetProjectCategories(w http.ResponseWriter, r *http.Request) {
+	projectID, err := strconv.Atoi(r.URL.Query().Get("project_id"))
+	if err != nil || projectID <= 0 {
+		utils.Error(w, http.StatusBadRequest, "INVALID_PROJECT_ID")
+		return
+	}
+
+	client := h.getRedmineClient()
+	if client == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "REDMINE_NOT_CONFIGURED")
+		return
+	}
+
+	list, err := client.GetCategories(projectID)
+	if err != nil {
+		slog.Warn("Failed to get project categories", "project_id", projectID, "error", err)
+		utils.Error(w, http.StatusBadGateway, "REDMINE_ERROR")
+		return
+	}
+
+	categories := make([]string, 0, len(list))
+	for _, c := range list {
+		categories = append(categories, c.Name)
+	}
+	sort.Strings(categories)
 
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"categories": categories})
 }
