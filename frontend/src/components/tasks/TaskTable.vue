@@ -23,13 +23,13 @@
             :class="{ overdue: isOverdue(task) }"
             :data-testid="'task-row-' + task.external_id"
           >
-            <td class="subject" @click="$emit('open-task', task.external_id)">{{ task.subject }}</td>
-
             <td class="center">
               <a :href="taskLink(task.external_id)" target="_blank" class="issue-link" :data-testid="'task-link-' + task.external_id">
                 #{{ task.external_id }}
               </a>
             </td>
+
+            <td class="subject" @click="$emit('open-task', task.external_id)">{{ task.subject }}</td>
 
             <td class="center">
               <select
@@ -191,8 +191,8 @@ function withCurrent(list: string[], current?: string | null): string[] {
 }
 
 const columns = [
+  { key: 'external_id', label: 'Номер', sortable: true, center: true },
   { key: 'subject', label: 'Наименование', sortable: true },
-  { key: 'external_id', label: 'Redmine', sortable: true, center: true },
   { key: 'priority_name', label: 'Приоритет', sortable: true, center: true },
   { key: 'assigned_to', label: 'Ответственный', sortable: true },
   { key: 'estimate', label: 'Оценка, ч', sortable: true, center: true },
