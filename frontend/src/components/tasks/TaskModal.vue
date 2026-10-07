@@ -511,8 +511,9 @@ function initials(name: string): string {
   padding: 6px 10px;
   font-size: 13px;
   font-family: inherit;
-  background: transparent;
-  border: 1px solid transparent;
+  /* Editable fields are always framed, read-only values are plain text */
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
   border-radius: 8px;
   color: var(--text-bright);
   cursor: pointer;
@@ -520,8 +521,7 @@ function initials(name: string): string {
 }
 
 .field-input:hover {
-  background: var(--surface-1);
-  border-color: var(--hairline);
+  border-color: var(--hairline-strong);
 }
 
 .field-input:focus {
