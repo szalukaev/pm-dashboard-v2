@@ -7,7 +7,7 @@
             <th
               v-for="col in columns"
               :key="col.key"
-              :class="{ sortable: col.sortable, sorted: sortBy === col.key, center: col.center }"
+              :class="{ sortable: col.sortable, sorted: sortBy === col.key }"
               @click="col.sortable && toggleSort(col.key)"
               :data-testid="'col-' + col.key"
             >
@@ -322,7 +322,7 @@ th {
   color: var(--text-muted);
   font-size: 12px;
   font-weight: 500;
-  text-align: left;
+  text-align: center;
   text-transform: uppercase;
   white-space: nowrap;
   user-select: none;
