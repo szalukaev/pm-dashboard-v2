@@ -40,35 +40,37 @@
     </div>
 
     <!-- Row 2: grouping, categories -->
-    <div class="filter-bar small">
-      <span class="filter-label">Группировка:</span>
-      <button
-        class="pill-btn sm"
-        :class="{ active: useGrouping && filters.group_by === 'project' }"
-        @click="setGrouping('project')"
-        data-testid="filter-group-project"
-      >
-        {{ $t('tasks.filters.group_by_project') }}
-      </button>
-      <button
-        class="pill-btn sm"
-        :class="{ active: useGrouping && filters.group_by === 'assignee' }"
-        @click="setGrouping('assignee')"
-        data-testid="filter-group-assignee"
-      >
-        {{ $t('tasks.filters.group_by_assignee') }}
-      </button>
-      <button
-        class="pill-btn sm"
-        :class="{ active: !useGrouping }"
-        @click="setGrouping('')"
-        data-testid="filter-no-group"
-      >
-        Без группировки
-      </button>
+    <div class="filter-row">
+      <div class="filter-group">
+        <span class="filter-label">Группировка:</span>
+        <button
+          class="pill-btn sm"
+          :class="{ active: useGrouping && filters.group_by === 'project' }"
+          @click="setGrouping('project')"
+          data-testid="filter-group-project"
+        >
+          {{ $t('tasks.filters.group_by_project') }}
+        </button>
+        <button
+          class="pill-btn sm"
+          :class="{ active: useGrouping && filters.group_by === 'assignee' }"
+          @click="setGrouping('assignee')"
+          data-testid="filter-group-assignee"
+        >
+          {{ $t('tasks.filters.group_by_assignee') }}
+        </button>
+        <button
+          class="pill-btn sm"
+          :class="{ active: !useGrouping }"
+          @click="setGrouping('')"
+          data-testid="filter-no-group"
+        >
+          {{ $t('common.all') }}
+        </button>
+      </div>
 
-      <template v-if="categories.length > 0 && filters.project_id">
-        <span class="filter-label spaced">Категория:</span>
+      <div class="filter-group" v-if="categories.length > 0 && filters.project_id">
+        <span class="filter-label">Категория:</span>
         <button
           v-for="cat in categories"
           :key="cat"
@@ -79,7 +81,7 @@
         >
           {{ cat }}
         </button>
-      </template>
+      </div>
     </div>
   </div>
 </template>
@@ -104,6 +106,8 @@ const visibleProjects = computed(() => {
 })
 
 const searchInput = ref(filters.value.search)
+// Saved filters are restored after this component is created.
+watch(() => filters.value.search, (val) => { searchInput.value = val })
 
 // Load settings to get selected_projects for filtering
 settingsStore.fetchSettings()
@@ -121,12 +125,7 @@ function setFilter(key: string, value: string) {
 }
 
 function setGrouping(mode: string) {
-  if (mode === '') {
-    useGrouping.value = false
-  } else {
-    useGrouping.value = true
-    store.setFilter('group_by', mode)
-  }
+  store.setGrouping(mode)
   store.fetchTasks()
 }
 
@@ -169,18 +168,24 @@ watch(searchInput, (val) => {
   flex-wrap: wrap;
 }
 
-.filter-bar.small {
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
 }
 
 .filter-label {
   font-size: 11px;
   color: var(--text-muted);
   margin-right: 2px;
-}
-
-.filter-label.spaced {
-  margin-left: 8px;
 }
 
 .pill-btn {
