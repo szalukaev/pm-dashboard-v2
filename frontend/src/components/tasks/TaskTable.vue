@@ -7,7 +7,7 @@
             v-for="col in columns"
             :key="col.key"
             class="th-cell"
-            :class="{ sortable: col.sortable, sorted: sortBy === col.key, 'center-cell': ['priority_name','estimate','fact','status_name','bug_fix_hours','bug_fix_pct','start_date','due_date'].includes(col.key) }"
+            :class="{ sortable: col.sortable, sorted: sortBy === col.key, 'center-cell': ['estimate','fact','status_name','bug_fix_hours','bug_fix_pct','start_date','due_date'].includes(col.key) }"
             @click="col.sortable && toggleSort(col.key)"
             :data-testid="'col-' + col.key"
           >
@@ -38,7 +38,7 @@
             </a>
             <span class="task-subject" :title="task.subject" @click.stop="$emit('open-task', task.external_id)">{{ task.subject }}</span>
           </td>
-          <td class="td-cell priority-cell center-cell" @dblclick.stop="startInlineEdit(task, 'priority_name')">
+          <td class="td-cell priority-cell" @dblclick.stop="startInlineEdit(task, 'priority_name')">
             <template v-if="isEditing(task.external_id, 'priority_name')">
               <select
                 :value="task.priority_name"
@@ -434,6 +434,7 @@ function formatHours(h: number): string {
 
 .priority-cell {
   white-space: nowrap;
+  text-align: left;
 }
 
 .priority-dot {
