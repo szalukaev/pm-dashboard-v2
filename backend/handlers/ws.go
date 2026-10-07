@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"sync"
 	"time"
@@ -23,11 +24,19 @@ const (
 )
 
 // checkWSOrigin allows only known frontend origins (CSWSH protection).
+// Same-origin is always allowed (browser on http://176.12.69.5:82 etc.);
+// otherwise localhost dev ports and FRONTEND_ORIGIN from env.
 func checkWSOrigin(r *http.Request) bool {
 	origin := r.Header.Get("Origin")
 	// Non-browser clients send no Origin header.
 	if origin == "" {
 		return true
+	}
+	// Same-origin: Origin host:port matches the request Host.
+	if u, err := url.Parse(origin); err == nil && u.Host != "" {
+		if u.Host == r.Host {
+			return true
+		}
 	}
 	allowed := map[string]bool{
 		"http://localhost:82":   true,
