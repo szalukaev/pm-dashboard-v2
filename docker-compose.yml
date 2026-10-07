@@ -19,8 +19,9 @@ services:
       dockerfile: ../Dockerfile.backend
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    ports:
-      - "8080:8080"
+    # No host port: the API is reachable only through the frontend nginx (port 82).
+    expose:
+      - "8080"
     volumes:
       - ./data:/data
     networks:
