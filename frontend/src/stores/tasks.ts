@@ -66,6 +66,7 @@ export const useTasksStore = defineStore('tasks', () => {
   const projects = ref<{ id: number; name: string; parent_id: number | null }[]>([])
   const categories = ref<string[]>([])
   const projectCategories = ref<Record<number, string[]>>({})
+  const members = ref<{ id: number; name: string }[]>([])
   const statuses = ref<{ id: number; name: string; is_closed: boolean; group: string }[]>([])
   const priorities = ref<{ id: number; name: string; sort_order: number }[]>([])
 
@@ -136,6 +137,18 @@ export const useTasksStore = defineStore('tasks', () => {
       const { data } = await axios.get(url)
       if (requestId === categoriesRequest) categories.value = data.categories || []
     } catch {}
+  }
+
+  // Assignee choices; loaded once and shared by every task table.
+  let membersRequest: Promise<void> | null = null
+
+  function fetchMembers(): Promise<void> {
+    if (!membersRequest) {
+      membersRequest = axios.get('/api/tasks/members')
+        .then(({ data }) => { members.value = data.members || [] })
+        .catch(() => { membersRequest = null })
+    }
+    return membersRequest
   }
 
   // All categories defined in a project, for inline editing; cached per project.
@@ -214,9 +227,9 @@ export const useTasksStore = defineStore('tasks', () => {
 
   return {
     tasks, groups, loading, error, total, useGrouping, filters,
-    projects, categories, projectCategories, statuses, priorities,
+    projects, categories, projectCategories, members, statuses, priorities,
     fetchTasks, fetchTask, updateTask,
-    fetchProjects, fetchCategories, fetchProjectCategories, fetchStatuses, fetchPriorities,
+    fetchProjects, fetchCategories, fetchProjectCategories, fetchMembers, fetchStatuses, fetchPriorities,
     setFilter, restoreFilters, resetFilters, hasActiveFilters,
   }
 })

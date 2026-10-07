@@ -152,7 +152,6 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import axios from 'axios'
 import { storeToRefs } from 'pinia'
 import type { Task } from '../../stores/tasks'
 import { useSettingsStore } from '../../stores/settings'
@@ -166,13 +165,9 @@ const { settings } = storeToRefs(settingsStore)
 
 defineProps<{ tasks: Task[] }>()
 
-// Load team members for assignee dropdown
-onMounted(async () => {
-  try {
-    const { data } = await axios.get('/api/tasks/members')
-    members.value = data.members || []
-  } catch {}
-})
+// Team members for the assignee dropdown — loaded once for all tables
+// (every accordion group renders its own TaskTable).
+onMounted(() => tasksStore.fetchMembers())
 const emit = defineEmits(['open-task', 'sort-change', 'inline-edit'])
 
 // Inline edit state
@@ -227,8 +222,7 @@ async function saveInlineEdit(task: Task, field: string, value: string) {
 const sortBy = ref('')
 const sortDir = ref('asc')
 
-const { statuses, priorities, projectCategories: projectCategoriesMap } = storeToRefs(tasksStore)
-const members = ref<{ id: number; name: string }[]>([])
+const { statuses, priorities, members, projectCategories: projectCategoriesMap } = storeToRefs(tasksStore)
 
 const statusNames = computed(() => {
   return statuses.value.map((s: any) => s.name) // already sorted by external_id ASC from API
@@ -271,9 +265,7 @@ function isOverdue(task: Task): boolean {
 }
 
 function priorityColor(id: number): string {
-  // Highest priority (largest id) = bright red
-  const style = getComputedStyle(document.documentElement)
-  // Map: lowest = gray, highest = bright red
+  // Highest priority (largest id) = bright red, lowest = gray
   if (id >= 6) return '#ff2222' // Immediate — bright red
   if (id >= 5) return '#ff4444' // Urgent — red
   if (id >= 4) return '#ff8800' // High — orange
