@@ -34,3 +34,16 @@ func deref(v *float64) interface{} {
 	}
 	return *v
 }
+
+func TestIsBugFixActivity(t *testing.T) {
+	for name, want := range map[string]bool{
+		"Fixing bugs":   true,
+		" fixing bugs ": true,
+		"Development":   false,
+		"":              false,
+	} {
+		if got := isBugFixActivity(name); got != want {
+			t.Errorf("isBugFixActivity(%q) = %v, want %v", name, got, want)
+		}
+	}
+}

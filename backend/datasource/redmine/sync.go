@@ -267,8 +267,10 @@ func (s *Syncer) syncIssues(_ context.Context, db **sql.DB) error {
 	slog.Info("Syncing issues for selected projects", "count", len(projectIDs), "expanded", true)
 	// Fact = sum of the time entries of an issue. A project's time entries
 	// include its subprojects, so entries are de-duplicated by id.
+	// Bug fix = the same, limited to the "Fixing bugs" activity.
 	seenEntries := make(map[int]bool)
 	spentByIssue := make(map[int]float64)
+	bugFixByIssue := make(map[int]float64)
 	timeLoaded := make(map[int]bool)
 	for _, pid := range projectIDs {
 		entries, err := s.client.GetTimeEntries(pid)
@@ -283,6 +285,9 @@ func (s *Syncer) syncIssues(_ context.Context, db **sql.DB) error {
 			}
 			seenEntries[e.ID] = true
 			spentByIssue[e.IssueID] += e.Hours
+			if isBugFixActivity(e.ActivityName) {
+				bugFixByIssue[e.IssueID] += e.Hours
+			}
 		}
 	}
 
@@ -296,8 +301,11 @@ func (s *Syncer) syncIssues(_ context.Context, db **sql.DB) error {
 		count := 0
 		for _, iss := range issues {
 			// Without time entries keep the value Redmine reported for the issue.
+			var bugFixHours *float64
 			if timeLoaded[iss.ProjectID] {
 				iss.SpentHours = spentByIssue[iss.ExternalID]
+				bf := bugFixByIssue[iss.ExternalID]
+				bugFixHours = &bf
 			}
 			_, err := (*db).Exec(`
 				INSERT INTO issues (
@@ -305,8 +313,8 @@ func (s *Syncer) syncIssues(_ context.Context, db **sql.DB) error {
 					status_name, status_id, priority_name, priority_id,
 					assigned_to_name, assigned_to_id, category_name,
 					start_date, due_date, estimated_hours, spent_hours,
-					done_ratio, tracker_name, author_name, data_source, synced_at
-				) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'redmine',NOW())
+					done_ratio, tracker_name, author_name, bug_fix_hours, data_source, synced_at
+				) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,'redmine',NOW())
 				ON CONFLICT (external_id, data_source) DO UPDATE SET
 					project_id = EXCLUDED.project_id,
 					project_name = EXCLUDED.project_name,
@@ -326,12 +334,13 @@ func (s *Syncer) syncIssues(_ context.Context, db **sql.DB) error {
 					done_ratio = EXCLUDED.done_ratio,
 					tracker_name = EXCLUDED.tracker_name,
 					author_name = EXCLUDED.author_name,
+					bug_fix_hours = COALESCE(EXCLUDED.bug_fix_hours, issues.bug_fix_hours),
 					synced_at = NOW()
 			`, iss.ExternalID, iss.ProjectID, iss.ProjectName, iss.Subject, iss.Description,
 				iss.StatusName, iss.StatusID, iss.PriorityName, iss.PriorityID,
 				iss.AssignedToName, iss.AssignedToID, iss.CategoryName,
 				iss.StartDate, iss.DueDate, iss.EstimatedHours, iss.SpentHours,
-				iss.DoneRatio, iss.TrackerName, iss.AuthorName)
+				iss.DoneRatio, iss.TrackerName, iss.AuthorName, bugFixHours)
 			if err != nil {
 				slog.Warn("Failed to upsert issue", "issue_id", iss.ExternalID, "error", err)
 				continue
@@ -360,4 +369,9 @@ func (s *Syncer) syncIssues(_ context.Context, db **sql.DB) error {
 	}
 
 	return nil
+}
+
+// isBugFixActivity reports whether a time entry activity is "Fixing bugs".
+func isBugFixActivity(name string) bool {
+	return strings.EqualFold(strings.TrimSpace(name), "Fixing bugs")
 }
