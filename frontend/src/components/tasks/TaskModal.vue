@@ -21,15 +21,15 @@
       <section class="params">
         <div class="params-col">
           <div class="param">
-            <span class="param-label">Проект</span>
+            <span class="param-label">{{ $t('tasks.modal.project') }}</span>
             <span class="param-value">{{ task.project_name || '—' }}</span>
           </div>
           <div class="param">
-            <span class="param-label">Тип</span>
+            <span class="param-label">{{ $t('tasks.modal.type') }}</span>
             <span class="param-value">{{ task.tracker_name || '—' }}</span>
           </div>
           <div class="param">
-            <span class="param-label">Оценка</span>
+            <span class="param-label">{{ $t('tasks.modal.estimate') }}</span>
             <div class="param-control">
               <input
                 v-model="editFields.estimated_hours"
@@ -40,15 +40,15 @@
                 @change="saveField('estimated_hours')"
                 @keyup.enter="($event.target as HTMLInputElement).blur()"
               />
-              <span class="unit">ч.</span>
+              <span class="unit">{{ $t('tasks.units.hours') }}</span>
             </div>
           </div>
           <div class="param">
-            <span class="param-label">Факт</span>
+            <span class="param-label">{{ $t('tasks.modal.fact') }}</span>
             <span class="param-value num">{{ formatHours(task.spent_hours) }}</span>
           </div>
           <div class="param">
-            <span class="param-label">Bug fix, ч</span>
+            <span class="param-label">{{ $t('tasks.modal.bug_fix') }}</span>
             <span class="param-value num">
               {{ formatHours(task.bug_fix_hours) }}
               <span v-if="bugFixPct" class="param-hint">{{ bugFixPct }}</span>
@@ -72,23 +72,23 @@
           <div class="param">
             <span class="param-label">{{ $t('tasks.table.assignee') }}</span>
             <select v-model="editFields.assigned_to_name" class="field-input" @change="saveField('assigned_to_name')">
-              <option value="">Без ответственного</option>
+              <option value="">{{ $t('tasks.modal.no_assignee') }}</option>
               <option v-for="m in memberNames" :key="m" :value="m">{{ m }}</option>
             </select>
           </div>
           <div class="param">
-            <span class="param-label">Категория</span>
+            <span class="param-label">{{ $t('tasks.modal.category') }}</span>
             <select v-model="editFields.category_name" class="field-input" @change="saveField('category_name')">
               <option value="">—</option>
               <option v-for="c in taskCategories" :key="c" :value="c">{{ c }}</option>
             </select>
           </div>
           <div class="param">
-            <span class="param-label">Дата начала</span>
+            <span class="param-label">{{ $t('tasks.modal.start_date') }}</span>
             <span class="param-value">{{ formatDay(task.start_date) }}</span>
           </div>
           <div class="param">
-            <span class="param-label">Дедлайн</span>
+            <span class="param-label">{{ $t('tasks.modal.deadline') }}</span>
             <input type="date" v-model="editFields.due_date" class="field-input" @change="saveField('due_date')" />
           </div>
         </div>
@@ -96,16 +96,16 @@
 
       <!-- Description -->
       <section class="section">
-        <h4 class="section-title">Описание</h4>
+        <h4 class="section-title">{{ $t('tasks.modal.description') }}</h4>
         <div v-if="detailsLoading" class="section-loading"><AppSpinner :size="20" /></div>
         <div v-else-if="descriptionHtml" class="markup" v-html="descriptionHtml"></div>
-        <div v-else class="empty">Описание не заполнено</div>
+        <div v-else class="empty">{{ $t('tasks.modal.description_empty') }}</div>
       </section>
 
       <!-- Files -->
       <section class="section">
         <h4 class="section-title">
-          Файлы
+          {{ $t('tasks.modal.files') }}
           <span v-if="attachments.length" class="section-count">{{ attachments.length }}</span>
         </h4>
         <div v-if="detailsLoading" class="section-loading"><AppSpinner :size="20" /></div>
@@ -127,13 +127,13 @@
             </span>
           </a>
         </div>
-        <div v-else class="empty">Файлов нет</div>
+        <div v-else class="empty">{{ $t('tasks.modal.files_empty') }}</div>
       </section>
 
       <!-- Comments -->
       <section class="section">
         <h4 class="section-title">
-          Комментарии
+          {{ $t('tasks.modal.comments') }}
           <span v-if="comments.length" class="section-count">{{ comments.length }}</span>
         </h4>
         <div v-if="detailsLoading" class="section-loading"><AppSpinner :size="20" /></div>
@@ -149,23 +149,23 @@
             </div>
           </div>
         </div>
-        <div v-else class="empty">Комментариев пока нет</div>
+        <div v-else class="empty">{{ $t('tasks.modal.comments_empty') }}</div>
         <div v-if="detailsError" class="empty error-text">{{ detailsError }}</div>
       </section>
 
       <!-- New comment -->
       <section class="section new-comment">
-        <h4 class="section-title">Новый комментарий</h4>
+        <h4 class="section-title">{{ $t('tasks.modal.new_comment') }}</h4>
         <textarea
           v-model="newComment"
           class="comment-input"
-          placeholder="Напишите комментарий… Поддерживается разметка Redmine"
+          :placeholder="$t('tasks.modal.comment_placeholder')"
           rows="3"
           @keydown.ctrl.enter="submitComment"
           @keydown.meta.enter="submitComment"
         ></textarea>
         <div class="comment-actions">
-          <span class="comment-hint">Ctrl + Enter — отправить</span>
+          <span class="comment-hint">{{ $t('tasks.modal.comment_hint') }}</span>
           <AppButton
             variant="primary"
             size="sm"
@@ -173,7 +173,7 @@
             :loading="sendingComment"
             @click="submitComment"
           >
-            Сохранить
+            {{ $t('common.save') }}
           </AppButton>
         </div>
       </section>
@@ -265,7 +265,7 @@ const taskCategories = computed(() => {
 const bugFixPct = computed(() => {
   const t = task.value
   if (!t || !t.spent_hours || !t.bug_fix_hours) return ''
-  return (t.bug_fix_hours / t.spent_hours * 100).toFixed(1) + '% от факта'
+  return i18n.t('tasks.modal.of_fact', { pct: (t.bug_fix_hours / t.spent_hours * 100).toFixed(1) })
 })
 
 const redmineUrl = computed(() => (settings.value.data_source_url || settings.value.redmine_url || '').replace(/\/$/, ''))
@@ -305,7 +305,7 @@ async function loadDetails(id: number) {
     if (task.value?.external_id !== id) return
     // Fall back to the cached description
     description.value = task.value?.description || ''
-    detailsError.value = 'Не удалось загрузить данные из Redmine'
+    detailsError.value = i18n.t('tasks.messages.details_error')
   } finally {
     if (task.value?.external_id === id) detailsLoading.value = false
   }
@@ -320,9 +320,9 @@ async function submitComment() {
     newComment.value = ''
     const { data } = await axios.get(`/api/tasks/${id}/comments`)
     rawComments.value = data.comments || []
-    toast('Комментарий добавлен', 'success')
+    toast(i18n.t('tasks.messages.comment_added'), 'success')
   } catch {
-    toast('Ошибка добавления комментария', 'error')
+    toast(i18n.t('tasks.messages.comment_error'), 'error')
   } finally {
     sendingComment.value = false
   }
@@ -360,12 +360,12 @@ watch(() => props.taskId, async (id) => {
 }, { immediate: true })
 
 const fieldLabels: Record<string, string> = {
-  status_name: 'Статус',
-  priority_name: 'Приоритет',
-  assigned_to_name: 'Исполнитель',
-  category_name: 'Категория',
-  due_date: 'Дедлайн',
-  estimated_hours: 'Оценка',
+  status_name: 'tasks.fields.status',
+  priority_name: 'tasks.fields.priority',
+  assigned_to_name: 'tasks.fields.assignee',
+  category_name: 'tasks.fields.category',
+  due_date: 'tasks.fields.deadline',
+  estimated_hours: 'tasks.fields.estimate',
 }
 
 async function saveField(field: keyof typeof editFields) {
@@ -388,15 +388,15 @@ async function saveField(field: keyof typeof editFields) {
   try {
     const result = await store.updateTask(task.value.external_id, { [field]: value }, true)
     if (result && result.redmine_ok === false) {
-      toast('Ошибка синхронизации с Redmine: ' + (result.redmine_error || ''), 'error')
+      toast(i18n.t('tasks.messages.redmine_sync_error') + ': ' + (result.redmine_error || ''), 'error')
       editFields[field] = old ?? ''
       return
     }
     t[field] = field === 'estimated_hours' && value !== null ? Number(value) : value
-    showChange(String(old ?? '—'), String(value ?? '—'), `#${task.value.external_id} — ${fieldLabels[field]}`)
+    showChange(String(old ?? '—'), String(value ?? '—'), `#${task.value.external_id} — ${i18n.t(fieldLabels[field])}`)
   } catch {
     editFields[field] = old ?? ''
-    swalError('Ошибка сохранения')
+    swalError(i18n.t('tasks.messages.save_error'))
   }
 }
 
@@ -404,23 +404,26 @@ function formatHours(h: number): string {
   if (!h) return '—'
   const hours = Math.floor(h)
   const mins = Math.round((h - hours) * 60)
-  return `${hours}:${mins.toString().padStart(2, '0')} ч.`
+  return `${hours}:${mins.toString().padStart(2, '0')} ${i18n.t('tasks.units.hours')}`
 }
+
+// Dates follow the interface language
+const dateLocale = computed(() => (i18n.locale.value === 'en' ? 'en-GB' : 'ru-RU'))
 
 function formatDay(d?: string | null): string {
   if (!d) return '—'
-  return new Date(d.slice(0, 10) + 'T00:00:00').toLocaleDateString('ru-RU')
+  return new Date(d.slice(0, 10) + 'T00:00:00').toLocaleDateString(dateLocale.value)
 }
 
 function formatDate(d?: string): string {
   if (!d) return ''
-  return new Date(d).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return new Date(d).toLocaleString(dateLocale.value, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} Б`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} КБ`
-  return `${(bytes / 1024 / 1024).toFixed(1)} МБ`
+  if (bytes < 1024) return `${bytes} ${i18n.t('tasks.units.b')}`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} ${i18n.t('tasks.units.kb')}`
+  return `${(bytes / 1024 / 1024).toFixed(1)} ${i18n.t('tasks.units.mb')}`
 }
 
 function initials(name: string): string {
