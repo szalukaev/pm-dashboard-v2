@@ -24,7 +24,6 @@ export interface Task {
   tracker_name: string
   author_name: string
   bug_fix_hours: number
-  bug_fix_pct: number
 }
 
 export interface TaskGroup {

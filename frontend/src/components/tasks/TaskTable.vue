@@ -102,7 +102,7 @@
             </template>
           </td>
           <td class="td-cell num-cell center-cell">{{ formatHours(task.bug_fix_hours) }}</td>
-          <td class="td-cell num-cell center-cell">{{ task.bug_fix_pct > 0 ? task.bug_fix_pct.toFixed(1) + '%' : '—' }}</td>
+          <td class="td-cell num-cell center-cell">{{ formatBugFixPct(task) }}</td>
           <td class="td-cell date-cell center-cell" @dblclick.stop="startInlineEdit(task, 'start_date')">
             <template v-if="isEditing(task.external_id, 'start_date')">
               <input
@@ -312,6 +312,12 @@ function projectCategories(task: Task): string[] {
   const projectCats = new Set<string>(projectCategoriesMap.value[task.project_id] || [])
   if (task.category_name) projectCats.add(task.category_name)
   return [...projectCats].sort()
+}
+
+// Share of bug fix hours in the fact, computed on the fly.
+function formatBugFixPct(task: Task): string {
+  if (!task.spent_hours || !task.bug_fix_hours) return '—'
+  return (task.bug_fix_hours / task.spent_hours * 100).toFixed(1) + '%'
 }
 
 function formatEstimate(h: number | null): string {

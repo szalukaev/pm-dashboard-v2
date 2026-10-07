@@ -43,7 +43,6 @@ type TaskResponse struct {
 	TrackerName    string   `json:"tracker_name"`
 	AuthorName     string   `json:"author_name"`
 	BugFixHours    float64  `json:"bug_fix_hours"`
-	BugFixPct      float64  `json:"bug_fix_pct"`
 }
 
 type TaskGroup struct {
@@ -196,10 +195,6 @@ func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			continue
 		}
-		// Calculate bug fix %
-		if t.SpentHours > 0 {
-			t.BugFixPct = (t.BugFixHours / t.SpentHours) * 100
-		}
 		tasks = append(tasks, t)
 	}
 
@@ -290,10 +285,6 @@ func (h *TaskHandler) GetTask(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		utils.Error(w, http.StatusNotFound, "TASK_NOT_FOUND")
 		return
-	}
-
-	if t.SpentHours > 0 {
-		t.BugFixPct = (t.BugFixHours / t.SpentHours) * 100
 	}
 
 	utils.JSON(w, http.StatusOK, t)
