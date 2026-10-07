@@ -29,6 +29,9 @@
    ═══════════════════════════════════════════════════════ */
 
 :root {
+  /* Native controls (dropdown lists, date pickers) follow the mode */
+  color-scheme: dark;
+
   /* Surfaces */
   --bg: #010102;
   --bg-card: #0f1011;
@@ -98,6 +101,7 @@
 
 /* Light mode base: categorical colors tuned for a light background */
 [data-mode="light"] {
+  color-scheme: light;
   --bg: #ffffff;
   --bg-card: #f5f6f6;
   --bg-card-alt: #f0f1f2;

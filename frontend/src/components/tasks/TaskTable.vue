@@ -459,11 +459,6 @@ tr.overdue td:first-child {
 
 .date {
   width: 130px;
-  color-scheme: dark;
-}
-
-[data-mode="light"] .date {
-  color-scheme: light;
 }
 
 .date.overdue {
