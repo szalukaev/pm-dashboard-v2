@@ -256,6 +256,10 @@ func (h *SprintHandler) AssignTask(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
 		return
 	}
+	if !h.ownsSprint(sprintID, middleware.GetUserID(r)) {
+		utils.Error(w, http.StatusNotFound, "SPRINT_NOT_FOUND")
+		return
+	}
 
 	var body struct {
 		IssueExternalID int `json:"issue_external_id"`
@@ -289,6 +293,10 @@ func (h *SprintHandler) UnassignTask(w http.ResponseWriter, r *http.Request) {
 	issueID, err := strconv.Atoi(mux.Vars(r)["issueId"])
 	if err != nil {
 		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
+		return
+	}
+	if !h.ownsSprint(sprintID, middleware.GetUserID(r)) {
+		utils.Error(w, http.StatusNotFound, "SPRINT_NOT_FOUND")
 		return
 	}
 
@@ -408,6 +416,13 @@ func (h *SprintHandler) RefreshSprint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	utils.Success(w)
+}
+
+// ownsSprint reports whether the sprint belongs to the given user.
+func (h *SprintHandler) ownsSprint(sprintID, userID int) bool {
+	var exists bool
+	err := (*h.DB).QueryRow("SELECT EXISTS(SELECT 1 FROM sprints WHERE id = $1 AND user_id = $2)", sprintID, userID).Scan(&exists)
+	return err == nil && exists
 }
 
 func (h *SprintHandler) getSprintTasks(sprintID int) []SprintTask {
