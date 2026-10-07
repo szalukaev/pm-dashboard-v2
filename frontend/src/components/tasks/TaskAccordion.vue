@@ -48,10 +48,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { ChevronDown, User } from 'lucide-vue-next'
 import TaskTable from './TaskTable.vue'
-import type { TaskGroup } from '../../stores/tasks'
+import { useTasksStore, type TaskGroup } from '../../stores/tasks'
 
 const props = defineProps<{ groups: TaskGroup[]; groupBy: string }>()
 defineEmits(['open-task'])
@@ -66,18 +66,16 @@ const sortedGroups = computed(() =>
   })
 )
 
-// Groups are expanded by default; only collapsed ones are remembered.
-const collapsed = ref<Set<string>>(new Set())
+// Groups are collapsed by default; expanded ones are kept in the store and
+// saved with the filters, so they survive closing the browser.
+const store = useTasksStore()
 
 function toggle(name: string) {
-  const next = new Set(collapsed.value)
-  if (next.has(name)) next.delete(name)
-  else next.add(name)
-  collapsed.value = next
+  store.toggleGroup(name)
 }
 
 function isOpen(name: string): boolean {
-  return !collapsed.value.has(name)
+  return store.isGroupExpanded(name)
 }
 
 function formatTotal(h: number): string {

@@ -51,6 +51,8 @@ export const useTasksStore = defineStore('tasks', () => {
   const error = ref('')
   const total = ref(0)
   const useGrouping = ref(false)
+  // Accordion groups the user expanded; everything else is collapsed.
+  const expandedGroups = ref<string[]>([])
 
   const filters = ref<TaskFilters>({
     type: 'open',
@@ -234,7 +236,9 @@ export const useTasksStore = defineStore('tasks', () => {
 
   async function saveFilters() {
     try {
-      await axios.put('/api/settings', { last_filters: { tasks: { ...filters.value, useGrouping: useGrouping.value } } })
+      await axios.put('/api/settings', {
+        last_filters: { tasks: { ...filters.value, useGrouping: useGrouping.value, expandedGroups: expandedGroups.value } },
+      })
     } catch {}
   }
 
@@ -245,17 +249,43 @@ export const useTasksStore = defineStore('tasks', () => {
         const saved = data.last_filters.tasks
         if (saved.type) filters.value.type = saved.type
         if (saved.project_id) filters.value.project_id = saved.project_id
+        if (saved.search) filters.value.search = saved.search
         if (saved.group_by) filters.value.group_by = saved.group_by
         if (saved.category) filters.value.category = saved.category
         if (saved.sort_by) filters.value.sort_by = saved.sort_by
         if (saved.sort_dir) filters.value.sort_dir = saved.sort_dir
         if (saved.useGrouping !== undefined) useGrouping.value = saved.useGrouping
+        if (Array.isArray(saved.expandedGroups)) expandedGroups.value = saved.expandedGroups
       }
     } catch {}
   }
 
+  function isGroupExpanded(name: string): boolean {
+    return expandedGroups.value.includes(name)
+  }
+
+  function toggleGroup(name: string) {
+    expandedGroups.value = isGroupExpanded(name)
+      ? expandedGroups.value.filter(n => n !== name)
+      : [...expandedGroups.value, name]
+    saveFilters()
+  }
+
+  // A new grouping starts with every group collapsed.
+  function setGrouping(mode: string) {
+    expandedGroups.value = []
+    if (mode === '') {
+      useGrouping.value = false
+      saveFilters()
+    } else {
+      useGrouping.value = true
+      setFilter('group_by', mode)
+    }
+  }
+
   return {
-    tasks, groups, loading, error, total, useGrouping, filters,
+    tasks, groups, loading, error, total, useGrouping, filters, expandedGroups,
+    isGroupExpanded, toggleGroup, setGrouping,
     projects, categories, projectCategories, members, statuses, priorities,
     fetchTasks, fetchTask, updateTask,
     fetchProjects, fetchCategories, fetchProjectCategories, fetchMembers, fetchStatuses, fetchPriorities,
