@@ -7,9 +7,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 )
+
+// pageRetryDelay is the pause before retrying a failed page (grows per attempt).
+var pageRetryDelay = time.Second
 
 type Client struct {
 	BaseURL    string
@@ -119,9 +123,14 @@ type TimeEntry struct {
 }
 
 // GetTimeEntries returns the time entries of a project that are linked to
-// issues. Subprojects are excluded: they are requested on their own.
-func (c *Client) GetTimeEntries(projectID int) ([]TimeEntry, error) {
-	pages, err := c.getPages(fmt.Sprintf("/time_entries.json?project_id=%d&subproject_id=!*", projectID))
+// issues, spent on or after `from` (YYYY-MM-DD; empty = all). Subprojects
+// are excluded: they are requested on their own.
+func (c *Client) GetTimeEntries(projectID int, from string) ([]TimeEntry, error) {
+	path := fmt.Sprintf("/time_entries.json?project_id=%d&subproject_id=!*", projectID)
+	if from != "" {
+		path += "&from=" + from
+	}
+	pages, err := c.getPages(path)
 	if err != nil {
 		return nil, err
 	}
@@ -201,15 +210,29 @@ func (c *Client) doRequest(path string) ([]byte, error) {
 }
 
 const (
-	pageSize    = 100
-	pageWorkers = 6
+	pageSize = 100
+	// Redmine answers 500 when hit with many parallel list requests.
+	pageWorkers  = 2
+	pageAttempts = 3
 )
 
 // getPages loads every page of a paginated list. The first page gives
 // total_count, the rest are requested concurrently and returned in order.
+// A failed page is retried a few times before the whole list fails.
 func (c *Client) getPages(path string) ([][]byte, error) {
 	page := func(offset int) ([]byte, error) {
-		return c.doRequest(fmt.Sprintf("%s&limit=%d&offset=%d", path, pageSize, offset))
+		var data []byte
+		var err error
+		for attempt := 1; attempt <= pageAttempts; attempt++ {
+			data, err = c.doRequest(fmt.Sprintf("%s&limit=%d&offset=%d", path, pageSize, offset))
+			if err == nil {
+				return data, nil
+			}
+			if attempt < pageAttempts {
+				time.Sleep(time.Duration(attempt) * pageRetryDelay)
+			}
+		}
+		return nil, err
 	}
 	first, err := page(0)
 	if err != nil {
@@ -293,11 +316,15 @@ func (c *Client) GetProjects() ([]Project, error) {
 }
 
 // GetIssues returns the issues of a project without its subprojects (they
-// are requested on their own); projectID 0 means all projects.
-func (c *Client) GetIssues(projectID int) ([]Issue, error) {
+// are requested on their own); projectID 0 means all projects. A non-nil
+// updatedSince limits the result to issues changed since that moment.
+func (c *Client) GetIssues(projectID int, updatedSince *time.Time) ([]Issue, error) {
 	path := "/issues.json?status_id=*"
 	if projectID > 0 {
 		path += fmt.Sprintf("&project_id=%d&subproject_id=!*", projectID)
+	}
+	if updatedSince != nil {
+		path += "&updated_on=" + url.QueryEscape(">="+updatedSince.UTC().Format(time.RFC3339))
 	}
 	pages, err := c.getPages(path)
 	if err != nil {

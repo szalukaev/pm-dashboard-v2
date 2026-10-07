@@ -6,20 +6,27 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 )
 
 type Syncer struct {
 	client *Client
+
+	// Incremental sync state, guarded by mu.
+	mu            sync.Mutex
+	lastSync      time.Time // start of the last sync that read every project
+	lastFull      time.Time // start of the last such sync that was a full one
+	knownProjects map[int]bool
 }
 
 func NewSyncer(client *Client) *Syncer {
-	return &Syncer{client: client}
+	return &Syncer{client: client, knownProjects: make(map[int]bool)}
 }
 
 func (s *Syncer) SyncAll(ctx context.Context, db **sql.DB) error {
 	startTime := time.Now()
-	slog.Info("Starting full sync from Redmine")
+	slog.Info("Starting sync from Redmine")
 
 	// Log sync start
 	var logID int
@@ -78,7 +85,7 @@ func (s *Syncer) SyncAll(ctx context.Context, db **sql.DB) error {
 	(*db).Exec(`UPDATE collection_log SET finished_at=$1, duration_ms=$2, issues_collected=$3, status='success' WHERE id=$4`,
 		time.Now(), durationMs, totalIssues, logID)
 
-	slog.Info("Full sync completed", "duration", duration, "issues", totalIssues)
+	slog.Info("Sync completed", "duration", duration, "issues", totalIssues)
 	return nil
 }
 
@@ -264,156 +271,7 @@ func (s *Syncer) syncIssues(_ context.Context, db **sql.DB) error {
 		projectIDs = append(projectIDs, pid)
 	}
 
-	slog.Info("Syncing issues for selected projects", "count", len(projectIDs), "expanded", true)
-	// Fact = sum of the time entries of an issue. Entries are de-duplicated
-	// by id in case Redmine still returns subproject entries for a parent.
-	// Bug fix = the same, limited to the "Fixing bugs" activity.
-	seenEntries := make(map[int]bool)
-	spentByIssue := make(map[int]float64)
-	bugFixByIssue := make(map[int]float64)
-	timeLoaded := make(map[int]bool)
-	for _, pid := range projectIDs {
-		entries, err := s.client.GetTimeEntries(pid)
-		if err != nil {
-			slog.Warn("Failed to get time entries for project", "project_id", pid, "error", err)
-			continue
-		}
-		timeLoaded[pid] = true
-		slog.Info("Loaded time entries for project", "project_id", pid, "count", len(entries))
-		for _, e := range entries {
-			if seenEntries[e.ID] {
-				continue
-			}
-			seenEntries[e.ID] = true
-			spentByIssue[e.IssueID] += e.Hours
-			if isBugFixActivity(e.ActivityName) {
-				bugFixByIssue[e.IssueID] += e.Hours
-			}
-		}
-	}
 
-	// Collect the issues of all projects first: an issue is written once even
-	// if Redmine returns it for both a parent project and its subproject.
-	var all []syncedIssue
-	seenIssues := make(map[int]bool)
-	for _, pid := range projectIDs {
-		issues, err := s.client.GetIssues(pid)
-		if err != nil {
-			slog.Warn("Failed to get issues for project", "project_id", pid, "error", err)
-			continue
-		}
-		for _, iss := range issues {
-			if seenIssues[iss.ExternalID] {
-				continue
-			}
-			seenIssues[iss.ExternalID] = true
-			// Without time entries keep the value Redmine reported for the issue.
-			item := syncedIssue{Issue: iss}
-			if timeLoaded[iss.ProjectID] {
-				item.SpentHours = spentByIssue[iss.ExternalID]
-				bf := bugFixByIssue[iss.ExternalID]
-				item.bugFixHours = &bf
-			}
-			all = append(all, item)
-		}
-	}
-	slog.Info("Loaded issues from Redmine", "count", len(all))
-
-	totalSynced := 0
-	for start := 0; start < len(all); start += issueBatchSize {
-		end := start + issueBatchSize
-		if end > len(all) {
-			end = len(all)
-		}
-		if err := upsertIssues(*db, all[start:end]); err != nil {
-			slog.Warn("Failed to upsert issues batch", "from", start, "to", end, "error", err)
-			continue
-		}
-		totalSynced += end - start
-	}
-	slog.Info("Synced issues total", "synced", totalSynced, "projects", len(projectIDs))
-
-	// Clean up issues from projects that are no longer selected by any user
-	placeholders := make([]string, len(projectIDs))
-	args := make([]interface{}, len(projectIDs))
-	for i, pid := range projectIDs {
-		placeholders[i] = fmt.Sprintf("$%d", i+1)
-		args[i] = pid
-	}
-	delQuery := fmt.Sprintf(`DELETE FROM issues WHERE data_source = 'redmine' AND project_id NOT IN (%s)`,
-		strings.Join(placeholders, ","))
-	res, err := (*db).Exec(delQuery, args...)
-	if err != nil {
-		slog.Warn("Failed to cleanup old issues", "error", err)
-	} else if n, _ := res.RowsAffected(); n > 0 {
-		slog.Info("Cleaned up issues from unselected projects", "deleted", n)
-	}
-
-	return nil
-}
-
-// syncedIssue is an issue ready to be stored; a nil bugFixHours keeps the
-// stored value (time entries of its project could not be loaded).
-type syncedIssue struct {
-	Issue
-	bugFixHours *float64
-}
-
-// issueBatchSize rows per INSERT: 20 params each, well below the 65535 limit.
-const issueBatchSize = 500
-
-// upsertIssues writes a batch of issues with a single multi-row statement —
-// the database is remote, so one round trip per issue made the sync slow.
-func upsertIssues(db *sql.DB, batch []syncedIssue) error {
-	const cols = 20
-	values := make([]string, len(batch))
-	args := make([]interface{}, 0, len(batch)*cols)
-	for i, it := range batch {
-		ph := make([]string, cols)
-		for j := range ph {
-			ph[j] = fmt.Sprintf("$%d", i*cols+j+1)
-		}
-		values[i] = "(" + strings.Join(ph, ",") + ",'redmine',NOW())"
-		args = append(args, it.ExternalID, it.ProjectID, it.ProjectName, it.Subject, it.Description,
-			it.StatusName, it.StatusID, it.PriorityName, it.PriorityID,
-			it.AssignedToName, it.AssignedToID, it.CategoryName,
-			it.StartDate, it.DueDate, it.EstimatedHours, it.SpentHours,
-			it.DoneRatio, it.TrackerName, it.AuthorName, it.bugFixHours)
-	}
-	_, err := db.Exec(`
-				INSERT INTO issues (
-					external_id, project_id, project_name, subject, description,
-					status_name, status_id, priority_name, priority_id,
-					assigned_to_name, assigned_to_id, category_name,
-					start_date, due_date, estimated_hours, spent_hours,
-					done_ratio, tracker_name, author_name, bug_fix_hours, data_source, synced_at
-				) VALUES `+strings.Join(values, ",")+`
-				ON CONFLICT (external_id, data_source) DO UPDATE SET
-					project_id = EXCLUDED.project_id,
-					project_name = EXCLUDED.project_name,
-					subject = EXCLUDED.subject,
-					description = EXCLUDED.description,
-					status_name = EXCLUDED.status_name,
-					status_id = EXCLUDED.status_id,
-					priority_name = EXCLUDED.priority_name,
-					priority_id = EXCLUDED.priority_id,
-					assigned_to_name = EXCLUDED.assigned_to_name,
-					assigned_to_id = EXCLUDED.assigned_to_id,
-					category_name = EXCLUDED.category_name,
-					start_date = EXCLUDED.start_date,
-					due_date = EXCLUDED.due_date,
-					estimated_hours = EXCLUDED.estimated_hours,
-					spent_hours = EXCLUDED.spent_hours,
-					done_ratio = EXCLUDED.done_ratio,
-					tracker_name = EXCLUDED.tracker_name,
-					author_name = EXCLUDED.author_name,
-					bug_fix_hours = COALESCE(EXCLUDED.bug_fix_hours, issues.bug_fix_hours),
-					synced_at = NOW()
-			`, args...)
-	return err
-}
-
-// isBugFixActivity reports whether a time entry activity is "Fixing bugs".
-func isBugFixActivity(name string) bool {
-	return strings.EqualFold(strings.TrimSpace(name), "Fixing bugs")
+	slog.Info("Syncing issues for selected projects", "count", len(projectIDs))
+	return s.syncProjectIssues(*db, projectIDs)
 }
