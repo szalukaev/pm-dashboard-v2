@@ -129,8 +129,10 @@ function formatHours(h: number): string {
 }
 
 .group-metric {
-  font-size: 12px;
-  color: var(--text-faint);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-bright);
+  font-variant-numeric: tabular-nums;
   margin-left: 8px;
 }
 
@@ -139,7 +141,8 @@ function formatHours(h: number): string {
 }
 
 .metric-label {
-  color: var(--text-faintest);
+  font-weight: 500;
+  color: var(--text-muted);
 }
 
 .accordion-body {
