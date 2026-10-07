@@ -91,7 +91,8 @@ onMounted(async () => {
   await Promise.all([
     store.fetchTasks(),
     store.fetchProjects(),
-    store.fetchCategories(),
+    // Categories depend on the restored project filter
+    store.fetchCategories(store.filters.project_id || undefined),
     store.fetchStatuses(),
     store.fetchPriorities(),
   ])

@@ -125,11 +125,16 @@ export const useTasksStore = defineStore('tasks', () => {
     } catch {}
   }
 
+  // Only the latest request may update the list: a slow response for a
+  // previous project must not overwrite the categories of the current one.
+  let categoriesRequest = 0
+
   async function fetchCategories(projectId?: string | number) {
+    const requestId = ++categoriesRequest
     try {
       const url = projectId ? `/api/tasks/categories?project_id=${projectId}` : '/api/tasks/categories'
       const { data } = await axios.get(url)
-      categories.value = data.categories || []
+      if (requestId === categoriesRequest) categories.value = data.categories || []
     } catch {}
   }
 
