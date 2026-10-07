@@ -55,6 +55,7 @@ function close() {
   border-radius: 12px;
   box-shadow: var(--shadow);
   max-height: 85vh;
+  max-width: calc(100vw - 32px);
   display: flex;
   flex-direction: column;
 }
