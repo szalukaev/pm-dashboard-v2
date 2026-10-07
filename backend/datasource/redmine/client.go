@@ -83,21 +83,60 @@ const developerEstimateFieldID = 18
 // issueEstimate prefers the developer estimate when it is set and positive,
 // otherwise falls back to the standard estimated_hours.
 func issueEstimate(estimated *float64, fields []customFieldValue) *float64 {
+	if v := developerEstimate(fields); v != nil {
+		return v
+	}
+	return estimated
+}
+
+// developerEstimate returns the developer estimate when it is set and positive.
+func developerEstimate(fields []customFieldValue) *float64 {
 	for _, f := range fields {
 		if f.ID != developerEstimateFieldID {
 			continue
 		}
 		s, ok := f.Value.(string)
 		if !ok {
-			break
+			return nil
 		}
 		v, err := strconv.ParseFloat(strings.TrimSpace(strings.Replace(s, ",", ".", 1)), 64)
 		if err == nil && v > 0 {
 			return &v
 		}
-		break
+		return nil
 	}
-	return estimated
+	return nil
+}
+
+// EstimateFields returns the Redmine fields that store an issue's estimate:
+// the developer estimate when it is already set, otherwise the standard
+// estimated_hours. A nil hours value clears the estimate.
+func (c *Client) EstimateFields(issueID int, hours *float64) (map[string]interface{}, error) {
+	data, err := c.doRequest(fmt.Sprintf("/issues/%d.json", issueID))
+	if err != nil {
+		return nil, err
+	}
+	var resp struct {
+		Issue struct {
+			CustomFields []customFieldValue `json:"custom_fields"`
+		} `json:"issue"`
+	}
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return nil, err
+	}
+	if developerEstimate(resp.Issue.CustomFields) != nil {
+		value := ""
+		if hours != nil {
+			value = strconv.FormatFloat(*hours, 'f', -1, 64)
+		}
+		return map[string]interface{}{
+			"custom_fields": []map[string]interface{}{{"id": developerEstimateFieldID, "value": value}},
+		}, nil
+	}
+	if hours == nil {
+		return map[string]interface{}{"estimated_hours": ""}, nil
+	}
+	return map[string]interface{}{"estimated_hours": *hours}, nil
 }
 
 type timeEntryResp struct {

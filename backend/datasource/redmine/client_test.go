@@ -1,6 +1,12 @@
 package redmine
 
-import "testing"
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+)
 
 func TestIssueEstimate(t *testing.T) {
 	std := 5.0
@@ -33,4 +39,37 @@ func deref(v *float64) interface{} {
 		return nil
 	}
 	return *v
+}
+
+func TestEstimateFields(t *testing.T) {
+	cases := []struct {
+		name  string
+		issue string
+		hours *float64
+		want  string
+	}{
+		{"developer estimate set", `{"issue":{"custom_fields":[{"id":18,"value":"4"}]}}`, ptr(6.5),
+			`{"custom_fields":[{"id":18,"value":"6.5"}]}`},
+		{"developer estimate set, clear", `{"issue":{"custom_fields":[{"id":18,"value":"4"}]}}`, nil,
+			`{"custom_fields":[{"id":18,"value":""}]}`},
+		{"developer estimate empty", `{"issue":{"custom_fields":[{"id":18,"value":""}]}}`, ptr(3),
+			`{"estimated_hours":3}`},
+		{"developer estimate zero", `{"issue":{"custom_fields":[{"id":18,"value":"0"}]}}`, ptr(3),
+			`{"estimated_hours":3}`},
+		{"no custom field, clear", `{"issue":{}}`, nil, `{"estimated_hours":""}`},
+	}
+	for _, c := range cases {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprint(w, c.issue)
+		}))
+		fields, err := NewClient(srv.URL, "key", "", "").EstimateFields(1, c.hours)
+		srv.Close()
+		if err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		got, _ := json.Marshal(fields)
+		if string(got) != c.want {
+			t.Errorf("%s: got %s, want %s", c.name, got, c.want)
+		}
+	}
 }

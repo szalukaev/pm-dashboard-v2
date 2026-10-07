@@ -375,10 +375,22 @@ func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 			}
 			if hours == nil {
 				localSets[field] = nil
-				redmineFields[field] = ""
 			} else {
 				localSets[field] = *hours
-				redmineFields[field] = *hours
+			}
+			if client == nil {
+				break
+			}
+			// Goes to the developer estimate if the issue already has one,
+			// otherwise to the standard estimated_hours.
+			fields, err := client.EstimateFields(externalID, hours)
+			if err != nil {
+				slog.Warn("Failed to read issue estimate fields", "issue", externalID, "error", err)
+				utils.Error(w, http.StatusBadGateway, "REDMINE_ERROR")
+				return
+			}
+			for k, v := range fields {
+				redmineFields[k] = v
 			}
 		case "category_name":
 			localSets["category_name"] = strValue
