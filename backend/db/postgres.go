@@ -66,7 +66,9 @@ func RunMigrations(db *sql.DB) error {
 
 		// Check if already applied
 		var count int
-		db.QueryRow("SELECT COUNT(*) FROM schema_migrations WHERE version = $1", version).Scan(&count)
+		if err := db.QueryRow("SELECT COUNT(*) FROM schema_migrations WHERE version = $1", version).Scan(&count); err != nil {
+			return fmt.Errorf("check migration %d: %w", version, err)
+		}
 		if count > 0 {
 			continue
 		}
@@ -77,12 +79,24 @@ func RunMigrations(db *sql.DB) error {
 			return fmt.Errorf("read migration %s: %w", f, err)
 		}
 
+		// The migration and its bookkeeping row are applied atomically:
+		// a half-applied migration must not be left behind or re-run.
 		slog.Info("Applying migration", "version", version, "file", base)
-		if _, err := db.Exec(string(sqlBytes)); err != nil {
+		tx, err := db.Begin()
+		if err != nil {
+			return fmt.Errorf("begin migration %d: %w", version, err)
+		}
+		if _, err := tx.Exec(string(sqlBytes)); err != nil {
+			tx.Rollback()
 			return fmt.Errorf("apply migration %d: %w", version, err)
 		}
-
-		db.Exec("INSERT INTO schema_migrations (version) VALUES ($1)", version)
+		if _, err := tx.Exec("INSERT INTO schema_migrations (version) VALUES ($1)", version); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("record migration %d: %w", version, err)
+		}
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("commit migration %d: %w", version, err)
+		}
 		slog.Info("Migration applied", "version", version)
 	}
 

@@ -51,8 +51,10 @@ func main() {
 			slog.Warn("PostgreSQL not available", "error", err)
 		} else {
 			defer pgDB.Close()
+			// Never serve traffic on top of an incompatible schema.
 			if err := db.RunMigrations(pgDB); err != nil {
-				slog.Warn("Migrations failed", "error", err)
+				slog.Error("Migrations failed, refusing to start", "error", err)
+				os.Exit(1)
 			}
 		}
 	}
