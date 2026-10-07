@@ -265,8 +265,8 @@ func (s *Syncer) syncIssues(_ context.Context, db **sql.DB) error {
 	}
 
 	slog.Info("Syncing issues for selected projects", "count", len(projectIDs), "expanded", true)
-	// Fact = sum of the time entries of an issue. A project's time entries
-	// include its subprojects, so entries are de-duplicated by id.
+	// Fact = sum of the time entries of an issue. Entries are de-duplicated
+	// by id in case Redmine still returns subproject entries for a parent.
 	// Bug fix = the same, limited to the "Fixing bugs" activity.
 	seenEntries := make(map[int]bool)
 	spentByIssue := make(map[int]float64)
@@ -279,6 +279,7 @@ func (s *Syncer) syncIssues(_ context.Context, db **sql.DB) error {
 			continue
 		}
 		timeLoaded[pid] = true
+		slog.Info("Loaded time entries for project", "project_id", pid, "count", len(entries))
 		for _, e := range entries {
 			if seenEntries[e.ID] {
 				continue

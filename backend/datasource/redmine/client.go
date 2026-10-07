@@ -117,12 +117,13 @@ type TimeEntry struct {
 	Hours        float64
 }
 
-// GetTimeEntries returns the time entries of a project that are linked to issues.
+// GetTimeEntries returns the time entries of a project that are linked to
+// issues. Subprojects are excluded: they are requested on their own.
 func (c *Client) GetTimeEntries(projectID int) ([]TimeEntry, error) {
 	var all []TimeEntry
 	offset := 0
 	for {
-		data, err := c.doRequest(fmt.Sprintf("/time_entries.json?project_id=%d&limit=100&offset=%d", projectID, offset))
+		data, err := c.doRequest(fmt.Sprintf("/time_entries.json?project_id=%d&subproject_id=!*&limit=100&offset=%d", projectID, offset))
 		if err != nil {
 			return nil, err
 		}
