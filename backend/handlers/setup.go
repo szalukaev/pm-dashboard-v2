@@ -1,11 +1,16 @@
 package handlers
 
 import (
+	"crypto/rand"
 	"database/sql"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -44,14 +49,29 @@ type adminCreateRequest struct {
 	Language    string `json:"language"`
 }
 
+// dbNamePattern limits database names to characters that are safe both in
+// the DSN path and inside a quoted identifier of CREATE DATABASE.
+var dbNamePattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,63}$`)
+
+// buildDSNFor assembles a postgres URL; user and password are percent-encoded,
+// so special characters (@ : / ? #) in credentials do not break the DSN.
+func buildDSNFor(r dbTestRequest, dbName string) string {
+	u := url.URL{
+		Scheme:   "postgres",
+		User:     url.UserPassword(r.User, r.Password),
+		Host:     net.JoinHostPort(r.Host, portOrDefault(r.Port)),
+		Path:     "/" + dbName,
+		RawQuery: "sslmode=disable&connect_timeout=5",
+	}
+	return u.String()
+}
+
 func buildDSN(r dbTestRequest) string {
-	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable&connect_timeout=5",
-		r.User, r.Password, r.Host, portOrDefault(r.Port), r.DBName)
+	return buildDSNFor(r, r.DBName)
 }
 
 func buildMaintDSN(r dbTestRequest) string {
-	return fmt.Sprintf("postgres://%s:%s@%s:%s/postgres?sslmode=disable&connect_timeout=5",
-		r.User, r.Password, r.Host, portOrDefault(r.Port))
+	return buildDSNFor(r, "postgres")
 }
 
 func portOrDefault(port string) string {
@@ -76,6 +96,11 @@ func (h *SetupHandler) TestDatabase(w http.ResponseWriter, r *http.Request) {
 	var req dbTestRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
+		return
+	}
+
+	if !dbNamePattern.MatchString(req.DBName) {
+		utils.JSON(w, http.StatusOK, map[string]interface{}{"success": false, "error": "Invalid database name: use latin letters, digits, _ and -"})
 		return
 	}
 
@@ -120,6 +145,11 @@ func (h *SetupHandler) SaveDatabase(w http.ResponseWriter, r *http.Request) {
 	var req dbTestRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
+		return
+	}
+
+	if !dbNamePattern.MatchString(req.DBName) {
+		utils.Error(w, http.StatusBadRequest, "INVALID_DB_NAME")
 		return
 	}
 
@@ -297,7 +327,12 @@ func (h *SetupHandler) CreateAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.SQLite.Set("session_secret", "auto-generated-secret")
+	secret := make([]byte, 32)
+	if _, err := rand.Read(secret); err != nil {
+		utils.Error(w, http.StatusInternalServerError, "SECRET_GENERATION_FAILED")
+		return
+	}
+	h.SQLite.Set("session_secret", hex.EncodeToString(secret))
 	h.SQLite.Set("admin_created", "true")
 	if req.Language != "" {
 		h.SQLite.Set("default_language", req.Language)
