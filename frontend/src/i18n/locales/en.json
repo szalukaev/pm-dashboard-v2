@@ -84,25 +84,83 @@
       "search_placeholder": "Search by name or number…",
       "group_by_project": "By Projects",
       "group_by_assignee": "By Assignees",
-      "categories": "Categories"
+      "categories": "Categories",
+      "all_projects": "All projects",
+      "reset": "Reset",
+      "found": "Found",
+      "grouping": "Grouping",
+      "category": "Category"
     },
     "table": {
       "name": "Name",
       "number": "Number",
       "priority": "Priority",
       "assignee": "Assignee",
+      "responsible": "Assignee",
+      "unassigned": "Unassigned",
       "estimate": "Estimate, h",
       "fact": "Actual, h",
       "status": "Status",
       "bug_fix": "Bug fix, h",
-      "bug_fix_pct": "Bug fix %",
+      "bug_fix_pct": "Bug fix, %",
       "start_date": "Start Date",
       "end_date": "End Date",
       "category": "Category"
     },
     "accordions": {
       "estimate": "Estimate",
-      "fact": "Actual"
+      "fact": "Actual",
+      "no_assignee": "Unassigned"
+    },
+    "empty": {
+      "filtered_title": "No tasks match the current filters",
+      "filtered_hint": "Reset the filters to see all tasks",
+      "reset_filters": "Reset filters"
+    },
+    "fields": {
+      "status": "Status",
+      "priority": "Priority",
+      "assignee": "Assignee",
+      "category": "Category",
+      "start_date": "Start Date",
+      "deadline": "Deadline",
+      "estimate": "Estimate"
+    },
+    "messages": {
+      "save_error": "Failed to save",
+      "redmine_sync_error": "Redmine sync error",
+      "invalid_number": "Enter a number",
+      "comment_added": "Comment added",
+      "comment_error": "Failed to add the comment",
+      "details_error": "Failed to load data from Redmine"
+    },
+    "units": {
+      "hours": "h",
+      "hours_short": "h",
+      "b": "B",
+      "kb": "KB",
+      "mb": "MB"
+    },
+    "modal": {
+      "project": "Project",
+      "type": "Type",
+      "estimate": "Estimate",
+      "fact": "Actual",
+      "bug_fix": "Bug fix, h",
+      "of_fact": "{pct}% of actual",
+      "no_assignee": "Unassigned",
+      "category": "Category",
+      "start_date": "Start Date",
+      "deadline": "Deadline",
+      "description": "Description",
+      "description_empty": "No description",
+      "files": "Files",
+      "files_empty": "No files",
+      "comments": "Comments",
+      "comments_empty": "No comments yet",
+      "new_comment": "New comment",
+      "comment_placeholder": "Write a comment… Redmine markup is supported",
+      "comment_hint": "Ctrl + Enter to send"
     }
   },
   "analytics": {

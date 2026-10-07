@@ -84,25 +84,83 @@
       "search_placeholder": "Поиск по названию или номеру…",
       "group_by_project": "По проектам",
       "group_by_assignee": "По исполнителям",
-      "categories": "Категории"
+      "categories": "Категории",
+      "all_projects": "Все проекты",
+      "reset": "Сбросить",
+      "found": "Найдено",
+      "grouping": "Группировка",
+      "category": "Категория"
     },
     "table": {
-      "name": "Название",
+      "name": "Наименование",
       "number": "Номер",
       "priority": "Приоритет",
       "assignee": "Исполнитель",
+      "responsible": "Ответственный",
+      "unassigned": "Не назначен",
       "estimate": "Оценка, ч",
       "fact": "Факт, ч",
       "status": "Статус",
       "bug_fix": "Bug fix, ч",
-      "bug_fix_pct": "Bug fix %",
+      "bug_fix_pct": "Bug fix, %",
       "start_date": "Дата старта",
       "end_date": "Дата окончания",
       "category": "Категория"
     },
     "accordions": {
       "estimate": "Оценка",
-      "fact": "Факт"
+      "fact": "Факт",
+      "no_assignee": "Без исполнителя"
+    },
+    "empty": {
+      "filtered_title": "Нет задач по текущим фильтрам",
+      "filtered_hint": "Сбросьте фильтры, чтобы увидеть все задачи",
+      "reset_filters": "Сбросить фильтры"
+    },
+    "fields": {
+      "status": "Статус",
+      "priority": "Приоритет",
+      "assignee": "Исполнитель",
+      "category": "Категория",
+      "start_date": "Дата начала",
+      "deadline": "Дедлайн",
+      "estimate": "Оценка"
+    },
+    "messages": {
+      "save_error": "Ошибка сохранения",
+      "redmine_sync_error": "Ошибка синхронизации с Redmine",
+      "invalid_number": "Введите число",
+      "comment_added": "Комментарий добавлен",
+      "comment_error": "Ошибка добавления комментария",
+      "details_error": "Не удалось загрузить данные из Redmine"
+    },
+    "units": {
+      "hours": "ч.",
+      "hours_short": "ч",
+      "b": "Б",
+      "kb": "КБ",
+      "mb": "МБ"
+    },
+    "modal": {
+      "project": "Проект",
+      "type": "Тип",
+      "estimate": "Оценка",
+      "fact": "Факт",
+      "bug_fix": "Bug fix, ч",
+      "of_fact": "{pct}% от факта",
+      "no_assignee": "Без ответственного",
+      "category": "Категория",
+      "start_date": "Дата начала",
+      "deadline": "Дедлайн",
+      "description": "Описание",
+      "description_empty": "Описание не заполнено",
+      "files": "Файлы",
+      "files_empty": "Файлов нет",
+      "comments": "Комментарии",
+      "comments_empty": "Комментариев пока нет",
+      "new_comment": "Новый комментарий",
+      "comment_placeholder": "Напишите комментарий… Поддерживается разметка Redmine",
+      "comment_hint": "Ctrl + Enter — отправить"
     }
   },
   "analytics": {

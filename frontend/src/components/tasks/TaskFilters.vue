@@ -19,7 +19,7 @@
         class="field filter-select"
         data-testid="filter-project"
       >
-        <option value="">Все проекты</option>
+        <option value="">{{ $t('tasks.filters.all_projects') }}</option>
         <option v-for="p in visibleProjects" :key="p.id" :value="p.id">{{ p.name }}</option>
       </select>
 
@@ -33,16 +33,16 @@
       />
 
       <button class="reset-btn" data-testid="filter-reset" @click="resetAll">
-        <RotateCcw :size="14" /> Сбросить
+        <RotateCcw :size="14" /> {{ $t('tasks.filters.reset') }}
       </button>
 
-      <span class="found">Найдено: <strong>{{ total }}</strong></span>
+      <span class="found">{{ $t('tasks.filters.found') }}: <strong>{{ total }}</strong></span>
     </div>
 
     <!-- Row 2: grouping, categories -->
     <div class="filter-row">
       <div class="filter-group">
-        <span class="filter-label">Группировка:</span>
+        <span class="filter-label">{{ $t('tasks.filters.grouping') }}:</span>
         <button
           class="pill-btn compact"
           :class="{ active: useGrouping && filters.group_by === 'project' }"
@@ -70,7 +70,7 @@
       </div>
 
       <div class="filter-group" v-if="categories.length > 0 && filters.project_id">
-        <span class="filter-label">Категория:</span>
+        <span class="filter-label">{{ $t('tasks.filters.category') }}:</span>
         <button
           v-for="cat in categories"
           :key="cat"

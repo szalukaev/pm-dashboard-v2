@@ -22,10 +22,10 @@
 
     <!-- Empty state: no rows because of active filters -->
     <div v-else-if="total === 0 && !loading && hasActiveFilters()" class="filtered-empty" data-testid="filtered-empty">
-      <p class="filtered-empty-title">Нет задач по текущим фильтрам</p>
-      <p class="filtered-empty-hint">Сбросьте фильтры, чтобы увидеть все задачи</p>
+      <p class="filtered-empty-title">{{ $t('tasks.empty.filtered_title') }}</p>
+      <p class="filtered-empty-hint">{{ $t('tasks.empty.filtered_hint') }}</p>
       <button class="reset-filters-btn" data-testid="reset-filters" @click="resetFilters">
-        Сбросить фильтры
+        {{ $t('tasks.empty.reset_filters') }}
       </button>
     </div>
 

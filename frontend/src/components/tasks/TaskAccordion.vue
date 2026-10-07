@@ -9,13 +9,13 @@
           :data-testid="'accordion-' + group.name"
         >
           <ChevronDown :size="18" class="chevron" :class="{ collapsed: !isOpen(group.name) }" />
-          {{ group.name }}
+          {{ groupTitle(group.name) }}
           <span class="project-count">({{ group.task_count }})</span>
           <span class="group-metric">
-            Оценка: <b class="estimate">{{ formatTotal(group.estimate_total) }}</b>
+            {{ $t('tasks.accordions.estimate') }}: <b class="estimate">{{ formatTotal(group.estimate_total) }}</b>
           </span>
           <span class="group-metric">
-            Факт: <b class="fact">{{ formatTotal(group.fact_total) }}</b>
+            {{ $t('tasks.accordions.fact') }}: <b class="fact">{{ formatTotal(group.fact_total) }}</b>
           </span>
         </h2>
         <TaskTable v-if="isOpen(group.name)" :tasks="group.tasks" @open-task="$emit('open-task', $event)" />
@@ -32,13 +32,13 @@
         >
           <ChevronDown :size="18" class="chevron" :class="{ collapsed: !isOpen(group.name) }" />
           <User :size="18" class="person" />
-          <span class="assignee-name">{{ group.name }}</span>
+          <span class="assignee-name">{{ groupTitle(group.name) }}</span>
           <span class="count-badge">{{ group.task_count }}</span>
           <span class="group-metric">
-            Оценка: <b class="estimate">{{ formatTotal(group.estimate_total) }}</b>
+            {{ $t('tasks.accordions.estimate') }}: <b class="estimate">{{ formatTotal(group.estimate_total) }}</b>
           </span>
           <span class="group-metric">
-            Факт: <b class="fact">{{ formatTotal(group.fact_total) }}</b>
+            {{ $t('tasks.accordions.fact') }}: <b class="fact">{{ formatTotal(group.fact_total) }}</b>
           </span>
         </div>
         <TaskTable v-if="isOpen(group.name)" :tasks="group.tasks" flat @open-task="$emit('open-task', $event)" />
@@ -49,6 +49,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ChevronDown, User } from 'lucide-vue-next'
 import TaskTable from './TaskTable.vue'
 import { useTasksStore, type TaskGroup } from '../../stores/tasks'
@@ -56,7 +57,14 @@ import { useTasksStore, type TaskGroup } from '../../stores/tasks'
 const props = defineProps<{ groups: TaskGroup[]; groupBy: string }>()
 defineEmits(['open-task'])
 
+const { t } = useI18n()
+
+// Group name the server gives to tasks without an assignee
 const NO_ASSIGNEE = 'Без исполнителя'
+
+function groupTitle(name: string): string {
+  return name === NO_ASSIGNEE ? t('tasks.accordions.no_assignee') : name
+}
 
 const sortedGroups = computed(() =>
   [...props.groups].sort((a, b) => {
@@ -79,7 +87,7 @@ function isOpen(name: string): boolean {
 }
 
 function formatTotal(h: number): string {
-  return `${(h || 0).toFixed(1)}ч`
+  return `${(h || 0).toFixed(1)}${t('tasks.units.hours_short')}`
 }
 </script>
 

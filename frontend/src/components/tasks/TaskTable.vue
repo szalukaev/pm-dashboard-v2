@@ -11,7 +11,7 @@
               @click="col.sortable && toggleSort(col.key)"
               :data-testid="'col-' + col.key"
             >
-              {{ col.label }}
+              {{ $t(col.label) }}
               <span v-if="col.sortable && sortBy === col.key" class="sort-icon">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
             </th>
           </tr>
@@ -48,7 +48,7 @@
                 :value="task.assigned_to_name || ''"
                 @change="saveInlineEdit(task, 'assigned_to_name', ($event.target as HTMLSelectElement).value)"
               >
-                <option value="">Не назначен</option>
+                <option value="">{{ $t('tasks.table.unassigned') }}</option>
                 <option v-for="m in withCurrent(memberNames, task.assigned_to_name)" :key="m" :value="m">{{ m }}</option>
               </select>
             </td>
@@ -122,6 +122,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useI18n } from 'vue-i18n'
 import type { Task } from '../../stores/tasks'
 import { useSettingsStore } from '../../stores/settings'
 import { useSwal } from '../../composables/useSwal'
@@ -130,6 +131,7 @@ import { useTasksStore } from '../../stores/tasks'
 const settingsStore = useSettingsStore()
 const tasksStore = useTasksStore()
 const { showChange, toast } = useSwal()
+const { t } = useI18n()
 const { settings } = storeToRefs(settingsStore)
 
 // flat: no own frame (the table sits inside a framed group)
@@ -141,13 +143,13 @@ onMounted(() => tasksStore.fetchMembers())
 const emit = defineEmits(['open-task', 'sort-change', 'inline-edit'])
 
 const fieldLabels: Record<string, string> = {
-  status_name: 'Статус',
-  priority_name: 'Приоритет',
-  assigned_to_name: 'Исполнитель',
-  category_name: 'Категория',
-  start_date: 'Дата начала',
-  due_date: 'Дедлайн',
-  estimated_hours: 'Оценка',
+  status_name: 'tasks.fields.status',
+  priority_name: 'tasks.fields.priority',
+  assigned_to_name: 'tasks.fields.assignee',
+  category_name: 'tasks.fields.category',
+  start_date: 'tasks.fields.start_date',
+  due_date: 'tasks.fields.deadline',
+  estimated_hours: 'tasks.fields.estimate',
 }
 
 async function saveInlineEdit(task: Task, field: string, value: string) {
@@ -161,13 +163,13 @@ async function saveInlineEdit(task: Task, field: string, value: string) {
     const result = await tasksStore.updateTask(task.external_id, { [field]: savedValue }, true)
     if (result && result.redmine_ok === false) {
       ;(task as any)[field] = oldValue
-      toast('Ошибка синхронизации с Redmine: ' + (result.redmine_error || ''), 'error')
+      toast(t('tasks.messages.redmine_sync_error') + ': ' + (result.redmine_error || ''), 'error')
       return
     }
-    showChange(oldNormalized || '—', value || '—', `#${task.external_id} — ${fieldLabels[field] || field}`)
+    showChange(oldNormalized || '—', value || '—', `#${task.external_id} — ${fieldLabels[field] ? t(fieldLabels[field]) : field}`)
   } catch {
     ;(task as any)[field] = oldValue
-    toast('Ошибка сохранения', 'error')
+    toast(t('tasks.messages.save_error'), 'error')
   }
 }
 
@@ -191,18 +193,18 @@ function withCurrent(list: string[], current?: string | null): string[] {
 }
 
 const columns = [
-  { key: 'external_id', label: 'Номер', sortable: true, center: true },
-  { key: 'subject', label: 'Наименование', sortable: true },
-  { key: 'priority_name', label: 'Приоритет', sortable: true, center: true },
-  { key: 'assigned_to', label: 'Ответственный', sortable: true },
-  { key: 'estimate', label: 'Оценка, ч', sortable: true, center: true },
-  { key: 'fact', label: 'Факт, ч', sortable: true, center: true },
-  { key: 'status_name', label: 'Статус', sortable: true },
-  { key: 'bug_fix_hours', label: 'Bug fix, ч', sortable: true, center: true },
-  { key: 'bug_fix_pct', label: 'Bug fix, %', sortable: true, center: true },
-  { key: 'start_date', label: 'Дата старта', sortable: true, center: true },
-  { key: 'due_date', label: 'Дата окончания', sortable: true, center: true },
-  { key: 'category_name', label: 'Категория', sortable: true },
+  { key: 'external_id', label: 'tasks.table.number', sortable: true },
+  { key: 'subject', label: 'tasks.table.name', sortable: true },
+  { key: 'priority_name', label: 'tasks.table.priority', sortable: true },
+  { key: 'assigned_to', label: 'tasks.table.responsible', sortable: true },
+  { key: 'estimate', label: 'tasks.table.estimate', sortable: true },
+  { key: 'fact', label: 'tasks.table.fact', sortable: true },
+  { key: 'status_name', label: 'tasks.table.status', sortable: true },
+  { key: 'bug_fix_hours', label: 'tasks.table.bug_fix', sortable: true },
+  { key: 'bug_fix_pct', label: 'tasks.table.bug_fix_pct', sortable: true },
+  { key: 'start_date', label: 'tasks.table.start_date', sortable: true },
+  { key: 'due_date', label: 'tasks.table.end_date', sortable: true },
+  { key: 'category_name', label: 'tasks.table.category', sortable: true },
 ]
 
 function toggleSort(key: string) {
