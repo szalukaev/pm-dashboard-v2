@@ -44,7 +44,7 @@
       <div class="filter-group">
         <span class="filter-label">Группировка:</span>
         <button
-          class="pill-btn sm"
+          class="pill-btn compact"
           :class="{ active: useGrouping && filters.group_by === 'project' }"
           @click="setGrouping('project')"
           data-testid="filter-group-project"
@@ -52,7 +52,7 @@
           {{ $t('tasks.filters.group_by_project') }}
         </button>
         <button
-          class="pill-btn sm"
+          class="pill-btn compact"
           :class="{ active: useGrouping && filters.group_by === 'assignee' }"
           @click="setGrouping('assignee')"
           data-testid="filter-group-assignee"
@@ -60,7 +60,7 @@
           {{ $t('tasks.filters.group_by_assignee') }}
         </button>
         <button
-          class="pill-btn sm"
+          class="pill-btn compact"
           :class="{ active: !useGrouping }"
           @click="setGrouping('')"
           data-testid="filter-no-group"
@@ -74,7 +74,7 @@
         <button
           v-for="cat in categories"
           :key="cat"
-          class="pill-btn sm"
+          class="pill-btn compact"
           :class="{ active: filters.category === cat }"
           @click="setFilter('category', filters.category === cat ? '' : cat)"
           :data-testid="'filter-cat-' + cat"
@@ -201,7 +201,8 @@ watch(searchInput, (val) => {
   white-space: nowrap;
 }
 
-.pill-btn.sm {
+/* Not "sm": Quasar hides elements with breakpoint class names on wide screens */
+.pill-btn.compact {
   padding: 4px 8px;
   font-size: 11px;
 }
