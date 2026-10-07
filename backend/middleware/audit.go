@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -95,10 +96,18 @@ func (m *AuditMiddleware) Log(next http.Handler) http.Handler {
 		var afterState interface{}
 		if len(bodyBytes) > 0 {
 			json.Unmarshal(bodyBytes, &afterState)
+			afterState = maskSecrets(afterState)
 		}
 		clientIP := ClientIP(r)
 		userAgent := r.UserAgent()
 		statusCode := aw.statusCode
+
+		// entity_id is BIGINT: a path without a numeric id (POST /api/contracts)
+		// must be stored as NULL, otherwise the INSERT fails and the record is lost.
+		var entityIDArg interface{}
+		if n, err := strconv.ParseInt(entityID, 10, 64); err == nil {
+			entityIDArg = n
+		}
 
 		go func() {
 			afterJSON, _ := json.Marshal(afterState)
@@ -106,7 +115,7 @@ func (m *AuditMiddleware) Log(next http.Handler) http.Handler {
 			(*m.DB).Exec(`INSERT INTO audit_log
 				(occurred_at, user_id, action, entity_type, entity_id, after_state, status_code, ip_address, user_agent)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-				time.Now(), userID, action, entityType, entityID,
+				time.Now(), userID, action, entityType, entityIDArg,
 				string(afterJSON), statusCode, clientIP, userAgent)
 		}()
 	})
@@ -118,10 +127,15 @@ func (m *AuditMiddleware) LogLogin(userID int, username string, success bool, r 
 		action = "login_failed"
 	}
 	afterData, _ := json.Marshal(map[string]interface{}{"username": username, "success": success})
+	// user_id references users(id): an unknown user (failed login) is stored as NULL.
+	var userIDArg interface{}
+	if userID > 0 {
+		userIDArg = userID
+	}
 	(*m.DB).Exec(`INSERT INTO audit_log
 		(occurred_at, user_id, action, entity_type, after_state, ip_address, user_agent)
 		VALUES ($1, $2, $3, 'auth', $4, $5, $6)`,
-		time.Now(), userID, action, string(afterData), ClientIP(r), r.UserAgent())
+		time.Now(), userIDArg, action, string(afterData), ClientIP(r), r.UserAgent())
 }
 
 func (m *AuditMiddleware) LogLogout(userID int, r *http.Request) {
@@ -129,6 +143,41 @@ func (m *AuditMiddleware) LogLogout(userID int, r *http.Request) {
 		(occurred_at, user_id, action, entity_type, ip_address, user_agent)
 		VALUES ($1, $2, 'logout', 'auth', $3, $4)`,
 		time.Now(), userID, ClientIP(r), r.UserAgent())
+}
+
+// auditSecretKeys are request body fields that must never reach audit_log.
+var auditSecretKeys = map[string]bool{
+	"password":         true,
+	"new_password":     true,
+	"current_password": true,
+	"api_key":          true,
+	"basic_password":   true,
+	"dsn":              true,
+	"license_blob":     true,
+}
+
+const auditSecretMask = "***"
+
+// maskSecrets replaces secret values in a decoded JSON body (recursively).
+func maskSecrets(v interface{}) interface{} {
+	switch val := v.(type) {
+	case map[string]interface{}:
+		for k, inner := range val {
+			if auditSecretKeys[strings.ToLower(k)] {
+				val[k] = auditSecretMask
+				continue
+			}
+			val[k] = maskSecrets(inner)
+		}
+		return val
+	case []interface{}:
+		for i, inner := range val {
+			val[i] = maskSecrets(inner)
+		}
+		return val
+	default:
+		return v
+	}
 }
 
 func methodToAction(method string) string {
