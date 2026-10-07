@@ -79,6 +79,10 @@ func (h *AdminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	if body.Role == "" {
 		body.Role = "user"
 	}
+	if !isValidRole(body.Role) {
+		utils.Error(w, http.StatusBadRequest, "INVALID_ROLE")
+		return
+	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(body.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -112,6 +116,20 @@ func (h *AdminHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewDecoder(r.Body).Decode(&body)
 
+	if body.Role != nil && !isValidRole(*body.Role) {
+		utils.Error(w, http.StatusBadRequest, "INVALID_ROLE")
+		return
+	}
+	if body.Password != nil && len(*body.Password) < 6 {
+		utils.Error(w, http.StatusBadRequest, "PASSWORD_TOO_SHORT")
+		return
+	}
+	// An administrator cannot demote themselves — protects against losing the last admin.
+	if body.Role != nil && *body.Role != "admin" && userID == middleware.GetUserID(r) {
+		utils.Error(w, http.StatusBadRequest, "CANNOT_DEMOTE_SELF")
+		return
+	}
+
 	if body.Role != nil {
 		res, err := (*h.DB).Exec("UPDATE users SET role=$1 WHERE id=$2", *body.Role, userID)
 		if err != nil {
@@ -123,21 +141,30 @@ func (h *AdminHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if body.Password != nil && len(*body.Password) >= 6 {
+	if body.Password != nil {
 		hash, err := bcrypt.GenerateFromPassword([]byte(*body.Password), bcrypt.DefaultCost)
-		if err == nil {
-			res, err := (*h.DB).Exec("UPDATE users SET password_hash=$1 WHERE id=$2", string(hash), userID)
-			if err != nil {
-				utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
-				return
-			}
-			if n, _ := res.RowsAffected(); n == 0 {
-				utils.Error(w, http.StatusNotFound, "USER_NOT_FOUND")
-				return
-			}
+		if err != nil {
+			utils.Error(w, http.StatusInternalServerError, "HASH_FAILED")
+			return
+		}
+		// A password set by an administrator is temporary: the user must
+		// replace it on the next login (unless the admin resets their own).
+		forceChange := userID != middleware.GetUserID(r)
+		res, err := (*h.DB).Exec("UPDATE users SET password_hash=$1, force_password_change=$2 WHERE id=$3", string(hash), forceChange, userID)
+		if err != nil {
+			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+			return
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			utils.Error(w, http.StatusNotFound, "USER_NOT_FOUND")
+			return
 		}
 	}
 	utils.Success(w)
+}
+
+func isValidRole(role string) bool {
+	return role == "admin" || role == "user"
 }
 
 func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {

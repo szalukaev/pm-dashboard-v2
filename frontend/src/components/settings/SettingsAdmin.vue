@@ -159,6 +159,9 @@ import { Trash2 } from 'lucide-vue-next'
 import AppButton from '../ui/AppButton.vue'
 import AppModal from '../ui/AppModal.vue'
 import { formatDate } from '../../utils/format'
+import { useSwal } from '../../composables/useSwal'
+
+const { toast } = useSwal()
 
 const users = ref<any[]>([])
 const statuses = ref<any[]>([])
@@ -193,8 +196,15 @@ async function createUser() {
 }
 
 async function updateUserRole(id: number, role: string) {
-  await axios.put(`/api/admin/users/${id}`, { role })
-  await loadData()
+  try {
+    await axios.put(`/api/admin/users/${id}`, { role })
+  } catch (e: any) {
+    const code = e?.response?.data?.error
+    toast(code === 'CANNOT_DEMOTE_SELF' ? 'Нельзя снять роль администратора с самого себя' : 'Не удалось изменить роль', 'error')
+  } finally {
+    // Reload in any case so the select shows the real role
+    await loadData()
+  }
 }
 
 async function deleteUser(id: number) {
