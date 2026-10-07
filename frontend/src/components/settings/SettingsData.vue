@@ -41,7 +41,7 @@
     </AppButton>
 
     <!-- Status Groups (admin only) -->
-    <div class="setting-block">
+    <div v-if="isAdmin" class="setting-block">
       <SettingsStatusGroups />
     </div>
   </div>
@@ -51,10 +51,13 @@
 import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 import { useSettingsStore } from '../../stores/settings'
+import { useAuthStore } from '../../stores/auth'
 import AppButton from '../ui/AppButton.vue'
 import SettingsStatusGroups from './SettingsStatusGroups.vue'
 
 const settingsStore = useSettingsStore()
+const auth = useAuthStore()
+const isAdmin = computed(() => auth.user?.role === 'admin')
 
 const projects = ref<{ id: number; name: string; parent_id: number | null }[]>([])
 const members = ref<{ id: number; name: string }[]>([])

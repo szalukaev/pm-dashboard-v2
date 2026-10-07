@@ -6,7 +6,7 @@
       <!-- Left menu -->
       <nav class="settings-menu">
         <button
-          v-for="tab in tabs"
+          v-for="tab in visibleTabs"
           :key="tab.key"
           class="menu-item"
           :class="{ active: activeTab === tab.key }"
@@ -24,18 +24,19 @@
         <SettingsData v-if="activeTab === 'data'" />
         <SettingsInterface v-if="activeTab === 'interface'" />
         <SettingsNotifications v-if="activeTab === 'notifications'" />
-        <SettingsConnections v-if="activeTab === 'connections'" />
-        <SettingsSync v-if="activeTab === 'sync'" />
-        <SettingsAudit v-if="activeTab === 'audit'" />
-        <SettingsAdmin v-if="activeTab === 'admin'" />
+        <SettingsConnections v-if="isAdmin && activeTab === 'connections'" />
+        <SettingsSync v-if="isAdmin && activeTab === 'sync'" />
+        <SettingsAudit v-if="isAdmin && activeTab === 'audit'" />
+        <SettingsAdmin v-if="isAdmin && activeTab === 'admin'" />
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { User, Database, Palette, Bell, Shield, Link, RefreshCw, ScrollText } from 'lucide-vue-next'
+import { useAuthStore } from '../stores/auth'
 import SettingsPersonal from '../components/settings/SettingsPersonal.vue'
 import SettingsData from '../components/settings/SettingsData.vue'
 import SettingsInterface from '../components/settings/SettingsInterface.vue'
@@ -52,11 +53,15 @@ const tabs = [
   { key: 'data', icon: Database, label: 'settings.tabs.data' },
   { key: 'interface', icon: Palette, label: 'settings.tabs.interface' },
   { key: 'notifications', icon: Bell, label: 'settings.tabs.notifications' },
-  { key: 'connections', icon: Link, label: 'settings.tabs.connections' },
-  { key: 'sync', icon: RefreshCw, label: 'settings.tabs.sync' },
-  { key: 'audit', icon: ScrollText, label: 'settings.tabs.audit' },
-  { key: 'admin', icon: Shield, label: 'settings.tabs.admin' },
+  { key: 'connections', icon: Link, label: 'settings.tabs.connections', adminOnly: true },
+  { key: 'sync', icon: RefreshCw, label: 'settings.tabs.sync', adminOnly: true },
+  { key: 'audit', icon: ScrollText, label: 'settings.tabs.audit', adminOnly: true },
+  { key: 'admin', icon: Shield, label: 'settings.tabs.admin', adminOnly: true },
 ]
+
+const auth = useAuthStore()
+const isAdmin = computed(() => auth.user?.role === 'admin')
+const visibleTabs = computed(() => tabs.filter(tab => !tab.adminOnly || isAdmin.value))
 </script>
 
 <style scoped>
