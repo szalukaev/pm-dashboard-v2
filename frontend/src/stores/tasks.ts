@@ -70,9 +70,17 @@ export const useTasksStore = defineStore('tasks', () => {
   const statuses = ref<{ id: number; name: string; is_closed: boolean; group: string }[]>([])
   const priorities = ref<{ id: number; name: string; sort_order: number }[]>([])
 
-  async function fetchTasks() {
-    loading.value = true
-    error.value = ''
+  // Only the latest request may update the list.
+  let tasksRequest = 0
+
+  // silent: refresh in the background without the loading skeleton, so the
+  // table does not flicker and expanded groups stay open.
+  async function fetchTasks(opts: { silent?: boolean } = {}) {
+    const requestId = ++tasksRequest
+    if (!opts.silent) {
+      loading.value = true
+      error.value = ''
+    }
     try {
       const params: Record<string, string> = {}
       if (filters.value.type) params.type = filters.value.type
@@ -84,21 +92,37 @@ export const useTasksStore = defineStore('tasks', () => {
         params.sort_dir = filters.value.sort_dir
       }
 
+      if (useGrouping.value) params.group_by = filters.value.group_by
+      const { data } = await axios.get('/api/tasks', { params })
+      if (requestId !== tasksRequest) return
       if (useGrouping.value) {
-        params.group_by = filters.value.group_by
-        const { data } = await axios.get('/api/tasks', { params })
         groups.value = data.groups || []
         tasks.value = []
       } else {
-        const { data } = await axios.get('/api/tasks', { params })
         tasks.value = data.tasks || []
         groups.value = []
       }
       total.value = tasks.value.length || groups.value.reduce((s, g) => s + g.task_count, 0)
     } catch (e: any) {
-      error.value = 'Не удалось загрузить данные'
+      if (requestId === tasksRequest && !opts.silent) error.value = 'Не удалось загрузить данные'
     } finally {
-      loading.value = false
+      if (requestId === tasksRequest) loading.value = false
+    }
+  }
+
+  // Applies a saved change to every loaded copy of the task right away.
+  function applyTaskChange(id: number, fields: Record<string, any>) {
+    const patch = (t: Task) => {
+      if (t.external_id !== id) return
+      for (const [k, v] of Object.entries(fields)) {
+        ;(t as any)[k] = k === 'estimated_hours' && v !== null && v !== '' ? Number(v) : v
+      }
+    }
+    tasks.value.forEach(patch)
+    for (const g of groups.value) {
+      g.tasks.forEach(patch)
+      g.estimate_total = g.tasks.reduce((s, t) => s + (t.estimated_hours || 0), 0)
+      g.fact_total = g.tasks.reduce((s, t) => s + (t.spent_hours || 0), 0)
     }
   }
 
@@ -115,6 +139,11 @@ export const useTasksStore = defineStore('tasks', () => {
     const { data } = await axios.put(`/api/tasks/${id}`, fields)
     if (!skipReload) {
       await fetchTasks()
+    } else if (data?.redmine_ok) {
+      // Redmine and our database already hold the new value: show it at once,
+      // then re-read quietly so the task moves to its new group / filter.
+      applyTaskChange(id, fields)
+      fetchTasks({ silent: true })
     }
     return data
   }

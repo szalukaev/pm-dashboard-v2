@@ -18,7 +18,7 @@
     </template>
 
     <!-- Error state -->
-    <AppEmptyState v-else-if="error" state="error" @retry="fetchTasks" />
+    <AppEmptyState v-else-if="error" state="error" @retry="fetchTasks()" />
 
     <!-- Empty state: no rows because of active filters -->
     <div v-else-if="total === 0 && !loading && hasActiveFilters()" class="filtered-empty" data-testid="filtered-empty">
