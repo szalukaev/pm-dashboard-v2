@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pm-dashboard-v3.0.0'
+const CACHE_NAME = 'pm-dashboard-v3.0.1'
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -38,6 +38,23 @@ self.addEventListener('fetch', (event) => {
 
   // API requests — network only
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/ws')) {
+    return
+  }
+
+  // Page shell (index.html) — network-first: a fresh deploy must be picked up
+  // immediately; the cached copy is only an offline fallback.
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone()
+            caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', clone))
+          }
+          return response
+        })
+        .catch(() => caches.match('/index.html'))
+    )
     return
   }
 
