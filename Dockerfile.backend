@@ -7,7 +7,9 @@ COPY . .
 RUN CGO_ENABLED=1 GOOS=linux go build -o /pm-dashboard .
 
 FROM alpine:3.19
-RUN apk add --no-cache ca-certificates
+# tzdata: the server keeps its schedules and the days of the history in the
+# time zone given by TZ.
+RUN apk add --no-cache ca-certificates tzdata
 COPY --from=builder /pm-dashboard /usr/local/bin/
 COPY --from=builder /app/invoice /app/invoice
 # File migrations must ship with the image; otherwise RunMigrations

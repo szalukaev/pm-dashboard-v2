@@ -57,6 +57,9 @@ services:
       - DATA_DIR=/data
       - REDIS_URL=redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}@redis:6379/0
       - SECURE_COOKIES=${SECURE_COOKIES:-false}
+      # The time zone of the schedules (cleanup, full sync) and of the days
+      # the history is kept by. Set TZ in .env to change it.
+      - TZ=${TZ:-Europe/Moscow}
     depends_on:
       redis:
         condition: service_healthy

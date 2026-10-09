@@ -68,6 +68,12 @@ type issueResp struct {
 		Author struct {
 			Name string `json:"name"`
 		} `json:"author"`
+		FixedVersion *struct {
+			Name string `json:"name"`
+		} `json:"fixed_version"`
+		CreatedOn    *string            `json:"created_on"`
+		UpdatedOn    *string            `json:"updated_on"`
+		ClosedOn     *string            `json:"closed_on"`
 		CustomFields []customFieldValue `json:"custom_fields"`
 	} `json:"issues"`
 	TotalCount int `json:"total_count"`
@@ -481,6 +487,12 @@ func (c *Client) GetIssues(projectID int, updatedSince *time.Time) ([]Issue, err
 				SpentHours:     i.SpentHours,
 				TrackerName:    i.Tracker.Name,
 				AuthorName:     i.Author.Name,
+				CreatedOn:      i.CreatedOn,
+				UpdatedOn:      i.UpdatedOn,
+				ClosedOn:       i.ClosedOn,
+			}
+			if i.FixedVersion != nil {
+				iss.FixedVersionName = i.FixedVersion.Name
 			}
 			if i.AssignedTo != nil {
 				iss.AssignedToName = i.AssignedTo.Name

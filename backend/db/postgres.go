@@ -133,7 +133,19 @@ func runFallbackMigrations(db *sql.DB) error {
 	if _, err := db.Exec(tableColumnsSQL); err != nil {
 		return err
 	}
-	_, err := db.Exec(syncStateSQL)
+	if _, err := db.Exec(syncStateSQL); err != nil {
+		return err
+	}
+	// The snapshot tables are created by this migration only; it must not
+	// run twice, or a restart would drop the collected history.
+	var exists bool
+	if err := db.QueryRow(`SELECT to_regclass('issue_snapshots') IS NOT NULL`).Scan(&exists); err != nil {
+		return err
+	}
+	if exists {
+		return nil
+	}
+	_, err := db.Exec(snapshotsSQL)
 	return err
 }
 
@@ -166,6 +178,9 @@ var tableColumnsSQL string
 
 //go:embed migrations/014_sync_state.up.sql
 var syncStateSQL string
+
+//go:embed migrations/015_snapshots.up.sql
+var snapshotsSQL string
 
 // fallbackMigrationSQL is kept as a safety net when migration files are not available
 const fallbackMigrationSQL = `
@@ -287,19 +302,6 @@ CREATE TABLE IF NOT EXISTS collection_log (
     id SERIAL PRIMARY KEY, started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     finished_at TIMESTAMPTZ, duration_ms INTEGER, issues_collected INTEGER DEFAULT 0,
     status VARCHAR(20) DEFAULT 'running', error_text TEXT, data_source VARCHAR(50) DEFAULT 'redmine'
-);
-CREATE TABLE IF NOT EXISTS daily_snapshots (
-    id SERIAL PRIMARY KEY, snapshot_date DATE NOT NULL, project_id INTEGER, project_name VARCHAR(500),
-    open_count INTEGER DEFAULT 0, testing_count INTEGER DEFAULT 0, closed_count INTEGER DEFAULT 0,
-    overdue_count INTEGER DEFAULT 0, total_count INTEGER DEFAULT 0,
-    data_source VARCHAR(50) DEFAULT 'redmine', created_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(snapshot_date, project_id, data_source)
-);
-CREATE TABLE IF NOT EXISTS issue_snapshots (
-    id SERIAL PRIMARY KEY, issue_external_id INTEGER NOT NULL, snapshot_date DATE NOT NULL,
-    status_name VARCHAR(255), priority_name VARCHAR(255), assigned_to_name VARCHAR(255),
-    estimated_hours NUMERIC(10,2), spent_hours NUMERIC(10,2), done_ratio INTEGER,
-    data_source VARCHAR(50) DEFAULT 'redmine', created_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE TABLE IF NOT EXISTS settings (
     key VARCHAR(100) PRIMARY KEY, value JSONB NOT NULL, updated_at TIMESTAMPTZ DEFAULT NOW()

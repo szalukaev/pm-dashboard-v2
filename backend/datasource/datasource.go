@@ -36,6 +36,13 @@ type Issue struct {
 	DoneRatio      int
 	TrackerName    string
 	AuthorName     string
+	// When the issue was created, last changed and closed in the source
+	// (RFC 3339), nil when the source does not say.
+	CreatedOn *string
+	UpdatedOn *string
+	ClosedOn  *string
+	// FixedVersionName: the version (sprint) the issue is planned for.
+	FixedVersionName string
 }
 
 type Member struct {

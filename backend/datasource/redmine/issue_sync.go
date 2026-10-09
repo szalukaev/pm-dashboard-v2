@@ -27,7 +27,7 @@ const (
 	// none in the answer of Redmine looks like a failure, not like the truth;
 	// nothing is deleted on such an answer.
 	emptyAnswerGuard = 50
-	// issueBatchSize rows per INSERT: 18 params each, well below the 65535 limit.
+	// issueBatchSize rows per INSERT: 22 params each, well below the 65535 limit.
 	issueBatchSize = 500
 	// timeEntryBatchSize rows per INSERT: 5 params each.
 	timeEntryBatchSize = 1000
@@ -509,7 +509,7 @@ func storeTimeEntries(db *sql.DB, projectID int, entries []TimeEntry, replace bo
 // the database is remote, so one round trip per issue made the sync slow.
 // Fact and bug fix hours are maintained by updateIssueHours.
 func upsertIssues(db *sql.DB, batch []Issue) error {
-	const cols = 18
+	const cols = 22
 	values := make([]string, len(batch))
 	args := make([]interface{}, 0, len(batch)*cols)
 	for i, it := range batch {
@@ -522,7 +522,8 @@ func upsertIssues(db *sql.DB, batch []Issue) error {
 			it.StatusName, it.StatusID, it.PriorityName, it.PriorityID,
 			it.AssignedToName, it.AssignedToID, it.CategoryName,
 			it.StartDate, it.DueDate, it.EstimatedHours,
-			it.DoneRatio, it.TrackerName, it.AuthorName)
+			it.DoneRatio, it.TrackerName, it.AuthorName,
+			it.CreatedOn, it.UpdatedOn, it.ClosedOn, it.FixedVersionName)
 	}
 	_, err := db.Exec(`
 		INSERT INTO issues (
@@ -531,6 +532,7 @@ func upsertIssues(db *sql.DB, batch []Issue) error {
 			assigned_to_name, assigned_to_id, category_name,
 			start_date, due_date, estimated_hours,
 			done_ratio, tracker_name, author_name,
+			created_on, updated_on, closed_on, fixed_version_name,
 			spent_hours, bug_fix_hours, data_source, synced_at
 		) VALUES `+strings.Join(values, ",")+`
 		ON CONFLICT (external_id, data_source) DO UPDATE SET
@@ -551,6 +553,10 @@ func upsertIssues(db *sql.DB, batch []Issue) error {
 			done_ratio = EXCLUDED.done_ratio,
 			tracker_name = EXCLUDED.tracker_name,
 			author_name = EXCLUDED.author_name,
+			created_on = EXCLUDED.created_on,
+			updated_on = EXCLUDED.updated_on,
+			closed_on = EXCLUDED.closed_on,
+			fixed_version_name = EXCLUDED.fixed_version_name,
 			synced_at = NOW()`, args...)
 	return err
 }
