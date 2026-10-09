@@ -5,13 +5,37 @@
       <span class="backlog-count">{{ totalTasks }}</span>
     </h3>
 
+    <!-- Applied on Enter: by project name, task subject or task number -->
+    <div v-if="backlog.length > 0" class="backlog-filter">
+      <Search :size="14" class="filter-icon" />
+      <input
+        v-model="query"
+        type="text"
+        :placeholder="$t('sprint.backlog_filter.placeholder')"
+        data-testid="backlog-filter"
+        @keydown.enter.prevent="applyFilter"
+      />
+      <button
+        v-if="query || applied"
+        type="button"
+        class="filter-clear"
+        :title="$t('sprint.backlog_filter.clear')"
+        @click="clearFilter"
+      >
+        <X :size="14" />
+      </button>
+    </div>
+
     <div v-if="backlog.length === 0" class="empty-hint">
       {{ $t('sprint.no_tasks') }}
+    </div>
+    <div v-else-if="visibleGroups.length === 0" class="empty-hint">
+      {{ $t('sprint.backlog_filter.nothing') }}
     </div>
 
     <div class="backlog-groups">
       <div
-        v-for="group in backlog"
+        v-for="group in visibleGroups"
         :key="group.project_name"
         class="backlog-group"
       >
@@ -45,7 +69,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { ChevronDown } from 'lucide-vue-next'
+import { ChevronDown, Search, X } from 'lucide-vue-next'
 import KanbanCard from '../kanban/KanbanCard.vue'
 import type { BacklogGroup, SprintTask } from '../../stores/sprint'
 import type { KanbanCard as KanbanCardType } from '../../stores/kanban'
@@ -55,9 +79,38 @@ defineEmits(['open-task'])
 
 const openGroups = ref<Set<string>>(new Set())
 
+// query is what is being typed, applied is what the list is filtered by
+const query = ref('')
+const applied = ref('')
+
+// A project whose name matches stays whole; otherwise only its matching tasks
+const visibleGroups = computed<BacklogGroup[]>(() => {
+  const q = applied.value
+  if (!q) return props.backlog
+  const number = q.replace(/^#/, '')
+  return props.backlog.flatMap(group => {
+    if (group.project_name.toLowerCase().includes(q)) return [group]
+    const tasks = group.tasks.filter(t =>
+      t.subject.toLowerCase().includes(q) || String(t.external_id).includes(number)
+    )
+    return tasks.length ? [{ ...group, tasks, task_count: tasks.length }] : []
+  })
+})
+
 const totalTasks = computed(() =>
-  props.backlog.reduce((sum, g) => sum + g.task_count, 0)
+  visibleGroups.value.reduce((sum, g) => sum + g.task_count, 0)
 )
+
+function applyFilter() {
+  applied.value = query.value.trim().toLowerCase()
+  // What was found is shown at once, without opening every project by hand
+  if (applied.value) openGroups.value = new Set(visibleGroups.value.map(g => g.project_name))
+}
+
+function clearFilter() {
+  query.value = ''
+  applied.value = ''
+}
 
 function toggle(name: string) {
   if (openGroups.value.has(name)) {
@@ -122,6 +175,52 @@ function mapToKanbanCard(task: SprintTask): KanbanCardType {
   background: var(--tag-bg);
   padding: 2px 8px;
   border-radius: 9999px;
+}
+
+.backlog-filter {
+  position: relative;
+  display: flex;
+  align-items: center;
+  max-width: 420px;
+  margin-bottom: 12px;
+}
+
+.backlog-filter input {
+  width: 100%;
+  padding: 8px 32px;
+  font-size: 13px;
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  color: var(--text);
+}
+
+.backlog-filter input:focus {
+  border-color: var(--accent);
+}
+
+.filter-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+
+.filter-clear {
+  position: absolute;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  color: var(--text-muted);
+}
+
+.filter-clear:hover {
+  background: var(--surface-3);
+  color: var(--text-bright);
 }
 
 .empty-hint {

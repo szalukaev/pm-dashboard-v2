@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -437,6 +438,11 @@ func (h *SprintHandler) GetBacklog(w http.ResponseWriter, r *http.Request) {
 	for name, tasks := range groups {
 		result = append(result, BacklogGroup{ProjectName: name, Tasks: tasks, TaskCount: len(tasks)})
 	}
+	// A map has no order; without sorting the projects would be shuffled on
+	// every refresh
+	sort.Slice(result, func(i, j int) bool {
+		return strings.ToLower(result[i].ProjectName) < strings.ToLower(result[j].ProjectName)
+	})
 	if result == nil {
 		result = []BacklogGroup{}
 	}

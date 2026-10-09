@@ -224,6 +224,11 @@
       "due_date": "Due Date",
       "description": "Description"
     },
+    "backlog_filter": {
+      "placeholder": "Project, task subject or number — then Enter",
+      "clear": "Clear",
+      "nothing": "Nothing found"
+    },
     "drag_hint": "Drag tasks from the backlog",
     "no_tasks": "No tasks",
     "no_data": "No data. Make sure projects are selected in the filter.",
