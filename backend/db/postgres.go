@@ -118,7 +118,10 @@ func runFallbackMigrations(db *sql.DB) error {
 	if _, err := db.Exec(showUnassignedSQL); err != nil {
 		return err
 	}
-	_, err := db.Exec(sprintActionsSQL)
+	if _, err := db.Exec(sprintActionsSQL); err != nil {
+		return err
+	}
+	_, err := db.Exec(licenseEventsSQL)
 	return err
 }
 
@@ -136,6 +139,9 @@ var showUnassignedSQL string
 
 //go:embed migrations/009_sprint_actions.up.sql
 var sprintActionsSQL string
+
+//go:embed migrations/010_license_events.up.sql
+var licenseEventsSQL string
 
 // fallbackMigrationSQL is kept as a safety net when migration files are not available
 const fallbackMigrationSQL = `

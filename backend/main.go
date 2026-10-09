@@ -16,6 +16,7 @@ import (
 	"pm-dashboard/db"
 	"pm-dashboard/datasource/manager"
 	"pm-dashboard/handlers"
+	"pm-dashboard/license"
 	"pm-dashboard/middleware"
 	"pm-dashboard/secrets"
 	"pm-dashboard/utils"
@@ -66,11 +67,14 @@ func main() {
 	sessionStore := db.NewSessionStore(redisURL)
 	defer sessionStore.Close()
 
-	// License checker (read-only middleware)
-	var licenseChecker *middleware.LicenseChecker
-	if pgDB != nil {
-		licenseChecker = middleware.NewLicenseChecker(&pgDB)
+	// License: one service owns its state — checked at start and every hour.
+	// The hardware fingerprint comes from a file collected on the host.
+	hwidPath := license.DefaultHWIDPath
+	if p := os.Getenv("HWID_SOURCE"); p != "" {
+		hwidPath = p
 	}
+	licenseSvc := license.New(&pgDB, hwidPath)
+	go licenseSvc.Run(context.Background())
 
 	// Audit middleware
 	var auditMW *middleware.AuditMiddleware
@@ -88,28 +92,17 @@ func main() {
 	sprintH := &handlers.SprintHandler{DB: &pgDB}
 	paymentsH := &handlers.PaymentsHandler{DB: &pgDB}
 	adminH := &handlers.AdminHandler{DB: &pgDB, SQLite: sqliteStore}
-	licenseH := &handlers.LicenseHandler{DB: &pgDB}
+	licenseH := &handlers.LicenseHandler{License: licenseSvc}
 	notifH := &handlers.NotificationsHandler{DB: &pgDB}
 	wsHub := handlers.NewWSHub()
-
-	// License periodic check — starts grace period without visiting the license page
-	if pgDB != nil {
-		go func() {
-			licenseH.RunPeriodicCheck()
-			ticker := time.NewTicker(6 * time.Hour)
-			defer ticker.Stop()
-			for range ticker.C {
-				licenseH.RunPeriodicCheck()
-			}
-		}()
-	}
-
 
 	// Data source client and background sync. The manager re-reads connection
 	// settings and the interval on the fly, so the loop runs even while the
 	// source or the database is not configured yet (setup wizard).
+	// Data is collected only under a working license: not before activation
+	// and not in read-only mode.
 	source := manager.New(sqliteStore, &pgDB, func() bool {
-		return licenseChecker != nil && licenseChecker.IsReadOnly()
+		return !licenseSvc.Usable() || licenseSvc.IsReadOnly()
 	})
 	taskH.Source = source
 	kanbanH.Source = source
@@ -117,6 +110,8 @@ func main() {
 	setupH.Source = source
 	settingsH.Source = source
 	authH.Source = source
+	// Data collection starts right after the license is activated
+	licenseH.OnActivated = func() { source.TriggerSync() }
 
 	// Personal API keys of the data source are stored encrypted; with them
 	// changes go to the source under the user's own name.
@@ -190,10 +185,9 @@ func main() {
 		api.Use(auditMW.Log)
 	}
 
-	// Wire license read-only middleware — blocks writes when license expired
-	if licenseChecker != nil {
-		api.Use(licenseChecker.ReadOnlyMiddleware)
-	}
+	// License state: nothing but the activation screen before activation,
+	// no writes in read-only mode
+	api.Use(licenseSvc.Guard)
 
 	// A tab hidden from a user by the administrator is closed here as well,
 	// not only in the menu. Task cards and reference lists stay open: other
@@ -208,6 +202,7 @@ func main() {
 		{Path: "/api/payments", Tab: "payments"},
 	}))
 
+	api.Handle("/license/details", middleware.RequireAdmin(http.HandlerFunc(licenseH.GetDetails))).Methods("GET")
 	api.Handle("/license/activate", middleware.RequireAdmin(http.HandlerFunc(licenseH.Activate))).Methods("POST")
 
 	api.HandleFunc("/auth/logout", authH.Logout).Methods("POST")

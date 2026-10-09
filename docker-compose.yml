@@ -24,6 +24,9 @@ services:
       - "8080"
     volumes:
       - ./data:/data
+      # Hardware identifiers of the host for the license, read-only.
+      # Create the file before the first start: sudo sh scripts/collect-hwid.sh
+      - /etc/pmdashboard/hwid-source:/etc/pmdashboard/hwid-source:ro
     networks:
       - backend
     environment:
