@@ -94,12 +94,13 @@ export const useSprintStore = defineStore('sprint', () => {
 
   async function assignTask(sprintId: number, issueExternalId: number) {
     await axios.post(`/api/sprints/${sprintId}/assign`, { issue_external_id: issueExternalId })
-    await fetchAll()
+    // Quietly: the page must not blink under a task that was just dropped
+    await fetchAll({ silent: true })
   }
 
   async function unassignTask(sprintId: number, issueExternalId: number) {
     await axios.delete(`/api/sprints/${sprintId}/assign/${issueExternalId}`)
-    await fetchAll()
+    await fetchAll({ silent: true })
   }
 
   async function refreshSprint(id: number) {

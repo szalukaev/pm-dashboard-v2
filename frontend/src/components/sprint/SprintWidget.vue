@@ -1,5 +1,13 @@
 <template>
-  <div class="sprint-widget" :class="{ 'is-closed': sprint.status === 'closed' }">
+  <!-- The whole block takes a dragged task: the header and a collapsed sprint too -->
+  <div
+    class="sprint-widget"
+    :class="{ 'is-closed': sprint.status === 'closed', 'is-drop-target': dragDepth > 0 }"
+    @dragenter="onDragEnter"
+    @dragover="onDragOver"
+    @dragleave="onDragLeave"
+    @drop="onDrop"
+  >
     <div class="widget-header" @click="toggleExpanded">
       <ChevronDown :size="16" class="chevron" :class="{ collapsed: !expanded }" />
       <Flag :size="16" class="flag-icon" />
@@ -44,8 +52,6 @@
       <div
         v-if="sprint.tasks.length > 0"
         class="tasks-grid"
-        @dragover.prevent
-        @drop="onDrop"
       >
         <KanbanCard
           v-for="task in sprint.tasks"
@@ -55,7 +61,7 @@
         />
       </div>
 
-      <div v-else class="empty-hint" @dragover.prevent @drop="onDrop">
+      <div v-else class="empty-hint">
         {{ $t('sprint.drag_hint') }}
       </div>
     </div>
@@ -103,10 +109,36 @@ function toggleExpanded() {
   expanded.value = !expanded.value
 }
 
-function onDrop(e: DragEvent) {
+// Tasks are taken by a sprint that is not closed
+const acceptsTasks = () => props.sprint.status !== 'closed'
+
+// dragenter and dragleave fire for every child element the pointer crosses,
+// so the highlight is counted, not switched
+const dragDepth = ref(0)
+
+function onDragEnter(e: DragEvent) {
+  if (!acceptsTasks()) return
   e.preventDefault()
-  const issueId = parseInt(e.dataTransfer?.getData('text/plain') || '0')
+  dragDepth.value++
+}
+
+function onDragOver(e: DragEvent) {
+  if (!acceptsTasks()) return
+  e.preventDefault()
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
+}
+
+function onDragLeave() {
+  if (dragDepth.value > 0) dragDepth.value--
+}
+
+function onDrop(e: DragEvent) {
+  dragDepth.value = 0
+  if (!acceptsTasks()) return
+  e.preventDefault()
+  const issueId = parseInt(e.dataTransfer?.getData('text/plain') || '', 10)
   if (issueId) {
+    expanded.value = true
     emit('assign-task', { sprintId: props.sprint.id, issueId })
   }
 }
@@ -127,6 +159,11 @@ function formatDate(d: string | null): string {
 
 .sprint-widget.is-closed {
   opacity: 0.7;
+}
+
+.sprint-widget.is-drop-target {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-bg);
 }
 
 .widget-header {
