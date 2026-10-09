@@ -13,7 +13,7 @@
 
       <div class="form-field">
         <label>{{ $t('sprint.form.project') }}</label>
-        <select v-model="form.project_name">
+        <select v-model="form.project_name" @change="onProjectChange">
           <option value="">—</option>
           <option v-for="p in projects" :key="p.name" :value="p.name">{{ p.name }}</option>
         </select>
@@ -21,7 +21,11 @@
 
       <div class="form-field">
         <label>{{ $t('sprint.form.category') }}</label>
-        <input v-model="form.category_name" type="text" />
+        <!-- The categories of the chosen project -->
+        <select v-model="form.category_name" :disabled="!projectId">
+          <option value="">{{ projectId ? '—' : $t('sprint.form.category_pick_project') }}</option>
+          <option v-for="c in categoryOptions" :key="c" :value="c">{{ c }}</option>
+        </select>
       </div>
 
       <div class="form-field checkbox-field">
@@ -75,13 +79,15 @@ import AppModal from '../ui/AppModal.vue'
 import AppButton from '../ui/AppButton.vue'
 import type { Sprint } from '../../stores/sprint'
 import { useAuthStore } from '../../stores/auth'
+import { useTasksStore } from '../../stores/tasks'
 
 const auth = useAuthStore()
+const tasksStore = useTasksStore()
 
 const props = defineProps<{
   visible: boolean
   sprint: Sprint | null
-  projects: { name: string }[]
+  projects: { id: number; name: string }[]
 }>()
 
 const emit = defineEmits(['close', 'submit'])
@@ -97,7 +103,28 @@ const form = reactive({
   status: 'open',
 })
 
-watch(() => props.sprint, (s) => {
+const projectId = computed(() => props.projects.find(p => p.name === form.project_name)?.id)
+
+// A category saved earlier stays selectable even if the project no longer has it
+const categoryOptions = computed(() => {
+  const list = (projectId.value && tasksStore.projectCategories[projectId.value]) || []
+  return form.category_name && !list.includes(form.category_name) ? [form.category_name, ...list] : list
+})
+
+function loadCategories() {
+  if (projectId.value) tasksStore.fetchProjectCategories(projectId.value)
+}
+
+function onProjectChange() {
+  form.category_name = ''
+  loadCategories()
+}
+
+watch(projectId, loadCategories)
+
+// Filled every time the window opens: a new sprint starts from a blank form
+watch([() => props.visible, () => props.sprint], ([visible, s]) => {
+  if (!visible) return
   if (s) {
     form.name = s.name
     form.project_name = s.project_name || ''
@@ -117,6 +144,7 @@ watch(() => props.sprint, (s) => {
     form.description = ''
     form.status = 'open'
   }
+  loadCategories()
 }, { immediate: true })
 
 // The name and the start date are required
@@ -170,6 +198,11 @@ function submit() {
 .form-field select:focus,
 .form-field textarea:focus {
   border-color: var(--accent);
+}
+
+.form-field select:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
 }
 
 .form-field textarea {

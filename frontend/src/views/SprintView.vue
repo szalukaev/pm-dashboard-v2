@@ -96,7 +96,7 @@ const editingSprint = ref<Sprint | null>(null)
 const showDeleteConfirm = ref(false)
 const deletingSprintId = ref<number | null>(null)
 const selectedTaskId = ref<number | null>(null)
-const projects = ref<{ name: string }[]>([])
+const projects = ref<{ id: number; name: string }[]>([])
 
 function openTask(id: number) {
   selectedTaskId.value = id
@@ -166,7 +166,7 @@ useLiveRefresh(() => fetchAll({ silent: true }))
 onMounted(async () => {
   await fetchAll()
   await tasksStore.fetchProjects()
-  projects.value = tasksStore.projects.map(p => ({ name: p.name }))
+  projects.value = tasksStore.projects.map(p => ({ id: p.id, name: p.name }))
 })
 </script>
 

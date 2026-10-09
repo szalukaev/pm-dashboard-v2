@@ -218,6 +218,7 @@
       "name": "Name",
       "project": "Project",
       "category": "Category",
+      "category_pick_project": "Choose a project first",
       "auto_fill": "Auto-fill by category",
       "start_date": "Start Date",
       "due_date": "Due Date",
