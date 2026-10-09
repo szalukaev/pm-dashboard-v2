@@ -59,7 +59,7 @@ services:
       - SECURE_COOKIES=${SECURE_COOKIES:-false}
       # The time zone of the schedules (cleanup, full sync) and of the days
       # the history is kept by. Set TZ in .env to change it.
-      - TZ=${TZ:-Europe/Moscow}
+      - TZ=${TZ:-Asia/Yekaterinburg}
     depends_on:
       redis:
         condition: service_healthy
