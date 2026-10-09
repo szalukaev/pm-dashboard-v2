@@ -17,7 +17,7 @@
     </div>
 
     <!-- Error -->
-    <AppEmptyState v-else-if="error" state="error" @retry="fetchBoard" />
+    <AppEmptyState v-else-if="error" state="error" @retry="fetchBoard()" />
 
     <!-- Empty -->
     <div v-else-if="mode === 'statuses' && !projectId" class="kanban-placeholder">
@@ -51,6 +51,7 @@ import { ref, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useKanbanStore } from '../stores/kanban'
 import { useTasksStore } from '../stores/tasks'
+import { useLiveRefresh } from '../composables/useLiveRefresh'
 import KanbanToolbar from '../components/kanban/KanbanToolbar.vue'
 import KanbanColumn from '../components/kanban/KanbanColumn.vue'
 import AppEmptyState from '../components/ui/AppEmptyState.vue'
@@ -83,6 +84,9 @@ function handleColumnDrop(e: Event) {
     moveColumn(fromId, toId)
   }
 }
+
+// Changes from a sync or from other users appear without a reload
+useLiveRefresh(() => fetchBoard({ silent: true }))
 
 onMounted(async () => {
   await kanbanStore.restoreState()

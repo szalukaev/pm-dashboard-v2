@@ -27,7 +27,7 @@
             v-for="task in group.tasks"
             :key="task.external_id"
             class="task-tile"
-            :class="{ 'high-priority': task.is_high_priority }"
+            :class="{ 'high-priority': task.is_high_priority, 'flash-update': isFlashing(task.external_id) }"
             @click="$emit('open-task', task.external_id)"
             :data-testid="'deadline-task-' + task.external_id"
           >
@@ -56,6 +56,7 @@ import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import type { DeadlineGroup } from '../../stores/analytics'
 import { useSettingsStore } from '../../stores/settings'
+import { isFlashing } from '../../composables/useFlash'
 
 const settingsStore = useSettingsStore()
 const { settings } = storeToRefs(settingsStore)

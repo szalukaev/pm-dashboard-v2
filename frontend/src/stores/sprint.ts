@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import axios from 'axios'
+import i18n from '../i18n'
 
 export interface SprintTask {
   external_id: number
@@ -45,15 +46,19 @@ export const useSprintStore = defineStore('sprint', () => {
   const loading = ref(false)
   const error = ref('')
 
-  async function fetchAll() {
-    loading.value = true
-    error.value = ''
+  // silent: refresh in the background, without the spinner.
+  async function fetchAll(opts: { silent?: boolean } = {}) {
+    const silent = opts.silent === true
+    if (!silent) {
+      loading.value = true
+      error.value = ''
+    }
     try {
       await Promise.all([fetchSprints(), fetchBacklog()])
     } catch {
-      error.value = 'Не удалось загрузить данные'
+      if (!silent) error.value = i18n.global.t('common.error')
     } finally {
-      loading.value = false
+      if (!silent) loading.value = false
     }
   }
 

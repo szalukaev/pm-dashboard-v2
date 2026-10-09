@@ -13,7 +13,7 @@
     </div>
 
     <!-- Error -->
-    <AppEmptyState v-else-if="error" state="error" @retry="fetchAll" />
+    <AppEmptyState v-else-if="error" state="error" @retry="fetchAll()" />
 
     <!-- Content -->
     <div v-else class="sprint-content">
@@ -70,6 +70,7 @@ import { ref, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useSprintStore, type Sprint } from '../stores/sprint'
 import { useTasksStore } from '../stores/tasks'
+import { useLiveRefresh } from '../composables/useLiveRefresh'
 import SprintWidget from '../components/sprint/SprintWidget.vue'
 import SprintBacklog from '../components/sprint/SprintBacklog.vue'
 import SprintForm from '../components/sprint/SprintForm.vue'
@@ -134,6 +135,9 @@ function confirmDelete(id: number) {
 async function handleAssignTask(payload: { sprintId: number; issueId: number }) {
   await assignTask(payload.sprintId, payload.issueId)
 }
+
+// Changes from a sync or from other users appear without a reload
+useLiveRefresh(() => fetchAll({ silent: true }))
 
 onMounted(async () => {
   await fetchAll()

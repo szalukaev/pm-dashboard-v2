@@ -20,7 +20,7 @@
           <tr
             v-for="task in tasks"
             :key="task.external_id"
-            :class="{ overdue: isOverdue(task) }"
+            :class="{ overdue: isOverdue(task), 'flash-update': isFlashing(task.external_id) }"
             :data-testid="'task-row-' + task.external_id"
           >
             <td class="center">
@@ -127,6 +127,7 @@ import type { Task } from '../../stores/tasks'
 import { useSettingsStore } from '../../stores/settings'
 import { useSwal } from '../../composables/useSwal'
 import { useTasksStore } from '../../stores/tasks'
+import { isFlashing } from '../../composables/useFlash'
 
 const settingsStore = useSettingsStore()
 const tasksStore = useTasksStore()

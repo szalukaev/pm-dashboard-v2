@@ -1,7 +1,7 @@
 <template>
   <div
     class="kanban-card"
-    :class="{ 'is-overdue': card.is_overdue, 'is-dragging': isDragging }"
+    :class="{ 'is-overdue': card.is_overdue, 'is-dragging': isDragging, 'flash-update': isFlashing(card.external_id) }"
     :style="{ borderLeftColor: priorityColor }"
     draggable="true"
     @dragstart="onDragStart"
@@ -55,6 +55,7 @@ import { storeToRefs } from 'pinia'
 import { AlertCircle } from 'lucide-vue-next'
 import type { KanbanCard } from '../../stores/kanban'
 import { useSettingsStore } from '../../stores/settings'
+import { isFlashing } from '../../composables/useFlash'
 
 const settingsStore = useSettingsStore()
 const { settings } = storeToRefs(settingsStore)

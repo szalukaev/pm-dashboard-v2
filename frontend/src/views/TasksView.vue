@@ -61,6 +61,7 @@
 import { ref, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTasksStore } from '../stores/tasks'
+import { useLiveRefresh } from '../composables/useLiveRefresh'
 import TaskFilters from '../components/tasks/TaskFilters.vue'
 import TaskAccordion from '../components/tasks/TaskAccordion.vue'
 import TaskTable from '../components/tasks/TaskTable.vue'
@@ -86,6 +87,9 @@ function handleSortChange(sort: { sortBy: string; sortDir: string }) {
 async function handleInlineEdit(payload: { taskId: number; field: string; value: any }) {
   await store.updateTask(payload.taskId, { [payload.field]: payload.value })
 }
+
+// Changes from a sync or from other users appear without a reload
+useLiveRefresh(() => store.fetchTasks({ silent: true }))
 
 onMounted(async () => {
   await store.restoreFilters()

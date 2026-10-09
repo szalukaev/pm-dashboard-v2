@@ -10,7 +10,7 @@
     </template>
 
     <!-- Error -->
-    <AppEmptyState v-else-if="error" state="error" @retry="fetchAll" />
+    <AppEmptyState v-else-if="error" state="error" @retry="fetchAll()" />
 
     <!-- Content -->
     <template v-else>
@@ -29,6 +29,7 @@
 import { ref, onMounted, watch, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAnalyticsStore } from '../stores/analytics'
+import { useLiveRefresh } from '../composables/useLiveRefresh'
 import StatCards from '../components/analytics/StatCards.vue'
 import TeamLoadTable from '../components/analytics/TeamLoadTable.vue'
 import ProjectDistribution from '../components/analytics/ProjectDistribution.vue'
@@ -53,6 +54,9 @@ watch(distribution, () => {
     distRef.value?.renderCharts(distribution.value)
   })
 }, { deep: true })
+
+// Changes from a sync or from other users appear without a reload
+useLiveRefresh(() => fetchAll({ silent: true }))
 
 onMounted(async () => {
   await fetchAll()

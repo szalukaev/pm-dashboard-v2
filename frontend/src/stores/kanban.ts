@@ -51,25 +51,35 @@ export const useKanbanStore = defineStore('kanban', () => {
     axios.put('/api/settings', fields).catch(() => {})
   }
 
-  async function fetchBoard() {
+  // Only the latest request may update the board.
+  let boardRequest = 0
+
+  // silent: refresh in the background, without the spinner and without
+  // replacing the board by an error if the request fails.
+  async function fetchBoard(opts: { silent?: boolean } = {}) {
+    const silent = opts.silent === true
+    const requestId = ++boardRequest
     // By statuses the board needs a project; the view asks to choose one
     if (mode.value === 'statuses' && !projectId.value) {
       columns.value = []
       total.value = 0
       return
     }
-    loading.value = true
-    error.value = ''
+    if (!silent) {
+      loading.value = true
+      error.value = ''
+    }
     try {
       const params: Record<string, string> = { mode: mode.value }
       if (projectId.value) params.project_id = projectId.value
       const { data } = await axios.get('/api/kanban/board', { params })
+      if (requestId !== boardRequest) return
       columns.value = data.columns || []
       total.value = data.total || 0
     } catch {
-      error.value = i18n.global.t('kanban.load_error')
+      if (requestId === boardRequest && !silent) error.value = i18n.global.t('kanban.load_error')
     } finally {
-      loading.value = false
+      if (requestId === boardRequest) loading.value = false
     }
   }
 

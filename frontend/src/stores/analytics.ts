@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import axios from 'axios'
+import i18n from '../i18n'
 
 export interface StatCard {
   label: string
@@ -43,9 +44,13 @@ export const useAnalyticsStore = defineStore('analytics', () => {
   const loading = ref(false)
   const error = ref('')
 
-  async function fetchAll() {
-    loading.value = true
-    error.value = ''
+  // silent: refresh in the background, without the loading skeleton.
+  async function fetchAll(opts: { silent?: boolean } = {}) {
+    const silent = opts.silent === true
+    if (!silent) {
+      loading.value = true
+      error.value = ''
+    }
     try {
       await Promise.all([
         fetchStats(),
@@ -54,9 +59,9 @@ export const useAnalyticsStore = defineStore('analytics', () => {
         fetchDeadlines(),
       ])
     } catch {
-      error.value = 'Не удалось загрузить данные'
+      if (!silent) error.value = i18n.global.t('common.error')
     } finally {
-      loading.value = false
+      if (!silent) loading.value = false
     }
   }
 
