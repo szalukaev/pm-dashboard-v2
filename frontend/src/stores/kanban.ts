@@ -74,28 +74,33 @@ export const useKanbanStore = defineStore('kanban', () => {
   }
 
   async function moveCard(issueId: number, targetId: string) {
-    // Optimistic update
     const card = findCard(issueId)
     const sourceCol = findColumnWithCard(issueId)
+    const targetCol = columns.value.find(c => c.id === targetId)
+    if (!card || !sourceCol || !targetCol || sourceCol.id === targetId) return
 
-    if (sourceCol?.id === targetId) return
+    const { toast, showChange } = useSwal()
+    const t = i18n.global.t
+    const byStatuses = mode.value === 'statuses'
+    const columnTitle = (col: KanbanColumn) => (col.id === UNASSIGNED ? t('kanban.unassigned') : col.name)
 
-    if (card && sourceCol) {
-      // Remove from source
-      sourceCol.tasks = sourceCol.tasks.filter(t => t.external_id !== issueId)
-      // Find target column
-      const targetCol = columns.value.find(c => c.id === targetId)
-      if (targetCol) {
-        targetCol.tasks.push(card)
-        // The card itself shows status and assignee
-        if (mode.value === 'statuses') {
-          card.status_id = Number(targetCol.id)
-          card.status_name = targetCol.name
-        } else {
-          card.assigned_to_id = targetCol.id === UNASSIGNED ? null : Number(targetCol.id)
-          card.assigned_to_name = targetCol.name
-        }
-      }
+    // Optimistic update; everything needed to undo it is kept
+    const sourceIndex = sourceCol.tasks.indexOf(card)
+    const before = {
+      status_id: card.status_id,
+      status_name: card.status_name,
+      assigned_to_id: card.assigned_to_id,
+      assigned_to_name: card.assigned_to_name,
+    }
+    sourceCol.tasks.splice(sourceIndex, 1)
+    targetCol.tasks.push(card)
+    // The card itself shows status and assignee
+    if (byStatuses) {
+      card.status_id = Number(targetCol.id)
+      card.status_name = targetCol.name
+    } else {
+      card.assigned_to_id = targetCol.id === UNASSIGNED ? null : Number(targetCol.id)
+      card.assigned_to_name = targetCol.name
     }
 
     try {
@@ -104,11 +109,18 @@ export const useKanbanStore = defineStore('kanban', () => {
         target_id: targetId,
         mode: mode.value,
       })
+      showChange(
+        columnTitle(sourceCol),
+        columnTitle(targetCol),
+        `#${issueId} — ${t(byStatuses ? 'tasks.fields.status' : 'tasks.fields.assignee')}`,
+      )
     } catch (e: any) {
-      // The data source did not take the change: put the card back and say why
-      await fetchBoard()
-      const { toast } = useSwal()
-      const t = i18n.global.t
+      // The data source did not take the change: put just this card back
+      // where it was (no board reload) and say why
+      Object.assign(card, before)
+      const at = targetCol.tasks.indexOf(card)
+      if (at >= 0) targetCol.tasks.splice(at, 1)
+      sourceCol.tasks.splice(Math.min(sourceIndex, sourceCol.tasks.length), 0, card)
       const data = e?.response?.data || {}
       const message = data.error === 'REDMINE_CHANGE_REJECTED' ? t('kanban.move_rejected')
         : data.error === 'REDMINE_UPDATE_FAILED' ? t('kanban.move_redmine_error', { message: data.message || '' })
