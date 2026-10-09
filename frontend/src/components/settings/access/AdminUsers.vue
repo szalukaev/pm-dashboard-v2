@@ -366,6 +366,7 @@ function summary(p: Permissions): string {
     p.all_projects ? t('access.summary.all_projects') : t('access.summary.projects', { n: p.project_ids.length }),
     p.all_team ? t('access.summary.all_team') : t('access.summary.team', { n: p.team_ids.length }),
   ]
+  if (p.show_unassigned) parts.push(t('access.summary.unassigned'))
   if (p.from_source) parts.push(t('access.summary.from_source'))
   if (p.own_tasks_only) parts.push(t('access.summary.own_tasks'))
   if (p.read_only) parts.push(t('access.summary.read_only'))

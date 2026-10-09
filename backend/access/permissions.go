@@ -24,6 +24,8 @@ type Permissions struct {
 	// AllProjects / AllTeam: everything, the lists are ignored.
 	AllProjects bool `json:"all_projects"`
 	AllTeam     bool `json:"all_team"`
+	// ShowUnassigned: issues without an assignee are visible too.
+	ShowUnassigned bool `json:"show_unassigned"`
 	// OwnTasksOnly adds the issues assigned to the user themselves.
 	OwnTasksOnly bool `json:"own_tasks_only"`
 	// ReadOnly: data may be viewed but not changed.
@@ -38,7 +40,7 @@ type Permissions struct {
 
 // Columns is the list of permission columns shared by user_permissions,
 // group_permissions and role_templates, in the order Scan and Values use.
-const Columns = "project_ids, team_ids, visible_tabs, widgets, all_projects, all_team, own_tasks_only, read_only, from_source"
+const Columns = "project_ids, team_ids, visible_tabs, widgets, all_projects, all_team, own_tasks_only, read_only, from_source, show_unassigned"
 
 // rawPermissions receives the permission columns of a row.
 type rawPermissions struct {
@@ -49,7 +51,7 @@ type rawPermissions struct {
 // dest returns the scan destinations for Columns.
 func (r *rawPermissions) dest() []interface{} {
 	return []interface{}{&r.projects, &r.team, &r.tabs, &r.widgets,
-		&r.p.AllProjects, &r.p.AllTeam, &r.p.OwnTasksOnly, &r.p.ReadOnly, &r.p.FromSource}
+		&r.p.AllProjects, &r.p.AllTeam, &r.p.OwnTasksOnly, &r.p.ReadOnly, &r.p.FromSource, &r.p.ShowUnassigned}
 }
 
 func (r *rawPermissions) permissions() Permissions {
@@ -85,7 +87,7 @@ func (p Permissions) Values() []interface{} {
 		data, _ := json.Marshal(*p.Widgets)
 		widgets = data
 	}
-	return []interface{}{projects, team, tabs, widgets, p.AllProjects, p.AllTeam, p.OwnTasksOnly, p.ReadOnly, p.FromSource}
+	return []interface{}{projects, team, tabs, widgets, p.AllProjects, p.AllTeam, p.OwnTasksOnly, p.ReadOnly, p.FromSource, p.ShowUnassigned}
 }
 
 // Normalized returns the set with sorted lists without duplicates, non-nil
@@ -108,6 +110,7 @@ func union(sets ...Permissions) Permissions {
 		result.TeamIDs = append(result.TeamIDs, s.TeamIDs...)
 		result.AllProjects = result.AllProjects || s.AllProjects
 		result.AllTeam = result.AllTeam || s.AllTeam
+		result.ShowUnassigned = result.ShowUnassigned || s.ShowUnassigned
 		result.VisibleTabs = unionKeys(result.VisibleTabs, s.VisibleTabs)
 		result.Widgets = unionKeys(result.Widgets, s.Widgets)
 	}

@@ -10,7 +10,12 @@ import (
 //
 // The user's own set is the individual one, or the role template when rights
 // are not set individually, or the default — own tasks only. Groups add to
-// it. Individually set tabs and widgets override whatever groups give.
+// it.
+//
+// Tabs and widgets are not summed with the user's own: a group that sets
+// them has priority, so that a group can hide a tab from its members
+// whatever their own rights say. Several such groups are summed with each
+// other; a group that leaves them at "everything" has no say.
 func effective(individual, template *Permissions, groups []Permissions) Permissions {
 	own := Permissions{OwnTasksOnly: true}
 	sets := groups
@@ -24,16 +29,32 @@ func effective(individual, template *Permissions, groups []Permissions) Permissi
 	}
 
 	result := union(sets...)
-	if individual != nil && individual.VisibleTabs != nil {
-		result.VisibleTabs = individual.VisibleTabs
-	}
-	if individual != nil && individual.Widgets != nil {
-		result.Widgets = individual.Widgets
-	}
+	result.VisibleTabs = groupKeys(groups, func(p Permissions) *[]string { return p.VisibleTabs }, own.VisibleTabs)
+	result.Widgets = groupKeys(groups, func(p Permissions) *[]string { return p.Widgets }, own.Widgets)
 	result.OwnTasksOnly = own.OwnTasksOnly
 	result.ReadOnly = own.ReadOnly
 	result.FromSource = own.FromSource
 	return result.Normalized()
+}
+
+// groupKeys returns the tabs or widgets (picked by get) the groups set: the
+// sum over the groups that set them at all, or own when no group does.
+func groupKeys(groups []Permissions, get func(Permissions) *[]string, own *[]string) *[]string {
+	var result *[]string
+	for _, g := range groups {
+		keys := get(g)
+		if keys == nil {
+			continue
+		}
+		if result == nil {
+			result = &[]string{}
+		}
+		*result = append(*result, *keys...)
+	}
+	if result == nil {
+		return own
+	}
+	return result
 }
 
 // Scope is what one user may see right now: the maximum set by the
@@ -58,6 +79,9 @@ type Scope struct {
 	Projects    []int
 	AllTeam     bool
 	Team        []int
+
+	// ShowUnassigned: issues without an assignee are visible.
+	ShowUnassigned bool
 
 	// OwnMember: issues assigned to this member are visible regardless of
 	// the lists above ("own tasks").
@@ -85,7 +109,9 @@ func newScope(userID int, admin bool, perms Permissions, facts userFacts) *Scope
 	if admin {
 		// An administrator sees everything and is never restricted.
 		s.AllowedAllProjects, s.AllowedAllTeam = true, true
+		s.ShowUnassigned = true
 	} else {
+		s.ShowUnassigned = perms.ShowUnassigned
 		s.ReadOnly = perms.ReadOnly
 		s.VisibleTabs, s.Widgets = perms.VisibleTabs, perms.Widgets
 		s.AllowedAllProjects, s.AllowedProjects = perms.AllProjects, perms.ProjectIDs
@@ -157,9 +183,16 @@ func (s *Scope) issueCond(alias string, args *[]interface{}, allProjects bool, p
 	if !allProjects {
 		add(alias + "project_id = ANY(" + placeholder(pq.Array(projects)) + ")")
 	}
-	if !allTeam {
-		// Issues without an assignee belong to nobody's team and stay visible.
-		add("(" + alias + "assigned_to_id IS NULL OR " + alias + "assigned_to_id = ANY(" + placeholder(pq.Array(team)) + "))")
+	// Issues without an assignee belong to nobody's team: they are shown
+	// only to those given the right to see them.
+	assignee := alias + "assigned_to_id"
+	switch {
+	case !allTeam && s.ShowUnassigned:
+		add("(" + assignee + " IS NULL OR " + assignee + " = ANY(" + placeholder(pq.Array(team)) + "))")
+	case !allTeam:
+		add(assignee + " = ANY(" + placeholder(pq.Array(team)) + ")")
+	case !s.ShowUnassigned:
+		add(assignee + " IS NOT NULL")
 	}
 	if cond == "" {
 		return "TRUE"

@@ -7,6 +7,8 @@ export interface Permissions {
   // Everything, the lists are ignored
   all_projects: boolean
   all_team: boolean
+  // Issues without an assignee are visible too
+  show_unassigned: boolean
   // Plus the issues assigned to the user themselves
   own_tasks_only: boolean
   // Data may be viewed but not changed
@@ -54,6 +56,7 @@ export function emptyPermissions(): Permissions {
     team_ids: [],
     all_projects: false,
     all_team: false,
+    show_unassigned: false,
     own_tasks_only: false,
     read_only: false,
     from_source: false,

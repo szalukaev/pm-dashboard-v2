@@ -86,6 +86,11 @@
             <div v-if="!visibleMembers.length" class="adm-empty">{{ $t('access.editor.nothing_found') }}</div>
           </div>
         </template>
+        <!-- Issues assigned to nobody are a right of their own -->
+        <label class="adm-check perm-unassigned" :title="$t('access.editor.show_unassigned_hint')">
+          <input type="checkbox" v-model="model.show_unassigned" data-testid="perm-show-unassigned" />
+          {{ $t('access.editor.show_unassigned') }}
+        </label>
       </div>
     </div>
 
@@ -229,6 +234,10 @@ function toggleAll(field: 'visible_tabs' | 'widgets', all: string[], e: Event) {
 
 .perm-note {
   margin-top: 6px;
+}
+
+.perm-unassigned {
+  margin-top: 10px;
 }
 
 .adm-pick-item.inherited {

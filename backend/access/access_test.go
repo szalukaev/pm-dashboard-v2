@@ -41,14 +41,47 @@ func TestEffective(t *testing.T) {
 		}
 	})
 
-	t.Run("individual rights add to groups, individual tabs win", func(t *testing.T) {
+	t.Run("individual rights add to groups, group tabs have priority", func(t *testing.T) {
 		individual := Permissions{ProjectIDs: []int{9}, VisibleTabs: keys("analytics")}
 		got := effective(&individual, nil, []Permissions{groupA})
 		if !reflect.DeepEqual(got.ProjectIDs, []int{1, 2, 9}) {
 			t.Errorf("projects = %v", got.ProjectIDs)
 		}
-		if !reflect.DeepEqual(*got.VisibleTabs, []string{"analytics"}) {
-			t.Errorf("tabs = %v", *got.VisibleTabs)
+		if !reflect.DeepEqual(*got.VisibleTabs, []string{"tasks"}) {
+			t.Errorf("tabs = %v, want the group's", *got.VisibleTabs)
+		}
+	})
+
+	t.Run("a group hides tabs from a user who has all of them", func(t *testing.T) {
+		template := Permissions{AllProjects: true} // tabs: everything
+		got := effective(nil, &template, []Permissions{groupA})
+		if got.VisibleTabs == nil || !reflect.DeepEqual(*got.VisibleTabs, []string{"tasks"}) {
+			t.Errorf("tabs = %v, want [tasks]", got.VisibleTabs)
+		}
+	})
+
+	t.Run("a group that sets no tabs or widgets has no say in them", func(t *testing.T) {
+		individual := Permissions{VisibleTabs: keys("analytics"), Widgets: keys("stats")}
+		silent := Permissions{ProjectIDs: []int{1}}
+		got := effective(&individual, nil, []Permissions{silent})
+		if !reflect.DeepEqual(*got.VisibleTabs, []string{"analytics"}) || !reflect.DeepEqual(*got.Widgets, []string{"stats"}) {
+			t.Errorf("tabs = %v, widgets = %v, want the user's own", *got.VisibleTabs, *got.Widgets)
+		}
+		// Only the group that sets widgets decides them
+		withWidgets := Permissions{Widgets: keys("deadlines")}
+		got = effective(&individual, nil, []Permissions{silent, withWidgets})
+		if !reflect.DeepEqual(*got.Widgets, []string{"deadlines"}) || !reflect.DeepEqual(*got.VisibleTabs, []string{"analytics"}) {
+			t.Errorf("tabs = %v, widgets = %v", *got.VisibleTabs, *got.Widgets)
+		}
+	})
+
+	t.Run("unassigned issues: any source may give the right", func(t *testing.T) {
+		if effective(nil, nil, nil).ShowUnassigned {
+			t.Error("off by default")
+		}
+		got := effective(&Permissions{}, nil, []Permissions{{ShowUnassigned: true}})
+		if !got.ShowUnassigned {
+			t.Error("a group must be able to give the right")
 		}
 	})
 
@@ -104,7 +137,7 @@ func TestScope(t *testing.T) {
 		s := newScope(2, false, effective(nil, nil, nil), userFacts{memberID: &member})
 		var args []interface{}
 		cond := s.IssueCond("i.", &args)
-		want := "((i.project_id = ANY($1) AND (i.assigned_to_id IS NULL OR i.assigned_to_id = ANY($2))) OR i.assigned_to_id = $3)"
+		want := "((i.project_id = ANY($1) AND i.assigned_to_id = ANY($2)) OR i.assigned_to_id = $3)"
 		if cond != want || len(args) != 3 || args[2] != member {
 			t.Errorf("condition = %q, args = %v", cond, args)
 		}
@@ -116,7 +149,7 @@ func TestScope(t *testing.T) {
 	t.Run("own tasks without a linked member: nothing", func(t *testing.T) {
 		s := newScope(2, false, effective(nil, nil, nil), userFacts{})
 		var args []interface{}
-		if cond := s.IssueCond("", &args); cond != "(project_id = ANY($1) AND (assigned_to_id IS NULL OR assigned_to_id = ANY($2)))" {
+		if cond := s.IssueCond("", &args); cond != "(project_id = ANY($1) AND assigned_to_id = ANY($2))" {
 			t.Errorf("condition = %q", cond)
 		}
 	})
@@ -128,7 +161,7 @@ func TestScope(t *testing.T) {
 			t.Errorf("scope = %+v", s)
 		}
 		args := []interface{}{"existing"}
-		if cond := s.IssueCond("", &args); cond != "(project_id = ANY($2))" || len(args) != 2 {
+		if cond := s.IssueCond("", &args); cond != "(project_id = ANY($2) AND assigned_to_id IS NOT NULL)" || len(args) != 2 {
 			t.Errorf("condition = %q, args = %d", cond, len(args))
 		}
 		if !s.AllowsProject(3) || s.ShowsProject(3) || s.AllowsProject(99) {
@@ -136,6 +169,29 @@ func TestScope(t *testing.T) {
 		}
 		if !reflect.DeepEqual(s.FilterProjects([]int{3, 99, 1}), []int{1, 3}) {
 			t.Errorf("FilterProjects = %v", s.FilterProjects([]int{3, 99, 1}))
+		}
+	})
+
+	t.Run("issues without an assignee", func(t *testing.T) {
+		cond := func(p Permissions) string {
+			var args []interface{}
+			return newScope(6, false, p, userFacts{}).IssueCond("", &args)
+		}
+		tests := []struct {
+			name  string
+			perms Permissions
+			want  string
+		}{
+			{"everything, unassigned hidden", Permissions{AllProjects: true, AllTeam: true}, "(assigned_to_id IS NOT NULL)"},
+			{"everything, unassigned shown", Permissions{AllProjects: true, AllTeam: true, ShowUnassigned: true}, "TRUE"},
+			{"a team, unassigned hidden", Permissions{AllProjects: true, TeamIDs: []int{1}}, "(assigned_to_id = ANY($1))"},
+			{"a team, unassigned shown", Permissions{AllProjects: true, TeamIDs: []int{1}, ShowUnassigned: true},
+				"((assigned_to_id IS NULL OR assigned_to_id = ANY($1)))"},
+		}
+		for _, tt := range tests {
+			if got := cond(tt.perms); got != tt.want {
+				t.Errorf("%s: condition = %q, want %q", tt.name, got, tt.want)
+			}
 		}
 	})
 

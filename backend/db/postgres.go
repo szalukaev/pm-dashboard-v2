@@ -112,7 +112,10 @@ func runFallbackMigrations(db *sql.DB) error {
 	if _, err := db.Exec(accessControlSQL); err != nil {
 		return err
 	}
-	_, err := db.Exec(rightsFromSourceSQL)
+	if _, err := db.Exec(rightsFromSourceSQL); err != nil {
+		return err
+	}
+	_, err := db.Exec(showUnassignedSQL)
 	return err
 }
 
@@ -124,6 +127,9 @@ var accessControlSQL string
 
 //go:embed migrations/007_rights_from_source.up.sql
 var rightsFromSourceSQL string
+
+//go:embed migrations/008_show_unassigned.up.sql
+var showUnassignedSQL string
 
 // fallbackMigrationSQL is kept as a safety net when migration files are not available
 const fallbackMigrationSQL = `

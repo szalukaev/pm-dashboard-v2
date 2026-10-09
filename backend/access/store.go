@@ -17,7 +17,7 @@ func Scan(scan func(dest ...interface{}) error, leading ...interface{}) (Permiss
 
 // assignments returns "col = $n, …" for Columns, placeholders starting at first.
 func assignments(first int) string {
-	names := []string{"project_ids", "team_ids", "visible_tabs", "widgets", "all_projects", "all_team", "own_tasks_only", "read_only", "from_source"}
+	names := []string{"project_ids", "team_ids", "visible_tabs", "widgets", "all_projects", "all_team", "own_tasks_only", "read_only", "from_source", "show_unassigned"}
 	result := ""
 	for i, name := range names {
 		if i > 0 {
@@ -33,7 +33,7 @@ func assignments(first int) string {
 func Save(db *sql.DB, table, keyColumn string, id int, p Permissions) error {
 	args := append([]interface{}{id}, p.Values()...)
 	_, err := db.Exec(`INSERT INTO `+table+` (`+keyColumn+`, `+Columns+`)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		ON CONFLICT (`+keyColumn+`) DO UPDATE SET `+assignments(2), args...)
 	return err
 }
