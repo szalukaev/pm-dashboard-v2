@@ -237,24 +237,9 @@ func (h *AnalyticsHandler) GetDeadlines(w http.ResponseWriter, r *http.Request) 
 	projects := h.getSelectedProjects(userID)
 	projectFilter, args := h.buildProjectFilter(projects, 1)
 	today := time.Now()
-	todayStr := today.Format("2006-01-02")
-	threeDays := today.AddDate(0, 0, 3).Format("2006-01-02")
-	week := today.AddDate(0, 0, 7).Format("2006-01-02")
 
-	// All open tasks with due dates
+	// All tasks that are not closed and have a due date
 	q := `SELECT external_id, project_id, project_name, subject, '',
-		status_name, status_id, priority_name, priority_id,
-		assigned_to_name, assigned_to_id, category_name,
-		start_date, due_date, estimated_hours, spent_hours,
-		done_ratio, tracker_name, author_name, COALESCE(bug_fix_hours, 0)
-		FROM issues WHERE ` + projectFilter + `
-		AND due_date IS NOT NULL
-		AND ` + statusNotIn("status_id", GroupClosed) + `
-		ORDER BY due_date ASC`
-
-	// Add today as arg for deadline comparison
-	argIdx := len(args) + 1
-	q = `SELECT external_id, project_id, project_name, subject, '',
 		status_name, status_id, priority_name, priority_id,
 		assigned_to_name, assigned_to_id, category_name,
 		start_date, due_date, estimated_hours, spent_hours,
@@ -265,7 +250,6 @@ func (h *AnalyticsHandler) GetDeadlines(w http.ResponseWriter, r *http.Request) 
 		AND ` + statusNotIn("status_id", GroupClosed) + `
 		ORDER BY due_date ASC`
 
-	_ = argIdx
 	rows, err := (*h.DB).Query(q, args...)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
@@ -296,22 +280,14 @@ func (h *AnalyticsHandler) GetDeadlines(w http.ResponseWriter, r *http.Request) 
 		if t.DueDate == nil {
 			continue
 		}
-		dueDate := *t.DueDate
-
-		switch {
-		case dueDate < todayStr:
-			groups["overdue"].Tasks = append(groups["overdue"].Tasks, t)
-		case dueDate == todayStr:
-			groups["today"].Tasks = append(groups["today"].Tasks, t)
-		case dueDate <= threeDays:
-			groups["three_days"].Tasks = append(groups["three_days"].Tasks, t)
-		case dueDate <= week:
-			groups["week"].Tasks = append(groups["week"].Tasks, t)
+		if g, ok := groups[deadlineBucket(*t.DueDate, today)]; ok {
+			g.Tasks = append(g.Tasks, t)
 		}
 	}
 
 	result := []DeadlineGroup{}
-	for _, g := range groups {
+	for _, name := range deadlineOrder {
+		g := groups[name]
 		if g.Tasks == nil {
 			g.Tasks = []DeadlineTask{}
 		}
@@ -322,6 +298,30 @@ func (h *AnalyticsHandler) GetDeadlines(w http.ResponseWriter, r *http.Request) 
 }
 
 // Helpers
+
+// deadlineOrder is the order of the deadline columns on the screen.
+var deadlineOrder = []string{"overdue", "today", "three_days", "week"}
+
+// deadlineBucket returns the deadline column of a due date (YYYY-MM-DD, a
+// longer timestamp is cut), or "" when it is more than a week away:
+// overdue — before today, three_days — the next 3 days, week — days 4 to 7.
+func deadlineBucket(dueDate string, today time.Time) string {
+	if len(dueDate) > 10 {
+		dueDate = dueDate[:10]
+	}
+	day := func(offset int) string { return today.AddDate(0, 0, offset).Format("2006-01-02") }
+	switch {
+	case dueDate < day(0):
+		return "overdue"
+	case dueDate == day(0):
+		return "today"
+	case dueDate <= day(3):
+		return "three_days"
+	case dueDate <= day(7):
+		return "week"
+	}
+	return ""
+}
 
 func (h *AnalyticsHandler) getSelectedProjects(userID int) []int64 {
 	var spJSON []byte
