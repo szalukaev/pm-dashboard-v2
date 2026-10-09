@@ -397,7 +397,7 @@
       "run_error": "Failed to start synchronization",
       "col_time": "Date/time",
       "col_duration": "Duration",
-      "col_issues": "Tasks collected",
+      "col_issues": "Issues changed",
       "col_status": "Status",
       "col_error": "Error",
       "status_success": "success",
@@ -405,7 +405,11 @@
       "status_error": "error",
       "empty": "No synchronization runs yet",
       "ms": "ms",
-      "sec": "s"
+      "sec": "s",
+      "status_partial": "with errors",
+      "status_stopped": "stopped",
+      "partial_error": "Projects not updated: {failed} of {total}",
+      "total_issues": "Issues in the database: {count}"
     },
     "priorities": {
       "title": "Priority order",
@@ -428,6 +432,26 @@
       "admin_hint": "Click a status, then a column to move it. The bug icon marks a status as Bugs — such tasks are counted in the Bugs figures in Analytics.",
       "readonly_hint": "Only an administrator can change status groups.",
       "save_error": "Failed to save the change"
+    },
+    "retention": {
+      "title": "Data management",
+      "hint": "Every day the system saves a snapshot: the totals per member and the state of the issues. The history and the trend charts are built from the snapshots. Here you set for how many days to keep it.",
+      "stored": "Snapshots stored: {rows} over {days} days — from {from} to {to}",
+      "stored_none": "No snapshots yet: the first one appears after the next synchronization.",
+      "days": "Keep snapshots (days)",
+      "auto": "Enable automatic cleanup (daily at {time})",
+      "cleanup_now": "Clean up now",
+      "purge": "Delete all snapshots",
+      "days_invalid": "The retention is a whole number from {min} to {max} days",
+      "saved": "Retention settings saved",
+      "save_error": "Could not save the retention settings",
+      "deleted": "Rows deleted: {count}",
+      "already_running": "A cleanup is already running",
+      "cleanup_error": "The cleanup failed",
+      "cleanup_confirm_title": "Delete old snapshots?",
+      "cleanup_confirm_text": "Snapshots older than {days} days will be deleted. This cannot be undone.",
+      "purge_confirm_title": "Delete all snapshots?",
+      "purge_confirm_text": "The whole history will be lost: the trend charts will start from scratch. Current issues are not affected. This cannot be undone."
     }
   },
   "access": {
@@ -437,7 +461,8 @@
       "users": "Users",
       "groups": "Groups",
       "templates": "Role templates",
-      "data": "Statuses and priorities"
+      "data": "Statuses and priorities",
+      "workers": "Workers"
     },
     "widgets": {
       "stats": "Project statistics",
@@ -720,5 +745,63 @@
     "forbidden": "Access denied",
     "network": "Network error",
     "timeout": "Request timed out"
+  },
+  "workers": {
+    "title": "Workers",
+    "hint": "The background jobs of the system: when they ran, how long they took and how they ended. Schedules follow the time of the server.",
+    "server_time": "Server time: {time} ({zone})",
+    "col_worker": "Worker",
+    "col_status": "Status",
+    "col_last_start": "Last run",
+    "col_duration": "Duration",
+    "col_processed": "Processed",
+    "col_actions": "Actions",
+    "names": {
+      "sync": "Data collection (Redmine)",
+      "cleanup": "Snapshot cleanup"
+    },
+    "states": {
+      "working": "Working",
+      "stopped": "Stopped",
+      "error": "Error",
+      "starting": "Starting"
+    },
+    "processed": {
+      "sync": "{count} issues",
+      "cleanup": "{count} deleted"
+    },
+    "schedule_sync": "every {minutes} min; full synchronization at {time}",
+    "schedule_cleanup": "daily at {time}; keep {days} days",
+    "run_now": "Run now",
+    "run_full": "Full synchronization now",
+    "stop": "Stop",
+    "enable": "Enable",
+    "disable": "Disable",
+    "schedule": "Configure schedule",
+    "schedule_title": "Schedule: {name}",
+    "interval": "Interval, min",
+    "full_sync_time": "Time of the full synchronization",
+    "cleanup_time": "Cleanup time",
+    "full_sync_hint": "Between full passes only changes are fetched, which takes seconds. Once a day after this time every project is re-read completely: this picks up issues deleted in Redmine and time logged for past dates. A full pass takes minutes.",
+    "cleanup_hint": "At this time every day the snapshots older than the retention are deleted. A failed cleanup is repeated in an hour.",
+    "started": "The worker is started",
+    "schedule_saved": "Schedule saved",
+    "schedule_error": "Could not save the schedule",
+    "action_error": "The action failed",
+    "load_error": "Could not load the state of the workers",
+    "partial": "Projects not updated: {failed} of {total}",
+    "duration_ms": "{ms} ms",
+    "duration_sec": "{sec} s",
+    "duration_min": "{min} min {sec} s",
+    "errors": {
+      "SYNC_ALREADY_RUNNING": "A synchronization is already running",
+      "DATA_SOURCE_NOT_CONFIGURED": "The data source is not configured",
+      "READ_ONLY_MODE": "The system is in read-only mode",
+      "WORKER_NOT_RUNNING": "The worker is not running now",
+      "CLEANUP_ALREADY_RUNNING": "A cleanup is already running",
+      "CLEANUP_FAILED": "The cleanup failed",
+      "INVALID_INTERVAL": "The interval is out of range",
+      "INVALID_TIME": "Enter the time as HH:MM"
+    }
   }
 }

@@ -24,6 +24,8 @@
       </label>
     </div>
 
+    <p class="total-issues" data-testid="sync-total-issues">{{ $t('settings.sync.total_issues', { count: totalIssues.toLocaleString() }) }}</p>
+
     <table class="sync-table">
       <thead>
         <tr>
@@ -42,8 +44,8 @@
           <td>
             <span class="status-badge" :class="log.status">{{ statusLabel(log.status) }}</span>
           </td>
-          <td class="error-cell" :title="log.error_text || undefined">
-            {{ log.error_text ? truncate(log.error_text, 60) : '—' }}
+          <td class="error-cell" :title="errorText(log) || undefined">
+            {{ errorText(log) ? truncate(errorText(log), 60) : '—' }}
           </td>
         </tr>
       </tbody>
@@ -52,6 +54,8 @@
     <div v-if="logs.length === 0" class="empty-hint">
       {{ $t('settings.sync.empty') }}
     </div>
+
+    <SettingsDataRetention />
   </div>
 </template>
 
@@ -63,6 +67,7 @@ import { RefreshCw } from 'lucide-vue-next'
 import { useSwal } from '../../composables/useSwal'
 import { useWebSocket } from '../../composables/useWebSocket'
 import AppButton from '../ui/AppButton.vue'
+import SettingsDataRetention from './SettingsDataRetention.vue'
 
 interface SyncLog {
   id: number
@@ -78,6 +83,8 @@ const { t, te, locale } = useI18n()
 const { toast } = useSwal()
 
 const logs = ref<SyncLog[]>([])
+// How many issues there are in all; an entry of the log counts what one sync brought
+const totalIssues = ref(0)
 const syncing = ref(false)
 
 // Interval between periodic syncs, minutes
@@ -122,7 +129,18 @@ async function loadLogs() {
   try {
     const { data } = await axios.get('/api/admin/sync-log')
     logs.value = data.logs || []
+    totalIssues.value = data.total_issues || 0
   } catch {}
+}
+
+// A sync that finished but could not read some projects keeps their number
+// as "<failed>/<total>"
+function errorText(log: SyncLog): string {
+  if (log.status === 'partial' && log.error_text) {
+    const [failed, total] = log.error_text.split('/')
+    return t('settings.sync.partial_error', { failed, total })
+  }
+  return log.error_text || ''
 }
 
 async function runSync() {
@@ -275,6 +293,32 @@ onUnmounted(() => off('sync-status', loadLogs))
 .status-badge.error {
   background: var(--danger)22;
   color: var(--danger);
+}
+
+.status-badge.success {
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+}
+
+.status-badge.running,
+.status-badge.partial {
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  color: var(--warning);
+}
+
+.status-badge.error {
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+}
+
+.status-badge.stopped {
+  background: var(--tag-bg);
+  color: var(--text-muted);
+}
+
+.total-issues {
+  margin: 16px 0 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .error-cell {

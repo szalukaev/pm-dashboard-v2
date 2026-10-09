@@ -23,6 +23,7 @@
     <AdminUsers v-if="activeTab === 'users'" :projects="projects" :members="members" />
     <AdminGroups v-else-if="activeTab === 'groups'" :projects="projects" :members="members" />
     <AdminTemplates v-else-if="activeTab === 'templates'" :projects="projects" :members="members" />
+    <AdminWorkers v-else-if="activeTab === 'workers'" />
 
     <!-- Settings of the data shared by all users -->
     <template v-else>
@@ -80,6 +81,7 @@ import { useI18n } from 'vue-i18n'
 import SettingsStatusGroups from './SettingsStatusGroups.vue'
 import AdminUsers from './access/AdminUsers.vue'
 import AdminGroups from './access/AdminGroups.vue'
+import AdminWorkers from './access/AdminWorkers.vue'
 import AdminTemplates from './access/AdminTemplates.vue'
 import { useSwal } from '../../composables/useSwal'
 import type { ProjectItem, MemberItem } from '../../utils/access'
@@ -91,7 +93,7 @@ interface Priority {
   color: string
 }
 
-const tabs = ['users', 'groups', 'templates', 'data'] as const
+const tabs = ['users', 'groups', 'templates', 'data', 'workers'] as const
 const activeTab = ref<(typeof tabs)[number]>('users')
 
 const { t } = useI18n()
