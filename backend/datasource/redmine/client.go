@@ -1,6 +1,7 @@
 package redmine
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"strconv"
@@ -22,6 +23,24 @@ type Client struct {
 	BasicLogin string
 	BasicPass  string
 	HTTPClient *http.Client
+
+	// ctx, when set, bounds the list requests of this client: a sync that
+	// is stopped drops what it is waiting for.
+	ctx context.Context
+}
+
+// withContext returns a copy of the client whose requests end with ctx.
+func (c *Client) withContext(ctx context.Context) *Client {
+	bound := *c
+	bound.ctx = ctx
+	return &bound
+}
+
+func (c *Client) requestContext() context.Context {
+	if c.ctx != nil {
+		return c.ctx
+	}
+	return context.Background()
 }
 
 type projectResp struct {
@@ -236,7 +255,7 @@ func NewClient(baseURL, apiKey, basicLogin, basicPass string) *Client {
 
 func (c *Client) doRequest(path string) ([]byte, error) {
 	url := fmt.Sprintf("%s%s", c.BaseURL, path)
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(c.requestContext(), "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -357,8 +376,9 @@ func (c *Client) getPages(path string) ([][]byte, error) {
 			if err == nil {
 				return data, nil
 			}
-			// A refusal is an answer, not a failure: asking again changes nothing
-			if errors.Is(err, ErrForbidden) || errors.Is(err, ErrUnauthorized) {
+			// A refusal is an answer, not a failure: asking again changes
+			// nothing. Neither does it when the sync was stopped.
+			if errors.Is(err, ErrForbidden) || errors.Is(err, ErrUnauthorized) || c.requestContext().Err() != nil {
 				return nil, err
 			}
 			if attempt < pageAttempts {

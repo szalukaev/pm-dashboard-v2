@@ -1,6 +1,7 @@
 package redmine
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -11,6 +12,10 @@ import (
 
 	"github.com/lib/pq"
 )
+
+// DefaultFullSyncTime is when the daily complete pass starts unless set
+// otherwise: at night, when nobody waits for fresh data.
+const DefaultFullSyncTime = "03:00"
 
 const (
 	// fullSyncInterval: how often a project is re-read from Redmine
@@ -58,6 +63,51 @@ type syncStore interface {
 	cleanupUnselected(projectIDs []int) error
 }
 
+// syncStats is what a sync of issues did.
+type syncStats struct {
+	issues   int // issues written
+	deleted  int // issues removed because they are gone from the source
+	projects int // projects that were to be synced
+	failed   int // projects that could not be read
+}
+
+// ParseTimeOfDay reads "HH:MM".
+func ParseTimeOfDay(value string) (hour, minute int, ok bool) {
+	t, err := time.Parse("15:04", value)
+	if err != nil {
+		return 0, 0, false
+	}
+	return t.Hour(), t.Minute(), true
+}
+
+// lastScheduled returns the latest moment not after now when the clock
+// showed the given time of day.
+func lastScheduled(now time.Time, timeOfDay string) time.Time {
+	hour, minute, ok := ParseTimeOfDay(timeOfDay)
+	if !ok {
+		hour, minute, _ = ParseTimeOfDay(DefaultFullSyncTime)
+	}
+	at := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, now.Location())
+	if at.After(now) {
+		at = at.AddDate(0, 0, -1)
+	}
+	return at
+}
+
+// needsFull reports whether a project must be re-read completely: it was
+// never read, or its last complete read is older than the latest scheduled
+// time of the full pass. Without a schedule a full pass is due a day after
+// the previous one.
+func needsFull(state projectState, known bool, now time.Time, fullTime string) bool {
+	if !known {
+		return true
+	}
+	if fullTime == "" {
+		return now.Sub(state.lastFull) >= fullSyncInterval
+	}
+	return state.lastFull.Before(lastScheduled(now, fullTime))
+}
+
 // fullLoad is everything Redmine has for one project.
 type fullLoad struct {
 	projectID int
@@ -78,11 +128,13 @@ type fullLoad struct {
 //
 // The state is kept per project: a project that failed is read again next
 // time and does not make the others be re-read.
-func (s *Syncer) syncProjectIssues(store syncStore, projectIDs []int, started time.Time) error {
+func (s *Syncer) syncProjectIssues(ctx context.Context, store syncStore, projectIDs []int, started time.Time, fullTime string) (syncStats, error) {
+	var stats syncStats
 	states, err := store.loadStates()
 	if err != nil {
-		return fmt.Errorf("load sync state: %w", err)
+		return stats, fmt.Errorf("load sync state: %w", err)
 	}
+	forceFull := fullSyncRequested(ctx)
 
 	selected := make(map[int]bool, len(projectIDs))
 	var fullIDs, quickIDs []int
@@ -91,12 +143,13 @@ func (s *Syncer) syncProjectIssues(store syncStore, projectIDs []int, started ti
 			continue
 		}
 		selected[pid] = true
-		if st, known := states[pid]; known && started.Sub(st.lastFull) < fullSyncInterval {
-			quickIDs = append(quickIDs, pid)
-		} else {
+		if st, known := states[pid]; forceFull || needsFull(st, known, started, fullTime) {
 			fullIDs = append(fullIDs, pid)
+		} else {
+			quickIDs = append(quickIDs, pid)
 		}
 	}
+	stats.projects = len(selected)
 
 	var issues []Issue
 	seenIssues := make(map[int]bool)
@@ -117,7 +170,12 @@ func (s *Syncer) syncProjectIssues(store syncStore, projectIDs []int, started ti
 	failed += len(quickIDs) - len(quickDone)
 
 	// Complete loads, a few projects at a time
-	loads := s.loadFull(fullIDs)
+	loads := s.loadFull(ctx, fullIDs)
+	// A stopped sync keeps nothing of what it was in the middle of: the
+	// projects are read again next time.
+	if ctx.Err() != nil {
+		return stats, ctx.Err()
+	}
 	var complete []fullLoad
 	for _, load := range loads {
 		if load.err != nil {
@@ -144,7 +202,7 @@ func (s *Syncer) syncProjectIssues(store syncStore, projectIDs []int, started ti
 	for start := 0; start < len(issues); start += issueBatchSize {
 		end := min(start+issueBatchSize, len(issues))
 		if err := store.upsertIssues(issues[start:end]); err != nil {
-			return fmt.Errorf("upsert issues: %w", err)
+			return stats, fmt.Errorf("upsert issues: %w", err)
 		}
 	}
 
@@ -166,7 +224,7 @@ func (s *Syncer) syncProjectIssues(store syncStore, projectIDs []int, started ti
 		ids = append(ids, int64(id))
 	}
 	if err := store.updateIssueHours(ids); err != nil {
-		return fmt.Errorf("update issue hours: %w", err)
+		return stats, fmt.Errorf("update issue hours: %w", err)
 	}
 
 	// Everything is stored: the projects that were read move on
@@ -188,7 +246,8 @@ func (s *Syncer) syncProjectIssues(store syncStore, projectIDs []int, started ti
 	if err := store.cleanupUnselected(projectIDs); err != nil {
 		slog.Warn("Failed to cleanup unselected projects", "error", err)
 	}
-	return nil
+	stats.issues, stats.deleted, stats.failed = len(issues), deleted, failed
+	return stats, nil
 }
 
 // loadChanges fetches what changed in the given projects since their last
@@ -285,7 +344,7 @@ func (s *Syncer) loadChanges(store syncStore, projectIDs []int, selected map[int
 }
 
 // loadFull reads the given projects completely, fullSyncWorkers at a time.
-func (s *Syncer) loadFull(projectIDs []int) []fullLoad {
+func (s *Syncer) loadFull(ctx context.Context, projectIDs []int) []fullLoad {
 	loads := make([]fullLoad, len(projectIDs))
 	var wg sync.WaitGroup
 	slots := make(chan struct{}, fullSyncWorkers)
@@ -295,6 +354,10 @@ func (s *Syncer) loadFull(projectIDs []int) []fullLoad {
 		go func(i, pid int) {
 			defer wg.Done()
 			defer func() { <-slots }()
+			if ctx.Err() != nil {
+				loads[i] = fullLoad{projectID: pid, err: ctx.Err()}
+				return
+			}
 			loads[i] = s.loadProject(pid)
 		}(i, pid)
 	}

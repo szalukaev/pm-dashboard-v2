@@ -16,9 +16,11 @@ import (
 	"pm-dashboard/db"
 	"pm-dashboard/datasource/manager"
 	"pm-dashboard/handlers"
+	"pm-dashboard/jobs"
 	"pm-dashboard/license"
 	"pm-dashboard/middleware"
 	"pm-dashboard/secrets"
+	"pm-dashboard/snapshots"
 	"pm-dashboard/utils"
 
 	"github.com/gorilla/mux"
@@ -135,6 +137,26 @@ func main() {
 
 	// Real-time: the sync and user edits report changes to open pages
 	source.SetNotifier(wsHub.BroadcastEvent)
+
+	// The history: a snapshot of the day after every sync, and the daily
+	// cleanup of what is older than the retention.
+	jobSettings := &jobs.Settings{DB: &pgDB}
+	cleaner := jobs.NewCleaner(&pgDB, jobSettings, jobs.NewStore(redisURL))
+	cleaner.ReadOnly = func() bool { return !licenseSvc.Usable() || licenseSvc.IsReadOnly() }
+	cleaner.Notify = wsHub.BroadcastEvent
+	workersH := &handlers.WorkersHandler{DB: &pgDB, Source: source, Cleaner: cleaner, Settings: jobSettings, Events: wsHub.BroadcastEvent}
+	source.SetAfterSync(func() {
+		if pgDB == nil {
+			return
+		}
+		counts, err := snapshots.Record(pgDB, time.Now())
+		if err != nil {
+			slog.Error("Failed to record the snapshot of the day", "error", err)
+			return
+		}
+		slog.Info("Snapshot of the day recorded", "members", counts.Members, "issues_changed", counts.Issues)
+	})
+	go cleaner.Run(context.Background())
 	taskH.Events = wsHub.BroadcastEvent
 	kanbanH.Events = wsHub.BroadcastEvent
 	go source.Run(context.Background())
@@ -316,6 +338,17 @@ func main() {
 	admin.HandleFunc("/sync-settings", adminH.GetSyncSettings).Methods("GET")
 	admin.HandleFunc("/sync-settings", adminH.UpdateSyncSettings).Methods("PUT")
 	admin.HandleFunc("/audit-log", adminH.GetAuditLog).Methods("GET")
+	// Background workers and the history they collect
+	admin.HandleFunc("/workers", workersH.ListWorkers).Methods("GET")
+	admin.HandleFunc("/workers/{key}/run", workersH.RunWorker).Methods("POST")
+	admin.HandleFunc("/workers/{key}/stop", workersH.StopWorker).Methods("POST")
+	admin.HandleFunc("/workers/{key}/enable", workersH.EnableWorker).Methods("POST")
+	admin.HandleFunc("/workers/{key}/disable", workersH.DisableWorker).Methods("POST")
+	admin.HandleFunc("/workers/{key}/schedule", workersH.UpdateSchedule).Methods("PUT")
+	admin.HandleFunc("/data-retention", workersH.GetDataRetention).Methods("GET")
+	admin.HandleFunc("/data-retention", workersH.UpdateDataRetention).Methods("PUT")
+	admin.HandleFunc("/snapshots/cleanup", workersH.CleanupSnapshots).Methods("POST")
+	admin.HandleFunc("/snapshots/purge", workersH.PurgeSnapshots).Methods("POST")
 
 	// WebSocket (session cookie required — not public)
 	r.HandleFunc("/ws", middleware.RequireWSSession(sessionStore, wsHub.HandleWebSocket))

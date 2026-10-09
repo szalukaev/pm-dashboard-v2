@@ -108,7 +108,7 @@ func TestSyncReportsEvents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m.run(current)
+	m.run(current, false)
 
 	wantEvents := []string{"sync-status:running", "issues-changed", "collection-complete", "sync-status:success"}
 	if !reflect.DeepEqual(events, wantEvents) {
@@ -122,7 +122,7 @@ func TestSyncReportsEvents(t *testing.T) {
 	events = nil
 	s.pass, s.err = func() {}, errors.New("redmine is down")
 	current, _ = m.begin()
-	m.run(current)
+	m.run(current, false)
 	if want := []string{"sync-status:running", "sync-status:error"}; !reflect.DeepEqual(events, want) {
 		t.Errorf("events after a failure = %v, want %v", events, want)
 	}
@@ -195,5 +195,101 @@ func TestInterval(t *testing.T) {
 	store.Set(intervalKey, "garbage")
 	if got := m.Interval(); got != DefaultInterval {
 		t.Errorf("interval for a broken value = %d, want %d", got, DefaultInterval)
+	}
+}
+
+// waitingSyncer runs until its context ends and reports how it was called.
+type waitingSyncer struct {
+	started chan struct{}
+}
+
+func (s *waitingSyncer) SyncAll(ctx context.Context, _ **sql.DB) error {
+	s.started <- struct{}{}
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+func TestStopInterruptsRunningSync(t *testing.T) {
+	store := &fakeStore{values: map[string]string{"redmine_url": "http://redmine.test", "redmine_api_key": "key"}}
+	s := &waitingSyncer{started: make(chan struct{})}
+	m := newTestManager(store, s)
+
+	statuses := make(chan string, 4)
+	m.SetNotifier(func(_ string, data interface{}) {
+		if status, ok := data.(SyncStatus); ok {
+			statuses <- status.Status
+		}
+	})
+	after := atomic.Int32{}
+	m.SetAfterSync(func() { after.Add(1) })
+
+	if m.Stop() {
+		t.Error("there is nothing to stop before a sync starts")
+	}
+	if err := m.TriggerSync(); err != nil {
+		t.Fatal(err)
+	}
+	<-s.started
+	if <-statuses != "running" {
+		t.Fatal("a started sync must report that it runs")
+	}
+	if !m.Stop() {
+		t.Fatal("a running sync must be stoppable")
+	}
+	if got := <-statuses; got != "stopped" {
+		t.Errorf("status after a stop = %q, want stopped", got)
+	}
+	if after.Load() != 0 {
+		t.Error("what follows a finished sync must not run after a stopped one")
+	}
+}
+
+func TestAfterSyncRunsOnSuccessOnly(t *testing.T) {
+	store := &fakeStore{values: map[string]string{"redmine_url": "http://redmine.test", "redmine_api_key": "key"}}
+	s := &stepSyncer{pass: func() {}}
+	m := newTestManager(store, s)
+	calls := 0
+	m.SetAfterSync(func() { calls++ })
+
+	current, _ := m.begin()
+	m.run(current, false)
+	if calls != 1 {
+		t.Fatalf("after a finished sync: %d calls, want 1", calls)
+	}
+	s.err = errors.New("redmine is down")
+	current, _ = m.begin()
+	m.run(current, false)
+	if calls != 1 {
+		t.Errorf("after a failed sync: %d calls, want still 1", calls)
+	}
+}
+
+func TestScheduleSettings(t *testing.T) {
+	store := &fakeStore{values: map[string]string{}}
+	m := newTestManager(store, &stepSyncer{pass: func() {}})
+
+	if !m.Enabled() {
+		t.Error("the periodic sync is on until it is switched off")
+	}
+	if err := m.SetEnabled(false); err != nil || m.Enabled() {
+		t.Errorf("switched off: enabled = %v, err = %v", m.Enabled(), err)
+	}
+	if err := m.SetEnabled(true); err != nil || !m.Enabled() {
+		t.Errorf("switched on again: enabled = %v, err = %v", m.Enabled(), err)
+	}
+
+	if got := m.FullSyncTime(); got != redmine.DefaultFullSyncTime {
+		t.Errorf("default time of the full pass = %q", got)
+	}
+	if err := m.SetFullSyncTime("23:30"); err != nil || m.FullSyncTime() != "23:30" {
+		t.Errorf("after setting 23:30: %q, err = %v", m.FullSyncTime(), err)
+	}
+	for _, bad := range []string{"", "24:00", "3 am", "12:60"} {
+		if err := m.SetFullSyncTime(bad); err == nil {
+			t.Errorf("%q must be refused", bad)
+		}
+	}
+	if m.FullSyncTime() != "23:30" {
+		t.Errorf("a refused value changed the setting to %q", m.FullSyncTime())
 	}
 }

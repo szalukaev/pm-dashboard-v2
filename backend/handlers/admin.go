@@ -399,7 +399,11 @@ func (h *AdminHandler) GetSyncLog(w http.ResponseWriter, r *http.Request) {
 	if logs == nil {
 		logs = []LogEntry{}
 	}
-	utils.JSON(w, http.StatusOK, map[string]interface{}{"logs": logs})
+	// issues_collected of an entry is what that sync brought; how many
+	// issues there are in all is a figure of its own
+	totalIssues := 0
+	(*h.DB).QueryRow("SELECT COUNT(*) FROM issues WHERE data_source = 'redmine'").Scan(&totalIssues)
+	utils.JSON(w, http.StatusOK, map[string]interface{}{"logs": logs, "total_issues": totalIssues})
 }
 
 // RunSync starts an unscheduled sync. The sync runs in the background; its

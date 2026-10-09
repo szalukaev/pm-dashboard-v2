@@ -18,8 +18,36 @@ type Syncer struct {
 	// Projects returns the projects whose issues are synced; optional.
 	Projects func() ([]int, error)
 
+	// FullSyncTime returns the time of day ("HH:MM", server time) after
+	// which the projects are re-read completely once a day; optional.
+	FullSyncTime func() string
+
 	// One sync of issues at a time.
 	mu sync.Mutex
+}
+
+// Statuses a sync is recorded with in collection_log.
+const (
+	StatusSuccess = "success"
+	// StatusPartial: the sync finished, but some projects could not be read.
+	// error_text holds "<failed>/<total>".
+	StatusPartial = "partial"
+	StatusError   = "error"
+	// StatusStopped: the sync was stopped by the administrator.
+	StatusStopped = "stopped"
+)
+
+type fullSyncKey struct{}
+
+// WithFullSync marks a sync that must re-read every project completely
+// whatever the schedule says.
+func WithFullSync(ctx context.Context) context.Context {
+	return context.WithValue(ctx, fullSyncKey{}, true)
+}
+
+func fullSyncRequested(ctx context.Context) bool {
+	requested, _ := ctx.Value(fullSyncKey{}).(bool)
+	return requested
 }
 
 func NewSyncer(client *Client) *Syncer {
@@ -35,8 +63,13 @@ func (s *Syncer) SyncAll(ctx context.Context, db **sql.DB) error {
 	(*db).QueryRow(`INSERT INTO collection_log (started_at, status, data_source)
 		VALUES ($1, 'running', 'redmine') RETURNING id`, startTime).Scan(&logID)
 
-	totalIssues := 0
+	var stats syncStats
 	var syncErr error
+
+	// The requests of this sync end when it is stopped
+	original := s.client
+	s.client = original.withContext(ctx)
+	defer func() { s.client = original }()
 
 	// Sync statuses
 	if err := s.syncStatuses(ctx, db); err != nil {
@@ -66,28 +99,38 @@ func (s *Syncer) SyncAll(ctx context.Context, db **sql.DB) error {
 
 	// Sync issues (from all projects)
 	if syncErr == nil {
-		if err := s.syncIssues(ctx, db); err != nil {
+		var err error
+		if stats, err = s.syncIssues(ctx, db); err != nil {
 			syncErr = fmt.Errorf("sync issues: %w", err)
 		}
-		// Count synced issues
-		(*db).QueryRow("SELECT COUNT(*) FROM issues WHERE data_source = 'redmine'").Scan(&totalIssues)
 	}
 
 	duration := time.Since(startTime)
 	durationMs := int(duration.Milliseconds())
 
 	// Update collection log
+	if ctx.Err() != nil {
+		(*db).Exec(`UPDATE collection_log SET finished_at=$1, duration_ms=$2, status=$3 WHERE id=$4`,
+			time.Now(), durationMs, StatusStopped, logID)
+		slog.Info("Sync stopped", "duration", duration)
+		return ctx.Err()
+	}
 	if syncErr != nil {
-		(*db).Exec(`UPDATE collection_log SET finished_at=$1, duration_ms=$2, status='error', error_text=$3 WHERE id=$4`,
-			time.Now(), durationMs, syncErr.Error(), logID)
+		(*db).Exec(`UPDATE collection_log SET finished_at=$1, duration_ms=$2, status=$3, error_text=$4 WHERE id=$5`,
+			time.Now(), durationMs, StatusError, syncErr.Error(), logID)
 		slog.Error("Sync failed", "duration", duration, "error", syncErr)
 		return syncErr
 	}
 
-	(*db).Exec(`UPDATE collection_log SET finished_at=$1, duration_ms=$2, issues_collected=$3, status='success' WHERE id=$4`,
-		time.Now(), durationMs, totalIssues, logID)
+	// issues_collected is what this sync brought: the issues it wrote.
+	status, note := StatusSuccess, ""
+	if stats.failed > 0 {
+		status, note = StatusPartial, fmt.Sprintf("%d/%d", stats.failed, stats.projects)
+	}
+	(*db).Exec(`UPDATE collection_log SET finished_at=$1, duration_ms=$2, issues_collected=$3, status=$4, error_text=NULLIF($5, '') WHERE id=$6`,
+		time.Now(), durationMs, stats.issues, status, note, logID)
 
-	slog.Info("Sync completed", "duration", duration, "issues", totalIssues)
+	slog.Info("Sync completed", "duration", duration, "issues", stats.issues, "status", status)
 	return nil
 }
 
@@ -214,7 +257,7 @@ func (s *Syncer) syncMembers(_ context.Context, db **sql.DB) error {
 	return nil
 }
 
-func (s *Syncer) syncIssues(_ context.Context, db **sql.DB) error {
+func (s *Syncer) syncIssues(ctx context.Context, db **sql.DB) (syncStats, error) {
 	// The projects to sync: what the users are shown within their rights
 	// (Projects), or — without access control wired in — the union of the
 	// projects selected by all users.
@@ -222,14 +265,14 @@ func (s *Syncer) syncIssues(_ context.Context, db **sql.DB) error {
 	if s.Projects != nil {
 		ids, err := s.Projects()
 		if err != nil {
-			return err
+			return syncStats{}, err
 		}
 		projectIDs = ids
 	} else {
 		rows, err := (*db).Query(`SELECT DISTINCT jsonb_array_elements_text(selected_projects)::int AS pid
 			FROM user_settings WHERE selected_projects != '[]'::jsonb`)
 		if err != nil {
-			return err
+			return syncStats{}, err
 		}
 		for rows.Next() {
 			var pid int
@@ -242,7 +285,7 @@ func (s *Syncer) syncIssues(_ context.Context, db **sql.DB) error {
 
 	if len(projectIDs) == 0 {
 		slog.Info("No projects selected in user_settings, skipping issue sync")
-		return nil
+		return syncStats{}, nil
 	}
 
 	// Selected projects include all their descendants
@@ -253,5 +296,9 @@ func (s *Syncer) syncIssues(_ context.Context, db **sql.DB) error {
 	slog.Info("Syncing issues for selected projects", "count", len(projectIDs))
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.syncProjectIssues(pgStore{db: *db}, projectIDs, time.Now())
+	fullTime := ""
+	if s.FullSyncTime != nil {
+		fullTime = s.FullSyncTime()
+	}
+	return s.syncProjectIssues(ctx, pgStore{db: *db}, projectIDs, time.Now(), fullTime)
 }

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"pm-dashboard/datasource/manager"
+	"pm-dashboard/datasource/redmine"
 	"pm-dashboard/utils"
 )
 
@@ -34,6 +35,15 @@ func (h *SyncStatusHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 		at := startedAt
 		if finishedAt != nil {
 			at = *finishedAt
+		}
+		// The indicator knows three states. A sync that could not read a
+		// part of the projects is a problem to look at; one stopped by the
+		// administrator says nothing about the data.
+		switch status {
+		case redmine.StatusPartial:
+			status = redmine.StatusError
+		case redmine.StatusStopped:
+			status = "unknown"
 		}
 		result["status"] = status
 		result["at"] = at

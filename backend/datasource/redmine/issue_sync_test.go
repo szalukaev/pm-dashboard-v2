@@ -1,6 +1,7 @@
 package redmine
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -209,7 +210,7 @@ func TestSyncProjectIssues(t *testing.T) {
 
 	// First run: nothing is known, every selected project is read completely.
 	// Project 2 denies its time entries, which must not count as a failure.
-	if err := syncer.syncProjectIssues(store, []int{1, 2}, start); err != nil {
+	if _, err := syncer.syncProjectIssues(context.Background(), store, []int{1, 2}, start, ""); err != nil {
 		t.Fatal(err)
 	}
 	if got := store.issueIDs(); !reflect.DeepEqual(got, []int{11, 12, 21}) {
@@ -234,7 +235,7 @@ func TestSyncProjectIssues(t *testing.T) {
 	// its time and still does not count as a failure.
 	redmine.issues[1] = append(redmine.issues[1], 13)
 	second := start.Add(5 * time.Minute)
-	if err := syncer.syncProjectIssues(store, []int{1, 2}, second); err != nil {
+	if _, err := syncer.syncProjectIssues(context.Background(), store, []int{1, 2}, second, ""); err != nil {
 		t.Fatal(err)
 	}
 	want = []string{"/issues.json project=0", "/time_entries.json project=1", "/time_entries.json project=2"}
@@ -253,7 +254,7 @@ func TestSyncProjectIssues(t *testing.T) {
 
 	// A project selected later is read completely, the others are not.
 	third := second.Add(5 * time.Minute)
-	if err := syncer.syncProjectIssues(store, []int{1, 2, 3}, third); err != nil {
+	if _, err := syncer.syncProjectIssues(context.Background(), store, []int{1, 2, 3}, third, ""); err != nil {
 		t.Fatal(err)
 	}
 	want = []string{"/issues.json project=0", "/issues.json project=3",
@@ -268,7 +269,7 @@ func TestSyncProjectIssues(t *testing.T) {
 	// The state survives a restart: a new syncer over the same store still
 	// asks only for changes.
 	restarted := NewSyncer(NewClient(srv.URL, "key", "", ""))
-	if err := restarted.syncProjectIssues(store, []int{1, 2, 3}, third.Add(5*time.Minute)); err != nil {
+	if _, err := restarted.syncProjectIssues(context.Background(), store, []int{1, 2, 3}, third.Add(5*time.Minute), ""); err != nil {
 		t.Fatal(err)
 	}
 	want = []string{"/issues.json project=0",
@@ -289,7 +290,7 @@ func TestSyncDeletesIssuesGoneFromRedmine(t *testing.T) {
 	syncer := NewSyncer(NewClient(srv.URL, "key", "", ""))
 	store := newMemStore()
 	start := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
-	if err := syncer.syncProjectIssues(store, []int{1, 2}, start); err != nil {
+	if _, err := syncer.syncProjectIssues(context.Background(), store, []int{1, 2}, start, ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -299,7 +300,7 @@ func TestSyncDeletesIssuesGoneFromRedmine(t *testing.T) {
 	redmine.entries[1] = []string{"100:11"}
 
 	// Changes alone do not show a deletion…
-	if err := syncer.syncProjectIssues(store, []int{1, 2}, start.Add(time.Hour)); err != nil {
+	if _, err := syncer.syncProjectIssues(context.Background(), store, []int{1, 2}, start.Add(time.Hour), ""); err != nil {
 		t.Fatal(err)
 	}
 	if len(store.deleted) != 0 {
@@ -308,7 +309,7 @@ func TestSyncDeletesIssuesGoneFromRedmine(t *testing.T) {
 
 	// …the next complete pass does: the deleted issue goes with its time
 	// entries, the moved one stays.
-	if err := syncer.syncProjectIssues(store, []int{1, 2}, start.Add(fullSyncInterval)); err != nil {
+	if _, err := syncer.syncProjectIssues(context.Background(), store, []int{1, 2}, start.Add(fullSyncInterval), ""); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(store.deleted, []int{12}) {
@@ -337,7 +338,7 @@ func TestSyncDeletesNothingOnFailureOrSuspiciousAnswer(t *testing.T) {
 	syncer := NewSyncer(NewClient(srv.URL, "key", "", ""))
 	store := newMemStore()
 	start := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
-	if err := syncer.syncProjectIssues(store, []int{1, 2}, start); err != nil {
+	if _, err := syncer.syncProjectIssues(context.Background(), store, []int{1, 2}, start, ""); err != nil {
 		t.Fatal(err)
 	}
 	stored := len(store.issues)
@@ -346,7 +347,7 @@ func TestSyncDeletesNothingOnFailureOrSuspiciousAnswer(t *testing.T) {
 	redmine.broken = map[int]bool{1: true}
 	redmine.issues[2] = nil
 	next := start.Add(fullSyncInterval)
-	if err := syncer.syncProjectIssues(store, []int{1, 2}, next); err != nil {
+	if _, err := syncer.syncProjectIssues(context.Background(), store, []int{1, 2}, next, ""); err != nil {
 		t.Fatal(err)
 	}
 	if len(store.deleted) != 0 || len(store.issues) != stored {
@@ -370,7 +371,7 @@ func TestSyncRemovesIssueMovedOutOfSyncedProjects(t *testing.T) {
 	syncer := NewSyncer(NewClient(srv.URL, "key", "", ""))
 	store := newMemStore()
 	start := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
-	if err := syncer.syncProjectIssues(store, []int{1}, start); err != nil {
+	if _, err := syncer.syncProjectIssues(context.Background(), store, []int{1}, start, ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -378,10 +379,110 @@ func TestSyncRemovesIssueMovedOutOfSyncedProjects(t *testing.T) {
 	// seen on the next pass and the issue is removed here at once.
 	redmine.issues[1] = []int{11}
 	redmine.issues[9] = []int{12}
-	if err := syncer.syncProjectIssues(store, []int{1}, start.Add(5*time.Minute)); err != nil {
+	if _, err := syncer.syncProjectIssues(context.Background(), store, []int{1}, start.Add(5*time.Minute), ""); err != nil {
 		t.Fatal(err)
 	}
 	if got := store.issueIDs(); !reflect.DeepEqual(got, []int{11}) {
 		t.Errorf("issues = %v, want [11]", got)
+	}
+}
+
+func TestNeedsFull(t *testing.T) {
+	loc := time.FixedZone("MSK", 3*3600)
+	at := func(day, hour, minute int) time.Time { return time.Date(2026, 10, day, hour, minute, 0, 0, loc) }
+
+	cases := []struct {
+		name     string
+		lastFull time.Time
+		now      time.Time
+		fullTime string
+		want     bool
+	}{
+		{"before the night pass of today: yesterday's pass still counts", at(9, 3, 5), at(10, 2, 50), "03:00", false},
+		{"the first sync after the time: full", at(9, 3, 5), at(10, 3, 1), "03:00", true},
+		{"already done tonight: only changes for the rest of the day", at(10, 3, 1), at(10, 23, 59), "03:00", false},
+		{"a pass run by hand in the evening does not cancel the night one", at(9, 18, 0), at(10, 3, 1), "03:00", true},
+		{"a day was missed: full at the first chance", at(8, 3, 5), at(10, 1, 0), "03:00", true},
+		{"a bad time falls back to the default", at(9, 3, 5), at(10, 3, 1), "25:99", true},
+		{"no schedule: a day after the previous pass", at(9, 12, 0), at(10, 11, 59), "", false},
+		{"no schedule: a day has passed", at(9, 12, 0), at(10, 12, 0), "", true},
+	}
+	for _, c := range cases {
+		if got := needsFull(projectState{lastFull: c.lastFull}, true, c.now, c.fullTime); got != c.want {
+			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
+		}
+	}
+	if !needsFull(projectState{}, false, at(10, 12, 0), "03:00") {
+		t.Error("a project that was never read must be read completely")
+	}
+}
+
+func TestSyncFullOnRequestAndStats(t *testing.T) {
+	pageRetryDelay = 0
+	redmine := &fakeRedmine{issues: map[int][]int{1: {11, 12}, 2: {21}}, entries: map[int][]string{}}
+	srv := redmine.server(t)
+	defer srv.Close()
+	syncer := NewSyncer(NewClient(srv.URL, "key", "", ""))
+	store := newMemStore()
+	start := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
+
+	stats, err := syncer.syncProjectIssues(context.Background(), store, []int{1, 2}, start, "03:00")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stats.issues != 3 || stats.projects != 2 || stats.failed != 0 {
+		t.Errorf("first run: stats = %+v", stats)
+	}
+	redmine.takeRequests()
+
+	// Nothing changed and no full pass is due: no issue is written
+	stats, err = syncer.syncProjectIssues(context.Background(), store, []int{1, 2}, start.Add(5*time.Minute), "03:00")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := redmine.takeRequests(); len(got) != 3 {
+		t.Errorf("a pass of changes made %d requests: %v", len(got), got)
+	}
+
+	// A full pass on request reads every project again and deletes what is gone
+	redmine.issues[1] = []int{11}
+	stats, err = syncer.syncProjectIssues(WithFullSync(context.Background()), store, []int{1, 2}, start.Add(10*time.Minute), "03:00")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stats.deleted != 1 || !reflect.DeepEqual(store.deleted, []int{12}) {
+		t.Errorf("full pass on request: stats = %+v, deleted = %v", stats, store.deleted)
+	}
+
+	// A project that cannot be read is counted
+	redmine.broken = map[int]bool{2: true}
+	stats, err = syncer.syncProjectIssues(WithFullSync(context.Background()), store, []int{1, 2}, start.Add(15*time.Minute), "03:00")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stats.failed != 1 || stats.projects != 2 {
+		t.Errorf("with a broken project: stats = %+v, want 1 failed of 2", stats)
+	}
+}
+
+func TestSyncStoppedKeepsNothing(t *testing.T) {
+	pageRetryDelay = 0
+	redmine := &fakeRedmine{issues: map[int][]int{1: {11}, 2: {21}}, entries: map[int][]string{}}
+	srv := redmine.server(t)
+	defer srv.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	syncer := NewSyncer(NewClient(srv.URL, "key", "", "").withContext(ctx))
+	store := newMemStore()
+
+	_, err := syncer.syncProjectIssues(ctx, store, []int{1, 2}, time.Now(), "03:00")
+	if err == nil {
+		t.Fatal("a stopped sync must report it")
+	}
+	if len(store.issues) != 0 || len(store.states) != 0 {
+		t.Errorf("a stopped sync stored %d issues and %d states", len(store.issues), len(store.states))
+	}
+	if got := redmine.takeRequests(); len(got) != 0 {
+		t.Errorf("a stopped sync still asked the source: %v", got)
 	}
 }
