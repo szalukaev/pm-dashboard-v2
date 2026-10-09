@@ -69,6 +69,8 @@
         </button>
       </div>
 
+      <AppColumnSettings class="columns-gear" :table="TASKS_TABLE" :columns="TASK_COLUMNS" />
+
       <div class="filter-group" v-if="categories.length > 0 && filters.project_id">
         <span class="filter-label">{{ $t('tasks.filters.category') }}:</span>
         <button
@@ -87,6 +89,8 @@
 </template>
 
 <script setup lang="ts">
+import AppColumnSettings from '../ui/AppColumnSettings.vue'
+import { TASK_COLUMNS, TASKS_TABLE } from './taskColumns'
 import { ref, watch, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { RotateCcw } from 'lucide-vue-next'
@@ -173,6 +177,12 @@ watch(searchInput, (val) => {
   align-items: center;
   gap: 16px;
   flex-wrap: wrap;
+}
+
+/* The column settings sit at the right edge of the row */
+.columns-gear {
+  margin-left: auto;
+  order: 1;
 }
 
 .filter-group {

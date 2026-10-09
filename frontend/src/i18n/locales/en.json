@@ -31,6 +31,10 @@
       "per_page": "Per page",
       "prev": "Previous page",
       "next": "Next page"
+    },
+    "columns": {
+      "title": "Configure columns",
+      "reset": "Reset to standard"
     }
   },
   "auth": {
@@ -223,7 +227,8 @@
       "in_test": "In Test",
       "overdue": "Overdue",
       "bugs": "Bugs",
-      "no_estimate": "No Estimate"
+      "no_estimate": "No Estimate",
+      "high_priority": "High"
     },
     "team_load": "Team Workload",
     "distribution": "Task Distribution by Project",

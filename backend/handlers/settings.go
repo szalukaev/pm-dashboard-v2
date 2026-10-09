@@ -42,10 +42,13 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 		DataSourceURL             string   `json:"data_source_url"`
 		// Rows per page chosen for each table; a table not listed uses the default
 		Pagination map[string]int `json:"pagination"`
+		// Visible columns and their order chosen for each table
+		TableColumns json.RawMessage `json:"table_columns"`
 	}
 	settings.Pagination = map[string]int{}
+	settings.TableColumns = json.RawMessage("{}")
 
-	var selectedProjects, selectedTeam, tabOrder, kanbanStatuses, kanbanUsers, lastFilters, pagination []byte
+	var selectedProjects, selectedTeam, tabOrder, kanbanStatuses, kanbanUsers, lastFilters, pagination, tableColumns []byte
 	var theme, language string
 	var notificationsEnabled, overdueAlerts bool
 
@@ -53,12 +56,12 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 		SELECT selected_projects, selected_team, theme, language, tab_order,
 		       kanban_column_order_statuses, kanban_column_order_users,
 		       last_filters, notifications_enabled, overdue_alerts,
-		       kanban_last_mode, kanban_last_project, pagination
+		       kanban_last_mode, kanban_last_project, pagination, table_columns
 		FROM user_settings WHERE user_id = $1
 	`, userID).Scan(
 		&selectedProjects, &selectedTeam, &theme, &language,
 		&tabOrder, &kanbanStatuses, &kanbanUsers, &lastFilters, &notificationsEnabled, &overdueAlerts,
-		&settings.KanbanLastMode, &settings.KanbanLastProject, &pagination,
+		&settings.KanbanLastMode, &settings.KanbanLastProject, &pagination, &tableColumns,
 	)
 
 	if err == sql.ErrNoRows {
@@ -94,6 +97,9 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 	json.Unmarshal(pagination, &settings.Pagination)
 	if settings.Pagination == nil {
 		settings.Pagination = map[string]int{}
+	}
+	if json.Valid(tableColumns) && len(tableColumns) > 0 {
+		settings.TableColumns = tableColumns
 	}
 	settings.Theme = theme
 	settings.Language = language
@@ -235,6 +241,20 @@ func (h *SettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request)
 		}
 		data, _ := json.Marshal(sizes)
 		if _, err := (*h.DB).Exec("UPDATE user_settings SET pagination = pagination || $1::jsonb WHERE user_id = $2", string(data), userID); err != nil {
+			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+			return
+		}
+	}
+
+	if v, ok := body["table_columns"]; ok {
+		// {"table": {"visible": [...], "order": [...]}}; the sent tables
+		// replace their saved setups, the others stay
+		if !validTableColumns(v) {
+			utils.Error(w, http.StatusBadRequest, "INVALID_TABLE_COLUMNS")
+			return
+		}
+		data, _ := json.Marshal(v)
+		if _, err := (*h.DB).Exec("UPDATE user_settings SET table_columns = table_columns || $1::jsonb WHERE user_id = $2", string(data), userID); err != nil {
 			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 			return
 		}

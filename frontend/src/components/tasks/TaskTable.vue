@@ -5,7 +5,7 @@
         <thead>
           <tr>
             <th
-              v-for="col in columns"
+              v-for="col in shownColumns"
               :key="col.key"
               :class="{ sortable: col.sortable, sorted: sortBy === col.key }"
               @click="col.sortable && toggleSort(col.key)"
@@ -23,15 +23,17 @@
             :class="{ overdue: isOverdue(task), 'flash-update': isFlashing(task.external_id) }"
             :data-testid="'task-row-' + task.external_id"
           >
-            <td class="center">
+            <!-- The cells follow the columns the user chose and their order -->
+            <template v-for="col in shownColumns" :key="col.key">
+            <td v-if="col.key === 'external_id'" class="center">
               <a :href="taskLink(task.external_id)" target="_blank" class="issue-link" :data-testid="'task-link-' + task.external_id">
                 #{{ task.external_id }}
               </a>
             </td>
 
-            <td class="subject" @click="$emit('open-task', task.external_id)">{{ task.subject }}</td>
+            <td v-else-if="col.key === 'subject'" class="subject" @click="$emit('open-task', task.external_id)">{{ task.subject }}</td>
 
-            <td class="center">
+            <td v-else-if="col.key === 'priority_name'" class="center">
               <select
                 :disabled="!auth.canWrite"
                 class="cell-inputpriority"
@@ -43,7 +45,7 @@
               </select>
             </td>
 
-            <td>
+            <td v-else-if="col.key === 'assigned_to'">
               <select
                 :disabled="!auth.canWrite"
                 class="cell-inputassignee"
@@ -55,7 +57,7 @@
               </select>
             </td>
 
-            <td class="center">
+            <td v-else-if="col.key === 'estimate'" class="center">
               <input
                 :disabled="!auth.canWrite"
                 class="cell-inputestimate"
@@ -68,9 +70,9 @@
               />
             </td>
 
-            <td class="center num">{{ formatHours(task.spent_hours) }}</td>
+            <td v-else-if="col.key === 'fact'" class="center num">{{ formatHours(task.spent_hours) }}</td>
 
-            <td>
+            <td v-else-if="col.key === 'status_name'">
               <select
                 :disabled="!auth.canWrite"
                 class="cell-inputstatus-select"
@@ -82,10 +84,10 @@
               </select>
             </td>
 
-            <td class="center num" :class="task.bug_fix_hours > 0 ? 'bug' : 'faint'">{{ formatHours(task.bug_fix_hours) }}</td>
-            <td class="center num" :class="task.bug_fix_hours > 0 ? 'bug' : 'faint'">{{ formatBugFixPct(task) }}</td>
+            <td v-else-if="col.key === 'bug_fix_hours'" class="center num" :class="task.bug_fix_hours > 0 ? 'bug' : 'faint'">{{ formatHours(task.bug_fix_hours) }}</td>
+            <td v-else-if="col.key === 'bug_fix_pct'" class="center num" :class="task.bug_fix_hours > 0 ? 'bug' : 'faint'">{{ formatBugFixPct(task) }}</td>
 
-            <td class="center">
+            <td v-else-if="col.key === 'start_date'" class="center">
               <input
                 :disabled="!auth.canWrite"
                 class="cell-inputdate"
@@ -95,7 +97,7 @@
               />
             </td>
 
-            <td class="center">
+            <td v-else-if="col.key === 'due_date'" class="center">
               <input
                 :disabled="!auth.canWrite"
                 class="cell-inputdate"
@@ -106,7 +108,7 @@
               />
             </td>
 
-            <td>
+            <td v-else-if="col.key === 'category_name'">
               <select
                 :disabled="!auth.canWrite"
                 class="cell-inputcategory"
@@ -119,6 +121,7 @@
                 <option v-for="c in projectCategories(task)" :key="c" :value="c">{{ c }}</option>
               </select>
             </td>
+            </template>
           </tr>
         </tbody>
       </table>
@@ -136,6 +139,7 @@ import { useAuthStore } from '../../stores/auth'
 import { useSwal } from '../../composables/useSwal'
 import { useTasksStore } from '../../stores/tasks'
 import { isFlashing } from '../../composables/useFlash'
+import { TASK_COLUMNS, TASKS_TABLE } from './taskColumns'
 
 const settingsStore = useSettingsStore()
 const tasksStore = useTasksStore()
@@ -207,20 +211,10 @@ function withCurrent(list: string[], current?: string | null): string[] {
   return current && !list.includes(current) ? [current, ...list] : list
 }
 
-const columns = [
-  { key: 'external_id', label: 'tasks.table.number', sortable: true },
-  { key: 'subject', label: 'tasks.table.name', sortable: true },
-  { key: 'priority_name', label: 'tasks.table.priority', sortable: true },
-  { key: 'assigned_to', label: 'tasks.table.responsible', sortable: true },
-  { key: 'estimate', label: 'tasks.table.estimate', sortable: true },
-  { key: 'fact', label: 'tasks.table.fact', sortable: true },
-  { key: 'status_name', label: 'tasks.table.status', sortable: true },
-  { key: 'bug_fix_hours', label: 'tasks.table.bug_fix', sortable: true },
-  { key: 'bug_fix_pct', label: 'tasks.table.bug_fix_pct', sortable: true },
-  { key: 'start_date', label: 'tasks.table.start_date', sortable: true },
-  { key: 'due_date', label: 'tasks.table.end_date', sortable: true },
-  { key: 'category_name', label: 'tasks.table.category', sortable: true },
-]
+// The columns the user chose to see, in their order
+const shownColumns = computed(() =>
+  settingsStore.tableColumns(TASKS_TABLE, TASK_COLUMNS.map(c => c.key)).map(key => TASK_COLUMNS.find(c => c.key === key)!)
+)
 
 function toggleSort(key: string) {
   const dir = sortBy.value === key && sortDir.value === 'asc' ? 'desc' : 'asc'

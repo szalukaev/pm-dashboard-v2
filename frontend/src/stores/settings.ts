@@ -17,6 +17,8 @@ interface Settings {
   redmine_url: string
   // Rows per page chosen for each table; a table not listed uses the default
   pagination: Record<string, number>
+  // Visible columns and their order chosen for each table
+  table_columns: Record<string, { visible: string[]; order: string[] }>
 }
 
 export const PAGE_SIZES = [10, 25, 50, 100]
@@ -36,6 +38,7 @@ const defaultSettings: Settings = {
   data_source_url: '',
   redmine_url: '',
   pagination: {},
+  table_columns: {},
 }
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -54,7 +57,7 @@ export const useSettingsStore = defineStore('settings', () => {
     loading.value = true
     try {
       const { data } = await axios.get('/api/settings')
-      settings.value = { ...defaultSettings, ...data, pagination: data.pagination || {} }
+      settings.value = { ...defaultSettings, ...data, pagination: data.pagination || {}, table_columns: data.table_columns || {} }
     } catch {
       // Use defaults
     } finally {
@@ -83,5 +86,33 @@ export const useSettingsStore = defineStore('settings', () => {
     } catch {}
   }
 
-  return { settings, loading, fetchSettings, ensureLoaded, updateSettings, pageSize, setPageSize }
+  // Every column of a table in the order the user chose. all is the standard
+  // order; a column added to the table later goes to the end.
+  function columnOrder(table: string, all: string[]): string[] {
+    const saved = settings.value.table_columns?.[table]
+    if (!saved || !Array.isArray(saved.order)) return all
+    return [...saved.order.filter(k => all.includes(k)), ...all.filter(k => !saved.order.includes(k))]
+  }
+
+  // The columns of a table the user sees, in their order. A column added to
+  // the table later is visible until the user hides it.
+  function tableColumns(table: string, all: string[]): string[] {
+    const saved = settings.value.table_columns?.[table]
+    if (!saved || !Array.isArray(saved.order) || !Array.isArray(saved.visible)) return all
+    const shown = columnOrder(table, all).filter(k => saved.visible.includes(k) || !saved.order.includes(k))
+    return shown.length > 0 ? shown : all
+  }
+
+  async function setTableColumns(table: string, visible: string[], order: string[]) {
+    const setup = { visible, order }
+    settings.value = { ...settings.value, table_columns: { ...settings.value.table_columns, [table]: setup } }
+    try {
+      await axios.put('/api/settings', { table_columns: { [table]: setup } })
+    } catch {}
+  }
+
+  return {
+    settings, loading, fetchSettings, ensureLoaded, updateSettings, pageSize, setPageSize,
+    columnOrder, tableColumns, setTableColumns,
+  }
 })
