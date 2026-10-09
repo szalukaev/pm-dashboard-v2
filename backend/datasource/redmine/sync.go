@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"sync"
 	"time"
+
+	"pm-dashboard/datasource"
 )
 
 type Syncer struct {
@@ -233,46 +235,10 @@ func (s *Syncer) syncIssues(_ context.Context, db **sql.DB) error {
 		return nil
 	}
 
-	// Expand projectIDs to include all descendants (children of selected projects)
-	expanded := make(map[int]bool)
-	for _, pid := range projectIDs {
-		expanded[pid] = true
+	// Selected projects include all their descendants
+	if expanded, err := datasource.ExpandProjects(*db, projectIDs); err == nil {
+		projectIDs = expanded
 	}
-	// Build parent->children map
-	pRows, err := (*db).Query("SELECT external_id, parent_id FROM projects WHERE data_source = 'redmine'")
-	if err == nil {
-		children := make(map[int][]int)
-		for pRows.Next() {
-			var id int
-			var parentID *int
-			if pRows.Scan(&id, &parentID) == nil {
-				if parentID != nil {
-					children[*parentID] = append(children[*parentID], id)
-				}
-			}
-		}
-		pRows.Close()
-		// BFS to find all descendants
-		queue := make([]int, 0, len(expanded))
-		for pid := range expanded {
-			queue = append(queue, pid)
-		}
-		for len(queue) > 0 {
-			pid := queue[0]
-			queue = queue[1:]
-			for _, cid := range children[pid] {
-				if !expanded[cid] {
-					expanded[cid] = true
-					queue = append(queue, cid)
-				}
-			}
-		}
-	}
-	projectIDs = projectIDs[:0]
-	for pid := range expanded {
-		projectIDs = append(projectIDs, pid)
-	}
-
 
 	slog.Info("Syncing issues for selected projects", "count", len(projectIDs))
 	return s.syncProjectIssues(*db, projectIDs)

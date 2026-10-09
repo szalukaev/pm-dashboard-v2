@@ -3,12 +3,15 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"pm-dashboard/datasource"
 	"pm-dashboard/datasource/manager"
+	"pm-dashboard/datasource/redmine"
 	"pm-dashboard/middleware"
 	"pm-dashboard/utils"
 )
@@ -140,10 +143,10 @@ func (h *KanbanHandler) GetBoard(w http.ResponseWriter, r *http.Request) {
 func (h *KanbanHandler) buildStatusColumns(cards []KanbanCard, orderJSON []byte) []KanbanColumn {
 	colMap := make(map[string]*KanbanColumn)
 	for _, c := range cards {
-		key := c.StatusName
+		key := strconv.Itoa(c.StatusID)
 		if _, ok := colMap[key]; !ok {
 			colMap[key] = &KanbanColumn{
-				ID:    strconv.Itoa(c.StatusID),
+				ID:    key,
 				Name:  c.StatusName,
 				Tasks: []KanbanCard{},
 			}
@@ -163,14 +166,16 @@ func (h *KanbanHandler) buildStatusColumns(cards []KanbanCard, orderJSON []byte)
 func (h *KanbanHandler) buildUserColumns(cards []KanbanCard, orderJSON []byte) []KanbanColumn {
 	colMap := make(map[string]*KanbanColumn)
 	for _, c := range cards {
-		key := c.AssignedToName
-		if key == "" {
-			key = "Неназначенные"
+		// Columns are identified by the member id, not by a display name;
+		// the "no assignee" column gets its title on the client.
+		key, name := unassignedColumn, ""
+		if c.AssignedToID != nil {
+			key, name = strconv.Itoa(*c.AssignedToID), c.AssignedToName
 		}
 		if _, ok := colMap[key]; !ok {
 			colMap[key] = &KanbanColumn{
 				ID:    key,
-				Name:  key,
+				Name:  name,
 				Tasks: []KanbanCard{},
 			}
 		}
@@ -181,11 +186,6 @@ func (h *KanbanHandler) buildUserColumns(cards []KanbanCard, orderJSON []byte) [
 	var order []string
 	if len(orderJSON) > 0 {
 		json.Unmarshal(orderJSON, &order)
-	}
-
-	// Remove empty "Неназначенные" if no unassigned tasks
-	if col, ok := colMap["Неназначенные"]; ok && len(col.Tasks) == 0 {
-		delete(colMap, "Неназначенные")
 	}
 
 	return applyColumnOrder(colMap, order)
@@ -226,42 +226,139 @@ func (h *KanbanHandler) MoveCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The issue must be on a project the user works with.
+	var projectID int
+	if err := (*h.DB).QueryRow("SELECT project_id FROM issues WHERE external_id = $1 AND data_source = 'redmine'",
+		body.IssueID).Scan(&projectID); err != nil {
+		utils.Error(w, http.StatusNotFound, "ISSUE_NOT_FOUND")
+		return
+	}
+	if allowed := h.userProjects(middleware.GetUserID(r)); len(allowed) > 0 && !containsInt(allowed, projectID) {
+		slog.Warn("Kanban move outside of user projects", "user", middleware.GetUserID(r), "issue", body.IssueID)
+		utils.Error(w, http.StatusForbidden, "FORBIDDEN")
+		return
+	}
+
+	// localSet: new values for the local cache; redmineFields: payload for
+	// the data source (an empty string clears a field in Redmine).
+	var localSet string
+	var localArgs []interface{}
+	redmineFields := map[string]interface{}{}
+
 	switch body.Mode {
 	case "statuses":
-		// Update status
+		var statusID int
 		var statusName string
-		err := (*h.DB).QueryRow("SELECT name FROM statuses WHERE external_id = $1", body.TargetID).Scan(&statusName)
-		if err != nil {
+		if err := (*h.DB).QueryRow("SELECT external_id, name FROM statuses WHERE external_id::text = $1 AND data_source = 'redmine'",
+			body.TargetID).Scan(&statusID, &statusName); err != nil {
 			utils.Error(w, http.StatusBadRequest, "STATUS_NOT_FOUND")
 			return
 		}
-		_, err = (*h.DB).Exec("UPDATE issues SET status_name = $1, status_id = $2, synced_at = NOW() WHERE external_id = $3",
-			statusName, body.TargetID, body.IssueID)
-		if err != nil {
-			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
-			return
-		}
+		localSet = "status_name = $1, status_id = $2"
+		localArgs = []interface{}{statusName, statusID}
+		redmineFields["status_id"] = statusID
 
 	case "users":
-		// Reassign
-		if body.TargetID == "Неназначенные" {
-			if _, err := (*h.DB).Exec("UPDATE issues SET assigned_to_name = '', assigned_to_id = NULL, synced_at = NOW() WHERE external_id = $1", body.IssueID); err != nil {
-				utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
-				return
-			}
-		} else {
-			// Find member by name
-			var memberID *int
-			(*h.DB).QueryRow("SELECT external_id FROM members WHERE name = $1 LIMIT 1", body.TargetID).Scan(&memberID)
-			if _, err := (*h.DB).Exec("UPDATE issues SET assigned_to_name = $1, assigned_to_id = $2, synced_at = NOW() WHERE external_id = $3",
-				body.TargetID, memberID, body.IssueID); err != nil {
-				utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
-				return
-			}
+		if body.TargetID == unassignedColumn {
+			localSet = "assigned_to_name = $1, assigned_to_id = $2"
+			localArgs = []interface{}{"", nil}
+			redmineFields["assigned_to_id"] = ""
+			break
 		}
+		var memberID int
+		var memberName string
+		if err := (*h.DB).QueryRow("SELECT external_id, name FROM members WHERE external_id::text = $1 AND data_source = 'redmine'",
+			body.TargetID).Scan(&memberID, &memberName); err != nil {
+			utils.Error(w, http.StatusBadRequest, "MEMBER_NOT_FOUND")
+			return
+		}
+		localSet = "assigned_to_name = $1, assigned_to_id = $2"
+		localArgs = []interface{}{memberName, memberID}
+		redmineFields["assigned_to_id"] = memberID
+
+	default:
+		utils.Error(w, http.StatusBadRequest, "INVALID_MODE")
+		return
+	}
+
+	// The data source is the system of record: write there first and touch
+	// the local cache only on success, otherwise the next sync would silently
+	// roll the move back.
+	if h.Source == nil || h.Source.Client() == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATA_SOURCE_NOT_CONFIGURED")
+		return
+	}
+	client := h.Source.Client()
+	if err := client.UpdateIssue(body.IssueID, redmineFields); err != nil {
+		slog.Warn("Failed to move issue in Redmine", "issue", body.IssueID, "error", err)
+		utils.JSON(w, http.StatusBadGateway, map[string]string{
+			"error":   "REDMINE_UPDATE_FAILED",
+			"message": err.Error(),
+		})
+		return
+	}
+	// Redmine accepts an update but silently skips a change its workflow
+	// forbids: read the issue back before trusting the move.
+	if state, err := client.GetIssueState(body.IssueID); err != nil {
+		slog.Warn("Could not verify the move in Redmine", "issue", body.IssueID, "error", err)
+	} else if !moveApplied(state, redmineFields) {
+		utils.Error(w, http.StatusBadGateway, "REDMINE_CHANGE_REJECTED")
+		return
+	}
+
+	localArgs = append(localArgs, body.IssueID)
+	if _, err := (*h.DB).Exec("UPDATE issues SET "+localSet+", synced_at = NOW() WHERE external_id = $3 AND data_source = 'redmine'",
+		localArgs...); err != nil {
+		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+		return
 	}
 
 	utils.Success(w)
+}
+
+// unassignedColumn is the id of the "no assignee" column in the users mode.
+const unassignedColumn = "unassigned"
+
+// userProjects returns the projects selected by the user together with all
+// their descendants; empty means no restriction.
+func (h *KanbanHandler) userProjects(userID int) []int {
+	var spJSON []byte
+	(*h.DB).QueryRow("SELECT selected_projects FROM user_settings WHERE user_id = $1", userID).Scan(&spJSON)
+	var selected []int
+	if len(spJSON) > 0 {
+		json.Unmarshal(spJSON, &selected)
+	}
+	if len(selected) == 0 {
+		return nil
+	}
+	if expanded, err := datasource.ExpandProjects(*h.DB, selected); err == nil {
+		return expanded
+	}
+	return selected
+}
+
+// moveApplied reports whether the issue in Redmine has the values a move
+// asked for (fields as sent to UpdateIssue).
+func moveApplied(state *redmine.IssueState, fields map[string]interface{}) bool {
+	if want, ok := fields["status_id"]; ok && state.StatusID != want {
+		return false
+	}
+	if want, ok := fields["assigned_to_id"]; ok {
+		if want == "" {
+			return state.AssignedToID == nil
+		}
+		return state.AssignedToID != nil && *state.AssignedToID == want
+	}
+	return true
+}
+
+func containsInt(list []int, v int) bool {
+	for _, x := range list {
+		if x == v {
+			return true
+		}
+	}
+	return false
 }
 
 func (h *KanbanHandler) SaveColumnOrder(w http.ResponseWriter, r *http.Request) {

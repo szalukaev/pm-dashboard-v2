@@ -507,9 +507,50 @@ func (c *Client) UpdateIssue(id int, fields map[string]interface{}) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		// On a validation failure Redmine explains itself: {"errors": [...]}
+		var failure struct {
+			Errors []string `json:"errors"`
+		}
+		if data, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10)); json.Unmarshal(data, &failure) == nil && len(failure.Errors) > 0 {
+			return fmt.Errorf("redmine update returned %d: %s", resp.StatusCode, strings.Join(failure.Errors, "; "))
+		}
 		return fmt.Errorf("redmine update returned %d", resp.StatusCode)
 	}
 	return nil
+}
+
+// IssueState is the part of an issue a Kanban move changes.
+type IssueState struct {
+	StatusID     int
+	AssignedToID *int // nil = nobody
+}
+
+// GetIssueState reads the current status and assignee of an issue. Redmine
+// silently ignores a change its workflow does not allow (the update still
+// succeeds), so a move is checked by reading the issue back.
+func (c *Client) GetIssueState(id int) (*IssueState, error) {
+	data, err := c.doRequest(fmt.Sprintf("/issues/%d.json", id))
+	if err != nil {
+		return nil, err
+	}
+	var resp struct {
+		Issue struct {
+			Status struct {
+				ID int `json:"id"`
+			} `json:"status"`
+			AssignedTo *struct {
+				ID int `json:"id"`
+			} `json:"assigned_to"`
+		} `json:"issue"`
+	}
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return nil, err
+	}
+	state := &IssueState{StatusID: resp.Issue.Status.ID}
+	if resp.Issue.AssignedTo != nil {
+		state.AssignedToID = &resp.Issue.AssignedTo.ID
+	}
+	return state, nil
 }
 
 type priorityResp struct {

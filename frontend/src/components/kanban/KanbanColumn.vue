@@ -9,7 +9,7 @@
   >
     <div class="column-header" draggable="true" @dragstart="onColumnDragStart">
       <GripVertical :size="14" class="drag-handle" />
-      <span class="column-name">{{ column.name }}</span>
+      <span class="column-name">{{ column.id === UNASSIGNED ? $t('kanban.unassigned') : column.name }}</span>
       <span class="column-count">{{ column.tasks.length }}</span>
     </div>
 
@@ -32,7 +32,7 @@
 import { ref } from 'vue'
 import { GripVertical } from 'lucide-vue-next'
 import KanbanCard from './KanbanCard.vue'
-import type { KanbanColumn as ColumnType } from '../../stores/kanban'
+import { UNASSIGNED, type KanbanColumn as ColumnType } from '../../stores/kanban'
 
 defineProps<{ column: ColumnType }>()
 defineEmits(['open-task', 'move-card'])

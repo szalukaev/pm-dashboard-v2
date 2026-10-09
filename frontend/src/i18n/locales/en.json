@@ -191,6 +191,12 @@
     "unassigned": "Unassigned",
     "select_project": "Select a project",
     "total_tasks": "Tasks",
+    "load_error": "Failed to load the board",
+    "move_error": "Failed to move the task",
+    "move_rejected": "Redmine did not accept the change: its settings forbid this transition. The task was put back.",
+    "move_redmine_error": "Redmine rejected the change: {message}",
+    "move_no_source": "The data source is not configured — the change was not saved",
+    "move_forbidden": "No access to the project of this task",
     "card": {
       "overdue": "Overdue"
     }

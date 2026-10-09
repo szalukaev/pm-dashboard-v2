@@ -1,6 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import axios from 'axios'
+import i18n from '../i18n'
+import { useSwal } from '../composables/useSwal'
+
+// Id of the "no assignee" column in the users mode
+export const UNASSIGNED = 'unassigned'
 
 export interface KanbanCard {
   external_id: number
@@ -43,7 +48,7 @@ export const useKanbanStore = defineStore('kanban', () => {
       columns.value = data.columns || []
       total.value = data.total || 0
     } catch {
-      error.value = 'Не удалось загрузить доску'
+      error.value = i18n.global.t('kanban.load_error')
     } finally {
       loading.value = false
     }
@@ -54,6 +59,8 @@ export const useKanbanStore = defineStore('kanban', () => {
     const card = findCard(issueId)
     const sourceCol = findColumnWithCard(issueId)
 
+    if (sourceCol?.id === targetId) return
+
     if (card && sourceCol) {
       // Remove from source
       sourceCol.tasks = sourceCol.tasks.filter(t => t.external_id !== issueId)
@@ -61,6 +68,14 @@ export const useKanbanStore = defineStore('kanban', () => {
       const targetCol = columns.value.find(c => c.id === targetId)
       if (targetCol) {
         targetCol.tasks.push(card)
+        // The card itself shows status and assignee
+        if (mode.value === 'statuses') {
+          card.status_id = Number(targetCol.id)
+          card.status_name = targetCol.name
+        } else {
+          card.assigned_to_id = targetCol.id === UNASSIGNED ? null : Number(targetCol.id)
+          card.assigned_to_name = targetCol.name
+        }
       }
     }
 
@@ -70,14 +85,23 @@ export const useKanbanStore = defineStore('kanban', () => {
         target_id: targetId,
         mode: mode.value,
       })
-    } catch {
-      // Revert on error
+    } catch (e: any) {
+      // The data source did not take the change: put the card back and say why
       await fetchBoard()
+      const { toast } = useSwal()
+      const t = i18n.global.t
+      const data = e?.response?.data || {}
+      const message = data.error === 'REDMINE_CHANGE_REJECTED' ? t('kanban.move_rejected')
+        : data.error === 'REDMINE_UPDATE_FAILED' ? t('kanban.move_redmine_error', { message: data.message || '' })
+        : data.error === 'DATA_SOURCE_NOT_CONFIGURED' ? t('kanban.move_no_source')
+        : data.error === 'FORBIDDEN' ? t('kanban.move_forbidden')
+        : t('kanban.move_error')
+      toast(message, 'error')
     }
   }
 
   async function saveColumnOrder() {
-    const order = columns.value.map(c => c.name)
+    const order = columns.value.map(c => c.id)
     try {
       await axios.put('/api/kanban/column-order', { mode: mode.value, order })
     } catch {}
