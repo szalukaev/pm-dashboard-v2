@@ -357,6 +357,12 @@
       "save_error": "Failed to save the change"
     }
   },
+  "sync_status": {
+    "success": "Last synchronization: {time}",
+    "running": "Data synchronization is in progress...",
+    "error": "The last synchronization session failed ({time}).",
+    "unknown": "No synchronization has run yet"
+  },
   "errors": {
     "generic": "An error occurred",
     "not_found": "Resource not found",

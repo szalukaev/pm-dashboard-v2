@@ -56,11 +56,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
 import { useI18n } from 'vue-i18n'
 import { RefreshCw } from 'lucide-vue-next'
 import { useSwal } from '../../composables/useSwal'
+import { useWebSocket } from '../../composables/useWebSocket'
 import AppButton from '../ui/AppButton.vue'
 
 interface SyncLog {
@@ -162,10 +163,16 @@ function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max) + '…' : s
 }
 
+// The log follows the sync: a new entry on start, its outcome on finish
+const { on, off } = useWebSocket()
+
 onMounted(() => {
   loadLogs()
   loadSettings()
+  on('sync-status', loadLogs)
 })
+
+onUnmounted(() => off('sync-status', loadLogs))
 </script>
 
 <style scoped>
