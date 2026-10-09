@@ -2,96 +2,165 @@ package redmine
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/lib/pq"
 )
 
 const (
-	// fullSyncInterval: how often everything is re-read from Redmine. In
-	// between only changes are fetched; the full pass also picks up deleted
-	// time entries and time logged for long-past dates.
-	fullSyncInterval = time.Hour
+	// fullSyncInterval: how often a project is re-read from Redmine
+	// completely. In between only changes are fetched; the full pass picks
+	// up what the changes cannot show: deleted issues, deleted time entries
+	// and time logged for long-past dates.
+	fullSyncInterval = 24 * time.Hour
 	// syncOverlap widens the incremental window against clock skew between
 	// this server and Redmine.
 	syncOverlap = 10 * time.Minute
+	// fullSyncWorkers projects are read completely at the same time.
+	fullSyncWorkers = 3
+	// emptyAnswerGuard: a project that has more issues than this here and
+	// none in the answer of Redmine looks like a failure, not like the truth;
+	// nothing is deleted on such an answer.
+	emptyAnswerGuard = 50
 	// issueBatchSize rows per INSERT: 18 params each, well below the 65535 limit.
 	issueBatchSize = 500
 	// timeEntryBatchSize rows per INSERT: 5 params each.
 	timeEntryBatchSize = 1000
 )
 
-// syncProjectIssues loads issues and time entries of the given projects.
-// Projects not seen before and every project once per fullSyncInterval are
-// read completely; otherwise only issues updated and time entries spent since
-// the previous successful sync are fetched. Fact and bug fix hours are then
-// recomputed from the stored time entries of the affected issues.
-func (s *Syncer) syncProjectIssues(db *sql.DB, projectIDs []int) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+// projectState is when a project was last read: any successful load and the
+// last complete one.
+type projectState struct {
+	lastSync time.Time
+	lastFull time.Time
+}
 
-	started := time.Now()
-	full := s.lastFull.IsZero() || started.Sub(s.lastFull) >= fullSyncInterval
-	since := s.lastSync.Add(-syncOverlap)
+// syncStore is where a sync keeps the issues and its own state: the
+// database (pgStore), or a stand-in in tests.
+type syncStore interface {
+	loadStates() (map[int]projectState, error)
+	saveState(projectID int, state projectState) error
+	storeTimeEntries(projectID int, entries []TimeEntry, replace bool) error
+	upsertIssues(batch []Issue) error
+	updateIssueHours(issueIDs []int64) error
+	// countIssues: how many issues of the project are stored.
+	countIssues(projectID int) (int, error)
+	// deleteMissing removes the issues of the project that are not in keep
+	// and returns their numbers.
+	deleteMissing(projectID int, keep []int) ([]int, error)
+	// deleteIssues removes the given issues wherever they are.
+	deleteIssues(issueIDs []int) error
+	cleanupUnselected(projectIDs []int) error
+}
+
+// fullLoad is everything Redmine has for one project.
+type fullLoad struct {
+	projectID int
+	issues    []Issue
+	entries   []TimeEntry
+	// noTimeAccess: the API key may not read the time entries of the project.
+	noTimeAccess bool
+	err          error
+}
+
+// syncProjectIssues loads issues and time entries of the given projects.
+//
+// A project that was never read, or was last read completely more than
+// fullSyncInterval ago, is read completely; issues that are no longer in
+// Redmine are deleted then. The other projects are covered by two requests
+// for all of them: the issues updated and the time spent since their last
+// sync. Fact and bug fix hours are then recomputed from the stored time
+// entries of the affected issues.
+//
+// The state is kept per project: a project that failed is read again next
+// time and does not make the others be re-read.
+func (s *Syncer) syncProjectIssues(store syncStore, projectIDs []int, started time.Time) error {
+	states, err := store.loadStates()
+	if err != nil {
+		return fmt.Errorf("load sync state: %w", err)
+	}
+
+	selected := make(map[int]bool, len(projectIDs))
+	var fullIDs, quickIDs []int
+	for _, pid := range projectIDs {
+		if selected[pid] {
+			continue
+		}
+		selected[pid] = true
+		if st, known := states[pid]; known && started.Sub(st.lastFull) < fullSyncInterval {
+			quickIDs = append(quickIDs, pid)
+		} else {
+			fullIDs = append(fullIDs, pid)
+		}
+	}
 
 	var issues []Issue
 	seenIssues := make(map[int]bool)
 	touched := make(map[int]bool)
-	loaded := make([]int, 0, len(projectIDs))
+	addIssues := func(list []Issue) {
+		for _, iss := range list {
+			if !seenIssues[iss.ExternalID] {
+				seenIssues[iss.ExternalID] = true
+				touched[iss.ExternalID] = true
+				issues = append(issues, iss)
+			}
+		}
+	}
 	failed := 0
 
-	for _, pid := range projectIDs {
-		projectFull := full || !s.knownProjects[pid]
+	// Changes of the projects that are up to date: two requests for all of them
+	quickDone, movedOut := s.loadChanges(store, quickIDs, selected, states, addIssues, touched)
+	if !quickDone {
+		failed += len(quickIDs)
+	}
 
-		from, updatedSince := "", (*time.Time)(nil)
-		if !projectFull {
-			// Entries are filtered by the day they were spent on; one extra day
-			// covers time logged for yesterday.
-			from = since.AddDate(0, 0, -1).Format("2006-01-02")
-			updatedSince = &since
-		}
-
-		entries, err := s.client.GetTimeEntries(pid, from)
-		if err != nil {
-			slog.Warn("Failed to get time entries for project", "project_id", pid, "error", err)
+	// Complete loads, a few projects at a time
+	loads := s.loadFull(fullIDs)
+	var complete []fullLoad
+	for _, load := range loads {
+		if load.err != nil {
+			slog.Warn("Failed to load project from Redmine", "project_id", load.projectID, "error", load.err)
 			failed++
 			continue
 		}
-		projectIssues, err := s.client.GetIssues(pid, updatedSince)
-		if err != nil {
-			slog.Warn("Failed to get issues for project", "project_id", pid, "error", err)
-			failed++
-			continue
-		}
-		if err := storeTimeEntries(db, pid, entries, projectFull); err != nil {
-			slog.Warn("Failed to store time entries for project", "project_id", pid, "error", err)
-			failed++
-			continue
-		}
-
-		for _, e := range entries {
-			touched[e.IssueID] = true
-		}
-		for _, iss := range projectIssues {
-			if seenIssues[iss.ExternalID] {
+		if !load.noTimeAccess {
+			if err := store.storeTimeEntries(load.projectID, load.entries, true); err != nil {
+				slog.Warn("Failed to store time entries for project", "project_id", load.projectID, "error", err)
+				failed++
 				continue
 			}
-			seenIssues[iss.ExternalID] = true
-			touched[iss.ExternalID] = true
-			issues = append(issues, iss)
 		}
-		loaded = append(loaded, pid)
-		slog.Info("Loaded project from Redmine", "project_id", pid, "full", projectFull,
-			"issues", len(projectIssues), "time_entries", len(entries))
+		for _, e := range load.entries {
+			touched[e.IssueID] = true
+		}
+		addIssues(load.issues)
+		complete = append(complete, load)
+		slog.Info("Loaded project from Redmine", "project_id", load.projectID, "full", true,
+			"issues", len(load.issues), "time_entries", len(load.entries))
 	}
 
 	for start := 0; start < len(issues); start += issueBatchSize {
 		end := min(start+issueBatchSize, len(issues))
-		if err := upsertIssues(db, issues[start:end]); err != nil {
+		if err := store.upsertIssues(issues[start:end]); err != nil {
 			return fmt.Errorf("upsert issues: %w", err)
+		}
+	}
+
+	// Issues that are gone from Redmine. After the upsert: an issue moved to
+	// another synced project already belongs to it and is not touched here.
+	deleted := 0
+	for _, load := range complete {
+		deleted += deleteGone(store, load)
+	}
+	if len(movedOut) > 0 {
+		// Moved to a project that is not synced
+		if err := store.deleteIssues(movedOut); err != nil {
+			slog.Warn("Failed to delete issues moved out of the synced projects", "error", err)
 		}
 	}
 
@@ -99,29 +168,266 @@ func (s *Syncer) syncProjectIssues(db *sql.DB, projectIDs []int) error {
 	for id := range touched {
 		ids = append(ids, int64(id))
 	}
-	if err := updateIssueHours(db, ids); err != nil {
+	if err := store.updateIssueHours(ids); err != nil {
 		return fmt.Errorf("update issue hours: %w", err)
 	}
 
-	for _, pid := range loaded {
-		s.knownProjects[pid] = true
+	// Everything is stored: the projects that were read move on
+	for _, load := range complete {
+		if err := store.saveState(load.projectID, projectState{lastSync: started, lastFull: started}); err != nil {
+			slog.Warn("Failed to save sync state", "project_id", load.projectID, "error", err)
+		}
 	}
-	// The window moves on only when every project was read: otherwise the
-	// next run repeats it and nothing is lost.
-	if failed == 0 {
-		s.lastSync = started
-		if full {
-			s.lastFull = started
+	if quickDone {
+		for _, pid := range quickIDs {
+			if err := store.saveState(pid, projectState{lastSync: started, lastFull: states[pid].lastFull}); err != nil {
+				slog.Warn("Failed to save sync state", "project_id", pid, "error", err)
+			}
 		}
 	}
 
-	slog.Info("Synced issues", "full", full, "issues", len(issues), "recalculated", len(ids),
-		"projects", len(loaded), "failed", failed, "duration", time.Since(started))
+	slog.Info("Synced issues", "issues", len(issues), "recalculated", len(ids), "deleted", deleted,
+		"projects_full", len(complete), "projects_changes", len(quickIDs), "failed", failed,
+		"duration", time.Since(started))
 
-	if err := cleanupUnselected(db, projectIDs); err != nil {
+	if err := store.cleanupUnselected(projectIDs); err != nil {
 		slog.Warn("Failed to cleanup unselected projects", "error", err)
 	}
 	return nil
+}
+
+// loadChanges fetches what changed in the given projects since their last
+// sync and stores the time entries. It reports whether the changes were read
+// (false: nothing may be taken as synced) and the changed issues that now
+// belong to a project that is not synced at all.
+func (s *Syncer) loadChanges(store syncStore, projectIDs []int, selected map[int]bool, states map[int]projectState,
+	addIssues func([]Issue), touched map[int]bool) (done bool, movedOut []int) {
+	if len(projectIDs) == 0 {
+		return true, nil
+	}
+	quick := make(map[int]bool, len(projectIDs))
+	since := states[projectIDs[0]].lastSync
+	for _, pid := range projectIDs {
+		quick[pid] = true
+		if states[pid].lastSync.Before(since) {
+			since = states[pid].lastSync
+		}
+	}
+	since = since.Add(-syncOverlap)
+
+	changed, err := s.client.GetIssues(0, &since)
+	if err != nil {
+		slog.Warn("Failed to get changed issues", "error", err)
+		return false, nil
+	}
+	// Entries are filtered by the day they were spent on; one extra day
+	// covers time logged for yesterday.
+	entries, err := s.client.GetTimeEntries(0, since.AddDate(0, 0, -1).Format("2006-01-02"))
+	if err != nil {
+		slog.Warn("Failed to get recent time entries", "error", err)
+		return false, nil
+	}
+
+	byProject := make(map[int][]TimeEntry)
+	for _, e := range entries {
+		if quick[e.ProjectID] {
+			byProject[e.ProjectID] = append(byProject[e.ProjectID], e)
+		}
+	}
+	for pid, list := range byProject {
+		if err := store.storeTimeEntries(pid, list, false); err != nil {
+			slog.Warn("Failed to store time entries for project", "project_id", pid, "error", err)
+			return false, nil
+		}
+		for _, e := range list {
+			touched[e.IssueID] = true
+		}
+	}
+
+	var mine []Issue
+	for _, iss := range changed {
+		switch {
+		case quick[iss.ProjectID]:
+			mine = append(mine, iss)
+		case !selected[iss.ProjectID]:
+			movedOut = append(movedOut, iss.ExternalID)
+		}
+		// An issue of a project that is being read completely comes with it
+	}
+	addIssues(mine)
+	slog.Info("Loaded changes from Redmine", "projects", len(projectIDs), "since", since.Format(time.RFC3339),
+		"issues", len(mine), "time_entries", len(entries))
+	return true, movedOut
+}
+
+// loadFull reads the given projects completely, fullSyncWorkers at a time.
+func (s *Syncer) loadFull(projectIDs []int) []fullLoad {
+	loads := make([]fullLoad, len(projectIDs))
+	var wg sync.WaitGroup
+	slots := make(chan struct{}, fullSyncWorkers)
+	for i, pid := range projectIDs {
+		wg.Add(1)
+		slots <- struct{}{}
+		go func(i, pid int) {
+			defer wg.Done()
+			defer func() { <-slots }()
+			loads[i] = s.loadProject(pid)
+		}(i, pid)
+	}
+	wg.Wait()
+	return loads
+}
+
+func (s *Syncer) loadProject(pid int) fullLoad {
+	load := fullLoad{projectID: pid}
+	entries, err := s.client.GetTimeEntries(pid, "")
+	switch {
+	case errors.Is(err, ErrForbidden):
+		// The key has no right to the time of this project. It is not a
+		// failure and will not pass by itself: the issues are synced
+		// without their hours.
+		slog.Warn("The API key has no access to the time entries of a project: its issues are synced without hours",
+			"project_id", pid)
+		load.noTimeAccess = true
+	case err != nil:
+		load.err = fmt.Errorf("time entries: %w", err)
+		return load
+	}
+	load.entries = entries
+
+	load.issues, err = s.client.GetIssues(pid, nil)
+	if err != nil {
+		load.err = fmt.Errorf("issues: %w", err)
+	}
+	return load
+}
+
+// deleteGone removes the issues of a completely read project that Redmine
+// no longer has, and returns how many were removed.
+func deleteGone(store syncStore, load fullLoad) int {
+	if len(load.issues) == 0 {
+		if stored, err := store.countIssues(load.projectID); err != nil || stored > emptyAnswerGuard {
+			slog.Warn("Redmine returned no issues for a project that has many here: nothing is deleted",
+				"project_id", load.projectID, "stored", stored, "error", err)
+			return 0
+		}
+	}
+	keep := make([]int, len(load.issues))
+	for i, iss := range load.issues {
+		keep[i] = iss.ExternalID
+	}
+	gone, err := store.deleteMissing(load.projectID, keep)
+	if err != nil {
+		slog.Warn("Failed to delete issues that are gone from Redmine", "project_id", load.projectID, "error", err)
+		return 0
+	}
+	if len(gone) > 0 {
+		slog.Info("Deleted issues that are gone from Redmine", "project_id", load.projectID, "count", len(gone), "issues", gone)
+	}
+	return len(gone)
+}
+
+// pgStore keeps the synced data in PostgreSQL.
+type pgStore struct {
+	db *sql.DB
+}
+
+func (p pgStore) loadStates() (map[int]projectState, error) {
+	rows, err := p.db.Query(`SELECT project_id, last_sync_at, last_full_at FROM sync_state WHERE data_source = 'redmine'`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	states := make(map[int]projectState)
+	for rows.Next() {
+		var pid int
+		var st projectState
+		if err := rows.Scan(&pid, &st.lastSync, &st.lastFull); err != nil {
+			return nil, err
+		}
+		states[pid] = st
+	}
+	return states, rows.Err()
+}
+
+func (p pgStore) saveState(projectID int, state projectState) error {
+	_, err := p.db.Exec(`INSERT INTO sync_state (project_id, data_source, last_sync_at, last_full_at)
+		VALUES ($1, 'redmine', $2, $3)
+		ON CONFLICT (project_id, data_source) DO UPDATE SET
+			last_sync_at = EXCLUDED.last_sync_at, last_full_at = EXCLUDED.last_full_at`,
+		projectID, state.lastSync, state.lastFull)
+	return err
+}
+
+func (p pgStore) storeTimeEntries(projectID int, entries []TimeEntry, replace bool) error {
+	return storeTimeEntries(p.db, projectID, entries, replace)
+}
+
+func (p pgStore) upsertIssues(batch []Issue) error { return upsertIssues(p.db, batch) }
+
+func (p pgStore) updateIssueHours(issueIDs []int64) error { return updateIssueHours(p.db, issueIDs) }
+
+func (p pgStore) countIssues(projectID int) (int, error) {
+	var n int
+	err := p.db.QueryRow(`SELECT COUNT(*) FROM issues WHERE data_source = 'redmine' AND project_id = $1`, projectID).Scan(&n)
+	return n, err
+}
+
+func (p pgStore) deleteMissing(projectID int, keep []int) ([]int, error) {
+	rows, err := p.db.Query(`SELECT external_id FROM issues
+		WHERE data_source = 'redmine' AND project_id = $1 AND NOT (external_id = ANY($2::int[]))`,
+		projectID, pq.Array(keep))
+	if err != nil {
+		return nil, err
+	}
+	var gone []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		gone = append(gone, id)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil || len(gone) == 0 {
+		return nil, err
+	}
+	return gone, p.deleteIssues(gone)
+}
+
+// deleteIssues removes issues together with what exists only for them:
+// their time entries and their places in sprints. Snapshots keep the history.
+func (p pgStore) deleteIssues(issueIDs []int) error {
+	if len(issueIDs) == 0 {
+		return nil
+	}
+	tx, err := p.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	ids := pq.Array(issueIDs)
+	for _, query := range []string{
+		`DELETE FROM time_entries WHERE data_source = 'redmine' AND issue_id = ANY($1::int[])`,
+		`DELETE FROM sprint_issues WHERE issue_external_id = ANY($1::int[])`,
+		`DELETE FROM issues WHERE data_source = 'redmine' AND external_id = ANY($1::int[])`,
+	} {
+		if _, err := tx.Exec(query, ids); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func (p pgStore) cleanupUnselected(projectIDs []int) error {
+	if err := cleanupUnselected(p.db, projectIDs); err != nil {
+		return err
+	}
+	// A project that is selected again later starts from a complete load
+	_, err := p.db.Exec(`DELETE FROM sync_state WHERE data_source = 'redmine' AND NOT (project_id = ANY($1::int[]))`,
+		pq.Array(projectIDs))
+	return err
 }
 
 // storeTimeEntries saves time entries of a project. A full load replaces the

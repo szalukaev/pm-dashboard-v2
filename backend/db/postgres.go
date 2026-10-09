@@ -130,7 +130,10 @@ func runFallbackMigrations(db *sql.DB) error {
 	if _, err := db.Exec(sourceMembersSQL); err != nil {
 		return err
 	}
-	_, err := db.Exec(tableColumnsSQL)
+	if _, err := db.Exec(tableColumnsSQL); err != nil {
+		return err
+	}
+	_, err := db.Exec(syncStateSQL)
 	return err
 }
 
@@ -160,6 +163,9 @@ var sourceMembersSQL string
 
 //go:embed migrations/013_table_columns.up.sql
 var tableColumnsSQL string
+
+//go:embed migrations/014_sync_state.up.sql
+var syncStateSQL string
 
 // fallbackMigrationSQL is kept as a safety net when migration files are not available
 const fallbackMigrationSQL = `

@@ -18,15 +18,12 @@ type Syncer struct {
 	// Projects returns the projects whose issues are synced; optional.
 	Projects func() ([]int, error)
 
-	// Incremental sync state, guarded by mu.
-	mu            sync.Mutex
-	lastSync      time.Time // start of the last sync that read every project
-	lastFull      time.Time // start of the last such sync that was a full one
-	knownProjects map[int]bool
+	// One sync of issues at a time.
+	mu sync.Mutex
 }
 
 func NewSyncer(client *Client) *Syncer {
-	return &Syncer{client: client, knownProjects: make(map[int]bool)}
+	return &Syncer{client: client}
 }
 
 func (s *Syncer) SyncAll(ctx context.Context, db **sql.DB) error {
@@ -254,5 +251,7 @@ func (s *Syncer) syncIssues(_ context.Context, db **sql.DB) error {
 	}
 
 	slog.Info("Syncing issues for selected projects", "count", len(projectIDs))
-	return s.syncProjectIssues(*db, projectIDs)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.syncProjectIssues(pgStore{db: *db}, projectIDs, time.Now())
 }

@@ -146,6 +146,9 @@ type timeEntryResp struct {
 		Issue *struct {
 			ID int `json:"id"`
 		} `json:"issue"`
+		Project struct {
+			ID int `json:"id"`
+		} `json:"project"`
 		Activity struct {
 			Name string `json:"name"`
 		} `json:"activity"`
@@ -158,6 +161,7 @@ type timeEntryResp struct {
 type TimeEntry struct {
 	ID           int
 	IssueID      int
+	ProjectID    int
 	ActivityName string
 	Hours        float64
 }
@@ -165,8 +169,14 @@ type TimeEntry struct {
 // GetTimeEntries returns the time entries of a project that are linked to
 // issues, spent on or after `from` (YYYY-MM-DD; empty = all). Subprojects
 // are excluded: they are requested on their own.
+//
+// projectID 0 asks for the entries of every project the key can see — one
+// request instead of one per project, for reading recent changes.
 func (c *Client) GetTimeEntries(projectID int, from string) ([]TimeEntry, error) {
-	path := fmt.Sprintf("/time_entries.json?project_id=%d&subproject_id=!*", projectID)
+	path := "/time_entries.json?"
+	if projectID > 0 {
+		path = fmt.Sprintf("/time_entries.json?project_id=%d&subproject_id=!*", projectID)
+	}
 	if from != "" {
 		path += "&from=" + from
 	}
@@ -187,6 +197,7 @@ func (c *Client) GetTimeEntries(projectID int, from string) ([]TimeEntry, error)
 			all = append(all, TimeEntry{
 				ID:           e.ID,
 				IssueID:      e.Issue.ID,
+				ProjectID:    e.Project.ID,
 				ActivityName: e.Activity.Name,
 				Hours:        e.Hours,
 			})
@@ -246,11 +257,18 @@ func (c *Client) doRequest(path string) ([]byte, error) {
 	if resp.StatusCode == http.StatusUnauthorized {
 		return nil, fmt.Errorf("%w (redmine returned 401 for %s)", ErrUnauthorized, path)
 	}
+	if resp.StatusCode == http.StatusForbidden {
+		return nil, fmt.Errorf("%w (redmine returned 403 for %s)", ErrForbidden, path)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("redmine returned %d for %s", resp.StatusCode, path)
 	}
 	return io.ReadAll(resp.Body)
 }
+
+// ErrForbidden: the owner of the API key has no right to what was asked.
+// Unlike a failure it will not go away by itself, so it is not retried.
+var ErrForbidden = errors.New("redmine denies access")
 
 // ErrUnauthorized: Redmine did not accept the API key.
 var ErrUnauthorized = errors.New("redmine api key is not valid")
@@ -314,10 +332,16 @@ func (c *Client) GetCurrentUser() (*Member, error) {
 
 const (
 	pageSize = 100
-	// Redmine answers 500 when hit with many parallel list requests.
+	// Pages of one list requested at once.
 	pageWorkers  = 2
 	pageAttempts = 3
+	// maxParallelLists bounds the list requests in flight over all lists and
+	// projects: Redmine answers 500 when hit with many of them at once.
+	maxParallelLists = 4
 )
+
+// listSlots enforces maxParallelLists.
+var listSlots = make(chan struct{}, maxParallelLists)
 
 // getPages loads every page of a paginated list. The first page gives
 // total_count, the rest are requested concurrently and returned in order.
@@ -327,9 +351,15 @@ func (c *Client) getPages(path string) ([][]byte, error) {
 		var data []byte
 		var err error
 		for attempt := 1; attempt <= pageAttempts; attempt++ {
+			listSlots <- struct{}{}
 			data, err = c.doRequest(fmt.Sprintf("%s&limit=%d&offset=%d", path, pageSize, offset))
+			<-listSlots
 			if err == nil {
 				return data, nil
+			}
+			// A refusal is an answer, not a failure: asking again changes nothing
+			if errors.Is(err, ErrForbidden) || errors.Is(err, ErrUnauthorized) {
+				return nil, err
 			}
 			if attempt < pageAttempts {
 				time.Sleep(time.Duration(attempt) * pageRetryDelay)
