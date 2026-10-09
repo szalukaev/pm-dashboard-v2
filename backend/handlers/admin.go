@@ -13,11 +13,9 @@ import (
 
 	"pm-dashboard/config"
 	"pm-dashboard/datasource/manager"
-	"pm-dashboard/middleware"
 	"pm-dashboard/utils"
 
 	"github.com/gorilla/mux"
-	"golang.org/x/crypto/bcrypt"
 )
 
 type AdminHandler struct {
@@ -26,177 +24,10 @@ type AdminHandler struct {
 	Source *manager.Manager
 }
 
-// ─── User Management ───
-
-func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
-	if *h.DB == nil {
-		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
-		return
-	}
-
-	rows, err := (*h.DB).Query("SELECT id, username, role, created_at FROM users ORDER BY id")
-	if err != nil {
-		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
-		return
-	}
-	defer rows.Close()
-
-	type UserInfo struct {
-		ID        int    `json:"id"`
-		Username  string `json:"username"`
-		Role      string `json:"role"`
-		CreatedAt string `json:"created_at"`
-	}
-	var users []UserInfo
-	for rows.Next() {
-		var u UserInfo
-		if rows.Scan(&u.ID, &u.Username, &u.Role, &u.CreatedAt) == nil {
-			users = append(users, u)
-		}
-	}
-	if users == nil {
-		users = []UserInfo{}
-	}
-	utils.JSON(w, http.StatusOK, map[string]interface{}{"users": users})
-}
-
-func (h *AdminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
-	if *h.DB == nil {
-		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
-		return
-	}
-
-	var body struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-		Role     string `json:"role"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
-		return
-	}
-	if len(body.Username) < 3 || len(body.Password) < 6 {
-		utils.Error(w, http.StatusBadRequest, "INVALID_INPUT")
-		return
-	}
-	if body.Role == "" {
-		body.Role = "user"
-	}
-	if !isValidRole(body.Role) {
-		utils.Error(w, http.StatusBadRequest, "INVALID_ROLE")
-		return
-	}
-
-	hash, err := bcrypt.GenerateFromPassword([]byte(body.Password), bcrypt.DefaultCost)
-	if err != nil {
-		utils.Error(w, http.StatusInternalServerError, "HASH_FAILED")
-		return
-	}
-
-	_, err = (*h.DB).Exec("INSERT INTO users (username, password_hash, role, force_password_change) VALUES ($1, $2, $3, true)",
-		body.Username, string(hash), body.Role)
-	if err != nil {
-		utils.Error(w, http.StatusConflict, "USER_EXISTS")
-		return
-	}
-	utils.Success(w)
-}
-
-func (h *AdminHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
-	if *h.DB == nil {
-		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
-		return
-	}
-
-	userID, err := strconv.Atoi(mux.Vars(r)["id"])
-	if err != nil {
-		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
-		return
-	}
-	var body struct {
-		Role     *string `json:"role"`
-		Password *string `json:"password"`
-	}
-	json.NewDecoder(r.Body).Decode(&body)
-
-	if body.Role != nil && !isValidRole(*body.Role) {
-		utils.Error(w, http.StatusBadRequest, "INVALID_ROLE")
-		return
-	}
-	if body.Password != nil && len(*body.Password) < 6 {
-		utils.Error(w, http.StatusBadRequest, "PASSWORD_TOO_SHORT")
-		return
-	}
-	// An administrator cannot demote themselves — protects against losing the last admin.
-	if body.Role != nil && *body.Role != "admin" && userID == middleware.GetUserID(r) {
-		utils.Error(w, http.StatusBadRequest, "CANNOT_DEMOTE_SELF")
-		return
-	}
-
-	if body.Role != nil {
-		res, err := (*h.DB).Exec("UPDATE users SET role=$1 WHERE id=$2", *body.Role, userID)
-		if err != nil {
-			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
-			return
-		}
-		if n, _ := res.RowsAffected(); n == 0 {
-			utils.Error(w, http.StatusNotFound, "USER_NOT_FOUND")
-			return
-		}
-	}
-	if body.Password != nil {
-		hash, err := bcrypt.GenerateFromPassword([]byte(*body.Password), bcrypt.DefaultCost)
-		if err != nil {
-			utils.Error(w, http.StatusInternalServerError, "HASH_FAILED")
-			return
-		}
-		// A password set by an administrator is temporary: the user must
-		// replace it on the next login (unless the admin resets their own).
-		forceChange := userID != middleware.GetUserID(r)
-		res, err := (*h.DB).Exec("UPDATE users SET password_hash=$1, force_password_change=$2 WHERE id=$3", string(hash), forceChange, userID)
-		if err != nil {
-			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
-			return
-		}
-		if n, _ := res.RowsAffected(); n == 0 {
-			utils.Error(w, http.StatusNotFound, "USER_NOT_FOUND")
-			return
-		}
-	}
-	utils.Success(w)
-}
+// Users, their rights, groups and role templates: see access_admin.go.
 
 func isValidRole(role string) bool {
 	return role == "admin" || role == "user"
-}
-
-func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
-	if *h.DB == nil {
-		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
-		return
-	}
-
-	userID, err := strconv.Atoi(mux.Vars(r)["id"])
-	if err != nil {
-		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
-		return
-	}
-	// Don't delete yourself
-	currentUserID := middleware.GetUserID(r)
-	if userID == currentUserID {
-		utils.Error(w, http.StatusBadRequest, "CANNOT_DELETE_SELF")
-		return
-	}
-	res, err := (*h.DB).Exec("DELETE FROM users WHERE id=$1", userID)
-	if err != nil {
-		utils.Error(w, http.StatusInternalServerError, "DELETE_FAILED")
-		return
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		utils.Error(w, http.StatusNotFound, "USER_NOT_FOUND")
-		return
-	}
-	utils.Success(w)
 }
 
 // ─── Status Mapping ───

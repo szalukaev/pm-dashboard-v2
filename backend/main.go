@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"pm-dashboard/access"
 	"pm-dashboard/config"
 	"pm-dashboard/db"
 	"pm-dashboard/datasource/manager"
@@ -115,6 +116,9 @@ func main() {
 	setupH.Source = source
 	settingsH.Source = source
 	syncStatusH := &handlers.SyncStatusHandler{DB: &pgDB, Source: source}
+	accessH := &handlers.AccessHandler{DB: &pgDB, Source: source}
+	// Issues are synced for the projects the users are shown within their rights
+	source.SetProjectSource((&access.Resolver{DB: &pgDB}).SyncProjects)
 
 	// Real-time: the sync and user edits report changes to open pages
 	source.SetNotifier(wsHub.BroadcastEvent)
@@ -173,6 +177,19 @@ func main() {
 		api.Use(licenseChecker.ReadOnlyMiddleware)
 	}
 
+	// A tab hidden from a user by the administrator is closed here as well,
+	// not only in the menu. Task cards and reference lists stay open: other
+	// tabs use them.
+	api.Use(middleware.RequireTabs([]middleware.TabRule{
+		{Path: "/api/tasks", Exact: true, Tab: "tasks"},
+		{Path: "/api/analytics", Tab: "analytics"},
+		{Path: "/api/kanban", Tab: "kanban"},
+		{Path: "/api/sprints", Tab: "sprint"},
+		{Path: "/api/organizations", Tab: "payments"},
+		{Path: "/api/contracts", Tab: "payments"},
+		{Path: "/api/payments", Tab: "payments"},
+	}))
+
 	api.Handle("/license/activate", middleware.RequireAdmin(http.HandlerFunc(licenseH.Activate))).Methods("POST")
 
 	api.HandleFunc("/auth/logout", authH.Logout).Methods("POST")
@@ -202,9 +219,9 @@ func main() {
 	api.HandleFunc("/tasks/{id}/details", taskH.GetTaskDetails).Methods("GET")
 	api.HandleFunc("/tasks/{id}/attachments/{attachment_id}", taskH.GetTaskAttachment).Methods("GET")
 	api.HandleFunc("/tasks/{id}/comments", taskH.GetComments).Methods("GET")
-	api.HandleFunc("/tasks/{id}/comments", taskH.AddComment).Methods("POST")
+	api.Handle("/tasks/{id}/comments", middleware.RequireWrite(http.HandlerFunc(taskH.AddComment))).Methods("POST")
 	api.HandleFunc("/tasks/{id}", taskH.GetTask).Methods("GET")
-	api.HandleFunc("/tasks/{id}", taskH.UpdateTask).Methods("PUT")
+	api.Handle("/tasks/{id}", middleware.RequireWrite(http.HandlerFunc(taskH.UpdateTask))).Methods("PUT")
 
 	// Analytics
 	api.HandleFunc("/analytics/stats", analyticsH.GetStats).Methods("GET")
@@ -214,7 +231,7 @@ func main() {
 
 	// Kanban
 	api.HandleFunc("/kanban/board", kanbanH.GetBoard).Methods("GET")
-	api.HandleFunc("/kanban/move", kanbanH.MoveCard).Methods("PUT")
+	api.Handle("/kanban/move", middleware.RequireWrite(http.HandlerFunc(kanbanH.MoveCard))).Methods("PUT")
 	api.HandleFunc("/kanban/column-order", kanbanH.SaveColumnOrder).Methods("PUT")
 
 	// Sprints
@@ -248,10 +265,24 @@ func main() {
 	// Admin (admin role required)
 	admin := api.PathPrefix("/admin").Subrouter()
 	admin.Use(middleware.RequireAdmin)
-	admin.HandleFunc("/users", adminH.ListUsers).Methods("GET")
-	admin.HandleFunc("/users", adminH.CreateUser).Methods("POST")
-	admin.HandleFunc("/users/{id}", adminH.UpdateUser).Methods("PUT")
-	admin.HandleFunc("/users/{id}", adminH.DeleteUser).Methods("DELETE")
+	// Access control: users, their rights, groups, role templates
+	admin.HandleFunc("/users", accessH.ListUsers).Methods("GET")
+	admin.HandleFunc("/users", accessH.CreateUser).Methods("POST")
+	admin.HandleFunc("/users/{id}", accessH.UpdateUser).Methods("PUT")
+	admin.HandleFunc("/users/{id}", accessH.DeleteUser).Methods("DELETE")
+	admin.HandleFunc("/users/{id}/reset-password", accessH.ResetPassword).Methods("POST")
+	admin.HandleFunc("/users/{id}/permissions", accessH.GetUserPermissions).Methods("GET")
+	admin.HandleFunc("/users/{id}/permissions", accessH.SetUserPermissions).Methods("PUT")
+	admin.HandleFunc("/users/{id}/permissions", accessH.ClearUserPermissions).Methods("DELETE")
+	admin.HandleFunc("/permissions/clone", accessH.ClonePermissions).Methods("POST")
+	admin.HandleFunc("/groups", accessH.ListGroups).Methods("GET")
+	admin.HandleFunc("/groups", accessH.CreateGroup).Methods("POST")
+	admin.HandleFunc("/groups/{id}", accessH.UpdateGroup).Methods("PUT")
+	admin.HandleFunc("/groups/{id}", accessH.DeleteGroup).Methods("DELETE")
+	admin.HandleFunc("/role-templates", accessH.ListTemplates).Methods("GET")
+	admin.HandleFunc("/role-templates", accessH.CreateTemplate).Methods("POST")
+	admin.HandleFunc("/role-templates/{id}", accessH.UpdateTemplate).Methods("PUT")
+	admin.HandleFunc("/role-templates/{id}", accessH.DeleteTemplate).Methods("DELETE")
 	admin.HandleFunc("/statuses", adminH.ListStatuses).Methods("GET")
 	admin.HandleFunc("/statuses/{id}", adminH.UpdateStatusGroup).Methods("PUT")
 	admin.HandleFunc("/priorities", adminH.ListPriorities).Methods("GET")

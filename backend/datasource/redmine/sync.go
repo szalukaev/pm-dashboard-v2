@@ -15,6 +15,9 @@ import (
 type Syncer struct {
 	client *Client
 
+	// Projects returns the projects whose issues are synced; optional.
+	Projects func() ([]int, error)
+
 	// Incremental sync state, guarded by mu.
 	mu            sync.Mutex
 	lastSync      time.Time // start of the last sync that read every project
@@ -215,20 +218,30 @@ func (s *Syncer) syncMembers(_ context.Context, db **sql.DB) error {
 }
 
 func (s *Syncer) syncIssues(_ context.Context, db **sql.DB) error {
-	// Get union of selected_projects from all users
-	rows, err := (*db).Query(`SELECT DISTINCT jsonb_array_elements_text(selected_projects)::int AS pid
-		FROM user_settings WHERE selected_projects != '[]'::jsonb`)
-	if err != nil {
-		return err
-	}
+	// The projects to sync: what the users are shown within their rights
+	// (Projects), or — without access control wired in — the union of the
+	// projects selected by all users.
 	var projectIDs []int
-	for rows.Next() {
-		var pid int
-		if rows.Scan(&pid) == nil {
-			projectIDs = append(projectIDs, pid)
+	if s.Projects != nil {
+		ids, err := s.Projects()
+		if err != nil {
+			return err
 		}
+		projectIDs = ids
+	} else {
+		rows, err := (*db).Query(`SELECT DISTINCT jsonb_array_elements_text(selected_projects)::int AS pid
+			FROM user_settings WHERE selected_projects != '[]'::jsonb`)
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			var pid int
+			if rows.Scan(&pid) == nil {
+				projectIDs = append(projectIDs, pid)
+			}
+		}
+		rows.Close()
 	}
-	rows.Close()
 
 	if len(projectIDs) == 0 {
 		slog.Info("No projects selected in user_settings, skipping issue sync")

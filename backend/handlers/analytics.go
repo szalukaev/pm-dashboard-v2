@@ -2,10 +2,8 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"pm-dashboard/middleware"
@@ -60,9 +58,7 @@ func (h *AnalyticsHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID := middleware.GetUserID(r)
-	projects := h.getSelectedProjects(userID)
-	projectFilter, args := h.buildProjectFilter(projects, 1)
+	projectFilter, args := projectIssues(r)
 
 	var stats []StatCard
 	today := time.Now().Format("2006-01-02")
@@ -128,22 +124,16 @@ func (h *AnalyticsHandler) GetTeamLoad(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID := middleware.GetUserID(r)
-	projects := h.getSelectedProjects(userID)
-	team := h.getSelectedTeam(userID)
 	today := time.Now().Format("2006-01-02")
 
-	projectFilter, args := h.buildProjectFilter(projects, 1)
-
-	// Build team filter
+	// The team the user tracks, within rights
+	scope := middleware.GetScope(r)
+	args := []interface{}{}
+	projectFilter := scope.IssueCond("", &args)
 	teamFilter := ""
-	if len(team) > 0 {
-		placeholders := make([]string, len(team))
-		for i, mid := range team {
-			placeholders[i] = "$" + itoa(len(args)+1)
-			args = append(args, mid)
-		}
-		teamFilter = " AND assigned_to_id IN (" + strings.Join(placeholders, ",") + ")"
+	if !scope.AllTeam {
+		// A chosen team means a row per member, without "unassigned"
+		teamFilter = " AND assigned_to_id IS NOT NULL"
 	}
 
 	q := `SELECT
@@ -187,9 +177,7 @@ func (h *AnalyticsHandler) GetDistribution(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	userID := middleware.GetUserID(r)
-	projects := h.getSelectedProjects(userID)
-	projectFilter, args := h.buildProjectFilter(projects, 1)
+	projectFilter, args := projectIssues(r)
 
 	q := `SELECT project_name, COALESCE(assigned_to_name, 'Неназначенные'), COUNT(*)
 		FROM issues WHERE ` + projectFilter + `
@@ -233,9 +221,7 @@ func (h *AnalyticsHandler) GetDeadlines(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	userID := middleware.GetUserID(r)
-	projects := h.getSelectedProjects(userID)
-	projectFilter, args := h.buildProjectFilter(projects, 1)
+	projectFilter, args := projectIssues(r)
 	today := time.Now()
 
 	// All tasks that are not closed and have a due date
@@ -323,37 +309,12 @@ func deadlineBucket(dueDate string, today time.Time) string {
 	return ""
 }
 
-func (h *AnalyticsHandler) getSelectedProjects(userID int) []int64 {
-	var spJSON []byte
-	(*h.DB).QueryRow("SELECT selected_projects FROM user_settings WHERE user_id = $1", userID).Scan(&spJSON)
-	var projects []int64
-	if len(spJSON) > 0 {
-		json.Unmarshal(spJSON, &projects)
-	}
-	return projects
-}
-
-func (h *AnalyticsHandler) getSelectedTeam(userID int) []int64 {
-	var stJSON []byte
-	(*h.DB).QueryRow("SELECT selected_team FROM user_settings WHERE user_id = $1", userID).Scan(&stJSON)
-	var team []int64
-	if len(stJSON) > 0 {
-		json.Unmarshal(stJSON, &team)
-	}
-	return team
-}
-
-func (h *AnalyticsHandler) buildProjectFilter(projects []int64, startArg int) (string, []interface{}) {
-	if len(projects) == 0 {
-		return "1=1", nil
-	}
-	placeholders := make([]string, len(projects))
-	args := make([]interface{}, len(projects))
-	for i, pid := range projects {
-		placeholders[i] = "$" + strconv.Itoa(startArg+i)
-		args[i] = pid
-	}
-	return "project_id IN (" + strings.Join(placeholders, ",") + ")", args
+// projectIssues returns the condition and its args selecting the issues of
+// the user's projects within rights — the base of every "by projects" figure.
+func projectIssues(r *http.Request) (string, []interface{}) {
+	args := []interface{}{}
+	cond := middleware.GetScope(r).ProjectIssueCond("", &args)
+	return cond, args
 }
 
 func itoa(n int) string {

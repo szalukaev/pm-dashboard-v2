@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"pm-dashboard/access"
 	"pm-dashboard/datasource"
 	"pm-dashboard/datasource/manager"
 	"pm-dashboard/datasource/redmine"
@@ -60,7 +61,6 @@ func (h *KanbanHandler) GetBoard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID := middleware.GetUserID(r)
 	mode := r.URL.Query().Get("mode")
 	if mode != "statuses" {
 		mode = "users"
@@ -68,10 +68,12 @@ func (h *KanbanHandler) GetBoard(w http.ResponseWriter, r *http.Request) {
 
 	var columns []KanbanColumn
 	var err error
+	scope := middleware.GetScope(r)
 	if mode == "statuses" {
-		columns, err = h.statusBoard(userID, r.URL.Query().Get("project_id"))
+		warnForeignProject(r, scope, r.URL.Query().Get("project_id"))
+		columns, err = h.statusBoard(scope, r.URL.Query().Get("project_id"))
 	} else {
-		columns, err = h.userBoard(userID)
+		columns, err = h.userBoard(scope)
 	}
 	if err != nil {
 		slog.Error("Failed to build the kanban board", "mode", mode, "error", err)
@@ -89,7 +91,8 @@ func (h *KanbanHandler) GetBoard(w http.ResponseWriter, r *http.Request) {
 // statusBoard: a column for every status of the data source, with the issues
 // of the chosen project and all its subprojects. No project — no columns, the
 // client asks to choose one.
-func (h *KanbanHandler) statusBoard(userID int, projectParam string) ([]KanbanColumn, error) {
+func (h *KanbanHandler) statusBoard(scope *access.Scope, projectParam string) ([]KanbanColumn, error) {
+	userID := scope.UserID
 	projectID, err := strconv.Atoi(projectParam)
 	if err != nil {
 		return []KanbanColumn{}, nil
@@ -98,7 +101,10 @@ func (h *KanbanHandler) statusBoard(userID int, projectParam string) ([]KanbanCo
 	if err != nil {
 		return nil, err
 	}
-	cards, err := h.loadCards("project_id = ANY($1)", pq.Array(projects))
+	// The project is chosen explicitly, so the user's own selection of
+	// projects does not apply — only the rights do.
+	args := []interface{}{pq.Array(projects)}
+	cards, err := h.loadCards("project_id = ANY($1) AND "+scope.AllowedIssueCond("", &args), args...)
 	if err != nil {
 		return nil, err
 	}
@@ -124,24 +130,21 @@ func (h *KanbanHandler) statusBoard(userID int, projectParam string) ([]KanbanCo
 
 // userBoard: a column for every member of the user's team plus "no assignee"
 // (hidden when empty), with the issues in open statuses only.
-func (h *KanbanHandler) userBoard(userID int) ([]KanbanColumn, error) {
-	var teamJSON []byte
-	(*h.DB).QueryRow("SELECT selected_team FROM user_settings WHERE user_id = $1", userID).Scan(&teamJSON)
+func (h *KanbanHandler) userBoard(scope *access.Scope) ([]KanbanColumn, error) {
+	userID := scope.UserID
+
+	// The team is what the user tracks within rights; the user themselves
+	// has a column too when they only see their own tasks.
 	var team []int
-	if len(teamJSON) > 0 {
-		json.Unmarshal(teamJSON, &team)
+	if !scope.AllTeam {
+		team = append(team, scope.Team...)
+		if scope.OwnMember != nil && !containsInt(team, *scope.OwnMember) {
+			team = append(team, *scope.OwnMember)
+		}
 	}
 
-	where := statusIn("status_id", GroupOpen)
 	args := []interface{}{}
-	if projects := h.userProjects(userID); len(projects) > 0 {
-		args = append(args, pq.Array(projects))
-		where += " AND project_id = ANY($" + strconv.Itoa(len(args)) + ")"
-	}
-	if len(team) > 0 {
-		args = append(args, pq.Array(team))
-		where += " AND (assigned_to_id IS NULL OR assigned_to_id = ANY($" + strconv.Itoa(len(args)) + "))"
-	}
+	where := statusIn("status_id", GroupOpen) + " AND " + scope.IssueCond("", &args)
 	cards, err := h.loadCards(where, args...)
 	if err != nil {
 		return nil, err
@@ -150,7 +153,7 @@ func (h *KanbanHandler) userBoard(userID int) ([]KanbanColumn, error) {
 	// With a team the columns are its members, including those without
 	// issues; without one — everybody who has issues.
 	columns := []KanbanColumn{}
-	if len(team) > 0 {
+	if !scope.AllTeam {
 		rows, err := (*h.DB).Query("SELECT external_id, name FROM members WHERE data_source = 'redmine' AND external_id = ANY($1) ORDER BY name",
 			pq.Array(team))
 		if err != nil {
@@ -283,16 +286,9 @@ func (h *KanbanHandler) MoveCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The issue must be on a project the user works with.
-	var projectID int
-	if err := (*h.DB).QueryRow("SELECT project_id FROM issues WHERE external_id = $1 AND data_source = 'redmine'",
-		body.IssueID).Scan(&projectID); err != nil {
-		utils.Error(w, http.StatusNotFound, "ISSUE_NOT_FOUND")
-		return
-	}
-	if allowed := h.userProjects(middleware.GetUserID(r)); len(allowed) > 0 && !containsInt(allowed, projectID) {
-		slog.Warn("Kanban move outside of user projects", "user", middleware.GetUserID(r), "issue", body.IssueID)
-		utils.Error(w, http.StatusForbidden, "FORBIDDEN")
+	// The issue must be within the user's rights.
+	scope := middleware.GetScope(r)
+	if !requireIssue(w, r, *h.DB, body.IssueID) {
 		return
 	}
 
@@ -327,6 +323,11 @@ func (h *KanbanHandler) MoveCard(w http.ResponseWriter, r *http.Request) {
 		if err := (*h.DB).QueryRow("SELECT external_id, name FROM members WHERE external_id::text = $1 AND data_source = 'redmine'",
 			body.TargetID).Scan(&memberID, &memberName); err != nil {
 			utils.Error(w, http.StatusBadRequest, "MEMBER_NOT_FOUND")
+			return
+		}
+		// An issue may be given only to a member the user may see.
+		if !scope.AllowsMember(memberID) {
+			utils.Error(w, http.StatusForbidden, "FORBIDDEN")
 			return
 		}
 		localSet = "assigned_to_name = $1, assigned_to_id = $2"
@@ -376,24 +377,6 @@ func (h *KanbanHandler) MoveCard(w http.ResponseWriter, r *http.Request) {
 
 // unassignedColumn is the id of the "no assignee" column in the users mode.
 const unassignedColumn = "unassigned"
-
-// userProjects returns the projects selected by the user together with all
-// their descendants; empty means no restriction.
-func (h *KanbanHandler) userProjects(userID int) []int {
-	var spJSON []byte
-	(*h.DB).QueryRow("SELECT selected_projects FROM user_settings WHERE user_id = $1", userID).Scan(&spJSON)
-	var selected []int
-	if len(spJSON) > 0 {
-		json.Unmarshal(spJSON, &selected)
-	}
-	if len(selected) == 0 {
-		return nil
-	}
-	if expanded, err := datasource.ExpandProjects(*h.DB, selected); err == nil {
-		return expanded
-	}
-	return selected
-}
 
 // moveApplied reports whether the issue in Redmine has the values a move
 // asked for (fields as sent to UpdateIssue).

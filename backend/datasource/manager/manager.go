@@ -50,6 +50,8 @@ type Manager struct {
 	newSyncer func(*redmine.Client) syncer
 	// snapshot reads issue fingerprints for change detection; replaced in tests.
 	snapshot func() (map[int]string, error)
+	// projectSource decides which projects are synced; nil = the syncer's default.
+	projectSource func() ([]int, error)
 	// notify reports sync events to open pages; nil = nobody listens.
 	notify func(event string, data interface{})
 
@@ -67,8 +69,12 @@ func New(store ConfigStore, db **sql.DB, readOnly func() bool) *Manager {
 		store:     store,
 		db:        db,
 		readOnly:  readOnly,
-		newSyncer: func(c *redmine.Client) syncer { return redmine.NewSyncer(c) },
 		wake:      make(chan struct{}, 1),
+	}
+	m.newSyncer = func(c *redmine.Client) syncer {
+		s := redmine.NewSyncer(c)
+		s.Projects = m.projectSource
+		return s
 	}
 	m.snapshot = m.issueFingerprints
 	m.Reload()
@@ -188,6 +194,13 @@ func (m *Manager) Running() bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.running
+}
+
+// SetProjectSource sets what decides which projects are synced (access
+// control: the projects the users are shown). Call it before Run.
+func (m *Manager) SetProjectSource(source func() ([]int, error)) {
+	m.projectSource = source
+	m.Reload()
 }
 
 // SetNotifier sets where the manager reports sync events (the WebSocket hub).

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"pm-dashboard/access"
 	"pm-dashboard/middleware"
 	"pm-dashboard/utils"
 
@@ -75,7 +76,7 @@ func (h *SprintHandler) ListSprints(w http.ResponseWriter, r *http.Request) {
 			&s.Description, &s.CategoryName, &s.AutoFillCategory) != nil {
 			continue
 		}
-		s.Tasks = h.getSprintTasks(s.ID)
+		s.Tasks = h.getSprintTasks(s.ID, middleware.GetScope(r))
 		s.TaskCount = len(s.Tasks)
 		s.calculateProgress()
 		sprints = append(sprints, s)
@@ -112,7 +113,7 @@ func (h *SprintHandler) GetSprint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.Tasks = h.getSprintTasks(s.ID)
+	s.Tasks = h.getSprintTasks(s.ID, middleware.GetScope(r))
 	s.TaskCount = len(s.Tasks)
 	s.calculateProgress()
 
@@ -159,7 +160,7 @@ func (h *SprintHandler) CreateSprint(w http.ResponseWriter, r *http.Request) {
 
 	// Auto-fill if project + category specified
 	if body.AutoFillCategory && body.ProjectName != nil && body.CategoryName != nil {
-		h.autoFill(sprintID, *body.ProjectName, *body.CategoryName)
+		h.autoFill(sprintID, *body.ProjectName, *body.CategoryName, middleware.GetScope(r))
 	}
 
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"id": sprintID, "success": true})
@@ -270,6 +271,9 @@ func (h *SprintHandler) AssignTask(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
 		return
 	}
+	if !requireIssue(w, r, *h.DB, body.IssueExternalID) {
+		return
+	}
 
 	_, err = (*h.DB).Exec(`INSERT INTO sprint_issues (sprint_id, issue_external_id) VALUES ($1, $2)
 		ON CONFLICT DO NOTHING`, sprintID, body.IssueExternalID)
@@ -321,30 +325,9 @@ func (h *SprintHandler) GetBacklog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID := middleware.GetUserID(r)
-
-	// Get user's selected projects
-	var selectedProjects []int64
-	var spJSON []byte
-	(*h.DB).QueryRow("SELECT selected_projects FROM user_settings WHERE user_id = $1", userID).Scan(&spJSON)
-	if len(spJSON) > 0 {
-		json.Unmarshal(spJSON, &selectedProjects)
-	}
-
-	// Find issues NOT in any sprint
-	where := []string{statusNotIn("i.status_id", GroupClosed)}
+	// Issues of the user's projects (within rights) that are in no sprint
 	args := []interface{}{}
-	argIdx := 1
-
-	if len(selectedProjects) > 0 {
-		placeholders := make([]string, len(selectedProjects))
-		for i, pid := range selectedProjects {
-			placeholders[i] = "$" + strconv.Itoa(argIdx)
-			args = append(args, pid)
-			argIdx++
-		}
-		where = append(where, "i.project_id IN ("+utils.JoinStrings(placeholders, ",")+")")
-	}
+	where := []string{statusNotIn("i.status_id", GroupClosed), middleware.GetScope(r).ProjectIssueCond("i.", &args)}
 
 	query := `SELECT i.external_id, i.subject, i.project_name, i.status_name,
 		i.priority_name, i.priority_id, i.assigned_to_name, i.due_date, i.estimated_hours
@@ -414,7 +397,7 @@ func (h *SprintHandler) RefreshSprint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if s.AutoFillCategory && s.ProjectName != nil && s.CategoryName != nil {
-		h.autoFill(s.ID, *s.ProjectName, *s.CategoryName)
+		h.autoFill(s.ID, *s.ProjectName, *s.CategoryName, middleware.GetScope(r))
 	}
 
 	utils.Success(w)
@@ -427,13 +410,18 @@ func (h *SprintHandler) ownsSprint(sprintID, userID int) bool {
 	return err == nil && exists
 }
 
-func (h *SprintHandler) getSprintTasks(sprintID int) []SprintTask {
+// getSprintTasks returns the issues of a sprint the user may still see: an
+// issue put into a sprint stays there, but rights may have been narrowed since.
+func (h *SprintHandler) getSprintTasks(sprintID int, scope *access.Scope) []SprintTask {
+	args := []interface{}{sprintID}
+	visible := scope.AllowedIssueCond("i.", &args)
 	rows, err := (*h.DB).Query(`SELECT i.external_id, i.subject, i.project_name, i.status_name,
 		i.priority_name, i.priority_id, i.assigned_to_name, i.due_date, i.estimated_hours,
 		COALESCE(st.group_name, 'open')
 		FROM sprint_issues si JOIN issues i ON si.issue_external_id = i.external_id
 		LEFT JOIN statuses st ON st.external_id = i.status_id AND st.data_source = 'redmine'
-		WHERE si.sprint_id = $1 ORDER BY `+priorityRank("i.priority_id")+` DESC NULLS LAST`, sprintID)
+		WHERE si.sprint_id = $1 AND `+visible+`
+		ORDER BY `+priorityRank("i.priority_id")+` DESC NULLS LAST`, args...)
 	if err != nil {
 		return []SprintTask{}
 	}
@@ -454,13 +442,16 @@ func (h *SprintHandler) getSprintTasks(sprintID int) []SprintTask {
 	return tasks
 }
 
-func (h *SprintHandler) autoFill(sprintID int, projectName, categoryName string) {
-	// Find issues matching project + category not already in sprint
+func (h *SprintHandler) autoFill(sprintID int, projectName, categoryName string, scope *access.Scope) {
+	// Find issues matching project + category not already in sprint,
+	// among those the user may see
+	args := []interface{}{projectName, categoryName, sprintID}
+	visible := scope.AllowedIssueCond("", &args)
 	rows, err := (*h.DB).Query(`SELECT external_id FROM issues
 		WHERE project_name = $1 AND category_name = $2
 		AND `+statusNotIn("status_id", GroupClosed)+`
-		AND external_id NOT IN (SELECT issue_external_id FROM sprint_issues WHERE sprint_id = $3)`,
-		projectName, categoryName, sprintID)
+		AND external_id NOT IN (SELECT issue_external_id FROM sprint_issues WHERE sprint_id = $3)
+		AND `+visible, args...)
 	if err != nil {
 		return
 	}

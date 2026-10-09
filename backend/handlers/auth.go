@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"pm-dashboard/access"
 	"pm-dashboard/db"
 	"pm-dashboard/middleware"
 	"pm-dashboard/utils"
@@ -200,6 +201,18 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A blocked user is told so only after the correct password, so the
+	// answer does not reveal which accounts exist.
+	var blocked bool
+	(*h.DB).QueryRow("SELECT is_blocked FROM users WHERE id = $1", id).Scan(&blocked)
+	if blocked {
+		if h.Audit != nil {
+			h.Audit.LogLogin(id, req.Username, false, r)
+		}
+		utils.Error(w, http.StatusForbidden, "USER_BLOCKED")
+		return
+	}
+
 	// Successful login — clear attempts
 	clearAttempts(req.Username)
 	(*h.DB).Exec("UPDATE users SET last_login = NOW() WHERE id = $1", id)
@@ -238,8 +251,30 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 			"avatar":                avatar,
 			"last_login":            lastLogin,
 			"force_password_change": forcePasswordChange,
+			"access":                h.accessInfo(id),
 		},
 	})
+}
+
+// accessInfo tells the client what to show: hidden tabs and widgets, and
+// whether data may be changed. The server enforces all of it by itself.
+func (h *AuthHandler) accessInfo(userID int) map[string]interface{} {
+	scope, err := (&access.Resolver{DB: h.DB}).Scope(userID)
+	if err != nil {
+		return map[string]interface{}{"visible_tabs": []string{}, "widgets": []string{}, "read_only": true}
+	}
+	return scopeInfo(scope)
+}
+
+func scopeInfo(scope *access.Scope) map[string]interface{} {
+	tabs, widgets := access.Tabs, access.Widgets
+	if !scope.Admin && scope.VisibleTabs != nil {
+		tabs = *scope.VisibleTabs
+	}
+	if !scope.Admin && scope.Widgets != nil {
+		widgets = *scope.Widgets
+	}
+	return map[string]interface{}{"visible_tabs": tabs, "widgets": widgets, "read_only": scope.ReadOnly}
 }
 
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
@@ -294,6 +329,7 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		"avatar":                avatar,
 		"last_login":            lastLogin,
 		"force_password_change": forcePasswordChange,
+		"access":                scopeInfo(middleware.GetScope(r)),
 	})
 }
 

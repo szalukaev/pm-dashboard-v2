@@ -99,9 +99,29 @@ func narrow(allowedAll bool, allowed, selected []int) (bool, []int) {
 	}
 }
 
-// IssueCond returns a SQL condition selecting the issues the user may see.
-// alias is the table prefix ("" or "i."); placeholders continue *args.
+// The three conditions below select issues in SQL. alias is the table prefix
+// ("" or "i."); placeholders continue *args.
+
+// IssueCond: the issues shown in lists — rights narrowed by both the
+// projects and the team the user selected.
 func (s *Scope) IssueCond(alias string, args *[]interface{}) string {
+	return s.issueCond(alias, args, s.AllProjects, s.Projects, s.AllTeam, s.Team)
+}
+
+// ProjectIssueCond: the issues of the selected projects whoever they are
+// assigned to (within rights) — for figures and boards "by projects", which
+// the selected team must not thin out.
+func (s *Scope) ProjectIssueCond(alias string, args *[]interface{}) string {
+	return s.issueCond(alias, args, s.AllProjects, s.Projects, s.AllowedAllTeam, s.AllowedTeam)
+}
+
+// AllowedIssueCond: every issue the administrator allows, ignoring the
+// user's own selection — for opening or changing one particular issue.
+func (s *Scope) AllowedIssueCond(alias string, args *[]interface{}) string {
+	return s.issueCond(alias, args, s.AllowedAllProjects, s.AllowedProjects, s.AllowedAllTeam, s.AllowedTeam)
+}
+
+func (s *Scope) issueCond(alias string, args *[]interface{}, allProjects bool, projects []int, allTeam bool, team []int) string {
 	cond := ""
 	add := func(part string) {
 		if cond != "" {
@@ -114,12 +134,12 @@ func (s *Scope) IssueCond(alias string, args *[]interface{}) string {
 		return "$" + strconv.Itoa(len(*args))
 	}
 
-	if !s.AllProjects {
-		add(alias + "project_id = ANY(" + placeholder(pq.Array(s.Projects)) + ")")
+	if !allProjects {
+		add(alias + "project_id = ANY(" + placeholder(pq.Array(projects)) + ")")
 	}
-	if !s.AllTeam {
+	if !allTeam {
 		// Issues without an assignee belong to nobody's team and stay visible.
-		add("(" + alias + "assigned_to_id IS NULL OR " + alias + "assigned_to_id = ANY(" + placeholder(pq.Array(s.Team)) + "))")
+		add("(" + alias + "assigned_to_id IS NULL OR " + alias + "assigned_to_id = ANY(" + placeholder(pq.Array(team)) + "))")
 	}
 	if cond == "" {
 		return "TRUE"

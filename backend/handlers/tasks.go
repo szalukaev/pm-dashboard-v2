@@ -64,7 +64,7 @@ func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID := middleware.GetUserID(r)
+	scope := middleware.GetScope(r)
 
 	// Parse query params
 	taskType := r.URL.Query().Get("type") // "open", "testing", "closed", "all"
@@ -75,45 +75,12 @@ func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 	sortDir := r.URL.Query().Get("sort_dir")
 	category := r.URL.Query().Get("category")
 
-	// Get user's selected projects and team
-	var selectedProjects, selectedTeam []int64
-	row := (*h.DB).QueryRow("SELECT selected_projects, selected_team FROM user_settings WHERE user_id = $1", userID)
-	var spJSON, stJSON []byte
-	if err := row.Scan(&spJSON, &stJSON); err == nil {
-		if len(spJSON) > 0 {
-			json.Unmarshal(spJSON, &selectedProjects)
-		}
-		if len(stJSON) > 0 {
-			json.Unmarshal(stJSON, &selectedTeam)
-		}
-	}
-
-	// Build query
-	where := []string{"1=1"}
+	// Only what the user may see: the rights given by the administrator,
+	// narrowed by the projects and team selected in the user's settings.
 	args := []interface{}{}
-	argIdx := 1
-
-	// Filter by user's selected projects
-	if len(selectedProjects) > 0 && projectID == "" {
-		placeholders := make([]string, len(selectedProjects))
-		for i, pid := range selectedProjects {
-			placeholders[i] = "$" + strconv.Itoa(argIdx)
-			args = append(args, pid)
-			argIdx++
-		}
-		where = append(where, "project_id IN ("+strings.Join(placeholders, ",")+")")
-	}
-
-	// Filter by user's selected team (only show tasks assigned to team members or unassigned)
-	if len(selectedTeam) > 0 {
-		placeholders := make([]string, len(selectedTeam))
-		for i, tid := range selectedTeam {
-			placeholders[i] = "$" + strconv.Itoa(argIdx)
-			args = append(args, tid)
-			argIdx++
-		}
-		where = append(where, "(assigned_to_id IN ("+strings.Join(placeholders, ",")+") OR assigned_to_id IS NULL)")
-	}
+	where := []string{scope.IssueCond("", &args)}
+	argIdx := len(args) + 1
+	warnForeignProject(r, scope, projectID)
 
 	// Filter by task type using status groups from statuses table
 	switch taskType {
@@ -273,6 +240,9 @@ func (h *TaskHandler) GetTask(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
 		return
 	}
+	if !requireIssue(w, r, *h.DB, externalID) {
+		return
+	}
 
 	var t TaskResponse
 	err = (*h.DB).QueryRow(`SELECT external_id, project_id, project_name, subject, description,
@@ -311,6 +281,10 @@ func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	var body map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
+		return
+	}
+
+	if !requireIssue(w, r, *h.DB, externalID) {
 		return
 	}
 
@@ -360,6 +334,11 @@ func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 			var assigneeID int
 			if err := (*h.DB).QueryRow("SELECT external_id FROM members WHERE name = $1 AND data_source = 'redmine' LIMIT 1", strValue).Scan(&assigneeID); err != nil {
 				utils.Error(w, http.StatusBadRequest, "MEMBER_NOT_FOUND")
+				return
+			}
+			// An issue may be given only to a member the user may see.
+			if !middleware.GetScope(r).AllowsMember(assigneeID) {
+				utils.Error(w, http.StatusForbidden, "MEMBER_NOT_ALLOWED")
 				return
 			}
 			localSets["assigned_to_name"] = strValue
@@ -524,6 +503,9 @@ func (h *TaskHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
 		return
 	}
+	if !requireIssue(w, r, *h.DB, externalID) {
+		return
+	}
 
 	client := h.getRedmineClient()
 	if client == nil {
@@ -548,6 +530,13 @@ func (h *TaskHandler) GetTaskDetails(w http.ResponseWriter, r *http.Request) {
 	externalID, err := strconv.Atoi(mux.Vars(r)["id"])
 	if err != nil {
 		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
+		return
+	}
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+	if !requireIssue(w, r, *h.DB, externalID) {
 		return
 	}
 	client := h.getRedmineClient()
@@ -582,6 +571,13 @@ func (h *TaskHandler) GetTaskAttachment(w http.ResponseWriter, r *http.Request) 
 	attachmentID, err2 := strconv.Atoi(vars["attachment_id"])
 	if err1 != nil || err2 != nil {
 		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
+		return
+	}
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+	if !requireIssue(w, r, *h.DB, externalID) {
 		return
 	}
 	client := h.getRedmineClient()
@@ -643,6 +639,9 @@ func (h *TaskHandler) AddComment(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
 		return
 	}
+	if !requireIssue(w, r, *h.DB, externalID) {
+		return
+	}
 
 	var body struct {
 		Text string `json:"text"`
@@ -672,14 +671,16 @@ func (h *TaskHandler) GetCategories(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	projectID := r.URL.Query().Get("project_id")
-	var rows *sql.Rows
-	var err error
-	if projectID != "" {
-		rows, err = (*h.DB).Query("SELECT DISTINCT category_name FROM issues WHERE category_name IS NOT NULL AND category_name != '' AND project_id = $1 ORDER BY category_name", projectID)
-	} else {
-		rows, err = (*h.DB).Query("SELECT DISTINCT category_name FROM issues WHERE category_name IS NOT NULL AND category_name != '' ORDER BY category_name")
+	// Categories of the issues the user may see only
+	scope := middleware.GetScope(r)
+	args := []interface{}{}
+	where := "category_name IS NOT NULL AND category_name != '' AND " + scope.ProjectIssueCond("", &args)
+	if projectID := r.URL.Query().Get("project_id"); projectID != "" {
+		warnForeignProject(r, scope, projectID)
+		args = append(args, projectID)
+		where += " AND project_id = $" + strconv.Itoa(len(args))
 	}
+	rows, err := (*h.DB).Query("SELECT DISTINCT category_name FROM issues WHERE "+where+" ORDER BY category_name", args...)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
@@ -707,6 +708,11 @@ func (h *TaskHandler) GetProjectCategories(w http.ResponseWriter, r *http.Reques
 	projectID, err := strconv.Atoi(r.URL.Query().Get("project_id"))
 	if err != nil || projectID <= 0 {
 		utils.Error(w, http.StatusBadRequest, "INVALID_PROJECT_ID")
+		return
+	}
+	if scope := middleware.GetScope(r); *h.DB == nil || !canSeeProject(*h.DB, scope, projectID) {
+		slog.Warn("Request for a project outside of user rights", "user", scope.UserID, "project", projectID, "path", r.URL.Path)
+		utils.JSON(w, http.StatusOK, map[string]interface{}{"categories": []string{}})
 		return
 	}
 
@@ -738,7 +744,10 @@ func (h *TaskHandler) GetProjects(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := (*h.DB).Query("SELECT external_id, name, parent_id FROM projects ORDER BY name")
+	// The projects the administrator allows; the user's own selection does
+	// not apply here — this list is what the selection is made from.
+	cond, args := allowedProjectsCond(middleware.GetScope(r), "external_id")
+	rows, err := (*h.DB).Query("SELECT external_id, name, parent_id FROM projects WHERE "+cond+" ORDER BY name", args...)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
@@ -765,7 +774,9 @@ func (h *TaskHandler) GetProjects(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TaskHandler) GetMembers(w http.ResponseWriter, r *http.Request) {
-	rows, err := (*h.DB).Query("SELECT external_id, name FROM members WHERE data_source = 'redmine' AND name != '' ORDER BY name")
+	// The members the administrator allows (see GetProjects)
+	cond, args := allowedMembersCond(middleware.GetScope(r), "external_id")
+	rows, err := (*h.DB).Query("SELECT external_id, name FROM members WHERE data_source = 'redmine' AND name != '' AND "+cond+" ORDER BY name", args...)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "DB_ERROR")
 		return

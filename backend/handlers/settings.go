@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 
 	"pm-dashboard/config"
@@ -126,8 +127,16 @@ func (h *SettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// The user narrows what the administrator allows and can never widen it:
+	// anything outside of the rights is dropped from the selection.
+	scope := middleware.GetScope(r)
 	if v, ok := body["selected_projects"]; ok {
-		data, _ := json.Marshal(v)
+		requested := intList(v)
+		allowed := scope.FilterProjects(requested)
+		if len(allowed) != len(uniqueIntCount(requested)) {
+			slog.Warn("Selection of projects outside of user rights dropped", "user", userID)
+		}
+		data, _ := json.Marshal(allowed)
 		if _, err := (*h.DB).Exec("UPDATE user_settings SET selected_projects = $1 WHERE user_id = $2", data, userID); err != nil {
 			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 			return
@@ -139,7 +148,12 @@ func (h *SettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request)
 		}
 	}
 	if v, ok := body["selected_team"]; ok {
-		data, _ := json.Marshal(v)
+		requested := intList(v)
+		allowed := scope.FilterTeam(requested)
+		if len(allowed) != len(uniqueIntCount(requested)) {
+			slog.Warn("Selection of team members outside of user rights dropped", "user", userID)
+		}
+		data, _ := json.Marshal(allowed)
 		if _, err := (*h.DB).Exec("UPDATE user_settings SET selected_team = $1 WHERE user_id = $2", data, userID); err != nil {
 			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 			return
