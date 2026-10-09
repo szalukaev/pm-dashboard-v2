@@ -170,6 +170,48 @@
       "new_comment": "New comment",
       "comment_placeholder": "Write a comment… Redmine markup is supported",
       "comment_hint": "Ctrl + Enter to send"
+    },
+    "history": {
+      "title": "Whole history",
+      "empty": "No changes yet",
+      "changed": "changed",
+      "fields": {
+        "status": "Status",
+        "priority": "Priority",
+        "assigned_to": "Assignee",
+        "category": "Category",
+        "fixed_version": "Version",
+        "tracker": "Tracker",
+        "project": "Project",
+        "parent": "Parent task",
+        "subject": "Subject",
+        "description": "Description",
+        "start_date": "Start date",
+        "due_date": "Due date",
+        "done_ratio": "Done, %",
+        "estimated_hours": "Estimate, h",
+        "is_private": "Private",
+        "attachment": "File",
+        "relation": "Relation",
+        "cf": "Custom field"
+      }
+    },
+    "related": {
+      "title": "Related tasks",
+      "hidden": "No access to the task",
+      "types": {
+        "relates": "Related to",
+        "duplicates": "Duplicates",
+        "duplicated": "Duplicated by",
+        "blocks": "Blocks",
+        "blocked": "Blocked by",
+        "precedes": "Precedes",
+        "follows": "Follows",
+        "copied_to": "Copied to",
+        "copied_from": "Copied from",
+        "parent": "Parent",
+        "child": "Subtask"
+      }
     }
   },
   "analytics": {

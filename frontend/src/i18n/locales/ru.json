@@ -170,6 +170,48 @@
       "new_comment": "Новый комментарий",
       "comment_placeholder": "Напишите комментарий… Поддерживается разметка Redmine",
       "comment_hint": "Ctrl + Enter — отправить"
+    },
+    "history": {
+      "title": "Вся история",
+      "empty": "Изменений пока нет",
+      "changed": "изменено",
+      "fields": {
+        "status": "Статус",
+        "priority": "Приоритет",
+        "assigned_to": "Исполнитель",
+        "category": "Категория",
+        "fixed_version": "Версия",
+        "tracker": "Тип",
+        "project": "Проект",
+        "parent": "Родительская задача",
+        "subject": "Название",
+        "description": "Описание",
+        "start_date": "Дата начала",
+        "due_date": "Дедлайн",
+        "done_ratio": "Готовность, %",
+        "estimated_hours": "Оценка, ч",
+        "is_private": "Частная",
+        "attachment": "Файл",
+        "relation": "Связь",
+        "cf": "Доп. поле"
+      }
+    },
+    "related": {
+      "title": "Связанные задачи",
+      "hidden": "Нет доступа к задаче",
+      "types": {
+        "relates": "Связана с",
+        "duplicates": "Дублирует",
+        "duplicated": "Дублируется",
+        "blocks": "Блокирует",
+        "blocked": "Блокируется",
+        "precedes": "Предшествует",
+        "follows": "Следует за",
+        "copied_to": "Скопирована в",
+        "copied_from": "Скопирована из",
+        "parent": "Родительская",
+        "child": "Подзадача"
+      }
     }
   },
   "analytics": {

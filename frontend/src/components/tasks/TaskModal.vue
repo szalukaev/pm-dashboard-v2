@@ -130,13 +130,69 @@
         <div v-else class="empty">{{ $t('tasks.modal.files_empty') }}</div>
       </section>
 
-      <!-- Comments -->
+      <!-- Related issues -->
+      <section v-if="related.length" class="section" data-testid="task-related">
+        <h4 class="section-title">
+          {{ $t('tasks.related.title') }}
+          <span class="section-count">{{ related.length }}</span>
+        </h4>
+        <div class="related">
+          <component
+            :is="r.accessible ? 'button' : 'div'"
+            v-for="r in related"
+            :key="r.relation + r.id"
+            class="related-row"
+            :class="{ locked: !r.accessible }"
+            :type="r.accessible ? 'button' : undefined"
+            @click="r.accessible && openRelated(r.id)"
+          >
+            <span class="related-type">{{ relationName(r.relation) }}</span>
+            <span class="related-id">#{{ r.id }}</span>
+            <span class="related-subject">{{ r.accessible ? r.subject : $t('tasks.related.hidden') }}</span>
+            <span v-if="r.accessible && r.status" class="related-status">{{ r.status }}</span>
+          </component>
+        </div>
+      </section>
+
+      <!-- Comments, or the whole history of the issue -->
       <section class="section">
         <h4 class="section-title">
-          {{ $t('tasks.modal.comments') }}
-          <span v-if="comments.length" class="section-count">{{ comments.length }}</span>
+          <button type="button" class="mode-pill" :class="{ active: historyMode === 'comments' }" data-testid="mode-comments" @click="historyMode = 'comments'">
+            {{ $t('tasks.modal.comments') }}
+            <span v-if="comments.length" class="section-count">{{ comments.length }}</span>
+          </button>
+          <button type="button" class="mode-pill" :class="{ active: historyMode === 'history' }" data-testid="mode-history" @click="historyMode = 'history'">
+            {{ $t('tasks.history.title') }}
+            <span v-if="history.length" class="section-count">{{ history.length }}</span>
+          </button>
         </h4>
         <div v-if="detailsLoading" class="section-loading"><AppSpinner :size="20" /></div>
+        <template v-else-if="historyMode === 'history'">
+          <div v-if="history.length" class="comments">
+            <div v-for="e in history" :key="e.id" class="comment">
+              <span class="avatar">{{ initials(e.author) }}</span>
+              <div class="comment-body">
+                <div class="comment-header">
+                  <span class="comment-author">{{ e.author }}</span>
+                  <span class="comment-date">{{ formatDate(e.created_on) }}</span>
+                </div>
+                <ul v-if="e.changes.length" class="changes">
+                  <li v-for="(change, i) in e.changes" :key="i">
+                    <span class="change-field">{{ fieldName(change.field) }}:</span>
+                    <template v-if="change.field === 'description'">{{ $t('tasks.history.changed') }}</template>
+                    <template v-else>
+                      <span class="change-old">{{ change.old || '—' }}</span>
+                      <span class="change-arrow">→</span>
+                      <span class="change-new">{{ change.new || '—' }}</span>
+                    </template>
+                  </li>
+                </ul>
+                <div v-if="e.html" class="markup comment-text" v-html="e.html"></div>
+              </div>
+            </div>
+          </div>
+          <div v-else class="empty">{{ $t('tasks.history.empty') }}</div>
+        </template>
         <div v-else-if="comments.length" class="comments">
           <div v-for="c in comments" :key="c.id" class="comment">
             <span class="avatar">{{ initials(c.author) }}</span>
@@ -213,6 +269,18 @@ interface Comment {
   created_on: string
 }
 
+interface HistoryEntry extends Comment {
+  changes: { field: string; old: string; new: string }[]
+}
+
+interface RelatedIssue {
+  relation: string
+  id: number
+  subject: string
+  status: string
+  accessible: boolean
+}
+
 const props = defineProps<{ taskId: number | null }>()
 defineEmits(['close'])
 
@@ -224,6 +292,11 @@ const { showChange, error: swalError, toast } = useSwal()
 const auth = useAuthStore()
 // "t" is taken by a local variable in saveField
 const i18n = useI18n()
+
+// The task shown: the one the card was opened for, or a related one the
+// user went to from it.
+const currentId = ref<number | null>(props.taskId)
+watch(() => props.taskId, id => { currentId.value = id })
 
 const task = ref<Task | null>(null)
 const loading = ref(false)
@@ -241,6 +314,9 @@ const editFields = reactive({
 const description = ref('')
 const attachments = ref<Attachment[]>([])
 const rawComments = ref<Comment[]>([])
+const rawHistory = ref<HistoryEntry[]>([])
+const related = ref<RelatedIssue[]>([])
+const historyMode = ref<'comments' | 'history'>('comments')
 const detailsLoading = ref(false)
 const detailsError = ref('')
 
@@ -282,6 +358,26 @@ const comments = computed(() =>
   rawComments.value.map(c => ({ ...c, html: renderRedmineMarkup(c.text, markupOptions()) }))
 )
 
+const history = computed(() =>
+  rawHistory.value.map(e => ({ ...e, html: e.text ? renderRedmineMarkup(e.text, markupOptions()) : '' }))
+)
+
+// Name of a changed field; a field without a translation is shown as the
+// source names it.
+function fieldName(field: string): string {
+  const key = `tasks.history.fields.${field.startsWith('cf_') ? 'cf' : field}`
+  return i18n.te(key) ? i18n.t(key) : field
+}
+
+function relationName(relation: string): string {
+  const key = `tasks.related.types.${relation}`
+  return i18n.te(key) ? i18n.t(key) : relation
+}
+
+function openRelated(id: number) {
+  currentId.value = id
+}
+
 function attachmentUrl(id: number): string {
   return `/api/tasks/${task.value?.external_id}/attachments/${id}`
 }
@@ -294,8 +390,9 @@ function taskLink(id: number): string {
   return redmineUrl.value ? `${redmineUrl.value}/issues/${id}` : '#'
 }
 
-async function loadDetails(id: number) {
-  detailsLoading.value = true
+// quiet: re-read in the background, without the spinners
+async function loadDetails(id: number, quiet = false) {
+  if (!quiet) detailsLoading.value = true
   detailsError.value = ''
   try {
     const { data } = await axios.get(`/api/tasks/${id}/details`)
@@ -303,7 +400,10 @@ async function loadDetails(id: number) {
     description.value = data.description || ''
     attachments.value = data.attachments || []
     rawComments.value = data.comments || []
+    rawHistory.value = data.history || []
+    related.value = data.related || []
   } catch {
+    if (quiet) return
     if (task.value?.external_id !== id) return
     // Fall back to the cached description
     description.value = task.value?.description || ''
@@ -322,6 +422,8 @@ async function submitComment() {
     newComment.value = ''
     const { data } = await axios.get(`/api/tasks/${id}/comments`)
     rawComments.value = data.comments || []
+    // The new comment belongs to the history too
+    loadDetails(id, true)
     toast(i18n.t('tasks.messages.comment_added'), 'success')
   } catch {
     toast(i18n.t('tasks.messages.comment_error'), 'error')
@@ -330,11 +432,14 @@ async function submitComment() {
   }
 }
 
-watch(() => props.taskId, async (id) => {
+watch(currentId, async (id) => {
   task.value = null
   description.value = ''
   attachments.value = []
   rawComments.value = []
+  rawHistory.value = []
+  related.value = []
+  historyMode.value = 'comments'
   newComment.value = ''
   if (!id) return
 
@@ -346,7 +451,7 @@ watch(() => props.taskId, async (id) => {
   if (!redmineUrl.value) settingsStore.fetchSettings()
 
   const loaded = await store.fetchTask(id)
-  if (props.taskId !== id) return
+  if (currentId.value !== id) return
   task.value = loaded
   loading.value = false
   if (!loaded) return
@@ -770,6 +875,123 @@ function initials(name: string): string {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+/* Comments / whole history */
+.mode-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.mode-pill:hover {
+  color: var(--text);
+}
+
+.mode-pill.active {
+  background: var(--surface-2);
+  color: var(--text-bright);
+}
+
+.changes {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.change-field {
+  color: var(--text-muted);
+  margin-right: 4px;
+}
+
+.change-old {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.change-arrow {
+  margin: 0 6px;
+  color: var(--text-faint);
+}
+
+/* Related issues */
+.related {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.related-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-size: 13px;
+  color: var(--text);
+  text-align: left;
+}
+
+button.related-row {
+  cursor: pointer;
+}
+
+button.related-row:hover {
+  border-color: var(--accent);
+}
+
+.related-row.locked {
+  color: var(--text-muted);
+  background: transparent;
+}
+
+.related-type {
+  flex-shrink: 0;
+  min-width: 110px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.related-id {
+  flex-shrink: 0;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.related-row.locked .related-id {
+  color: var(--text-muted);
+}
+
+.related-subject {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.related-status {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  font-size: 11px;
+  border-radius: 9999px;
+  background: var(--tag-bg);
+  color: var(--text-muted);
 }
 
 .comment {

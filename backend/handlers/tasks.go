@@ -583,6 +583,8 @@ func (h *TaskHandler) GetTaskDetails(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusBadGateway, "REDMINE_ERROR")
 		return
 	}
+	describeHistory(*h.DB, client, externalID, details.History)
+	describeRelated(*h.DB, middleware.GetScope(r), details.Related)
 	utils.JSON(w, http.StatusOK, details)
 }
 
