@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"pm-dashboard/access"
 	"pm-dashboard/middleware"
@@ -143,10 +144,20 @@ func (h *SprintHandler) CreateSprint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	body.Name = strings.TrimSpace(body.Name)
 	if body.Name == "" {
 		utils.Error(w, http.StatusBadRequest, "NAME_REQUIRED")
 		return
 	}
+	body.StartDate = emptyToNil(body.StartDate)
+	if body.StartDate == nil {
+		utils.Error(w, http.StatusBadRequest, "START_DATE_REQUIRED")
+		return
+	}
+	body.DueDate = emptyToNil(body.DueDate)
+	body.ProjectName = emptyToNil(body.ProjectName)
+	body.CategoryName = emptyToNil(body.CategoryName)
+	body.Description = emptyToNil(body.Description)
 
 	var sprintID int
 	err := (*h.DB).QueryRow(`INSERT INTO sprints (user_id, name, project_name, start_date, due_date,
@@ -205,6 +216,24 @@ func (h *SprintHandler) UpdateSprint(w http.ResponseWriter, r *http.Request) {
 			slog.Warn("Sprint action outside of user rights", "user", userID, "action", action, "sprint", sprintID)
 			utils.Error(w, http.StatusForbidden, "SPRINT_ACTION_FORBIDDEN")
 			return
+		}
+	}
+
+	// The form sends an empty string for a field left blank: the name and
+	// the start date are required, the rest is stored as NULL.
+	for k, v := range body {
+		text, isText := v.(string)
+		blank := v == nil || (isText && strings.TrimSpace(text) == "")
+		switch {
+		case !blank || !allowed[k]:
+		case k == "name":
+			utils.Error(w, http.StatusBadRequest, "NAME_REQUIRED")
+			return
+		case k == "start_date":
+			utils.Error(w, http.StatusBadRequest, "START_DATE_REQUIRED")
+			return
+		default:
+			body[k] = nil
 		}
 	}
 
@@ -442,6 +471,15 @@ func (h *SprintHandler) RefreshSprint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	utils.Success(w)
+}
+
+// emptyToNil turns a blank value into NULL: an empty date is not a date, and
+// an empty project or category means none.
+func emptyToNil(s *string) *string {
+	if s == nil || strings.TrimSpace(*s) == "" {
+		return nil
+	}
+	return s
 }
 
 // ownsSprint reports whether the sprint belongs to the given user.

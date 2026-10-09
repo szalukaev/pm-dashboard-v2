@@ -33,8 +33,8 @@
 
       <div class="form-row">
         <div class="form-field">
-          <label>{{ $t('sprint.form.start_date') }}</label>
-          <input v-model="form.start_date" type="date" />
+          <label>{{ $t('sprint.form.start_date') }} *</label>
+          <input v-model="form.start_date" type="date" required />
         </div>
         <div class="form-field">
           <label>{{ $t('sprint.form.due_date') }}</label>
@@ -62,7 +62,7 @@
       <AppButton variant="ghost" @click="$emit('close')">
         {{ $t('common.cancel') }}
       </AppButton>
-      <AppButton variant="primary" @click="submit" :disabled="!form.name">
+      <AppButton variant="primary" @click="submit" :disabled="!canSubmit">
         {{ sprint ? $t('common.save') : $t('common.create') }}
       </AppButton>
     </template>
@@ -70,7 +70,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, watch } from 'vue'
+import { computed, reactive, watch } from 'vue'
 import AppModal from '../ui/AppModal.vue'
 import AppButton from '../ui/AppButton.vue'
 import type { Sprint } from '../../stores/sprint'
@@ -119,8 +119,20 @@ watch(() => props.sprint, (s) => {
   }
 }, { immediate: true })
 
+// The name and the start date are required
+const canSubmit = computed(() => form.name.trim() !== '' && form.start_date !== '')
+
 function submit() {
-  emit('submit', { ...form })
+  if (!canSubmit.value) return
+  // A field left blank is "not set", not an empty string
+  emit('submit', {
+    ...form,
+    name: form.name.trim(),
+    project_name: form.project_name || null,
+    category_name: form.category_name || null,
+    due_date: form.due_date || null,
+    description: form.description.trim() || null,
+  })
 }
 </script>
 
