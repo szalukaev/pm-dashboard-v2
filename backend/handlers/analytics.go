@@ -62,20 +62,19 @@ func (h *AnalyticsHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	var stats []StatCard
 	today := time.Now().Format("2006-01-02")
 
-	// Active projects
+	// Active projects: those with open or testing issues
 	var activeProjects int
 	q := `SELECT COUNT(DISTINCT project_id) FROM issues WHERE ` + projectFilter + `
-		AND (LOWER(status_name) NOT IN ('closed', 'rejected', 'resolved', 'tested')
-		OR LOWER(status_name) LIKE '%test%')`
+		AND ` + statusIn("status_id", GroupOpen, GroupTesting)
 	(*h.DB).QueryRow(q, args...).Scan(&activeProjects)
 	stats = append(stats, StatCard{Label: "active_projects", Value: float64(activeProjects)})
 
 	// Completion: closed / (open + testing*0.5 + closed)
 	var closed, open, testing int
 	q = `SELECT
-		COUNT(CASE WHEN LOWER(status_name) IN ('closed','rejected','resolved','tested') THEN 1 END),
-		COUNT(CASE WHEN LOWER(status_name) NOT IN ('closed','rejected','resolved','tested') AND LOWER(status_name) NOT LIKE '%test%' THEN 1 END),
-		COUNT(CASE WHEN LOWER(status_name) LIKE '%test%' THEN 1 END)
+		COUNT(CASE WHEN ` + statusIn("status_id", GroupClosed) + ` THEN 1 END),
+		COUNT(CASE WHEN ` + statusIn("status_id", GroupOpen) + ` THEN 1 END),
+		COUNT(CASE WHEN ` + statusIn("status_id", GroupTesting) + ` THEN 1 END)
 		FROM issues WHERE ` + projectFilter
 	(*h.DB).QueryRow(q, args...).Scan(&closed, &open, &testing)
 	denom := float64(open) + float64(testing)*0.5 + float64(closed)
@@ -95,7 +94,7 @@ func (h *AnalyticsHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	var overdue int
 	q = `SELECT COUNT(*) FROM issues WHERE ` + projectFilter + `
 		AND due_date IS NOT NULL AND due_date < $` + itoa(len(args)+1) + `
-		AND LOWER(status_name) NOT IN ('closed', 'rejected', 'resolved', 'tested')`
+		AND ` + statusIn("status_id", GroupOpen, GroupTesting)
 	overdueArgs := append(args, today)
 	(*h.DB).QueryRow(q, overdueArgs...).Scan(&overdue)
 	stats = append(stats, StatCard{Label: "overdue", Value: float64(overdue), Variant: "danger"})
@@ -111,7 +110,7 @@ func (h *AnalyticsHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	var noEstimate int
 	q = `SELECT COUNT(*) FROM issues WHERE ` + projectFilter + `
 		AND (estimated_hours IS NULL OR estimated_hours = 0)
-		AND LOWER(status_name) NOT IN ('closed', 'rejected', 'resolved', 'tested')`
+		AND ` + statusIn("status_id", GroupOpen)
 	(*h.DB).QueryRow(q, args...).Scan(&noEstimate)
 	stats = append(stats, StatCard{Label: "no_estimate", Value: float64(noEstimate)})
 
@@ -148,13 +147,13 @@ func (h *AnalyticsHandler) GetTeamLoad(w http.ResponseWriter, r *http.Request) {
 
 	q := `SELECT
 		COALESCE(assigned_to_name, 'Неназначенные'),
-		COUNT(CASE WHEN LOWER(status_name) NOT IN ('closed','rejected','resolved','tested') AND LOWER(status_name) NOT LIKE '%test%' THEN 1 END),
-		COUNT(CASE WHEN LOWER(status_name) LIKE '%test%' THEN 1 END),
-		COUNT(CASE WHEN LOWER(status_name) IN ('closed','rejected','resolved','tested') THEN 1 END),
-		COUNT(CASE WHEN due_date IS NOT NULL AND due_date < $` + itoa(len(args)+1) + ` AND LOWER(status_name) NOT IN ('closed','rejected','resolved','tested') THEN 1 END),
+		COUNT(CASE WHEN ` + statusIn("status_id", GroupOpen) + ` THEN 1 END),
+		COUNT(CASE WHEN ` + statusIn("status_id", GroupTesting) + ` THEN 1 END),
+		COUNT(CASE WHEN ` + statusIn("status_id", GroupClosed) + ` THEN 1 END),
+		COUNT(CASE WHEN due_date IS NOT NULL AND due_date < $` + itoa(len(args)+1) + ` AND ` + statusIn("status_id", GroupOpen, GroupTesting) + ` THEN 1 END),
 		COUNT(CASE WHEN LOWER(status_name) LIKE '%bug%' THEN 1 END),
 		COUNT(CASE WHEN priority_id = $` + itoa(len(args)+2) + ` THEN 1 END),
-		COUNT(CASE WHEN (estimated_hours IS NULL OR estimated_hours = 0) AND LOWER(status_name) NOT IN ('closed','rejected','resolved','tested') THEN 1 END)
+		COUNT(CASE WHEN (estimated_hours IS NULL OR estimated_hours = 0) AND ` + statusIn("status_id", GroupOpen) + ` THEN 1 END)
 		FROM issues WHERE ` + projectFilter + teamFilter + `
 		GROUP BY assigned_to_name
 		ORDER BY assigned_to_name`
@@ -193,7 +192,7 @@ func (h *AnalyticsHandler) GetDistribution(w http.ResponseWriter, r *http.Reques
 
 	q := `SELECT project_name, COALESCE(assigned_to_name, 'Неназначенные'), COUNT(*)
 		FROM issues WHERE ` + projectFilter + `
-		AND LOWER(status_name) NOT IN ('closed', 'rejected', 'resolved', 'tested')
+		AND ` + statusIn("status_id", GroupOpen) + `
 		GROUP BY project_name, assigned_to_name
 		ORDER BY project_name, assigned_to_name`
 
@@ -249,7 +248,7 @@ func (h *AnalyticsHandler) GetDeadlines(w http.ResponseWriter, r *http.Request) 
 		done_ratio, tracker_name, author_name, COALESCE(bug_fix_hours, 0)
 		FROM issues WHERE ` + projectFilter + `
 		AND due_date IS NOT NULL
-		AND LOWER(status_name) NOT IN ('closed', 'rejected', 'resolved', 'tested')
+		AND ` + statusNotIn("status_id", GroupClosed) + `
 		ORDER BY due_date ASC`
 
 	// Add today as arg for deadline comparison
@@ -261,7 +260,7 @@ func (h *AnalyticsHandler) GetDeadlines(w http.ResponseWriter, r *http.Request) 
 		done_ratio, tracker_name, author_name, COALESCE(bug_fix_hours, 0)
 		FROM issues WHERE ` + projectFilter + `
 		AND due_date IS NOT NULL
-		AND LOWER(status_name) NOT IN ('closed', 'rejected', 'resolved', 'tested')
+		AND ` + statusNotIn("status_id", GroupClosed) + `
 		ORDER BY due_date ASC`
 
 	_ = argIdx

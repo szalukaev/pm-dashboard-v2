@@ -73,7 +73,7 @@ func (h *KanbanHandler) GetBoard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build project filter
-	where := []string{"LOWER(status_name) NOT IN ('closed', 'rejected', 'resolved', 'tested')"}
+	where := []string{statusNotIn("status_id", GroupClosed)}
 	args := []interface{}{}
 	argIdx := 1
 

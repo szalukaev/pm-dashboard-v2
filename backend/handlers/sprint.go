@@ -45,6 +45,8 @@ type SprintTask struct {
 	DueDate        *string `json:"due_date"`
 	EstimatedHours *float64 `json:"estimated_hours"`
 	IsOverdue      bool    `json:"is_overdue"`
+
+	statusGroup string // group of the status, see status_groups.go
 }
 
 func (h *SprintHandler) ListSprints(w http.ResponseWriter, r *http.Request) {
@@ -330,7 +332,7 @@ func (h *SprintHandler) GetBacklog(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Find issues NOT in any sprint
-	where := []string{"LOWER(i.status_name) NOT IN ('closed', 'rejected', 'resolved', 'tested')"}
+	where := []string{statusNotIn("i.status_id", GroupClosed)}
 	args := []interface{}{}
 	argIdx := 1
 
@@ -427,8 +429,10 @@ func (h *SprintHandler) ownsSprint(sprintID, userID int) bool {
 
 func (h *SprintHandler) getSprintTasks(sprintID int) []SprintTask {
 	rows, err := (*h.DB).Query(`SELECT i.external_id, i.subject, i.project_name, i.status_name,
-		i.priority_name, i.priority_id, i.assigned_to_name, i.due_date, i.estimated_hours
+		i.priority_name, i.priority_id, i.assigned_to_name, i.due_date, i.estimated_hours,
+		COALESCE(st.group_name, 'open')
 		FROM sprint_issues si JOIN issues i ON si.issue_external_id = i.external_id
+		LEFT JOIN statuses st ON st.external_id = i.status_id AND st.data_source = 'redmine'
 		WHERE si.sprint_id = $1 ORDER BY i.priority_id DESC`, sprintID)
 	if err != nil {
 		return []SprintTask{}
@@ -439,7 +443,8 @@ func (h *SprintHandler) getSprintTasks(sprintID int) []SprintTask {
 	for rows.Next() {
 		var t SprintTask
 		if rows.Scan(&t.ExternalID, &t.Subject, &t.ProjectName, &t.StatusName,
-			&t.PriorityName, &t.PriorityID, &t.AssignedToName, &t.DueDate, &t.EstimatedHours) == nil {
+			&t.PriorityName, &t.PriorityID, &t.AssignedToName, &t.DueDate, &t.EstimatedHours,
+			&t.statusGroup) == nil {
 			tasks = append(tasks, t)
 		}
 	}
@@ -453,7 +458,7 @@ func (h *SprintHandler) autoFill(sprintID int, projectName, categoryName string)
 	// Find issues matching project + category not already in sprint
 	rows, err := (*h.DB).Query(`SELECT external_id FROM issues
 		WHERE project_name = $1 AND category_name = $2
-		AND LOWER(status_name) NOT IN ('closed', 'rejected', 'resolved', 'tested')
+		AND `+statusNotIn("status_id", GroupClosed)+`
 		AND external_id NOT IN (SELECT issue_external_id FROM sprint_issues WHERE sprint_id = $3)`,
 		projectName, categoryName, sprintID)
 	if err != nil {
@@ -474,11 +479,10 @@ func (h *SprintHandler) autoFill(sprintID int, projectName, categoryName string)
 
 func (s *Sprint) calculateProgress() {
 	for _, t := range s.Tasks {
-		sn := t.StatusName
-		switch {
-		case isClosedStatus(sn):
+		switch t.statusGroup {
+		case GroupClosed:
 			s.ClosedCount++
-		case isTestingStatus(sn):
+		case GroupTesting:
 			s.TestingCount++
 			s.OpenCount++ // testing counts as 0.5 open
 		default:
@@ -490,18 +494,4 @@ func (s *Sprint) calculateProgress() {
 	if total > 0 {
 		s.Progress = (float64(s.ClosedCount) + float64(s.TestingCount)*0.5) / float64(total) * 100
 	}
-}
-
-func isClosedStatus(name string) bool {
-	closed := []string{"closed", "rejected", "resolved", "tested"}
-	for _, c := range closed {
-		if name == c {
-			return true
-		}
-	}
-	return false
-}
-
-func isTestingStatus(name string) bool {
-	return len(name) >= 4 && (name[:4] == "test" || name[:4] == "Test")
 }

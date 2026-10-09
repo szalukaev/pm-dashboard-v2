@@ -180,6 +180,8 @@ const { statuses, priorities, members, projectCategories: projectCategoriesMap }
 
 const statusNames = computed(() => statuses.value.map(s => s.name))
 const priorityNames = computed(() => priorities.value.map(p => p.name))
+// Closed is whatever the status groups in the settings say, not a status name
+const closedStatusIds = computed(() => new Set(statuses.value.filter(s => s.group === 'closed').map(s => s.id)))
 
 const memberNames = computed(() => {
   const selectedTeam = settings.value.selected_team || []
@@ -219,8 +221,7 @@ function toggleSort(key: string) {
 
 function isOverdue(task: Task): boolean {
   if (!task.due_date) return false
-  return task.due_date.slice(0, 10) < new Date().toISOString().slice(0, 10) &&
-    !['closed', 'rejected', 'resolved', 'tested'].includes(task.status_name.toLowerCase())
+  return task.due_date.slice(0, 10) < new Date().toISOString().slice(0, 10) && !closedStatusIds.value.has(task.status_id)
 }
 
 // Colors as in the previous version of the dashboard
