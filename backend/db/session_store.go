@@ -16,6 +16,9 @@ type SessionStore interface {
 	Set(ctx context.Context, sessionID string, userID int, expiry time.Duration) error
 	Get(ctx context.Context, sessionID string) (int, error)
 	Delete(ctx context.Context, sessionID string) error
+	// DeleteUser ends every session of the user (on all devices) and
+	// returns how many there were.
+	DeleteUser(ctx context.Context, userID int) (int, error)
 	Close() error
 }
 
@@ -135,6 +138,24 @@ func (s *RedisSessionStore) Delete(ctx context.Context, sessionID string) error 
 	return s.client.Del(ctx, key).Err()
 }
 
+// DeleteUser walks all sessions: there is no index by user, and the number
+// of sessions of an on-premise installation is small.
+func (s *RedisSessionStore) DeleteUser(ctx context.Context, userID int) (int, error) {
+	want := strconv.Itoa(userID)
+	deleted := 0
+	iter := s.client.Scan(ctx, 0, "session:*", 200).Iterator()
+	for iter.Next(ctx) {
+		key := iter.Val()
+		if val, err := s.client.Get(ctx, key).Result(); err == nil && val == want {
+			if err := s.client.Del(ctx, key).Err(); err != nil {
+				return deleted, err
+			}
+			deleted++
+		}
+	}
+	return deleted, iter.Err()
+}
+
 func (s *RedisSessionStore) Close() error {
 	return s.client.Close()
 }
@@ -173,6 +194,19 @@ func (s *MemorySessionStore) Delete(ctx context.Context, sessionID string) error
 	delete(s.sessions, sessionID)
 	s.mu.Unlock()
 	return nil
+}
+
+func (s *MemorySessionStore) DeleteUser(ctx context.Context, userID int) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	deleted := 0
+	for id, entry := range s.sessions {
+		if entry.userID == userID {
+			delete(s.sessions, id)
+			deleted++
+		}
+	}
+	return deleted, nil
 }
 
 // Close stops the cleanup goroutine and waits for it to exit.

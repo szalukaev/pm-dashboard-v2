@@ -42,6 +42,30 @@ func TestMemorySessionStoreConcurrentAccess(t *testing.T) {
 }
 
 // TestMemorySessionStoreExpired verifies lazy expiry on Get and the sweeper.
+func TestMemorySessionStoreDeleteUser(t *testing.T) {
+	s := newMemorySessionStore()
+	defer s.Close()
+	ctx := context.Background()
+
+	// User 7 is logged in on two devices, user 8 on one
+	s.Set(ctx, "phone", 7, time.Minute)
+	s.Set(ctx, "laptop", 7, time.Minute)
+	s.Set(ctx, "other", 8, time.Minute)
+
+	deleted, err := s.DeleteUser(ctx, 7)
+	if err != nil || deleted != 2 {
+		t.Fatalf("DeleteUser = %d, %v; want 2 sessions", deleted, err)
+	}
+	for _, id := range []string{"phone", "laptop"} {
+		if _, err := s.Get(ctx, id); err == nil {
+			t.Errorf("session %q must be gone", id)
+		}
+	}
+	if _, err := s.Get(ctx, "other"); err != nil {
+		t.Errorf("a session of another user must stay: %v", err)
+	}
+}
+
 func TestMemorySessionStoreExpired(t *testing.T) {
 	s := newMemorySessionStore()
 	defer s.Close()

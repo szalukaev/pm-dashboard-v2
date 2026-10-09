@@ -130,7 +130,7 @@ func main() {
 	taskH.Keys = userKeys
 	kanbanH.Keys = userKeys
 	syncStatusH := &handlers.SyncStatusHandler{DB: &pgDB, Source: source}
-	accessH := &handlers.AccessHandler{DB: &pgDB, Source: source}
+	accessH := &handlers.AccessHandler{DB: &pgDB, Source: source, Sessions: sessionStore}
 	// Issues are synced for the projects the users are shown within their rights
 	source.SetProjectSource((&access.Resolver{DB: &pgDB}).SyncProjects)
 

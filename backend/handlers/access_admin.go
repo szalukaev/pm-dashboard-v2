@@ -5,12 +5,14 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"pm-dashboard/access"
 	"pm-dashboard/datasource/manager"
+	"pm-dashboard/db"
 	"pm-dashboard/middleware"
 	"pm-dashboard/utils"
 
@@ -24,6 +26,8 @@ import (
 type AccessHandler struct {
 	DB     **sql.DB
 	Source *manager.Manager
+	// Sessions ends the sessions of a user whose password was reset.
+	Sessions db.SessionStore
 }
 
 func (h *AccessHandler) resolver() *access.Resolver {
@@ -329,6 +333,13 @@ func (h *AccessHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	if n, _ := res.RowsAffected(); n == 0 {
 		utils.Error(w, http.StatusNotFound, "USER_NOT_FOUND")
 		return
+	}
+	// The old password no longer works, and neither must the sessions
+	// opened with it: the user is logged out on every device.
+	if h.Sessions != nil {
+		if _, err := h.Sessions.DeleteUser(r.Context(), userID); err != nil {
+			slog.Warn("Could not end the sessions after a password reset", "user", userID, "error", err)
+		}
 	}
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"password": password})
 }
