@@ -54,7 +54,7 @@
 
         <div v-if="isOpen(group.project_name)" class="group-body">
           <KanbanCard
-            v-for="task in group.tasks"
+            v-for="task in pageOf(group)"
             :key="task.external_id"
             :card="mapToKanbanCard(task)"
             compact
@@ -63,6 +63,14 @@
             @open-task="$emit('open-task', $event)"
           />
         </div>
+        <AppPagination
+          v-if="isOpen(group.project_name)"
+          :total="group.tasks.length"
+          :limit="pageSize"
+          :offset="offsetOf(group)"
+          @update:offset="offsets[group.project_name] = $event"
+          @update:limit="setPageSize"
+        />
       </div>
     </div>
   </div>
@@ -72,6 +80,8 @@
 import { ref, computed } from 'vue'
 import { ChevronDown, Search, X } from 'lucide-vue-next'
 import KanbanCard from '../kanban/KanbanCard.vue'
+import AppPagination from '../ui/AppPagination.vue'
+import { useSettingsStore } from '../../stores/settings'
 import type { BacklogGroup, SprintTask } from '../../stores/sprint'
 import type { KanbanCard as KanbanCardType } from '../../stores/kanban'
 
@@ -79,6 +89,30 @@ const props = defineProps<{ backlog: BacklogGroup[] }>()
 defineEmits(['open-task'])
 
 const openGroups = ref<Set<string>>(new Set())
+
+// Each project shows its tasks page by page; the backlog is already loaded
+// whole (the filter works over all of it), so the pages are cut here.
+const settingsStore = useSettingsStore()
+settingsStore.ensureLoaded()
+const PAGE_TABLE = 'backlog'
+const pageSize = computed(() => settingsStore.pageSize(PAGE_TABLE))
+const offsets = ref<Record<string, number>>({})
+
+// A page that no longer exists (tasks left the backlog) falls back to the last one
+function offsetOf(group: BacklogGroup): number {
+  const last = group.tasks.length > 0 ? Math.floor((group.tasks.length - 1) / pageSize.value) * pageSize.value : 0
+  return Math.min(offsets.value[group.project_name] || 0, last)
+}
+
+function pageOf(group: BacklogGroup): SprintTask[] {
+  const start = offsetOf(group)
+  return group.tasks.slice(start, start + pageSize.value)
+}
+
+async function setPageSize(size: number) {
+  await settingsStore.setPageSize(PAGE_TABLE, size)
+  offsets.value = {}
+}
 
 // query is what is being typed, applied is what the list is filtered by
 const query = ref('')
@@ -104,6 +138,7 @@ const totalTasks = computed(() =>
 
 function applyFilter() {
   applied.value = query.value.trim().toLowerCase()
+  offsets.value = {}
   // What was found is shown at once, without opening every project by hand
   if (applied.value) openGroups.value = new Set(visibleGroups.value.map(g => g.project_name))
 }
@@ -111,6 +146,7 @@ function applyFilter() {
 function clearFilter() {
   query.value = ''
   applied.value = ''
+  offsets.value = {}
 }
 
 function toggle(name: string) {

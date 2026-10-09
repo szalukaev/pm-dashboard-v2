@@ -93,6 +93,13 @@
         </tbody>
       </table>
     </div>
+    <AppPagination
+      :total="total"
+      :limit="pageSize"
+      :offset="offset"
+      @update:offset="setPage"
+      @update:limit="setPageSize"
+    />
 
     <!-- New user -->
     <AppModal v-model="createOpen" :title="$t('access.users.new_title')" width="440px">
@@ -226,6 +233,8 @@ import { Plus, ShieldCheck, Copy, KeyRound, Lock, Unlock, Trash2 } from 'lucide-
 import AppButton from '../../ui/AppButton.vue'
 import AppModal from '../../ui/AppModal.vue'
 import PermissionsEditor from './PermissionsEditor.vue'
+import AppPagination from '../../ui/AppPagination.vue'
+import { useSettingsStore } from '../../../stores/settings'
 import { useAuthStore } from '../../../stores/auth'
 import { useSwal } from '../../../composables/useSwal'
 import { formatDate } from '../../../utils/format'
@@ -260,24 +269,49 @@ const { t, te } = useI18n()
 const { toast, confirm } = useSwal()
 const auth = useAuthStore()
 
+// The table shows one page of users
+const PAGE_TABLE = 'admin_users_table'
+const settingsStore = useSettingsStore()
+const pageSize = computed(() => settingsStore.pageSize(PAGE_TABLE))
 const users = ref<AdminUser[]>([])
+const total = ref(0)
+const offset = ref(0)
 const templates = ref<{ id: number; name: string }[]>([])
 const groups = ref<{ id: number; name: string }[]>([])
 const saving = ref(false)
 
 async function load() {
   try {
-    const [u, tpl, g] = await Promise.all([
-      axios.get('/api/admin/users'),
+    await settingsStore.ensureLoaded()
+    const usersPage = () => axios.get('/api/admin/users', { params: { limit: pageSize.value, offset: offset.value } })
+    let [u, tpl, g] = await Promise.all([
+      usersPage(),
       axios.get('/api/admin/role-templates'),
       axios.get('/api/admin/groups'),
     ])
+    // The last user of the last page was deleted: show the page before it
+    if ((u.data.users || []).length === 0 && u.data.total > 0) {
+      offset.value = Math.floor((u.data.total - 1) / pageSize.value) * pageSize.value
+      u = await usersPage()
+    }
     users.value = u.data.users || []
+    total.value = u.data.total || 0
     templates.value = tpl.data.templates || []
     groups.value = g.data.groups || []
   } catch {
     toast(t('access.load_error'), 'error')
   }
+}
+
+async function setPage(value: number) {
+  offset.value = value
+  await load()
+}
+
+async function setPageSize(size: number) {
+  await settingsStore.setPageSize(PAGE_TABLE, size)
+  offset.value = 0
+  await load()
 }
 
 function errorText(e: any, fallback: string): string {
@@ -458,9 +492,17 @@ const clone = reactive({
   include_widgets: true,
 })
 
-const cloneTargets = computed(() => users.value.filter(u => u.id !== cloneSource.value?.id && u.role !== 'admin'))
+// Rights may be copied to any user, not only to those on the current page
+const allUsers = ref<AdminUser[]>([])
+const cloneTargets = computed(() => allUsers.value.filter(u => u.id !== cloneSource.value?.id && u.role !== 'admin'))
 
-function openClone(u: AdminUser) {
+async function openClone(u: AdminUser) {
+  try {
+    const { data } = await axios.get('/api/admin/users')
+    allUsers.value = data.users || []
+  } catch {
+    allUsers.value = users.value
+  }
   cloneSource.value = u
   Object.assign(clone, { to_type: 'user', to_id: null, include_tabs: true, include_widgets: true })
   cloneOpen.value = true

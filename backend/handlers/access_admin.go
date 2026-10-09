@@ -76,6 +76,14 @@ type adminUser struct {
 }
 
 func (h *AccessHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
+	// Paged for the table of users; without a limit — the whole list, for
+	// the places that choose a user from it.
+	limit, offset := pageOf(r)
+	total := 0
+	if err := (*h.DB).QueryRow("SELECT COUNT(*) FROM users").Scan(&total); err != nil {
+		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
+		return
+	}
 	rows, err := (*h.DB).Query(`SELECT u.id, u.username, COALESCE(u.display_name, ''), u.role, u.created_at, u.last_login,
 			u.is_blocked, u.member_id, COALESCE(m.name, ''), u.role_template_id, COALESCE(t.name, ''),
 			EXISTS(SELECT 1 FROM user_permissions p WHERE p.user_id = u.id),
@@ -84,7 +92,7 @@ func (h *AccessHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		FROM users u
 		LEFT JOIN members m ON m.external_id = u.member_id AND m.data_source = 'redmine'
 		LEFT JOIN role_templates t ON t.id = u.role_template_id
-		ORDER BY u.id`)
+		ORDER BY u.id` + pageClause(limit, offset))
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
@@ -102,7 +110,7 @@ func (h *AccessHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		}
 		users = append(users, u)
 	}
-	utils.JSON(w, http.StatusOK, map[string]interface{}{"users": users})
+	utils.JSON(w, http.StatusOK, map[string]interface{}{"users": users, "total": total})
 }
 
 func (h *AccessHandler) CreateUser(w http.ResponseWriter, r *http.Request) {

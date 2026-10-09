@@ -18,7 +18,7 @@
       </thead>
       <tbody>
         <tr v-for="(inv, idx) in invoices" :key="inv.id">
-          <td>{{ idx + 1 }}</td>
+          <td>{{ offset + idx + 1 }}</td>
           <td>{{ formatDate(inv.issued_at) }}</td>
           <td class="num">{{ formatMoney(inv.total) }}</td>
           <td class="num">{{ formatMoney(inv.paid_amount) }}</td>
@@ -33,7 +33,7 @@
             <button class="action-btn" @click="$emit('download', inv.id)" title="Скачать">
               <Download :size="14" />
             </button>
-            <button class="action-btn" @click="copyInvoiceInfo(inv, idx)" title="Копировать">
+            <button class="action-btn" @click="copyInvoiceInfo(inv, offset + idx)" title="Копировать">
               <Copy :size="14" />
             </button>
             <button class="action-btn danger-btn" @click="$emit('delete-invoice', inv.id)" title="Удалить">
@@ -43,17 +43,27 @@
         </tr>
       </tbody>
     </table>
+    <AppPagination
+      v-if="!loading"
+      :total="total"
+      :limit="pageSize"
+      :offset="offset"
+      @update:offset="setPage"
+      @update:limit="setPageSize"
+    />
 
-    <div v-else class="empty-invoices">
+    <div v-if="!loading && invoices.length === 0" class="empty-invoices">
       Нет счетов
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { CreditCard, Download, Copy, Trash2 } from 'lucide-vue-next'
 import AppSpinner from '../ui/AppSpinner.vue'
+import AppPagination from '../ui/AppPagination.vue'
+import { useSettingsStore } from '../../stores/settings'
 import { usePaymentsStore, type Invoice } from '../../stores/payments'
 import { formatMoney, formatDate } from '../../utils/format'
 
@@ -61,8 +71,30 @@ const props = defineProps<{ contractId: number }>()
 defineEmits(['pay', 'download', 'delete-invoice'])
 
 const store = usePaymentsStore()
+const settingsStore = useSettingsStore()
+const PAGE_TABLE = 'payments_table'
+const pageSize = computed(() => settingsStore.pageSize(PAGE_TABLE))
 const invoices = ref<Invoice[]>([])
+const total = ref(0)
+const offset = ref(0)
 const loading = ref(true)
+
+async function load() {
+  const page = await store.fetchInvoices(props.contractId, pageSize.value, offset.value)
+  invoices.value = page.invoices
+  total.value = page.total
+}
+
+async function setPage(value: number) {
+  offset.value = value
+  await load()
+}
+
+async function setPageSize(size: number) {
+  await settingsStore.setPageSize(PAGE_TABLE, size)
+  offset.value = 0
+  await load()
+}
 
 function statusLabel(status: string): string {
   const map: Record<string, string> = {
@@ -79,7 +111,8 @@ function copyInvoiceInfo(inv: Invoice, idx: number) {
 }
 
 onMounted(async () => {
-  invoices.value = await store.fetchInvoices(props.contractId)
+  await settingsStore.ensureLoaded()
+  await load()
   loading.value = false
 })
 </script>

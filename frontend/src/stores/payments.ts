@@ -129,11 +129,12 @@ export const usePaymentsStore = defineStore('payments', () => {
     await fetchAll()
   }
 
-  async function fetchInvoices(contractId: number): Promise<Invoice[]> {
+  // One page of the invoices of a contract and how many there are in all
+  async function fetchInvoices(contractId: number, limit: number, offset: number): Promise<{ invoices: Invoice[]; total: number }> {
     try {
-      const { data } = await axios.get(`/api/contracts/${contractId}/invoices`)
-      return data.invoices || []
-    } catch { return [] }
+      const { data } = await axios.get(`/api/contracts/${contractId}/invoices`, { params: { limit, offset } })
+      return { invoices: data.invoices || [], total: data.total || 0 }
+    } catch { return { invoices: [], total: 0 } }
   }
 
   async function createInvoice(contractId: number, items: { name: string; quantity: number; price: number }[]) {

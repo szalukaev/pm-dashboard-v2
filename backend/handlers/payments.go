@@ -387,9 +387,16 @@ func (h *PaymentsHandler) ListInvoices(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Ownership: invoices are visible only via a contract belonging to the caller.
+	limit, offset := pageOf(r)
+	total := 0
+	if err := (*h.DB).QueryRow(`SELECT COUNT(*) FROM invoices i JOIN contracts c ON i.contract_id = c.id
+		WHERE i.contract_id=$1 AND c.user_id=$2`, contractID, userID).Scan(&total); err != nil {
+		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
+		return
+	}
 	rows, err := (*h.DB).Query(`SELECT i.id, i.amount, i.vat_rate, i.issued_at, i.paid_amount, i.status
 		FROM invoices i JOIN contracts c ON i.contract_id = c.id
-		WHERE i.contract_id=$1 AND c.user_id=$2 ORDER BY i.issued_at DESC`, contractID, userID)
+		WHERE i.contract_id=$1 AND c.user_id=$2 ORDER BY i.issued_at DESC, i.id DESC`+pageClause(limit, offset), contractID, userID)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED"); return
 	}
@@ -419,7 +426,7 @@ func (h *PaymentsHandler) ListInvoices(w http.ResponseWriter, r *http.Request) {
 		invoices = append(invoices, inv)
 	}
 	if invoices == nil { invoices = []Invoice{} }
-	utils.JSON(w, http.StatusOK, map[string]interface{}{"invoices": invoices})
+	utils.JSON(w, http.StatusOK, map[string]interface{}{"invoices": invoices, "total": total})
 }
 
 func (h *PaymentsHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) {
