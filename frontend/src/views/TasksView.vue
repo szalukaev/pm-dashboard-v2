@@ -91,7 +91,8 @@ function openTask(id: number) {
 function handleSortChange(sort: { sortBy: string; sortDir: string }) {
   store.setFilter('sort_by', sort.sortBy)
   store.setFilter('sort_dir', sort.sortDir)
-  store.fetchTasks()
+  // Quietly: the table stays in place and only its rows change
+  store.fetchTasks({ silent: true })
 }
 
 async function handleInlineEdit(payload: { taskId: number; field: string; value: any }) {

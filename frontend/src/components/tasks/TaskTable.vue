@@ -183,10 +183,13 @@ async function saveInlineEdit(task: Task, field: string, value: string) {
   }
 }
 
-const sortBy = ref('')
-const sortDir = ref('asc')
+const { statuses, priorities, members, projectCategories: projectCategoriesMap, filters } = storeToRefs(tasksStore)
 
-const { statuses, priorities, members, projectCategories: projectCategoriesMap } = storeToRefs(tasksStore)
+// The sorting is one for every table of tasks and lives with the filters:
+// a table is rebuilt when its data is reloaded, and a state of its own
+// would be lost between two clicks.
+const sortBy = computed(() => filters.value.sort_by)
+const sortDir = computed(() => filters.value.sort_dir)
 
 const statusNames = computed(() => statuses.value.map(s => s.name))
 const priorityNames = computed(() => priorities.value.map(p => p.name))
@@ -220,13 +223,8 @@ const columns = [
 ]
 
 function toggleSort(key: string) {
-  if (sortBy.value === key) {
-    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
-  } else {
-    sortBy.value = key
-    sortDir.value = 'asc'
-  }
-  emit('sort-change', { sortBy: sortBy.value, sortDir: sortDir.value })
+  const dir = sortBy.value === key && sortDir.value === 'asc' ? 'desc' : 'asc'
+  emit('sort-change', { sortBy: key, sortDir: dir })
 }
 
 function isOverdue(task: Task): boolean {
