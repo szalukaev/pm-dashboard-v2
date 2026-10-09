@@ -2,7 +2,7 @@
   <div class="sprint-view">
     <div class="view-header">
       <h1 class="page-title">{{ $t('sprint.title') }}</h1>
-      <AppButton variant="primary" @click="showForm = true" data-testid="new-sprint-btn">
+      <AppButton v-if="auth.canSprint('create')" variant="primary" @click="showForm = true" data-testid="new-sprint-btn">
         + {{ $t('sprint.new_sprint') }}
       </AppButton>
     </div>
@@ -25,7 +25,7 @@
           :sprint="sprint"
           @complete="completeSprint"
           @edit="editSprint"
-          @refresh="refreshSprint"
+          @refresh="handleRefresh"
           @delete="confirmDelete"
           @open-task="openTask"
           @assign-task="handleAssignTask"
@@ -71,6 +71,9 @@ import { storeToRefs } from 'pinia'
 import { useSprintStore, type Sprint } from '../stores/sprint'
 import { useTasksStore } from '../stores/tasks'
 import { useLiveRefresh } from '../composables/useLiveRefresh'
+import { useAuthStore } from '../stores/auth'
+import { useI18n } from 'vue-i18n'
+import { useSwal } from '../composables/useSwal'
 import SprintWidget from '../components/sprint/SprintWidget.vue'
 import SprintBacklog from '../components/sprint/SprintBacklog.vue'
 import SprintForm from '../components/sprint/SprintForm.vue'
@@ -82,6 +85,9 @@ import TaskModal from '../components/tasks/TaskModal.vue'
 
 const sprintStore = useSprintStore()
 const tasksStore = useTasksStore()
+const auth = useAuthStore()
+const { t } = useI18n()
+const { toast } = useSwal()
 const { sprints, backlog, loading, error } = storeToRefs(sprintStore)
 const { fetchAll, createSprint, updateSprint, deleteSprint, assignTask, refreshSprint } = sprintStore
 
@@ -106,22 +112,32 @@ function closeForm() {
   editingSprint.value = null
 }
 
-async function handleFormSubmit(form: any) {
-  if (editingSprint.value) {
-    await updateSprint(editingSprint.value.id, form)
-  } else {
-    await createSprint(form)
+// The buttons of actions the user has no right to are hidden; if the server
+// still refuses (the rights changed meanwhile), say so instead of failing silently.
+async function guarded(action: () => Promise<unknown>) {
+  try {
+    await action()
+  } catch (e: any) {
+    const forbidden = e?.response?.data?.error === 'SPRINT_ACTION_FORBIDDEN'
+    toast(t(forbidden ? 'sprint.action_forbidden' : 'sprint.action_failed'), 'error')
+    if (forbidden) auth.fetchMe()
   }
+}
+
+async function handleFormSubmit(form: any) {
+  const editing = editingSprint.value
+  await guarded(() => (editing ? updateSprint(editing.id, form) : createSprint(form)))
   closeForm()
 }
 
 async function completeSprint(id: number) {
-  await updateSprint(id, { status: 'closed' })
+  await guarded(() => updateSprint(id, { status: 'closed' }))
 }
 
 async function handleDelete() {
   if (deletingSprintId.value) {
-    await deleteSprint(deletingSprintId.value)
+    const id = deletingSprintId.value
+    await guarded(() => deleteSprint(id))
     showDeleteConfirm.value = false
     deletingSprintId.value = null
   }
@@ -133,7 +149,15 @@ function confirmDelete(id: number) {
 }
 
 async function handleAssignTask(payload: { sprintId: number; issueId: number }) {
-  await assignTask(payload.sprintId, payload.issueId)
+  if (!auth.canSprint('tasks')) {
+    toast(t('sprint.action_forbidden'), 'info')
+    return
+  }
+  await guarded(() => assignTask(payload.sprintId, payload.issueId))
+}
+
+async function handleRefresh(id: number) {
+  await guarded(() => refreshSprint(id))
 }
 
 // Changes from a sync or from other users appear without a reload

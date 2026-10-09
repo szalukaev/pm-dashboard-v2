@@ -257,14 +257,17 @@ func main() {
 
 	// Sprints
 	api.HandleFunc("/sprints", sprintH.ListSprints).Methods("GET")
-	api.HandleFunc("/sprints", sprintH.CreateSprint).Methods("POST")
+	// Each action with sprints is a right of its own. Updating a sprint is
+	// checked inside the handler: it is "edit" or "close" depending on what
+	// is being changed.
+	api.Handle("/sprints", middleware.RequireSprint(access.SprintCreate, sprintH.CreateSprint)).Methods("POST")
 	api.HandleFunc("/sprints/backlog", sprintH.GetBacklog).Methods("GET")
 	api.HandleFunc("/sprints/{id}", sprintH.GetSprint).Methods("GET")
 	api.HandleFunc("/sprints/{id}", sprintH.UpdateSprint).Methods("PUT")
-	api.HandleFunc("/sprints/{id}", sprintH.DeleteSprint).Methods("DELETE")
-	api.HandleFunc("/sprints/{id}/assign", sprintH.AssignTask).Methods("POST")
-	api.HandleFunc("/sprints/{id}/assign/{issueId}", sprintH.UnassignTask).Methods("DELETE")
-	api.HandleFunc("/sprints/{id}/refresh", sprintH.RefreshSprint).Methods("POST")
+	api.Handle("/sprints/{id}", middleware.RequireSprint(access.SprintDelete, sprintH.DeleteSprint)).Methods("DELETE")
+	api.Handle("/sprints/{id}/assign", middleware.RequireSprint(access.SprintTasks, sprintH.AssignTask)).Methods("POST")
+	api.Handle("/sprints/{id}/assign/{issueId}", middleware.RequireSprint(access.SprintTasks, sprintH.UnassignTask)).Methods("DELETE")
+	api.Handle("/sprints/{id}/refresh", middleware.RequireSprint(access.SprintTasks, sprintH.RefreshSprint)).Methods("POST")
 
 	// Payments
 	api.HandleFunc("/organizations", paymentsH.ListOrganizations).Methods("GET")

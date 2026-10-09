@@ -12,16 +12,17 @@
       <span v-if="isOverdue" class="overdue-badge badge danger">{{ $t('sprint.overdue') }}</span>
 
       <div class="header-actions" v-if="sprint.status !== 'closed'" @click.stop>
-        <button class="action-btn" @click="$emit('complete', sprint.id)" :title="$t('sprint.complete')">
+        <!-- Each action is a right of its own -->
+        <button v-if="auth.canSprint('close')" class="action-btn" @click="$emit('complete', sprint.id)" :title="$t('sprint.complete')">
           <CheckCircle2 :size="16" />
         </button>
-        <button class="action-btn" @click="$emit('edit', sprint.id)" :title="$t('common.edit')">
+        <button v-if="auth.canSprint('edit')" class="action-btn" @click="$emit('edit', sprint.id)" :title="$t('common.edit')">
           <Pencil :size="16" />
         </button>
-        <button class="action-btn" @click="$emit('refresh', sprint.id)" :title="$t('sprint.refresh_from_redmine')">
+        <button v-if="auth.canSprint('tasks')" class="action-btn" @click="$emit('refresh', sprint.id)" :title="$t('sprint.refresh_from_redmine')">
           <RefreshCw :size="16" />
         </button>
-        <button class="action-btn danger-btn" @click="$emit('delete', sprint.id)" :title="$t('common.delete')">
+        <button v-if="auth.canSprint('delete')" class="action-btn danger-btn" @click="$emit('delete', sprint.id)" :title="$t('common.delete')">
           <Trash2 :size="16" />
         </button>
       </div>
@@ -69,12 +70,14 @@ import SprintProgressBar from './SprintProgressBar.vue'
 import KanbanCard from '../kanban/KanbanCard.vue'
 import type { Sprint, SprintTask } from '../../stores/sprint'
 import type { KanbanCard as KanbanCardType } from '../../stores/kanban'
+import { useAuthStore } from '../../stores/auth'
 
 const props = defineProps<{
   sprint: Sprint
 }>()
 
 const emit = defineEmits(['complete', 'edit', 'refresh', 'delete', 'open-task', 'assign-task'])
+const auth = useAuthStore()
 
 const expanded = ref(props.sprint.status !== 'closed')
 

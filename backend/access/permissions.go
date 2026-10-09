@@ -17,6 +17,18 @@ var (
 	Widgets = []string{"stats", "team_load", "distribution", "deadlines"}
 )
 
+// What a user may do with sprints, each allowed separately.
+const (
+	SprintCreate = "create" // create a sprint
+	SprintEdit   = "edit"   // change its name, dates, description
+	SprintTasks  = "tasks"  // add and remove its tasks
+	SprintClose  = "close"  // close (and reopen) it
+	SprintDelete = "delete" // delete it
+)
+
+// SprintActions lists the sprint actions in the order they are shown.
+var SprintActions = []string{SprintCreate, SprintEdit, SprintTasks, SprintClose, SprintDelete}
+
 // Permissions is one permission set: of a user, a group or a role template.
 type Permissions struct {
 	ProjectIDs []int `json:"project_ids"`
@@ -36,40 +48,55 @@ type Permissions struct {
 	// VisibleTabs / Widgets: nil = everything, otherwise the allowed keys.
 	VisibleTabs *[]string `json:"visible_tabs"`
 	Widgets     *[]string `json:"widgets"`
+	// SprintActions: nil = every action, otherwise the allowed ones.
+	SprintActions *[]string `json:"sprint_actions"`
 }
 
 // Columns is the list of permission columns shared by user_permissions,
 // group_permissions and role_templates, in the order Scan and Values use.
-const Columns = "project_ids, team_ids, visible_tabs, widgets, all_projects, all_team, own_tasks_only, read_only, from_source, show_unassigned"
+const Columns = "project_ids, team_ids, visible_tabs, widgets, all_projects, all_team, own_tasks_only, read_only, from_source, show_unassigned, sprint_actions"
 
 // rawPermissions receives the permission columns of a row.
 type rawPermissions struct {
-	projects, team, tabs, widgets []byte
-	p                             Permissions
+	projects, team, tabs, widgets, sprint []byte
+	p                                     Permissions
+}
+
+// keyList decodes a nullable JSON list of keys; NULL means "everything".
+func keyList(raw []byte) *[]string {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	var keys []string
+	if json.Unmarshal(raw, &keys) != nil {
+		return nil
+	}
+	return &keys
+}
+
+// keyValue encodes a key list for a nullable JSON column.
+func keyValue(keys *[]string) interface{} {
+	if keys == nil {
+		return nil
+	}
+	data, _ := json.Marshal(*keys)
+	return data
 }
 
 // dest returns the scan destinations for Columns.
 func (r *rawPermissions) dest() []interface{} {
 	return []interface{}{&r.projects, &r.team, &r.tabs, &r.widgets,
-		&r.p.AllProjects, &r.p.AllTeam, &r.p.OwnTasksOnly, &r.p.ReadOnly, &r.p.FromSource, &r.p.ShowUnassigned}
+		&r.p.AllProjects, &r.p.AllTeam, &r.p.OwnTasksOnly, &r.p.ReadOnly, &r.p.FromSource, &r.p.ShowUnassigned,
+		&r.sprint}
 }
 
 func (r *rawPermissions) permissions() Permissions {
 	p := r.p
 	json.Unmarshal(r.projects, &p.ProjectIDs)
 	json.Unmarshal(r.team, &p.TeamIDs)
-	if len(r.tabs) > 0 && string(r.tabs) != "null" {
-		var tabs []string
-		if json.Unmarshal(r.tabs, &tabs) == nil {
-			p.VisibleTabs = &tabs
-		}
-	}
-	if len(r.widgets) > 0 && string(r.widgets) != "null" {
-		var widgets []string
-		if json.Unmarshal(r.widgets, &widgets) == nil {
-			p.Widgets = &widgets
-		}
-	}
+	p.VisibleTabs = keyList(r.tabs)
+	p.Widgets = keyList(r.widgets)
+	p.SprintActions = keyList(r.sprint)
 	return p.Normalized()
 }
 
@@ -78,16 +105,9 @@ func (p Permissions) Values() []interface{} {
 	p = p.Normalized()
 	projects, _ := json.Marshal(p.ProjectIDs)
 	team, _ := json.Marshal(p.TeamIDs)
-	var tabs, widgets interface{}
-	if p.VisibleTabs != nil {
-		data, _ := json.Marshal(*p.VisibleTabs)
-		tabs = data
-	}
-	if p.Widgets != nil {
-		data, _ := json.Marshal(*p.Widgets)
-		widgets = data
-	}
-	return []interface{}{projects, team, tabs, widgets, p.AllProjects, p.AllTeam, p.OwnTasksOnly, p.ReadOnly, p.FromSource, p.ShowUnassigned}
+	return []interface{}{projects, team, keyValue(p.VisibleTabs), keyValue(p.Widgets),
+		p.AllProjects, p.AllTeam, p.OwnTasksOnly, p.ReadOnly, p.FromSource, p.ShowUnassigned,
+		keyValue(p.SprintActions)}
 }
 
 // Normalized returns the set with sorted lists without duplicates, non-nil
@@ -97,36 +117,24 @@ func (p Permissions) Normalized() Permissions {
 	p.TeamIDs = uniqueInts(p.TeamIDs)
 	p.VisibleTabs = knownKeys(p.VisibleTabs, Tabs)
 	p.Widgets = knownKeys(p.Widgets, Widgets)
+	p.SprintActions = knownKeys(p.SprintActions, SprintActions)
 	return p
 }
 
 // union merges permission sets: a user gets everything any of them gives.
-// Only data access and visibility are merged; OwnTasksOnly, ReadOnly and
-// FromSource are personal and come from the user's own set.
+// Only access to data is merged. OwnTasksOnly, ReadOnly and FromSource are
+// personal and come from the user's own set; tabs, widgets and sprint
+// actions follow their own rule (see effective).
 func union(sets ...Permissions) Permissions {
-	result := Permissions{VisibleTabs: &[]string{}, Widgets: &[]string{}}
+	result := Permissions{}
 	for _, s := range sets {
 		result.ProjectIDs = append(result.ProjectIDs, s.ProjectIDs...)
 		result.TeamIDs = append(result.TeamIDs, s.TeamIDs...)
 		result.AllProjects = result.AllProjects || s.AllProjects
 		result.AllTeam = result.AllTeam || s.AllTeam
 		result.ShowUnassigned = result.ShowUnassigned || s.ShowUnassigned
-		result.VisibleTabs = unionKeys(result.VisibleTabs, s.VisibleTabs)
-		result.Widgets = unionKeys(result.Widgets, s.Widgets)
-	}
-	if len(sets) == 0 {
-		result.VisibleTabs, result.Widgets = nil, nil
 	}
 	return result.Normalized()
-}
-
-// unionKeys merges two key lists where nil means "everything".
-func unionKeys(a, b *[]string) *[]string {
-	if a == nil || b == nil {
-		return nil
-	}
-	merged := append(append([]string{}, *a...), *b...)
-	return &merged
 }
 
 func uniqueInts(list []int) []int {

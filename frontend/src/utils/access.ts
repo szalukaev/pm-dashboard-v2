@@ -18,6 +18,8 @@ export interface Permissions {
   // null = everything, otherwise the allowed keys
   visible_tabs: string[] | null
   widgets: string[] | null
+  // Allowed actions with sprints; null = every action
+  sprint_actions: string[] | null
 }
 
 export interface NamedPermissions {
@@ -49,6 +51,8 @@ export interface MemberItem {
 // navigation.<tab> and access.widgets.<widget> in the dictionary.
 export const TABS = ['tasks', 'analytics', 'kanban', 'sprint', 'payments']
 export const WIDGETS = ['stats', 'team_load', 'distribution', 'deadlines']
+// Actions with sprints, each allowed separately; labels are access.sprint.<action>
+export const SPRINT_ACTIONS = ['create', 'edit', 'tasks', 'close', 'delete']
 
 export function emptyPermissions(): Permissions {
   return {
@@ -62,6 +66,7 @@ export function emptyPermissions(): Permissions {
     from_source: false,
     visible_tabs: null,
     widgets: null,
+    sprint_actions: null,
   }
 }
 
@@ -72,6 +77,7 @@ export function clonePermissions(p: Permissions): Permissions {
     team_ids: [...(p.team_ids || [])],
     visible_tabs: p.visible_tabs ? [...p.visible_tabs] : null,
     widgets: p.widgets ? [...p.widgets] : null,
+    sprint_actions: p.sprint_actions ? [...p.sprint_actions] : null,
   }
 }
 

@@ -212,6 +212,8 @@
     "complete": "Complete",
     "delete": "Delete",
     "refresh_from_redmine": "Refresh from Redmine",
+    "action_forbidden": "You have no right to do this with a sprint",
+    "action_failed": "The sprint action failed",
     "form": {
       "name": "Name",
       "project": "Project",
@@ -378,6 +380,13 @@
       "distribution": "Task distribution by project",
       "deadlines": "Upcoming deadlines"
     },
+    "sprint": {
+      "create": "Create",
+      "edit": "Edit",
+      "tasks": "Change the tasks of a sprint",
+      "close": "Close a sprint",
+      "delete": "Delete"
+    },
     "errors": {
       "USER_EXISTS": "A user with this login already exists",
       "INVALID_INPUT": "Check the fields",
@@ -442,7 +451,7 @@
       "from_group": "Inherited from group \"{name}\"",
       "effective": "Effective rights",
       "inherited_hint": "The user's own rights come from the role template. They can be set individually — then changes of the template no longer affect this user.",
-      "individual_hint": "Individual rights replace the role template and add to the rights of groups. If tabs or widgets are set in a group of the user, the group's settings apply.",
+      "individual_hint": "Individual rights replace the role template and add to the rights of groups. If tabs, widgets or sprint actions are set in a group of the user, the group's settings apply.",
       "set_individually": "Set individually",
       "save_as_template": "Create a template from current rights",
       "reset": "Back to the template",
@@ -468,6 +477,8 @@
       "all_tabs": "All tabs",
       "widgets": "Analytics widgets",
       "all_widgets": "All widgets",
+      "sprints": "Sprints",
+      "all_sprint_actions": "All actions",
       "search_project": "Search a project…",
       "search_member": "Search a member…",
       "selected": "Selected: {n}",
@@ -514,7 +525,7 @@
       "tab_rights": "Rights",
       "tab_general": "Name",
       "search_user": "Search a user…",
-      "rights_hint": "Every member of the group gets these rights — in addition to their own. Tabs and widgets set in a group have priority over the member's own settings.",
+      "rights_hint": "Every member of the group gets these rights — in addition to their own. Tabs, widgets and sprint actions set in a group have priority over the member's own settings.",
       "saved": "Group saved",
       "delete_title": "Delete group \"{name}\"?",
       "delete_text": "Its members will lose the rights they got through this group."

@@ -31,6 +31,8 @@ func effective(individual, template *Permissions, groups []Permissions) Permissi
 	result := union(sets...)
 	result.VisibleTabs = groupKeys(groups, func(p Permissions) *[]string { return p.VisibleTabs }, own.VisibleTabs)
 	result.Widgets = groupKeys(groups, func(p Permissions) *[]string { return p.Widgets }, own.Widgets)
+	// What may be done with sprints follows the same rule.
+	result.SprintActions = groupKeys(groups, func(p Permissions) *[]string { return p.SprintActions }, own.SprintActions)
 	result.OwnTasksOnly = own.OwnTasksOnly
 	result.ReadOnly = own.ReadOnly
 	result.FromSource = own.FromSource
@@ -67,6 +69,8 @@ type Scope struct {
 	// VisibleTabs / Widgets: nil = everything.
 	VisibleTabs *[]string
 	Widgets     *[]string
+	// SprintActions: nil = every action with sprints is allowed.
+	SprintActions *[]string
 
 	// The maximum set by the administrator.
 	AllowedAllProjects bool
@@ -114,6 +118,7 @@ func newScope(userID int, admin bool, perms Permissions, facts userFacts) *Scope
 		s.ShowUnassigned = perms.ShowUnassigned
 		s.ReadOnly = perms.ReadOnly
 		s.VisibleTabs, s.Widgets = perms.VisibleTabs, perms.Widgets
+		s.SprintActions = perms.SprintActions
 		s.AllowedAllProjects, s.AllowedProjects = perms.AllProjects, perms.ProjectIDs
 		if perms.FromSource {
 			// Exactly the projects of the source: membership there is per
@@ -225,6 +230,20 @@ func (s *Scope) TabVisible(tab string) bool {
 	}
 	for _, t := range *s.VisibleTabs {
 		if t == tab {
+			return true
+		}
+	}
+	return false
+}
+
+// CanSprint reports whether the user may do the action with sprints (one of
+// the Sprint* constants).
+func (s *Scope) CanSprint(action string) bool {
+	if s.Admin || s.SprintActions == nil {
+		return true
+	}
+	for _, a := range *s.SprintActions {
+		if a == action {
 			return true
 		}
 	}

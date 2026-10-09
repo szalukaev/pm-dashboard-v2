@@ -49,7 +49,8 @@
 
       <div class="form-field" v-if="sprint">
         <label>{{ $t('sprint.form.status') }}</label>
-        <select v-model="form.status">
+        <!-- Changing the status closes or reopens the sprint: a separate right -->
+        <select v-model="form.status" :disabled="!auth.canSprint('close')">
           <option value="open">open</option>
           <option value="active">active</option>
           <option value="closed">closed</option>
@@ -73,6 +74,9 @@ import { reactive, watch } from 'vue'
 import AppModal from '../ui/AppModal.vue'
 import AppButton from '../ui/AppButton.vue'
 import type { Sprint } from '../../stores/sprint'
+import { useAuthStore } from '../../stores/auth'
+
+const auth = useAuthStore()
 
 const props = defineProps<{
   visible: boolean

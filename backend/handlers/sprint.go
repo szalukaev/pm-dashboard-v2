@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -191,6 +192,22 @@ func (h *SprintHandler) UpdateSprint(w http.ResponseWriter, r *http.Request) {
 		"category_name": true, "auto_fill_category": true,
 	}
 
+	// Changing the status closes or reopens the sprint; anything else edits
+	// it. The two are separate rights, and a request may need both.
+	scope := middleware.GetScope(r)
+	var currentStatus string
+	if err := (*h.DB).QueryRow("SELECT status FROM sprints WHERE id = $1 AND user_id = $2", sprintID, userID).Scan(&currentStatus); err != nil {
+		utils.Error(w, http.StatusNotFound, "SPRINT_NOT_FOUND")
+		return
+	}
+	for _, action := range sprintUpdateActions(body, allowed, currentStatus) {
+		if !scope.CanSprint(action) {
+			slog.Warn("Sprint action outside of user rights", "user", userID, "action", action, "sprint", sprintID)
+			utils.Error(w, http.StatusForbidden, "SPRINT_ACTION_FORBIDDEN")
+			return
+		}
+	}
+
 	sets := []string{}
 	args := []interface{}{}
 	argIdx := 1
@@ -220,6 +237,30 @@ func (h *SprintHandler) UpdateSprint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	utils.Success(w)
+}
+
+// sprintUpdateActions returns the rights an update of a sprint needs: "close"
+// when the status changes, "edit" when any other known field is sent. The
+// edit form sends the status along with everything else, so a status equal
+// to the current one is not a change.
+func sprintUpdateActions(body map[string]interface{}, known map[string]bool, currentStatus string) []string {
+	var edit, status bool
+	for field, value := range body {
+		switch {
+		case field == "status":
+			status = value != currentStatus
+		case known[field]:
+			edit = true
+		}
+	}
+	var actions []string
+	if edit {
+		actions = append(actions, access.SprintEdit)
+	}
+	if status {
+		actions = append(actions, access.SprintClose)
+	}
+	return actions
 }
 
 func (h *SprintHandler) DeleteSprint(w http.ResponseWriter, r *http.Request) {

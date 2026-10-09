@@ -66,6 +66,27 @@ func TestOrderColumns(t *testing.T) {
 	}
 }
 
+func TestSprintUpdateActions(t *testing.T) {
+	known := map[string]bool{"name": true, "status": true, "due_date": true}
+	tests := []struct {
+		name string
+		body map[string]interface{}
+		want []string
+	}{
+		{"closing", map[string]interface{}{"status": "closed"}, []string{"close"}},
+		{"renaming", map[string]interface{}{"name": "Sprint 2"}, []string{"edit"}},
+		{"the edit form with the same status", map[string]interface{}{"name": "Sprint 2", "status": "open"}, []string{"edit"}},
+		{"the edit form changing the status too", map[string]interface{}{"name": "Sprint 2", "status": "closed"}, []string{"edit", "close"}},
+		{"reopening", map[string]interface{}{"status": "active"}, []string{"close"}},
+		{"unknown fields need nothing", map[string]interface{}{"user_id": 5}, nil},
+	}
+	for _, tt := range tests {
+		if got := sprintUpdateActions(tt.body, known, "open"); !reflect.DeepEqual(got, tt.want) {
+			t.Errorf("%s: got %v, want %v", tt.name, got, tt.want)
+		}
+	}
+}
+
 func TestMoveApplied(t *testing.T) {
 	ivan := 42
 	tests := []struct {

@@ -16,6 +16,8 @@ interface User {
     visible_tabs: string[]
     widgets: string[]
     read_only: boolean
+    // Allowed actions with sprints: create, edit, tasks, close, delete
+    sprint_actions?: string[]
   }
   // The user's account in the data source, tied by a personal API key.
   // type is the kind of the source ('redmine'); needs_token asks for the key.
@@ -90,6 +92,12 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // The user may do the action with sprints (create | edit | tasks | close | delete)
+  function canSprint(action: string): boolean {
+    const actions = user.value?.access?.sprint_actions
+    return isAdmin.value || !actions || actions.includes(action)
+  }
+
   // Ties the user to the owner of the personal API key of the data source.
   // Only the user can do it, and only for themselves.
   async function setSourceToken(token: string) {
@@ -103,7 +111,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   return {
-    user, isAuthenticated, isAdmin, canWrite, tabVisible, widgetVisible,
+    user, isAuthenticated, isAdmin, canWrite, tabVisible, widgetVisible, canSprint,
     login, logout, fetchMe, changePassword, updateMe, setSourceToken, clearSourceToken,
   }
 })

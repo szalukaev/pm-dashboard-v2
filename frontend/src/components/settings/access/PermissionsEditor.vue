@@ -129,13 +129,35 @@
         </div>
       </div>
     </div>
+
+    <!-- What may be done with sprints -->
+    <div class="perm-block">
+      <div class="perm-block-head">
+        <span class="adm-label">{{ $t('access.editor.sprints') }}</span>
+        <label class="adm-check">
+          <input
+            type="checkbox"
+            :checked="model.sprint_actions === null"
+            data-testid="perm-all-sprint-actions"
+            @change="toggleAll('sprint_actions', SPRINT_ACTIONS, $event)"
+          />
+          {{ $t('access.editor.all_sprint_actions') }}
+        </label>
+      </div>
+      <div v-if="model.sprint_actions !== null" class="perm-keys perm-keys-row">
+        <label v-for="action in SPRINT_ACTIONS" :key="action" class="adm-check">
+          <input type="checkbox" :value="action" v-model="model.sprint_actions" :data-testid="'perm-sprint-' + action" />
+          {{ $t('access.sprint.' + action) }}
+        </label>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import {
-  TABS, WIDGETS, projectTree, withDescendants, coveredByParents,
+  TABS, WIDGETS, SPRINT_ACTIONS, projectTree, withDescendants, coveredByParents,
   type Permissions, type ProjectItem, type MemberItem,
 } from '../../../utils/access'
 
@@ -188,7 +210,7 @@ function toggleProject(id: number, checked: boolean) {
 }
 
 // "Everything" is stored as null; unticking it starts from the full list.
-function toggleAll(field: 'visible_tabs' | 'widgets', all: string[], e: Event) {
+function toggleAll(field: 'visible_tabs' | 'widgets' | 'sprint_actions', all: string[], e: Event) {
   model.value[field] = (e.target as HTMLInputElement).checked ? null : [...all]
 }
 </script>
@@ -234,6 +256,12 @@ function toggleAll(field: 'visible_tabs' | 'widgets', all: string[], e: Event) {
 
 .perm-note {
   margin-top: 6px;
+}
+
+.perm-keys-row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px 24px;
 }
 
 .perm-unassigned {

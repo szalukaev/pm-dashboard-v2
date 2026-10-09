@@ -75,6 +75,30 @@ func TestEffective(t *testing.T) {
 		}
 	})
 
+	t.Run("sprint actions: everything by default, a group has priority", func(t *testing.T) {
+		everything := newScope(1, false, effective(&Permissions{}, nil, nil), userFacts{})
+		if !everything.CanSprint(SprintDelete) {
+			t.Error("without a restriction every sprint action is allowed")
+		}
+
+		individual := Permissions{SprintActions: keys("create", "edit", "nonsense")}
+		own := newScope(1, false, effective(&individual, nil, nil), userFacts{})
+		if !own.CanSprint(SprintCreate) || !own.CanSprint(SprintEdit) || own.CanSprint(SprintClose) || own.CanSprint(SprintDelete) {
+			t.Errorf("own actions = %v", *own.SprintActions)
+		}
+
+		group := Permissions{SprintActions: keys("tasks")}
+		viaGroup := newScope(1, false, effective(&individual, nil, []Permissions{group}), userFacts{})
+		if !viaGroup.CanSprint(SprintTasks) || viaGroup.CanSprint(SprintCreate) {
+			t.Errorf("with a group: actions = %v, want the group's", *viaGroup.SprintActions)
+		}
+
+		admin := newScope(1, true, Permissions{SprintActions: keys()}, userFacts{})
+		if !admin.CanSprint(SprintDelete) {
+			t.Error("an administrator may do everything with sprints")
+		}
+	})
+
 	t.Run("unassigned issues: any source may give the right", func(t *testing.T) {
 		if effective(nil, nil, nil).ShowUnassigned {
 			t.Error("off by default")

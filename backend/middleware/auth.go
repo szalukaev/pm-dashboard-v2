@@ -147,6 +147,19 @@ func RequireTabs(rules []TabRule) func(http.Handler) http.Handler {
 	}
 }
 
+// RequireSprint rejects a request when the user is not allowed the given
+// action with sprints (access.Sprint* constants).
+func RequireSprint(action string, next http.HandlerFunc) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !GetScope(r).CanSprint(action) {
+			slog.Warn("Sprint action outside of user rights", "user", GetUserID(r), "action", action, "path", r.URL.Path)
+			http.Error(w, `{"error":"SPRINT_ACTION_FORBIDDEN"}`, http.StatusForbidden)
+			return
+		}
+		next(w, r)
+	})
+}
+
 // RequireWrite rejects requests of a read-only user.
 func RequireWrite(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
