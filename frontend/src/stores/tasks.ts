@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import axios from 'axios'
 
 export interface Task {
@@ -45,8 +45,50 @@ export interface TaskFilters {
 }
 
 export const useTasksStore = defineStore('tasks', () => {
-  const tasks = ref<Task[]>([])
-  const groups = ref<TaskGroup[]>([])
+  // Every loaded task lives once in this map (number → task). The flat list
+  // and the groups only refer to it, so a change of a task shows everywhere
+  // and its table row is updated in place instead of being rebuilt.
+  const taskMap = ref(new Map<number, Task>())
+  const taskOrder = ref<number[]>([])
+  const groupDefs = ref<{ name: string; task_count: number; ids: number[] }[]>([])
+
+  function tasksByIds(ids: number[]): Task[] {
+    const list: Task[] = []
+    for (const id of ids) {
+      const task = taskMap.value.get(id)
+      if (task) list.push(task)
+    }
+    return list
+  }
+
+  const tasks = computed<Task[]>(() => tasksByIds(taskOrder.value))
+  const groups = computed<TaskGroup[]>(() => groupDefs.value.map(def => {
+    const list = tasksByIds(def.ids)
+    return {
+      name: def.name,
+      task_count: def.task_count,
+      estimate_total: list.reduce((s, t) => s + (Number(t.estimated_hours) || 0), 0),
+      fact_total: list.reduce((s, t) => s + (Number(t.spent_hours) || 0), 0),
+      tasks: list,
+    }
+  }))
+
+  // Replaces the loaded tasks with a fresh server answer. A task that was
+  // already loaded keeps its object and only gets the new field values.
+  function storeTasks(incoming: Task[]) {
+    const map = taskMap.value
+    const fresh = new Set<number>()
+    for (const task of incoming) {
+      fresh.add(task.external_id)
+      const existing = map.get(task.external_id)
+      if (existing) Object.assign(existing, task)
+      else map.set(task.external_id, task)
+    }
+    for (const id of [...map.keys()]) {
+      if (!fresh.has(id)) map.delete(id)
+    }
+  }
+
   const loading = ref(false)
   const error = ref('')
   const total = ref(0)
@@ -98,13 +140,21 @@ export const useTasksStore = defineStore('tasks', () => {
       const { data } = await axios.get('/api/tasks', { params })
       if (requestId !== tasksRequest) return
       if (useGrouping.value) {
-        groups.value = data.groups || []
-        tasks.value = []
+        const serverGroups: TaskGroup[] = data.groups || []
+        storeTasks(serverGroups.flatMap(g => g.tasks || []))
+        groupDefs.value = serverGroups.map(g => ({
+          name: g.name,
+          task_count: g.task_count,
+          ids: (g.tasks || []).map(t => t.external_id),
+        }))
+        taskOrder.value = []
       } else {
-        tasks.value = data.tasks || []
-        groups.value = []
+        const list: Task[] = data.tasks || []
+        storeTasks(list)
+        taskOrder.value = list.map(t => t.external_id)
+        groupDefs.value = []
       }
-      total.value = tasks.value.length || groups.value.reduce((s, g) => s + g.task_count, 0)
+      total.value = taskOrder.value.length || groupDefs.value.reduce((s, g) => s + g.task_count, 0)
     } catch (e: any) {
       if (requestId === tasksRequest && !opts.silent) error.value = 'Не удалось загрузить данные'
     } finally {
@@ -112,19 +162,13 @@ export const useTasksStore = defineStore('tasks', () => {
     }
   }
 
-  // Applies a saved change to every loaded copy of the task right away.
+  // Applies a saved change to the loaded task right away; the list, the
+  // groups and their totals follow by themselves.
   function applyTaskChange(id: number, fields: Record<string, any>) {
-    const patch = (t: Task) => {
-      if (t.external_id !== id) return
-      for (const [k, v] of Object.entries(fields)) {
-        ;(t as any)[k] = k === 'estimated_hours' && v !== null && v !== '' ? Number(v) : v
-      }
-    }
-    tasks.value.forEach(patch)
-    for (const g of groups.value) {
-      g.tasks.forEach(patch)
-      g.estimate_total = g.tasks.reduce((s, t) => s + (t.estimated_hours || 0), 0)
-      g.fact_total = g.tasks.reduce((s, t) => s + (t.spent_hours || 0), 0)
+    const task = taskMap.value.get(id)
+    if (!task) return
+    for (const [k, v] of Object.entries(fields)) {
+      ;(task as any)[k] = k === 'estimated_hours' && v !== null && v !== '' ? Number(v) : v
     }
   }
 
