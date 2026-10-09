@@ -615,7 +615,7 @@
     "last_check_ok": "Last successful check",
     "hwid": "Hardware fingerprint of the server",
     "hwid_hint": "Send this string to the vendor — the license is issued for it.",
-    "hwid_missing": "The hardware fingerprint is not available. On the server (not in the container) run scripts/collect-hwid.sh as root and restart the backend container.",
+    "hwid_missing": "The hardware fingerprint is not available. It is collected automatically at start; docker compose logs hwid shows the reason. If it cannot be collected automatically, run scripts/collect-hwid.sh on the server (not in the container) as root and restart the backend container.",
     "copy": "Copy",
     "copy_failed": "Could not copy — select the string manually",
     "activate_title": "License activation",

@@ -8,9 +8,10 @@ import (
 )
 
 // DefaultHWIDPath is where the host's hardware identifiers are mounted into
-// the container (read-only). The file is written on the host by
-// scripts/collect-hwid.sh: the application never asks the hardware itself,
-// which would need privileges a container should not have.
+// the container (read-only). The file is written by scripts/collect-hwid.sh,
+// which docker-compose runs before the backend starts: the application never
+// asks the hardware itself, which would need privileges its container should
+// not have.
 const DefaultHWIDPath = "/etc/pmdashboard/hwid-source"
 
 // HWID is the hardware fingerprint of the host: two components, each a

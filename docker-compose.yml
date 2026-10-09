@@ -13,6 +13,29 @@ services:
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
 
+  # Collects the hardware identifiers of the host for the license before the
+  # backend starts and exits. It has no network and no extra privileges; the
+  # backend itself only reads the resulting file.
+  hwid:
+    image: alpine:3.19
+    network_mode: none
+    restart: "no"
+    environment:
+      - MACHINE_ID_FILE=/host/machine-id
+    volumes:
+      - ./scripts/collect-hwid.sh:/collect-hwid.sh:ro
+      - type: bind
+        source: /etc/machine-id
+        target: /host/machine-id
+        read_only: true
+        bind:
+          create_host_path: false
+      - /etc/pmdashboard:/etc/pmdashboard
+    # A failure must not keep the application from starting: the license
+    # screen reports a missing fingerprint, the reason is in the log of
+    # this service (docker compose logs hwid).
+    command: sh -c "sh /collect-hwid.sh || true"
+
   backend:
     build:
       context: ./backend
@@ -24,9 +47,9 @@ services:
       - "8080"
     volumes:
       - ./data:/data
-      # Hardware identifiers of the host for the license, read-only.
-      # Create the file before the first start: sudo sh scripts/collect-hwid.sh
-      - /etc/pmdashboard/hwid-source:/etc/pmdashboard/hwid-source:ro
+      # Hardware identifiers of the host for the license, read-only;
+      # the file in it is written by the hwid service.
+      - /etc/pmdashboard:/etc/pmdashboard:ro
     networks:
       - backend
     environment:
@@ -37,6 +60,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      hwid:
+        condition: service_completed_successfully
 
   frontend:
     build:
