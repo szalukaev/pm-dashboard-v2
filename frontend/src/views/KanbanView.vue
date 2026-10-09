@@ -30,6 +30,7 @@
       v-else
       class="kanban-board"
       @kanban-drop="handleDrop"
+      @kanban-column-drop="handleColumnDrop"
       data-testid="kanban-board"
     >
       <KanbanColumn
@@ -59,7 +60,7 @@ import TaskModal from '../components/tasks/TaskModal.vue'
 const kanbanStore = useKanbanStore()
 const tasksStore = useTasksStore()
 const { columns, mode, total, loading, error, projectId } = storeToRefs(kanbanStore)
-const { fetchBoard, moveCard, setMode, setProject } = kanbanStore
+const { fetchBoard, moveCard, moveColumn, setMode, setProject } = kanbanStore
 
 const projects = ref<{ id: number; name: string }[]>([])
 const selectedTaskId = ref<number | null>(null)
@@ -76,7 +77,15 @@ function handleDrop(e: Event) {
   }
 }
 
+function handleColumnDrop(e: Event) {
+  const { fromId, toId } = (e as CustomEvent).detail
+  if (fromId && toId) {
+    moveColumn(fromId, toId)
+  }
+}
+
 onMounted(async () => {
+  await kanbanStore.restoreState()
   await Promise.all([
     fetchBoard(),
     tasksStore.fetchProjects().then(() => {

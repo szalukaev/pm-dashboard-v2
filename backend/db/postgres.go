@@ -143,6 +143,8 @@ CREATE TABLE IF NOT EXISTS user_settings (
     tab_order JSONB DEFAULT '[]',
     kanban_column_order_statuses JSONB DEFAULT '[]',
     kanban_column_order_users JSONB DEFAULT '[]',
+    kanban_last_mode VARCHAR(20) NOT NULL DEFAULT 'users',
+    kanban_last_project INTEGER,
     last_filters JSONB DEFAULT '{}',
     notifications_enabled BOOLEAN DEFAULT true,
     overdue_alerts BOOLEAN DEFAULT false,

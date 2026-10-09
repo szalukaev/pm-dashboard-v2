@@ -33,7 +33,9 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 		TabOrder                  []string `json:"tab_order"`
 		KanbanColumnOrderStatuses []string `json:"kanban_column_order_statuses"`
 		KanbanColumnOrderUsers    []string `json:"kanban_column_order_users"`
-		LastFilters               map[string]interface{} `json:"last_filters"`
+		KanbanLastMode            string   `json:"kanban_last_mode"`
+		KanbanLastProject         *int     `json:"kanban_last_project"`
+		LastFilters              map[string]interface{} `json:"last_filters"`
 		NotificationsEnabled      bool     `json:"notifications_enabled"`
 		OverdueAlerts             bool     `json:"overdue_alerts"`
 		DataSourceURL             string   `json:"data_source_url"`
@@ -46,11 +48,13 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 	err := (*h.DB).QueryRow(`
 		SELECT selected_projects, selected_team, theme, language, tab_order,
 		       kanban_column_order_statuses, kanban_column_order_users,
-		       last_filters, notifications_enabled, overdue_alerts
+		       last_filters, notifications_enabled, overdue_alerts,
+		       kanban_last_mode, kanban_last_project
 		FROM user_settings WHERE user_id = $1
 	`, userID).Scan(
 		&selectedProjects, &selectedTeam, &theme, &language,
 		&tabOrder, &kanbanStatuses, &kanbanUsers, &lastFilters, &notificationsEnabled, &overdueAlerts,
+		&settings.KanbanLastMode, &settings.KanbanLastProject,
 	)
 
 	if err == sql.ErrNoRows {
@@ -61,6 +65,7 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		settings.Theme = "dark"
 		settings.Language = "ru"
+		settings.KanbanLastMode = "users"
 		settings.NotificationsEnabled = true
 		settings.OverdueAlerts = false
 		if h.SQLite != nil {
@@ -188,6 +193,32 @@ func (h *SettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request)
 	if v, ok := body["kanban_column_order_users"]; ok {
 		data, _ := json.Marshal(v)
 		if _, err := (*h.DB).Exec("UPDATE user_settings SET kanban_column_order_users = $1 WHERE user_id = $2", data, userID); err != nil {
+			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+			return
+		}
+	}
+
+	if v, ok := body["kanban_last_mode"]; ok {
+		mode, _ := v.(string)
+		if mode != "users" && mode != "statuses" {
+			utils.Error(w, http.StatusBadRequest, "INVALID_MODE")
+			return
+		}
+		if _, err := (*h.DB).Exec("UPDATE user_settings SET kanban_last_mode = $1 WHERE user_id = $2", mode, userID); err != nil {
+			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+			return
+		}
+	}
+	if v, ok := body["kanban_last_project"]; ok {
+		// A number selects the project, null clears the choice
+		var project interface{}
+		if id, isNumber := v.(float64); isNumber {
+			project = int(id)
+		} else if v != nil {
+			utils.Error(w, http.StatusBadRequest, "INVALID_PROJECT")
+			return
+		}
+		if _, err := (*h.DB).Exec("UPDATE user_settings SET kanban_last_project = $1 WHERE user_id = $2", project, userID); err != nil {
 			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 			return
 		}

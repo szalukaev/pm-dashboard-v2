@@ -34,8 +34,11 @@ import { GripVertical } from 'lucide-vue-next'
 import KanbanCard from './KanbanCard.vue'
 import { UNASSIGNED, type KanbanColumn as ColumnType } from '../../stores/kanban'
 
-defineProps<{ column: ColumnType }>()
+const props = defineProps<{ column: ColumnType }>()
 defineEmits(['open-task', 'move-card'])
+
+// Data type of a dragged column header (a dragged card uses text/plain)
+const COLUMN_DRAG = 'application/x-kanban-column'
 
 const isDragOver = ref(false)
 
@@ -54,22 +57,29 @@ function onDragLeave(e: DragEvent) {
 
 function onDrop(e: DragEvent) {
   isDragOver.value = false
+
+  // A column header dropped here: this column gives up its place to it
+  const fromId = e.dataTransfer?.getData(COLUMN_DRAG)
+  if (fromId) {
+    e.currentTarget?.dispatchEvent(new CustomEvent('kanban-column-drop', {
+      detail: { fromId, toId: props.column.id },
+      bubbles: true,
+    }))
+    return
+  }
+
   const issueId = parseInt(e.dataTransfer?.getData('text/plain') || '0')
   if (issueId) {
     // The parent handles the actual move
-    const column = (e.currentTarget as HTMLElement).closest('.kanban-column')
-    const columnId = column?.getAttribute('data-testid')?.replace('kanban-column-', '') || ''
-    // Emit through parent
-    const event = new CustomEvent('kanban-drop', {
-      detail: { issueId, columnId },
+    e.currentTarget?.dispatchEvent(new CustomEvent('kanban-drop', {
+      detail: { issueId, columnId: props.column.id },
       bubbles: true,
-    })
-    e.currentTarget?.dispatchEvent(event)
+    }))
   }
 }
 
 function onColumnDragStart(e: DragEvent) {
-  e.dataTransfer?.setData('text/column', 'true')
+  e.dataTransfer?.setData(COLUMN_DRAG, props.column.id)
 }
 </script>
 

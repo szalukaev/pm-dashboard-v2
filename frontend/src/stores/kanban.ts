@@ -38,7 +38,26 @@ export const useKanbanStore = defineStore('kanban', () => {
   const error = ref('')
   const projectId = ref('')
 
+  // The board opens in the mode and on the project the user left it
+  async function restoreState() {
+    try {
+      const { data } = await axios.get('/api/settings')
+      mode.value = data.kanban_last_mode === 'statuses' ? 'statuses' : 'users'
+      projectId.value = data.kanban_last_project ? String(data.kanban_last_project) : ''
+    } catch {}
+  }
+
+  function saveState(fields: Record<string, unknown>) {
+    axios.put('/api/settings', fields).catch(() => {})
+  }
+
   async function fetchBoard() {
+    // By statuses the board needs a project; the view asks to choose one
+    if (mode.value === 'statuses' && !projectId.value) {
+      columns.value = []
+      total.value = 0
+      return
+    }
     loading.value = true
     error.value = ''
     try {
@@ -119,18 +138,32 @@ export const useKanbanStore = defineStore('kanban', () => {
     return columns.value.find(col => col.tasks.some(t => t.external_id === issueId))
   }
 
+  // Puts the dragged column on the place of the one it was dropped on
+  function moveColumn(fromId: string, toId: string) {
+    const from = columns.value.findIndex(c => c.id === fromId)
+    const to = columns.value.findIndex(c => c.id === toId)
+    if (from < 0 || to < 0 || from === to) return
+    const reordered = [...columns.value]
+    const [moved] = reordered.splice(from, 1)
+    reordered.splice(to, 0, moved)
+    columns.value = reordered
+    saveColumnOrder()
+  }
+
   function setMode(newMode: 'users' | 'statuses') {
     mode.value = newMode
+    saveState({ kanban_last_mode: newMode })
     fetchBoard()
   }
 
   function setProject(id: string) {
     projectId.value = id
+    saveState({ kanban_last_project: id ? Number(id) : null })
     fetchBoard()
   }
 
   return {
     columns, mode, total, loading, error, projectId,
-    fetchBoard, moveCard, saveColumnOrder, setMode, setProject,
+    restoreState, fetchBoard, moveCard, moveColumn, saveColumnOrder, setMode, setProject,
   }
 })

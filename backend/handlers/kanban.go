@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	"pm-dashboard/datasource"
@@ -14,6 +14,8 @@ import (
 	"pm-dashboard/datasource/redmine"
 	"pm-dashboard/middleware"
 	"pm-dashboard/utils"
+
+	"github.com/lib/pq"
 )
 
 type KanbanHandler struct {
@@ -57,156 +59,209 @@ func (h *KanbanHandler) GetBoard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID := middleware.GetUserID(r)
-	mode := r.URL.Query().Get("mode") // "users" or "statuses"
-	projectID := r.URL.Query().Get("project_id")
-
-	if mode == "" {
+	mode := r.URL.Query().Get("mode")
+	if mode != "statuses" {
 		mode = "users"
 	}
 
-	// Get user settings for column order
-	var columnOrderStatuses, columnOrderUsers []byte
-	(*h.DB).QueryRow(`SELECT kanban_column_order_statuses, kanban_column_order_users
-		FROM user_settings WHERE user_id = $1`, userID).Scan(&columnOrderStatuses, &columnOrderUsers)
-
-	// Get user's selected projects
-	var selectedProjects []int64
-	var spJSON []byte
-	(*h.DB).QueryRow("SELECT selected_projects FROM user_settings WHERE user_id = $1", userID).Scan(&spJSON)
-	if len(spJSON) > 0 {
-		json.Unmarshal(spJSON, &selectedProjects)
+	var columns []KanbanColumn
+	var err error
+	if mode == "statuses" {
+		columns, err = h.statusBoard(userID, r.URL.Query().Get("project_id"))
+	} else {
+		columns, err = h.userBoard(userID)
 	}
-
-	// Build project filter
-	where := []string{statusNotIn("status_id", GroupClosed)}
-	args := []interface{}{}
-	argIdx := 1
-
-	if projectID != "" {
-		where = append(where, "project_id = $"+strconv.Itoa(argIdx))
-		args = append(args, projectID)
-		argIdx++
-	} else if len(selectedProjects) > 0 {
-		placeholders := make([]string, len(selectedProjects))
-		for i, pid := range selectedProjects {
-			placeholders[i] = "$" + strconv.Itoa(argIdx)
-			args = append(args, pid)
-			argIdx++
-		}
-		where = append(where, "project_id IN ("+strings.Join(placeholders, ",")+")")
-	}
-
-	query := `SELECT external_id, subject, project_name, status_name, status_id,
-		priority_name, priority_id, assigned_to_name, assigned_to_id,
-		category_name, due_date, estimated_hours
-		FROM issues WHERE ` + strings.Join(where, " AND ") + `
-		ORDER BY ` + priorityRank("priority_id") + ` DESC NULLS LAST, external_id`
-
-	rows, err := (*h.DB).Query(query, args...)
 	if err != nil {
+		slog.Error("Failed to build the kanban board", "mode", mode, "error", err)
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
 	}
-	defer rows.Close()
 
-	todayStr := time.Now().Format("2006-01-02")
-	var cards []KanbanCard
-	for rows.Next() {
-		var c KanbanCard
-		if rows.Scan(&c.ExternalID, &c.Subject, &c.ProjectName, &c.StatusName, &c.StatusID,
-			&c.PriorityName, &c.PriorityID, &c.AssignedToName, &c.AssignedToID,
-			&c.CategoryName, &c.DueDate, &c.EstimatedHours) == nil {
-			// Check overdue
-			if c.DueDate != nil && *c.DueDate < todayStr {
-				c.IsOverdue = true
-			}
-			cards = append(cards, c)
-		}
+	board := KanbanBoard{Mode: mode, Columns: columns}
+	for _, col := range columns {
+		board.Total += len(col.Tasks)
 	}
-	if cards == nil {
-		cards = []KanbanCard{}
-	}
-
-	// Build columns based on mode
-	board := KanbanBoard{Mode: mode, Total: len(cards)}
-
-	switch mode {
-	case "statuses":
-		board.Columns = h.buildStatusColumns(cards, columnOrderStatuses)
-	default: // "users"
-		board.Columns = h.buildUserColumns(cards, columnOrderUsers)
-	}
-
 	utils.JSON(w, http.StatusOK, board)
 }
 
-func (h *KanbanHandler) buildStatusColumns(cards []KanbanCard, orderJSON []byte) []KanbanColumn {
-	colMap := make(map[string]*KanbanColumn)
-	for _, c := range cards {
-		key := strconv.Itoa(c.StatusID)
-		if _, ok := colMap[key]; !ok {
-			colMap[key] = &KanbanColumn{
-				ID:    key,
-				Name:  c.StatusName,
-				Tasks: []KanbanCard{},
-			}
+// statusBoard: a column for every status of the data source, with the issues
+// of the chosen project and all its subprojects. No project — no columns, the
+// client asks to choose one.
+func (h *KanbanHandler) statusBoard(userID int, projectParam string) ([]KanbanColumn, error) {
+	projectID, err := strconv.Atoi(projectParam)
+	if err != nil {
+		return []KanbanColumn{}, nil
+	}
+	projects, err := datasource.ExpandProjects(*h.DB, []int{projectID})
+	if err != nil {
+		return nil, err
+	}
+	cards, err := h.loadCards("project_id = ANY($1)", pq.Array(projects))
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := (*h.DB).Query("SELECT external_id, name FROM statuses WHERE data_source = 'redmine' ORDER BY external_id")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	columns := []KanbanColumn{}
+	for rows.Next() {
+		var id int
+		var name string
+		if err := rows.Scan(&id, &name); err != nil {
+			return nil, err
 		}
-		colMap[key].Tasks = append(colMap[key].Tasks, c)
+		columns = append(columns, KanbanColumn{ID: strconv.Itoa(id), Name: name})
 	}
 
-	// Apply order if saved
-	var order []string
-	if len(orderJSON) > 0 {
-		json.Unmarshal(orderJSON, &order)
-	}
-
-	return applyColumnOrder(colMap, order)
+	columns = fillColumns(columns, cards, func(c KanbanCard) string { return strconv.Itoa(c.StatusID) })
+	return orderColumns(columns, h.columnOrder(userID, "kanban_column_order_statuses")), nil
 }
 
-func (h *KanbanHandler) buildUserColumns(cards []KanbanCard, orderJSON []byte) []KanbanColumn {
-	colMap := make(map[string]*KanbanColumn)
-	for _, c := range cards {
-		// Columns are identified by the member id, not by a display name;
-		// the "no assignee" column gets its title on the client.
-		key, name := unassignedColumn, ""
-		if c.AssignedToID != nil {
-			key, name = strconv.Itoa(*c.AssignedToID), c.AssignedToName
+// userBoard: a column for every member of the user's team plus "no assignee"
+// (hidden when empty), with the issues in open statuses only.
+func (h *KanbanHandler) userBoard(userID int) ([]KanbanColumn, error) {
+	var teamJSON []byte
+	(*h.DB).QueryRow("SELECT selected_team FROM user_settings WHERE user_id = $1", userID).Scan(&teamJSON)
+	var team []int
+	if len(teamJSON) > 0 {
+		json.Unmarshal(teamJSON, &team)
+	}
+
+	where := statusIn("status_id", GroupOpen)
+	args := []interface{}{}
+	if projects := h.userProjects(userID); len(projects) > 0 {
+		args = append(args, pq.Array(projects))
+		where += " AND project_id = ANY($" + strconv.Itoa(len(args)) + ")"
+	}
+	if len(team) > 0 {
+		args = append(args, pq.Array(team))
+		where += " AND (assigned_to_id IS NULL OR assigned_to_id = ANY($" + strconv.Itoa(len(args)) + "))"
+	}
+	cards, err := h.loadCards(where, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	// With a team the columns are its members, including those without
+	// issues; without one — everybody who has issues.
+	columns := []KanbanColumn{}
+	if len(team) > 0 {
+		rows, err := (*h.DB).Query("SELECT external_id, name FROM members WHERE data_source = 'redmine' AND external_id = ANY($1) ORDER BY name",
+			pq.Array(team))
+		if err != nil {
+			return nil, err
 		}
-		if _, ok := colMap[key]; !ok {
-			colMap[key] = &KanbanColumn{
-				ID:    key,
-				Name:  name,
-				Tasks: []KanbanCard{},
+		defer rows.Close()
+		for rows.Next() {
+			var id int
+			var name string
+			if err := rows.Scan(&id, &name); err != nil {
+				return nil, err
+			}
+			columns = append(columns, KanbanColumn{ID: strconv.Itoa(id), Name: name})
+		}
+	} else {
+		seen := map[int]bool{}
+		for _, c := range cards {
+			if c.AssignedToID != nil && !seen[*c.AssignedToID] {
+				seen[*c.AssignedToID] = true
+				columns = append(columns, KanbanColumn{ID: strconv.Itoa(*c.AssignedToID), Name: c.AssignedToName})
 			}
 		}
-		colMap[key].Tasks = append(colMap[key].Tasks, c)
+		sort.Slice(columns, func(i, j int) bool { return columns[i].Name < columns[j].Name })
 	}
+	// The title of this column is set on the client (it is translated).
+	columns = append(columns, KanbanColumn{ID: unassignedColumn})
 
-	// Apply order if saved
-	var order []string
-	if len(orderJSON) > 0 {
-		json.Unmarshal(orderJSON, &order)
+	columns = fillColumns(columns, cards, func(c KanbanCard) string {
+		if c.AssignedToID == nil {
+			return unassignedColumn
+		}
+		return strconv.Itoa(*c.AssignedToID)
+	})
+	if last := len(columns) - 1; len(columns[last].Tasks) == 0 {
+		columns = columns[:last]
 	}
-
-	return applyColumnOrder(colMap, order)
+	return orderColumns(columns, h.columnOrder(userID, "kanban_column_order_users")), nil
 }
 
-func applyColumnOrder(colMap map[string]*KanbanColumn, order []string) []KanbanColumn {
-	var columns []KanbanColumn
+// loadCards reads issues for the board, most important first.
+func (h *KanbanHandler) loadCards(where string, args ...interface{}) ([]KanbanCard, error) {
+	rows, err := (*h.DB).Query(`SELECT external_id, subject, project_name, status_name, status_id,
+		priority_name, priority_id, assigned_to_name, assigned_to_id,
+		category_name, due_date, estimated_hours,
+		COALESCE(`+statusNotIn("status_id", GroupClosed)+`, true)
+		FROM issues WHERE data_source = 'redmine' AND `+where+`
+		ORDER BY `+priorityRank("priority_id")+` DESC NULLS LAST, external_id`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
-	// Add columns in order
-	for _, name := range order {
-		if col, ok := colMap[name]; ok {
-			columns = append(columns, *col)
-			delete(colMap, name)
+	today := time.Now().Format("2006-01-02")
+	var cards []KanbanCard
+	for rows.Next() {
+		var c KanbanCard
+		var notClosed bool
+		if err := rows.Scan(&c.ExternalID, &c.Subject, &c.ProjectName, &c.StatusName, &c.StatusID,
+			&c.PriorityName, &c.PriorityID, &c.AssignedToName, &c.AssignedToID,
+			&c.CategoryName, &c.DueDate, &c.EstimatedHours, &notClosed); err != nil {
+			return nil, err
+		}
+		// Overdue: the due date has passed and the issue is not closed
+		c.IsOverdue = notClosed && c.DueDate != nil && (*c.DueDate)[:min(10, len(*c.DueDate))] < today
+		cards = append(cards, c)
+	}
+	return cards, rows.Err()
+}
+
+// columnOrder returns the column ids saved by the user for a mode.
+func (h *KanbanHandler) columnOrder(userID int, column string) []string {
+	var data []byte
+	(*h.DB).QueryRow("SELECT "+column+" FROM user_settings WHERE user_id = $1", userID).Scan(&data)
+	var order []string
+	if len(data) > 0 {
+		json.Unmarshal(data, &order)
+	}
+	return order
+}
+
+// fillColumns puts every card into the column with the id key(card) returns;
+// cards without a column are dropped. Tasks is never nil in the result.
+func fillColumns(columns []KanbanColumn, cards []KanbanCard, key func(KanbanCard) string) []KanbanColumn {
+	index := make(map[string]int, len(columns))
+	for i := range columns {
+		columns[i].Tasks = []KanbanCard{}
+		index[columns[i].ID] = i
+	}
+	for _, c := range cards {
+		if i, ok := index[key(c)]; ok {
+			columns[i].Tasks = append(columns[i].Tasks, c)
 		}
 	}
+	return columns
+}
 
-	// Add remaining columns
-	for _, col := range colMap {
-		columns = append(columns, *col)
+// orderColumns puts the columns listed in order (ids) first, in that order;
+// the rest keep their relative position.
+func orderColumns(columns []KanbanColumn, order []string) []KanbanColumn {
+	position := make(map[string]int, len(order))
+	for i, id := range order {
+		if _, dup := position[id]; !dup {
+			position[id] = i
+		}
 	}
-
+	sort.SliceStable(columns, func(i, j int) bool {
+		pi, okI := position[columns[i].ID]
+		pj, okJ := position[columns[j].ID]
+		if okI != okJ {
+			return okI
+		}
+		return okI && pi < pj
+	})
 	return columns
 }
 
