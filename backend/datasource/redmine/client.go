@@ -169,14 +169,8 @@ type TimeEntry struct {
 // GetTimeEntries returns the time entries of a project that are linked to
 // issues, spent on or after `from` (YYYY-MM-DD; empty = all). Subprojects
 // are excluded: they are requested on their own.
-//
-// projectID 0 asks for the entries of every project the key can see — one
-// request instead of one per project, for reading recent changes.
 func (c *Client) GetTimeEntries(projectID int, from string) ([]TimeEntry, error) {
-	path := "/time_entries.json?"
-	if projectID > 0 {
-		path = fmt.Sprintf("/time_entries.json?project_id=%d&subproject_id=!*", projectID)
-	}
+	path := fmt.Sprintf("/time_entries.json?project_id=%d&subproject_id=!*", projectID)
 	if from != "" {
 		path += "&from=" + from
 	}

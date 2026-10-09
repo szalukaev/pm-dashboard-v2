@@ -72,9 +72,8 @@ type fullLoad struct {
 //
 // A project that was never read, or was last read completely more than
 // fullSyncInterval ago, is read completely; issues that are no longer in
-// Redmine are deleted then. The other projects are covered by two requests
-// for all of them: the issues updated and the time spent since their last
-// sync. Fact and bug fix hours are then recomputed from the stored time
+// Redmine are deleted then. For the other projects only the issues updated
+// and the time spent since their last sync are fetched. Fact and bug fix hours are then recomputed from the stored time
 // entries of the affected issues.
 //
 // The state is kept per project: a project that failed is read again next
@@ -115,9 +114,7 @@ func (s *Syncer) syncProjectIssues(store syncStore, projectIDs []int, started ti
 
 	// Changes of the projects that are up to date: two requests for all of them
 	quickDone, movedOut := s.loadChanges(store, quickIDs, selected, states, addIssues, touched)
-	if !quickDone {
-		failed += len(quickIDs)
-	}
+	failed += len(quickIDs) - len(quickDone)
 
 	// Complete loads, a few projects at a time
 	loads := s.loadFull(fullIDs)
@@ -178,16 +175,14 @@ func (s *Syncer) syncProjectIssues(store syncStore, projectIDs []int, started ti
 			slog.Warn("Failed to save sync state", "project_id", load.projectID, "error", err)
 		}
 	}
-	if quickDone {
-		for _, pid := range quickIDs {
-			if err := store.saveState(pid, projectState{lastSync: started, lastFull: states[pid].lastFull}); err != nil {
-				slog.Warn("Failed to save sync state", "project_id", pid, "error", err)
-			}
+	for pid := range quickDone {
+		if err := store.saveState(pid, projectState{lastSync: started, lastFull: states[pid].lastFull}); err != nil {
+			slog.Warn("Failed to save sync state", "project_id", pid, "error", err)
 		}
 	}
 
 	slog.Info("Synced issues", "issues", len(issues), "recalculated", len(ids), "deleted", deleted,
-		"projects_full", len(complete), "projects_changes", len(quickIDs), "failed", failed,
+		"projects_full", len(complete), "projects_changes", len(quickDone), "failed", failed,
 		"duration", time.Since(started))
 
 	if err := store.cleanupUnselected(projectIDs); err != nil {
@@ -197,13 +192,18 @@ func (s *Syncer) syncProjectIssues(store syncStore, projectIDs []int, started ti
 }
 
 // loadChanges fetches what changed in the given projects since their last
-// sync and stores the time entries. It reports whether the changes were read
-// (false: nothing may be taken as synced) and the changed issues that now
-// belong to a project that is not synced at all.
+// sync and stores the time entries. It returns the projects whose changes
+// were read (the others may not be taken as synced) and the changed issues
+// that now belong to a project that is not synced at all.
+//
+// The changed issues of all projects come with one request. The time is
+// asked project by project: Redmine is too slow to answer for all of them
+// at once.
 func (s *Syncer) loadChanges(store syncStore, projectIDs []int, selected map[int]bool, states map[int]projectState,
-	addIssues func([]Issue), touched map[int]bool) (done bool, movedOut []int) {
+	addIssues func([]Issue), touched map[int]bool) (done map[int]bool, movedOut []int) {
+	done = make(map[int]bool, len(projectIDs))
 	if len(projectIDs) == 0 {
-		return true, nil
+		return done, nil
 	}
 	quick := make(map[int]bool, len(projectIDs))
 	since := states[projectIDs[0]].lastSync
@@ -218,46 +218,70 @@ func (s *Syncer) loadChanges(store syncStore, projectIDs []int, selected map[int
 	changed, err := s.client.GetIssues(0, &since)
 	if err != nil {
 		slog.Warn("Failed to get changed issues", "error", err)
-		return false, nil
-	}
-	// Entries are filtered by the day they were spent on; one extra day
-	// covers time logged for yesterday.
-	entries, err := s.client.GetTimeEntries(0, since.AddDate(0, 0, -1).Format("2006-01-02"))
-	if err != nil {
-		slog.Warn("Failed to get recent time entries", "error", err)
-		return false, nil
+		return done, nil
 	}
 
-	byProject := make(map[int][]TimeEntry)
-	for _, e := range entries {
-		if quick[e.ProjectID] {
-			byProject[e.ProjectID] = append(byProject[e.ProjectID], e)
-		}
+	// Entries are filtered by the day they were spent on; one extra day
+	// covers time logged for yesterday.
+	from := since.AddDate(0, 0, -1).Format("2006-01-02")
+	type recent struct {
+		entries []TimeEntry
+		err     error
 	}
-	for pid, list := range byProject {
-		if err := store.storeTimeEntries(pid, list, false); err != nil {
-			slog.Warn("Failed to store time entries for project", "project_id", pid, "error", err)
-			return false, nil
+	loaded := make([]recent, len(projectIDs))
+	var wg sync.WaitGroup
+	slots := make(chan struct{}, maxParallelLists)
+	for i, pid := range projectIDs {
+		wg.Add(1)
+		slots <- struct{}{}
+		go func(i, pid int) {
+			defer wg.Done()
+			defer func() { <-slots }()
+			entries, err := s.client.GetTimeEntries(pid, from)
+			if errors.Is(err, ErrForbidden) {
+				// No right to the time of this project: its issues are
+				// synced without hours, see loadProject
+				err = nil
+			}
+			loaded[i] = recent{entries: entries, err: err}
+		}(i, pid)
+	}
+	wg.Wait()
+
+	total := 0
+	for i, pid := range projectIDs {
+		if loaded[i].err != nil {
+			slog.Warn("Failed to get recent time entries for project", "project_id", pid, "error", loaded[i].err)
+			continue
 		}
-		for _, e := range list {
-			touched[e.IssueID] = true
+		if len(loaded[i].entries) > 0 {
+			if err := store.storeTimeEntries(pid, loaded[i].entries, false); err != nil {
+				slog.Warn("Failed to store time entries for project", "project_id", pid, "error", err)
+				continue
+			}
+			for _, e := range loaded[i].entries {
+				touched[e.IssueID] = true
+			}
+			total += len(loaded[i].entries)
 		}
+		done[pid] = true
 	}
 
 	var mine []Issue
 	for _, iss := range changed {
 		switch {
-		case quick[iss.ProjectID]:
+		case done[iss.ProjectID]:
 			mine = append(mine, iss)
 		case !selected[iss.ProjectID]:
 			movedOut = append(movedOut, iss.ExternalID)
 		}
-		// An issue of a project that is being read completely comes with it
+		// An issue of a project that is being read completely comes with
+		// it; one of a project that failed is read again next time
 	}
 	addIssues(mine)
-	slog.Info("Loaded changes from Redmine", "projects", len(projectIDs), "since", since.Format(time.RFC3339),
-		"issues", len(mine), "time_entries", len(entries))
-	return true, movedOut
+	slog.Info("Loaded changes from Redmine", "projects", len(done), "since", since.Format(time.RFC3339),
+		"issues", len(mine), "time_entries", total)
+	return done, movedOut
 }
 
 // loadFull reads the given projects completely, fullSyncWorkers at a time.

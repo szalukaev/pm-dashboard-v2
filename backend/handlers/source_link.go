@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"pm-dashboard/datasource/manager"
@@ -90,8 +91,18 @@ func (k *UserKeys) RefreshProjects(userID int) {
 		slog.Warn("Could not save the user's projects from the data source", "user", userID, "error", err)
 		return
 	}
-	k.refreshMembers(userID, client, projects)
+	// The members are read project by project, which takes minutes for a
+	// user of many projects: in the background, one user at a time, so that
+	// the sync this runs before does not wait.
+	go func() {
+		membersRefresh.Lock()
+		defer membersRefresh.Unlock()
+		k.refreshMembers(userID, client, projects)
+	}()
 }
+
+// membersRefresh lets one refreshMembers run at a time.
+var membersRefresh sync.Mutex
 
 // sourceMembersMaxAge is how long the members read from the source are
 // trusted. They are read project by project, which is too heavy to repeat

@@ -228,15 +228,21 @@ func TestSyncProjectIssues(t *testing.T) {
 		t.Errorf("requests of the first run = %v", got)
 	}
 
-	// Second run a few minutes later: two requests for everything. An issue
-	// of project 3, which is not selected, is not taken.
+	// Second run a few minutes later: the changed issues of all projects
+	// with one request, the recent time project by project. An issue of
+	// project 3, which is not selected, is not taken; project 2 still denies
+	// its time and still does not count as a failure.
 	redmine.issues[1] = append(redmine.issues[1], 13)
 	second := start.Add(5 * time.Minute)
 	if err := syncer.syncProjectIssues(store, []int{1, 2}, second); err != nil {
 		t.Fatal(err)
 	}
-	if got := redmine.takeRequests(); !reflect.DeepEqual(got, []string{"/issues.json project=0", "/time_entries.json project=0"}) {
+	want = []string{"/issues.json project=0", "/time_entries.json project=1", "/time_entries.json project=2"}
+	if got := redmine.takeRequests(); !reflect.DeepEqual(got, want) {
 		t.Errorf("requests of the second run = %v", got)
+	}
+	if st := store.states[2]; !st.lastSync.Equal(second) {
+		t.Errorf("project 2: sync mark = %v, want it moved although its time is denied", st.lastSync)
 	}
 	if got := store.issueIDs(); !reflect.DeepEqual(got, []int{11, 12, 13, 21}) {
 		t.Errorf("issues after the second run = %v", got)
@@ -250,7 +256,8 @@ func TestSyncProjectIssues(t *testing.T) {
 	if err := syncer.syncProjectIssues(store, []int{1, 2, 3}, third); err != nil {
 		t.Fatal(err)
 	}
-	want = []string{"/issues.json project=0", "/issues.json project=3", "/time_entries.json project=0", "/time_entries.json project=3"}
+	want = []string{"/issues.json project=0", "/issues.json project=3",
+		"/time_entries.json project=1", "/time_entries.json project=2", "/time_entries.json project=3"}
 	if got := redmine.takeRequests(); !reflect.DeepEqual(got, want) {
 		t.Errorf("requests of the third run = %v", got)
 	}
@@ -264,7 +271,9 @@ func TestSyncProjectIssues(t *testing.T) {
 	if err := restarted.syncProjectIssues(store, []int{1, 2, 3}, third.Add(5*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
-	if got := redmine.takeRequests(); !reflect.DeepEqual(got, []string{"/issues.json project=0", "/time_entries.json project=0"}) {
+	want = []string{"/issues.json project=0",
+		"/time_entries.json project=1", "/time_entries.json project=2", "/time_entries.json project=3"}
+	if got := redmine.takeRequests(); !reflect.DeepEqual(got, want) {
 		t.Errorf("requests after a restart = %v", got)
 	}
 }
