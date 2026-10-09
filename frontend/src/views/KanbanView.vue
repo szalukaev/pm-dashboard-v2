@@ -52,6 +52,9 @@ import { storeToRefs } from 'pinia'
 import { useKanbanStore } from '../stores/kanban'
 import { useTasksStore } from '../stores/tasks'
 import { useLiveRefresh } from '../composables/useLiveRefresh'
+import { useAuthStore } from '../stores/auth'
+import { useI18n } from 'vue-i18n'
+import { useSwal } from '../composables/useSwal'
 import KanbanToolbar from '../components/kanban/KanbanToolbar.vue'
 import KanbanColumn from '../components/kanban/KanbanColumn.vue'
 import AppEmptyState from '../components/ui/AppEmptyState.vue'
@@ -59,6 +62,9 @@ import AppSpinner from '../components/ui/AppSpinner.vue'
 import TaskModal from '../components/tasks/TaskModal.vue'
 
 const kanbanStore = useKanbanStore()
+const auth = useAuthStore()
+const { t } = useI18n()
+const { toast } = useSwal()
 const tasksStore = useTasksStore()
 const { columns, mode, total, loading, error, projectId } = storeToRefs(kanbanStore)
 const { fetchBoard, moveCard, moveColumn, setMode, setProject } = kanbanStore
@@ -73,6 +79,10 @@ function openTask(id: number) {
 function handleDrop(e: Event) {
   const customEvent = e as CustomEvent
   const { issueId, columnId } = customEvent.detail
+  if (!auth.canWrite) {
+    toast(t('kanban.read_only'), 'info')
+    return
+  }
   if (issueId && columnId) {
     moveCard(issueId, columnId)
   }

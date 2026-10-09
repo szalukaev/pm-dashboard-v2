@@ -33,7 +33,8 @@
 
             <td class="center">
               <select
-                class="cell-input priority"
+                :disabled="!auth.canWrite"
+                class="cell-inputpriority"
                 :style="{ color: priorityColor(task.priority_name) }"
                 :value="task.priority_name"
                 @change="saveInlineEdit(task, 'priority_name', ($event.target as HTMLSelectElement).value)"
@@ -44,7 +45,8 @@
 
             <td>
               <select
-                class="cell-input assignee"
+                :disabled="!auth.canWrite"
+                class="cell-inputassignee"
                 :value="task.assigned_to_name || ''"
                 @change="saveInlineEdit(task, 'assigned_to_name', ($event.target as HTMLSelectElement).value)"
               >
@@ -55,7 +57,8 @@
 
             <td class="center">
               <input
-                class="cell-input estimate"
+                :disabled="!auth.canWrite"
+                class="cell-inputestimate"
                 type="text"
                 inputmode="decimal"
                 :value="task.estimated_hours ?? ''"
@@ -69,7 +72,8 @@
 
             <td>
               <select
-                class="cell-input status-select"
+                :disabled="!auth.canWrite"
+                class="cell-inputstatus-select"
                 :style="badgeStyle(statusColor(task.status_name))"
                 :value="task.status_name"
                 @change="saveInlineEdit(task, 'status_name', ($event.target as HTMLSelectElement).value)"
@@ -83,7 +87,8 @@
 
             <td class="center">
               <input
-                class="cell-input date"
+                :disabled="!auth.canWrite"
+                class="cell-inputdate"
                 type="date"
                 :value="(task.start_date || '').slice(0, 10)"
                 @change="saveInlineEdit(task, 'start_date', ($event.target as HTMLInputElement).value)"
@@ -92,7 +97,8 @@
 
             <td class="center">
               <input
-                class="cell-input date"
+                :disabled="!auth.canWrite"
+                class="cell-inputdate"
                 :class="{ overdue: isOverdue(task) }"
                 type="date"
                 :value="(task.due_date || '').slice(0, 10)"
@@ -102,7 +108,8 @@
 
             <td>
               <select
-                class="cell-input category"
+                :disabled="!auth.canWrite"
+                class="cell-inputcategory"
                 :value="task.category_name || ''"
                 @focus="tasksStore.fetchProjectCategories(task.project_id)"
                 @mousedown="tasksStore.fetchProjectCategories(task.project_id)"
@@ -125,6 +132,7 @@ import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import type { Task } from '../../stores/tasks'
 import { useSettingsStore } from '../../stores/settings'
+import { useAuthStore } from '../../stores/auth'
 import { useSwal } from '../../composables/useSwal'
 import { useTasksStore } from '../../stores/tasks'
 import { isFlashing } from '../../composables/useFlash'
@@ -132,6 +140,7 @@ import { isFlashing } from '../../composables/useFlash'
 const settingsStore = useSettingsStore()
 const tasksStore = useTasksStore()
 const { showChange, toast } = useSwal()
+const auth = useAuthStore()
 const { t } = useI18n()
 const { settings } = storeToRefs(settingsStore)
 
@@ -417,8 +426,14 @@ tr.overdue td:first-child {
   transition: border-color 0.15s, background 0.15s;
 }
 
-.cell-input:hover {
+.cell-input:hover:not(:disabled) {
   border-color: var(--hairline);
+}
+
+/* A read-only user sees the values as plain text */
+.cell-input:disabled {
+  cursor: default;
+  opacity: 1;
 }
 
 .cell-input:focus {

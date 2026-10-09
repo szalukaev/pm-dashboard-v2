@@ -62,6 +62,13 @@
       </AppButton>
     </div>
 
+    <!-- The user's account in the data source -->
+    <div v-if="user?.source?.type" class="source-block">
+      <h4 class="source-title">{{ $t('source_token.title') }}</h4>
+      <p class="source-hint">{{ $t('source_token.hint') }}</p>
+      <SourceTokenForm allow-unlink />
+    </div>
+
     <!-- Change password modal -->
     <AppModal v-model="showChangePassword" title="Изменение пароля" width="400px">
       <form @submit.prevent="submitPasswordChange" class="pw-form">
@@ -103,6 +110,7 @@ import { Camera } from 'lucide-vue-next'
 import axios from 'axios'
 import AppButton from '../ui/AppButton.vue'
 import AppModal from '../ui/AppModal.vue'
+import SourceTokenForm from './SourceTokenForm.vue'
 
 const authStore = useAuthStore()
 const { user } = storeToRefs(authStore)
@@ -321,6 +329,26 @@ async function submitPasswordChange() {
 .form-actions {
   display: flex;
   gap: 8px;
+}
+
+.source-block {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-light);
+}
+
+.source-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-bright);
+  margin-bottom: 6px;
+}
+
+.source-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+  max-width: 560px;
 }
 
 .pw-form {

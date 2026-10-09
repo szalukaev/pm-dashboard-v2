@@ -14,10 +14,11 @@
 
     <!-- Content -->
     <template v-else>
-      <StatCards :stats="stats" />
-      <TeamLoadTable :team="teamLoad" />
-      <ProjectDistribution ref="distRef" :distribution="distribution" />
-      <DeadlineTiles :deadlines="deadlines" @open-task="openTask" />
+      <!-- Widgets hidden from the user by the administrator are not shown -->
+      <StatCards v-if="auth.widgetVisible('stats')" :stats="stats" />
+      <TeamLoadTable v-if="auth.widgetVisible('team_load')" :team="teamLoad" />
+      <ProjectDistribution v-if="auth.widgetVisible('distribution')" ref="distRef" :distribution="distribution" />
+      <DeadlineTiles v-if="auth.widgetVisible('deadlines')" :deadlines="deadlines" @open-task="openTask" />
     </template>
 
     <!-- Task modal (shared with Tasks) -->
@@ -29,6 +30,7 @@
 import { ref, onMounted, watch, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAnalyticsStore } from '../stores/analytics'
+import { useAuthStore } from '../stores/auth'
 import { useLiveRefresh } from '../composables/useLiveRefresh'
 import StatCards from '../components/analytics/StatCards.vue'
 import TeamLoadTable from '../components/analytics/TeamLoadTable.vue'
@@ -38,6 +40,7 @@ import AppEmptyState from '../components/ui/AppEmptyState.vue'
 import TaskModal from '../components/tasks/TaskModal.vue'
 
 const store = useAnalyticsStore()
+const auth = useAuthStore()
 const { stats, teamLoad, distribution, deadlines, loading, error } = storeToRefs(store)
 const { fetchAll } = store
 

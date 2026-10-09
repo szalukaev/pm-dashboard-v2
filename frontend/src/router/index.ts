@@ -2,6 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import axios from 'axios'
 
 const APP_VERSION = '3.0.0'
+// Tabs the administrator can hide from a user (route names)
+const DATA_TABS = ['tasks', 'analytics', 'kanban', 'sprint', 'payments']
 let versionWarningShown = false
 // /api/setup/status is stable for the lifetime of the SPA — fetch once.
 let setupStatusChecked = false
@@ -83,6 +85,12 @@ router.beforeEach(async (to, _from, next) => {
       const authStore = useAuthStore()
       await authStore.fetchMe()
       if (authStore.isAuthenticated) {
+        // A tab hidden by the administrator: go to the first one allowed
+        const tab = typeof to.name === 'string' ? to.name : ''
+        if (DATA_TABS.includes(tab) && !authStore.tabVisible(tab)) {
+          const first = DATA_TABS.find(t => authStore.tabVisible(t))
+          return next({ name: first || 'settings' })
+        }
         next()
       } else {
         next({ name: 'login' })

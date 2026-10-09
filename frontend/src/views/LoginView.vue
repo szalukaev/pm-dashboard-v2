@@ -50,6 +50,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import i18n from '../i18n'
 import AppButton from '../components/ui/AppButton.vue'
 
 const router = useRouter()
@@ -68,7 +69,11 @@ async function handleLogin() {
     await auth.login(username.value, password.value)
     router.push('/')
   } catch (e: any) {
-    error.value = 'Неверное имя пользователя или пароль'
+    const code = e?.response?.data?.error
+    const key = code === 'USER_BLOCKED' ? 'error_blocked'
+      : code === 'TOO_MANY_ATTEMPTS' ? 'error_too_many_attempts'
+      : 'error_invalid_credentials'
+    error.value = i18n.global.t(`auth.${key}`)
   } finally {
     loading.value = false
   }

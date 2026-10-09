@@ -2,199 +2,128 @@
   <div class="settings-admin">
     <h3 class="section-title">{{ $t('settings.tabs.admin') }}</h3>
 
-    <!-- Users Management -->
-    <div class="admin-section">
-      <div class="section-header">
-        <h4 class="block-title">Пользователи</h4>
-        <AppButton variant="primary" @click="showUserForm = true" test-id="add-user-btn">
-          + Добавить
-        </AppButton>
+    <div class="adm-tabs">
+      <button
+        v-for="tab in tabs"
+        :key="tab"
+        type="button"
+        class="adm-tab"
+        :class="{ active: activeTab === tab }"
+        :data-testid="'admin-tab-' + tab"
+        @click="activeTab = tab"
+      >
+        {{ $t('access.tabs.' + tab) }}
+      </button>
+    </div>
+
+    <!-- Access control. Each screen loads its own data when it is opened,
+         so a change made on one is seen on another. -->
+    <AdminUsers v-if="activeTab === 'users'" :projects="projects" :members="members" />
+    <AdminGroups v-else-if="activeTab === 'groups'" :projects="projects" :members="members" />
+    <AdminTemplates v-else-if="activeTab === 'templates'" :projects="projects" :members="members" />
+
+    <!-- Settings of the data shared by all users -->
+    <template v-else>
+      <div class="adm-section">
+        <SettingsStatusGroups />
       </div>
 
-      <table class="admin-table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Имя</th>
-            <th>Роль</th>
-            <th>Создан</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="u in users" :key="u.id">
-            <td>{{ u.id }}</td>
-            <td>{{ u.username }}</td>
-            <td>
-              <select
-                :value="u.role"
-                @change="updateUserRole(u.id, ($event.target as HTMLSelectElement).value)"
-                class="inline-select"
-              >
-                <option value="user">user</option>
-                <option value="admin">admin</option>
-              </select>
-            </td>
-            <td class="date-cell">{{ formatDate(u.created_at) }}</td>
-            <td>
-              <button class="action-btn danger-btn" @click="deleteUser(u.id)" title="Удалить">
-                <Trash2 :size="14" />
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Status groups: shared by all users, so they live here -->
-    <div class="admin-section">
-      <SettingsStatusGroups />
-    </div>
-
-    <!-- Priority Order -->
-    <div class="admin-section">
-      <h4 class="block-title">{{ $t('settings.priorities.title') }}</h4>
-      <p class="block-hint">{{ $t('settings.priorities.order_hint') }}</p>
-
-      <table class="admin-table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Название</th>
-            <th>Порядок</th>
-            <th>Цвет</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="p in priorities" :key="p.external_id">
-            <td>{{ p.external_id }}</td>
-            <td>{{ p.name }}</td>
-            <td>
-              <input
-                type="number"
-                :value="p.sort_order"
-                @change="updatePriorityOrder(p.external_id, Number(($event.target as HTMLInputElement).value))"
-                class="inline-input"
-                min="0"
-              />
-            </td>
-            <td>
-              <input
-                type="color"
-                :value="p.color"
-                @change="updatePriorityColor(p.external_id, ($event.target as HTMLInputElement).value)"
-                class="color-input"
-              />
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Add User Modal -->
-    <AppModal
-      :model-value="showUserForm"
-      title="Новый пользователь"
-      width="400px"
-      @update:model-value="showUserForm = $event"
-    >
-      <form class="modal-form" @submit.prevent="createUser">
-        <div class="form-field">
-          <label>Имя пользователя</label>
-          <input v-model="newUser.username" type="text" required minlength="3" />
+      <div class="adm-section">
+        <h4 class="adm-title">{{ $t('settings.priorities.title') }}</h4>
+        <p class="adm-hint">{{ $t('settings.priorities.order_hint') }}</p>
+        <div class="adm-table-wrap">
+          <table class="adm-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>{{ $t('settings.priorities.name') }}</th>
+                <th>{{ $t('settings.priorities.order') }}</th>
+                <th>{{ $t('settings.priorities.color') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="p in priorities" :key="p.external_id">
+                <td>{{ p.external_id }}</td>
+                <td>{{ p.name }}</td>
+                <td>
+                  <input
+                    type="text"
+                    inputmode="numeric"
+                    :value="p.sort_order"
+                    class="adm-input order-input"
+                    @change="updatePriority(p.external_id, { sort_order: Number(($event.target as HTMLInputElement).value) || 0 })"
+                  />
+                </td>
+                <td>
+                  <input
+                    type="color"
+                    :value="p.color"
+                    class="color-input"
+                    @change="updatePriority(p.external_id, { color: ($event.target as HTMLInputElement).value })"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-        <div class="form-field">
-          <label>Пароль</label>
-          <input v-model="newUser.password" type="password" required minlength="6" />
-        </div>
-        <div class="form-field">
-          <label>Роль</label>
-          <select v-model="newUser.role">
-            <option value="user">Пользователь</option>
-            <option value="admin">Администратор</option>
-          </select>
-        </div>
-      </form>
-      <template #footer>
-        <AppButton variant="ghost" @click="showUserForm = false">{{ $t('common.cancel') }}</AppButton>
-        <AppButton variant="primary" @click="createUser" :disabled="newUser.username.length < 3 || newUser.password.length < 6">
-          {{ $t('common.create') }}
-        </AppButton>
-      </template>
-    </AppModal>
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import axios from 'axios'
-import { Trash2 } from 'lucide-vue-next'
-import AppButton from '../ui/AppButton.vue'
-import AppModal from '../ui/AppModal.vue'
+import { useI18n } from 'vue-i18n'
 import SettingsStatusGroups from './SettingsStatusGroups.vue'
-import { formatDate } from '../../utils/format'
+import AdminUsers from './access/AdminUsers.vue'
+import AdminGroups from './access/AdminGroups.vue'
+import AdminTemplates from './access/AdminTemplates.vue'
 import { useSwal } from '../../composables/useSwal'
+import type { ProjectItem, MemberItem } from '../../utils/access'
 
-const { toast } = useSwal()
-
-const users = ref<any[]>([])
-const priorities = ref<any[]>([])
-const showUserForm = ref(false)
-const newUser = reactive({ username: '', password: '', role: 'user' })
-
-async function loadData() {
-  try {
-    const [uRes, pRes] = await Promise.all([
-      axios.get('/api/admin/users'),
-      axios.get('/api/admin/priorities'),
-    ])
-    users.value = uRes.data.users || []
-    priorities.value = pRes.data.priorities || []
-  } catch {
-    // May fail if not admin
-  }
+interface Priority {
+  external_id: number
+  name: string
+  sort_order: number
+  color: string
 }
 
-async function createUser() {
+const tabs = ['users', 'groups', 'templates', 'data'] as const
+const activeTab = ref<(typeof tabs)[number]>('users')
+
+const { t } = useI18n()
+const { toast } = useSwal()
+
+// Everything rights can be given to: an administrator gets the full lists
+const projects = ref<ProjectItem[]>([])
+const members = ref<MemberItem[]>([])
+const priorities = ref<Priority[]>([])
+
+async function loadPriorities() {
   try {
-    await axios.post('/api/admin/users', newUser)
-    showUserForm.value = false
-    newUser.username = ''
-    newUser.password = ''
-    newUser.role = 'user'
-    await loadData()
+    const { data } = await axios.get('/api/admin/priorities')
+    priorities.value = data.priorities || []
   } catch {}
 }
 
-async function updateUserRole(id: number, role: string) {
+async function updatePriority(id: number, fields: Record<string, unknown>) {
   try {
-    await axios.put(`/api/admin/users/${id}`, { role })
-  } catch (e: any) {
-    const code = e?.response?.data?.error
-    toast(code === 'CANNOT_DEMOTE_SELF' ? 'Нельзя снять роль администратора с самого себя' : 'Не удалось изменить роль', 'error')
-  } finally {
-    // Reload in any case so the select shows the real role
-    await loadData()
+    await axios.put(`/api/admin/priorities/${id}`, fields)
+  } catch {
+    toast(t('access.save_error'), 'error')
   }
+  await loadPriorities()
 }
 
-async function deleteUser(id: number) {
-  if (!confirm('Удалить пользователя?')) return
-  await axios.delete(`/api/admin/users/${id}`)
-  await loadData()
-}
-
-async function updatePriorityOrder(id: number, order: number) {
-  await axios.put(`/api/admin/priorities/${id}`, { sort_order: order })
-  await loadData()
-}
-
-async function updatePriorityColor(id: number, color: string) {
-  await axios.put(`/api/admin/priorities/${id}`, { color })
-  await loadData()
-}
-
-onMounted(loadData)
+onMounted(async () => {
+  loadPriorities()
+  try {
+    const [p, m] = await Promise.all([axios.get('/api/tasks/projects'), axios.get('/api/tasks/members')])
+    projects.value = p.data.projects || []
+    members.value = m.data.members || []
+  } catch {}
+})
 </script>
 
 <style scoped>
@@ -202,89 +131,10 @@ onMounted(loadData)
   font-size: 14px;
   font-weight: 600;
   color: var(--text-bright);
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
-.admin-section {
-  margin-bottom: 32px;
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.block-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-bright);
-  margin-bottom: 8px;
-}
-
-.section-header .block-title {
-  margin-bottom: 0;
-}
-
-.block-hint {
-  font-size: 12px;
-  color: var(--text-muted);
-  margin-bottom: 12px;
-}
-
-.admin-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-  border: 1px solid var(--hairline);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.admin-table th {
-  background: var(--surface-2);
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  padding: 10px 12px;
-  text-align: left;
-  border-bottom: 1px solid var(--border-light);
-}
-
-.admin-table td {
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border-light);
-  color: var(--text-dim);
-}
-
-.admin-table tr:hover td {
-  background: var(--bg-hover);
-}
-
-.date-cell {
-  font-size: 12px;
-  color: var(--text-faint);
-}
-
-.inline-select {
-  padding: 4px 8px;
-  font-size: 12px;
-  background: var(--surface-2);
-  border: 1px solid var(--hairline);
-  border-radius: 6px;
-  color: var(--text);
-}
-
-.inline-input {
-  padding: 4px 8px;
-  font-size: 12px;
-  background: var(--surface-2);
-  border: 1px solid var(--hairline);
-  border-radius: 6px;
-  color: var(--text);
+.order-input {
   width: 60px;
   text-align: center;
 }
@@ -296,57 +146,5 @@ onMounted(loadData)
   border-radius: 4px;
   cursor: pointer;
   padding: 0;
-}
-
-.action-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  color: var(--text-muted);
-  transition: all 0.15s;
-}
-
-.action-btn:hover {
-  background: var(--surface-3);
-  color: var(--text-bright);
-}
-
-.danger-btn:hover {
-  color: var(--danger);
-}
-
-.modal-form {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.form-field label {
-  display: block;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  margin-bottom: 4px;
-}
-
-.form-field input,
-.form-field select {
-  width: 100%;
-  padding: 8px 12px;
-  font-size: 13px;
-  background: var(--surface-2);
-  border: 1px solid var(--hairline);
-  border-radius: 8px;
-  color: var(--text);
-}
-
-.form-field input:focus,
-.form-field select:focus {
-  border-color: var(--accent);
 }
 </style>

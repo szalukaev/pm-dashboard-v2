@@ -8,6 +8,7 @@
     <nav class="header-tabs">
       <router-link
         v-for="(tab, index) in tabs"
+        v-show="auth.tabVisible(tab.testId)"
         :key="tab.path"
         :to="tab.path"
         class="tab"

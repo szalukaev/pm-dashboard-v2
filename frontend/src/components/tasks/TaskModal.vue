@@ -35,7 +35,7 @@
                 v-model="editFields.estimated_hours"
                 type="text"
                 inputmode="decimal"
-                class="field-input num-input"
+                :disabled="!auth.canWrite" class="field-input num-input"
                 placeholder="—"
                 @change="saveField('estimated_hours')"
                 @keyup.enter="($event.target as HTMLInputElement).blur()"
@@ -59,26 +59,26 @@
         <div class="params-col">
           <div class="param">
             <span class="param-label">{{ $t('tasks.table.status') }}</span>
-            <select v-model="editFields.status_name" class="field-input" @change="saveField('status_name')">
+            <select v-model="editFields.status_name" :disabled="!auth.canWrite" class="field-input" @change="saveField('status_name')">
               <option v-for="s in statuses" :key="s.id" :value="s.name">{{ s.name }}</option>
             </select>
           </div>
           <div class="param">
             <span class="param-label">{{ $t('tasks.table.priority') }}</span>
-            <select v-model="editFields.priority_name" class="field-input" @change="saveField('priority_name')">
+            <select v-model="editFields.priority_name" :disabled="!auth.canWrite" class="field-input" @change="saveField('priority_name')">
               <option v-for="p in priorityNames" :key="p" :value="p">{{ p }}</option>
             </select>
           </div>
           <div class="param">
             <span class="param-label">{{ $t('tasks.table.assignee') }}</span>
-            <select v-model="editFields.assigned_to_name" class="field-input" @change="saveField('assigned_to_name')">
+            <select v-model="editFields.assigned_to_name" :disabled="!auth.canWrite" class="field-input" @change="saveField('assigned_to_name')">
               <option value="">{{ $t('tasks.modal.no_assignee') }}</option>
               <option v-for="m in memberNames" :key="m" :value="m">{{ m }}</option>
             </select>
           </div>
           <div class="param">
             <span class="param-label">{{ $t('tasks.modal.category') }}</span>
-            <select v-model="editFields.category_name" class="field-input" @change="saveField('category_name')">
+            <select v-model="editFields.category_name" :disabled="!auth.canWrite" class="field-input" @change="saveField('category_name')">
               <option value="">—</option>
               <option v-for="c in taskCategories" :key="c" :value="c">{{ c }}</option>
             </select>
@@ -89,7 +89,7 @@
           </div>
           <div class="param">
             <span class="param-label">{{ $t('tasks.modal.deadline') }}</span>
-            <input type="date" v-model="editFields.due_date" class="field-input" @change="saveField('due_date')" />
+            <input type="date" v-model="editFields.due_date" :disabled="!auth.canWrite" class="field-input" @change="saveField('due_date')" />
           </div>
         </div>
       </section>
@@ -154,7 +154,7 @@
       </section>
 
       <!-- New comment -->
-      <section class="section new-comment">
+      <section v-if="auth.canWrite" class="section new-comment">
         <h4 class="section-title">{{ $t('tasks.modal.new_comment') }}</h4>
         <textarea
           v-model="newComment"
@@ -192,6 +192,7 @@ import AppSpinner from '../ui/AppSpinner.vue'
 import AppButton from '../ui/AppButton.vue'
 import { useTasksStore, type Task } from '../../stores/tasks'
 import { useSettingsStore } from '../../stores/settings'
+import { useAuthStore } from '../../stores/auth'
 import { useSwal } from '../../composables/useSwal'
 import { renderRedmineMarkup } from '../../utils/redmineMarkup'
 
@@ -220,6 +221,7 @@ const settingsStore = useSettingsStore()
 const { settings } = storeToRefs(settingsStore)
 const { statuses, priorities, members, projectCategories } = storeToRefs(store)
 const { showChange, error: swalError, toast } = useSwal()
+const auth = useAuthStore()
 // "t" is taken by a local variable in saveField
 const i18n = useI18n()
 

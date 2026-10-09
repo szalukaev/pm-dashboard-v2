@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import axios from 'axios'
 
 interface User {
@@ -10,11 +10,42 @@ interface User {
   avatar?: string
   last_login?: string
   force_password_change?: boolean
+  // What the administrator lets the user see and do. The server enforces
+  // it; the client only hides what would not work anyway.
+  access?: {
+    visible_tabs: string[]
+    widgets: string[]
+    read_only: boolean
+  }
+  // The user's account in the data source, tied by a personal API key.
+  // type is the kind of the source ('redmine'); needs_token asks for the key.
+  source?: {
+    type: string
+    linked: boolean
+    member_id: number | null
+    member_name: string
+    token_hint: string
+    needs_token: boolean
+  }
 }
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
   const isAuthenticated = ref(false)
+
+  const isAdmin = computed(() => user.value?.role === 'admin')
+  // The user may change data (not a read-only one)
+  const canWrite = computed(() => !user.value?.access?.read_only)
+
+  function tabVisible(tab: string): boolean {
+    const tabs = user.value?.access?.visible_tabs
+    return isAdmin.value || !tabs || tabs.includes(tab)
+  }
+
+  function widgetVisible(widget: string): boolean {
+    const widgets = user.value?.access?.widgets
+    return isAdmin.value || !widgets || widgets.includes(widget)
+  }
 
   async function login(username: string, password: string) {
     const { data } = await axios.post('/api/auth/login', { username, password })
@@ -59,5 +90,20 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { user, isAuthenticated, login, logout, fetchMe, changePassword, updateMe }
+  // Ties the user to the owner of the personal API key of the data source.
+  // Only the user can do it, and only for themselves.
+  async function setSourceToken(token: string) {
+    const { data } = await axios.put('/api/auth/source-token', { token })
+    if (user.value) user.value.source = data.source
+  }
+
+  async function clearSourceToken() {
+    const { data } = await axios.delete('/api/auth/source-token')
+    if (user.value) user.value.source = data.source
+  }
+
+  return {
+    user, isAuthenticated, isAdmin, canWrite, tabVisible, widgetVisible,
+    login, logout, fetchMe, changePassword, updateMe, setSourceToken, clearSourceToken,
+  }
 })

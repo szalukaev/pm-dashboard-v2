@@ -30,6 +30,23 @@
         </AppButton>
       </template>
     </AppModal>
+
+    <!-- First login: who the user is in the data source. Asked after the
+         password is set; may be put off, then it is asked on the next login. -->
+    <AppModal
+      :model-value="showTokenPrompt"
+      :title="$t('source_token.prompt_title')"
+      width="520px"
+      @update:model-value="!$event && postponeToken()"
+    >
+      <p class="force-hint">{{ $t('source_token.prompt_text') }}</p>
+      <SourceTokenForm />
+      <template #footer>
+        <AppButton variant="ghost" test-id="source-token-later" @click="postponeToken">
+          {{ $t('source_token.later') }}
+        </AppButton>
+      </template>
+    </AppModal>
   </div>
 </template>
 
@@ -39,6 +56,7 @@ import { storeToRefs } from 'pinia'
 import { useAuthStore } from './stores/auth'
 import AppModal from './components/ui/AppModal.vue'
 import AppButton from './components/ui/AppButton.vue'
+import SourceTokenForm from './components/settings/SourceTokenForm.vue'
 
 const authStore = useAuthStore()
 const { user } = storeToRefs(authStore)
@@ -50,6 +68,22 @@ const passwordError = ref('')
 const showForceChange = computed(() => {
   return user.value?.force_password_change === true
 })
+
+// The key is asked once per login: "Later" hides the question until the
+// next one (the choice lives as long as the browser tab).
+const TOKEN_POSTPONED = 'pm-dashboard-token-postponed'
+const tokenPostponed = ref(sessionStorage.getItem(TOKEN_POSTPONED) || '')
+
+const showTokenPrompt = computed(() => {
+  const u = user.value
+  return !!u && !showForceChange.value && u.source?.needs_token === true && tokenPostponed.value !== String(u.id)
+})
+
+function postponeToken() {
+  if (!user.value) return
+  tokenPostponed.value = String(user.value.id)
+  sessionStorage.setItem(TOKEN_POSTPONED, tokenPostponed.value)
+}
 
 async function submitPasswordChange() {
   if (newPassword.value.length < 6) {
