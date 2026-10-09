@@ -5,6 +5,10 @@
     width="520px"
     @update:model-value="!$event && $emit('close')"
   >
+    <template v-if="sprint" #title>
+      {{ $t('sprint.edit_sprint') }}
+      <SprintStateBadge :sprint="sprint" class="title-state" />
+    </template>
     <form class="sprint-form" @submit.prevent="submit">
       <div class="form-field">
         <label>{{ $t('sprint.form.name') }} *</label>
@@ -50,16 +54,6 @@
         <label>{{ $t('sprint.form.description') }}</label>
         <textarea v-model="form.description" rows="3"></textarea>
       </div>
-
-      <div class="form-field" v-if="sprint">
-        <label>{{ $t('sprint.form.status') }}</label>
-        <!-- Changing the status closes or reopens the sprint: a separate right -->
-        <select v-model="form.status" :disabled="!auth.canSprint('close')">
-          <option value="open">open</option>
-          <option value="active">active</option>
-          <option value="closed">closed</option>
-        </select>
-      </div>
     </form>
 
     <template #footer>
@@ -78,10 +72,9 @@ import { computed, reactive, watch } from 'vue'
 import AppModal from '../ui/AppModal.vue'
 import AppButton from '../ui/AppButton.vue'
 import type { Sprint } from '../../stores/sprint'
-import { useAuthStore } from '../../stores/auth'
+import SprintStateBadge from './SprintStateBadge.vue'
 import { useTasksStore } from '../../stores/tasks'
 
-const auth = useAuthStore()
 const tasksStore = useTasksStore()
 
 const props = defineProps<{
@@ -100,7 +93,6 @@ const form = reactive({
   start_date: '',
   due_date: '',
   description: '',
-  status: 'open',
 })
 
 const projectId = computed(() => props.projects.find(p => p.name === form.project_name)?.id)
@@ -130,10 +122,10 @@ watch([() => props.visible, () => props.sprint], ([visible, s]) => {
     form.project_name = s.project_name || ''
     form.category_name = s.category_name || ''
     form.auto_fill_category = s.auto_fill_category
-    form.start_date = s.start_date || ''
-    form.due_date = s.due_date || ''
+    // The server sends a date with a time part; the field takes the date only
+    form.start_date = (s.start_date || '').slice(0, 10)
+    form.due_date = (s.due_date || '').slice(0, 10)
     form.description = s.description || ''
-    form.status = s.status
   } else {
     form.name = ''
     form.project_name = ''
@@ -142,7 +134,6 @@ watch([() => props.visible, () => props.sprint], ([visible, s]) => {
     form.start_date = ''
     form.due_date = ''
     form.description = ''
-    form.status = 'open'
   }
   loadCategories()
 }, { immediate: true })
@@ -165,6 +156,10 @@ function submit() {
 </script>
 
 <style scoped>
+.title-state {
+  margin-left: 8px;
+}
+
 .sprint-form {
   display: flex;
   flex-direction: column;

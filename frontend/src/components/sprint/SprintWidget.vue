@@ -4,12 +4,11 @@
       <ChevronDown :size="16" class="chevron" :class="{ collapsed: !expanded }" />
       <Flag :size="16" class="flag-icon" />
       <span class="sprint-name">{{ sprint.name }}</span>
-      <span class="badge" :class="sprint.status">{{ sprint.status }}</span>
+      <SprintStateBadge :sprint="sprint" />
       <span class="task-count">{{ sprint.task_count }}</span>
       <span v-if="sprint.start_date || sprint.due_date" class="date-range">
         {{ formatDate(sprint.start_date) }} — {{ formatDate(sprint.due_date) }}
       </span>
-      <span v-if="isOverdue" class="overdue-badge badge danger">{{ $t('sprint.overdue') }}</span>
 
       <div class="header-actions" v-if="sprint.status !== 'closed'" @click.stop>
         <!-- Each action is a right of its own -->
@@ -64,9 +63,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { ChevronDown, Flag, CheckCircle2, Pencil, RefreshCw, Trash2 } from 'lucide-vue-next'
 import SprintProgressBar from './SprintProgressBar.vue'
+import SprintStateBadge from './SprintStateBadge.vue'
 import KanbanCard from '../kanban/KanbanCard.vue'
 import type { Sprint, SprintTask } from '../../stores/sprint'
 import type { KanbanCard as KanbanCardType } from '../../stores/kanban'
@@ -98,11 +98,6 @@ function toKanbanCard(task: SprintTask): KanbanCardType {
     is_overdue: task.is_overdue,
   }
 }
-
-const isOverdue = computed(() => {
-  if (!props.sprint.due_date || props.sprint.status === 'closed') return false
-  return props.sprint.due_date < new Date().toISOString().slice(0, 10)
-})
 
 function toggleExpanded() {
   expanded.value = !expanded.value
@@ -169,35 +164,6 @@ function formatDate(d: string | null): string {
   color: var(--text-bright);
 }
 
-.badge {
-  display: inline-block;
-  padding: 2px 8px;
-  font-size: 10px;
-  font-weight: 500;
-  border-radius: 9999px;
-  text-transform: uppercase;
-}
-
-.badge.open {
-  background: var(--accent-bg);
-  color: var(--accent);
-}
-
-.badge.active {
-  background: var(--success)22;
-  color: var(--success);
-}
-
-.badge.closed {
-  background: var(--tag-bg);
-  color: var(--text-muted);
-}
-
-.badge.danger {
-  background: var(--danger)22;
-  color: var(--danger);
-}
-
 .task-count {
   font-size: 12px;
   color: var(--text-muted);
@@ -207,10 +173,6 @@ function formatDate(d: string | null): string {
   font-size: 11px;
   color: var(--text-faint);
   margin-left: auto;
-}
-
-.overdue-badge {
-  margin-left: 0;
 }
 
 .header-actions {

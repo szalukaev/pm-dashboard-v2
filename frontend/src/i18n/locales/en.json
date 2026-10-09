@@ -222,13 +222,16 @@
       "auto_fill": "Auto-fill by category",
       "start_date": "Start Date",
       "due_date": "Due Date",
-      "description": "Description",
-      "status": "Status"
+      "description": "Description"
     },
     "drag_hint": "Drag tasks from the backlog",
     "no_tasks": "No tasks",
     "no_data": "No data. Make sure projects are selected in the filter.",
-    "overdue": "Overdue",
+    "state": {
+      "open": "Open",
+      "overdue": "Overdue",
+      "closed": "Closed"
+    },
     "progress": {
       "open": "Open",
       "testing": "Testing",
