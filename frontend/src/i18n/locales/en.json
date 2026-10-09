@@ -25,6 +25,8 @@
     "confirm_delete_text": "This action cannot be undone.",
     "success": "Success",
     "copied": "Copied",
+    "fullscreen": "Full screen",
+    "windowed": "Windowed",
     "pagination": {
       "range": "{from}–{to} of {total}",
       "page": "Page {page} of {pages}",

@@ -25,6 +25,8 @@
     "confirm_delete_text": "Действие необратимо.",
     "success": "Успешно",
     "copied": "Скопировано",
+    "fullscreen": "Во весь экран",
+    "windowed": "В окне",
     "pagination": {
       "range": "{from}–{to} из {total}",
       "page": "Стр. {page} из {pages}",

@@ -3,6 +3,7 @@
     :model-value="!!taskId"
     :title="task ? `#${task.external_id} ${task.subject}` : ''"
     width="70vw"
+    expandable
     @update:model-value="!$event && $emit('close')"
   >
     <template #title>
@@ -149,7 +150,7 @@
             <span class="related-type">{{ relationName(r.relation) }}</span>
             <span class="related-id">#{{ r.id }}</span>
             <span class="related-subject">{{ r.accessible ? r.subject : $t('tasks.related.hidden') }}</span>
-            <span v-if="r.accessible && r.status" class="related-status">{{ r.status }}</span>
+            <span v-if="r.accessible && r.status" class="related-status" :style="statusBadge(r.status)">{{ r.status }}</span>
           </component>
         </div>
       </section>
@@ -251,6 +252,7 @@ import { useSettingsStore } from '../../stores/settings'
 import { useAuthStore } from '../../stores/auth'
 import { useSwal } from '../../composables/useSwal'
 import { renderRedmineMarkup } from '../../utils/redmineMarkup'
+import { statusColor } from '../../utils/statusColor'
 
 interface Attachment {
   id: number
@@ -367,6 +369,11 @@ const history = computed(() =>
 function fieldName(field: string): string {
   const key = `tasks.history.fields.${field.startsWith('cf_') ? 'cf' : field}`
   return i18n.te(key) ? i18n.t(key) : field
+}
+
+function statusBadge(status: string) {
+  const color = statusColor(status)
+  return { color, background: color + '22' }
 }
 
 function relationName(relation: string): string {

@@ -36,7 +36,7 @@
             <td v-else-if="col.key === 'priority_name'" class="center">
               <select
                 :disabled="!auth.canWrite"
-                class="cell-inputpriority"
+                class="cell-input priority"
                 :style="{ color: priorityColor(task.priority_name) }"
                 :value="task.priority_name"
                 @change="saveInlineEdit(task, 'priority_name', ($event.target as HTMLSelectElement).value)"
@@ -48,7 +48,7 @@
             <td v-else-if="col.key === 'assigned_to'">
               <select
                 :disabled="!auth.canWrite"
-                class="cell-inputassignee"
+                class="cell-input assignee"
                 :value="task.assigned_to_name || ''"
                 @change="saveInlineEdit(task, 'assigned_to_name', ($event.target as HTMLSelectElement).value)"
               >
@@ -60,7 +60,7 @@
             <td v-else-if="col.key === 'estimate'" class="center">
               <input
                 :disabled="!auth.canWrite"
-                class="cell-inputestimate"
+                class="cell-input estimate"
                 type="text"
                 inputmode="decimal"
                 :value="task.estimated_hours ?? ''"
@@ -72,11 +72,11 @@
 
             <td v-else-if="col.key === 'fact'" class="center num">{{ formatHours(task.spent_hours) }}</td>
 
-            <td v-else-if="col.key === 'status_name'">
+            <td v-else-if="col.key === 'status_name'" class="center">
               <select
                 :disabled="!auth.canWrite"
-                class="cell-inputstatus-select"
-                :style="badgeStyle(statusColor(task.status_name))"
+                class="cell-input status-select"
+                :style="{ color: statusColor(task.status_name) }"
                 :value="task.status_name"
                 @change="saveInlineEdit(task, 'status_name', ($event.target as HTMLSelectElement).value)"
               >
@@ -90,7 +90,7 @@
             <td v-else-if="col.key === 'start_date'" class="center">
               <input
                 :disabled="!auth.canWrite"
-                class="cell-inputdate"
+                class="cell-input date"
                 type="date"
                 :value="(task.start_date || '').slice(0, 10)"
                 @change="saveInlineEdit(task, 'start_date', ($event.target as HTMLInputElement).value)"
@@ -100,7 +100,7 @@
             <td v-else-if="col.key === 'due_date'" class="center">
               <input
                 :disabled="!auth.canWrite"
-                class="cell-inputdate"
+                class="cell-input date"
                 :class="{ overdue: isOverdue(task) }"
                 type="date"
                 :value="(task.due_date || '').slice(0, 10)"
@@ -111,7 +111,7 @@
             <td v-else-if="col.key === 'category_name'">
               <select
                 :disabled="!auth.canWrite"
-                class="cell-inputcategory"
+                class="cell-input category"
                 :value="task.category_name || ''"
                 @focus="tasksStore.fetchProjectCategories(task.project_id)"
                 @mousedown="tasksStore.fetchProjectCategories(task.project_id)"
@@ -140,6 +140,7 @@ import { useSwal } from '../../composables/useSwal'
 import { useTasksStore } from '../../stores/tasks'
 import { isFlashing } from '../../composables/useFlash'
 import { TASK_COLUMNS, TASKS_TABLE } from './taskColumns'
+import { statusColor } from '../../utils/statusColor'
 
 const settingsStore = useSettingsStore()
 const tasksStore = useTasksStore()
@@ -237,30 +238,6 @@ const priorityColors: Record<string, string> = {
 
 function priorityColor(name: string): string {
   return priorityColors[(name || '').toLowerCase()] || '#888888'
-}
-
-const statusColors: Record<string, string> = {
-  'new': '#5e6ad2',
-  'in progress': '#ffd93d',
-  'review': '#a855f7',
-  'feedback': '#f97316',
-  'bugs': '#ff6b6b',
-  'testing': '#06b6d4',
-  'closed': '#6bcb77',
-  'tested': '#6bcb77',
-  'resolved': '#6bcb77',
-}
-
-function statusColor(name: string): string {
-  const n = (name || '').toLowerCase()
-  if (statusColors[n]) return statusColors[n]
-  if (n.includes('test')) return statusColors.testing
-  if (n.includes('bug')) return statusColors.bugs
-  return '#888888'
-}
-
-function badgeStyle(color: string) {
-  return { color, background: color + '22' }
 }
 
 function taskLink(id: number): string {
@@ -459,11 +436,11 @@ tr.overdue td:first-child {
   color: var(--text-faint);
 }
 
+/* The status looks like the priority: colored text, no badge */
 .status-select {
-  padding: 2px 8px;
+  width: 120px;
   font-size: 11px;
-  font-weight: 500;
-  border-radius: 9999px;
+  font-weight: 600;
 }
 
 .date {
