@@ -32,6 +32,7 @@ func effective(individual, template *Permissions, groups []Permissions) Permissi
 	}
 	result.OwnTasksOnly = own.OwnTasksOnly
 	result.ReadOnly = own.ReadOnly
+	result.FromSource = own.FromSource
 	return result.Normalized()
 }
 
@@ -63,9 +64,23 @@ type Scope struct {
 	OwnMember *int
 }
 
-// newScope builds the scope from effective permissions and the user's own
-// choice. selectedProjects must already include subprojects.
-func newScope(userID int, admin bool, perms Permissions, memberID *int, selectedProjects, selectedTeam []int) *Scope {
+// userFacts is what is known about the user besides the permission sets.
+type userFacts struct {
+	// memberID: who the user is in the data source, nil when not linked.
+	memberID *int
+	// sourceProjects: the projects the user is a member of in the source.
+	sourceProjects []int
+	// selectedProjects (with subprojects) and selectedTeam: the user's own
+	// choice in the settings.
+	selectedProjects []int
+	selectedTeam     []int
+}
+
+// newScope builds the scope from effective permissions and what is known
+// about the user. perms.ProjectIDs must already include subprojects: a right
+// to a project is a right to its whole branch.
+func newScope(userID int, admin bool, perms Permissions, facts userFacts) *Scope {
+	memberID, selectedProjects, selectedTeam := facts.memberID, facts.selectedProjects, facts.selectedTeam
 	s := &Scope{UserID: userID, Admin: admin}
 	if admin {
 		// An administrator sees everything and is never restricted.
@@ -74,6 +89,11 @@ func newScope(userID int, admin bool, perms Permissions, memberID *int, selected
 		s.ReadOnly = perms.ReadOnly
 		s.VisibleTabs, s.Widgets = perms.VisibleTabs, perms.Widgets
 		s.AllowedAllProjects, s.AllowedProjects = perms.AllProjects, perms.ProjectIDs
+		if perms.FromSource {
+			// Exactly the projects of the source: membership there is per
+			// project and is not extended to subprojects here.
+			s.AllowedProjects = uniqueInts(append(append([]int{}, perms.ProjectIDs...), facts.sourceProjects...))
+		}
 		s.AllowedAllTeam, s.AllowedTeam = perms.AllTeam, perms.TeamIDs
 		if perms.OwnTasksOnly && memberID != nil {
 			s.OwnMember = memberID

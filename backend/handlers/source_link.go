@@ -42,23 +42,76 @@ func (k *UserKeys) ClientFor(userID int) *redmine.Client {
 	if k == nil || k.Source == nil {
 		return nil
 	}
-	system := k.Source.Client()
-	if system == nil || k.Box == nil {
-		return system
+	if personal := k.personalClient(userID); personal != nil {
+		return personal
+	}
+	return k.Source.Client()
+}
+
+// personalClient returns a client acting with the user's own key, nil when
+// the user has not given one (or the source is not configured).
+func (k *UserKeys) personalClient(userID int) *redmine.Client {
+	if k == nil || k.Source == nil || k.Box == nil || *k.DB == nil || k.Source.Client() == nil {
+		return nil
 	}
 	var encrypted string
 	if err := (*k.DB).QueryRow("SELECT source_token_enc FROM users WHERE id = $1", userID).Scan(&encrypted); err != nil || encrypted == "" {
-		return system
+		return nil
 	}
 	token, err := k.Box.Decrypt(encrypted)
 	if err != nil {
-		slog.Warn("Stored personal API key cannot be read, using the system key", "user", userID, "error", err)
-		return system
+		slog.Warn("Stored personal API key cannot be read", "user", userID, "error", err)
+		return nil
 	}
-	if personal := k.Source.ClientWithKey(token); personal != nil {
-		return personal
+	return k.Source.ClientWithKey(token)
+}
+
+// RefreshProjects re-reads the projects the user is a member of in the data
+// source ("rights as in Redmine", see access.Permissions.FromSource).
+func (k *UserKeys) RefreshProjects(userID int) {
+	client := k.personalClient(userID)
+	if client == nil {
+		return
 	}
-	return system
+	projects, err := client.GetCurrentProjects()
+	switch {
+	case errors.Is(err, redmine.ErrUnauthorized):
+		// The key was revoked in the source: the rights it gave go with it.
+		slog.Warn("Personal API key is no longer accepted by the data source", "user", userID)
+		projects = []int{}
+	case err != nil:
+		// The source is unavailable: keep what was read last time.
+		slog.Warn("Could not read the user's projects from the data source", "user", userID, "error", err)
+		return
+	}
+	data, _ := json.Marshal(projects)
+	if _, err := (*k.DB).Exec("UPDATE users SET source_projects = $1, source_projects_at = NOW() WHERE id = $2", data, userID); err != nil {
+		slog.Warn("Could not save the user's projects from the data source", "user", userID, "error", err)
+	}
+}
+
+// RefreshAllProjects does RefreshProjects for every active user who gave a
+// key. It runs before each sync, so a change of membership in the source
+// reaches the dashboard within one sync interval.
+func (k *UserKeys) RefreshAllProjects() {
+	if k == nil || *k.DB == nil {
+		return
+	}
+	rows, err := (*k.DB).Query("SELECT id FROM users WHERE source_token_enc <> '' AND NOT is_blocked")
+	if err != nil {
+		return
+	}
+	var ids []int
+	for rows.Next() {
+		var id int
+		if rows.Scan(&id) == nil {
+			ids = append(ids, id)
+		}
+	}
+	rows.Close()
+	for _, id := range ids {
+		k.RefreshProjects(id)
+	}
 }
 
 // sourceInfo describes the link for /auth/me and the login answer.
@@ -165,13 +218,23 @@ func (h *AuthHandler) SetSourceToken(w http.ResponseWriter, r *http.Request) {
 		VALUES ($1, $2, $3, 'redmine', NOW())
 		ON CONFLICT (external_id, data_source) DO NOTHING`, member.ExternalID, member.Name, member.Login)
 
+	// The projects of the user in the source, for "rights as in Redmine";
+	// the sync then fetches the issues of the projects that became visible.
+	if h.Keys != nil {
+		h.Keys.RefreshProjects(userID)
+	}
+	if h.Source != nil {
+		h.Source.TriggerSync()
+	}
+
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"success": true, "source": h.sourceInfo(userID)})
 }
 
 // ClearSourceToken removes the link of the current user.
 func (h *AuthHandler) ClearSourceToken(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.GetUserID(r)
-	if _, err := (*h.DB).Exec("UPDATE users SET member_id = NULL, source_token_enc = '', source_token_hint = '' WHERE id = $1", userID); err != nil {
+	if _, err := (*h.DB).Exec(`UPDATE users SET member_id = NULL, source_token_enc = '', source_token_hint = '',
+		source_projects = '[]', source_projects_at = NULL WHERE id = $1`, userID); err != nil {
 		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 		return
 	}

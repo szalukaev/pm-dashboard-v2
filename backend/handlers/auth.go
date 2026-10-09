@@ -29,6 +29,8 @@ type AuthHandler struct {
 	Source *manager.Manager
 	// Secrets encrypts the personal API keys.
 	Secrets *secrets.Box
+	// Keys reads what the keys give access to in the data source.
+	Keys *UserKeys
 }
 
 type loginRequest struct {

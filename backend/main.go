@@ -129,6 +129,10 @@ func main() {
 	userKeys := &handlers.UserKeys{DB: &pgDB, Source: source, Box: secretBox}
 	taskH.Keys = userKeys
 	kanbanH.Keys = userKeys
+	authH.Keys = userKeys
+	// "Rights as in the data source": what projects each user is a member
+	// of there is re-read before every sync
+	source.SetBeforeSync(userKeys.RefreshAllProjects)
 	syncStatusH := &handlers.SyncStatusHandler{DB: &pgDB, Source: source}
 	accessH := &handlers.AccessHandler{DB: &pgDB, Source: source, Sessions: sessionStore}
 	// Issues are synced for the projects the users are shown within their rights

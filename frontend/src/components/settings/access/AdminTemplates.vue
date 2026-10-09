@@ -24,6 +24,7 @@
             <td>
               {{ tpl.name }}
               <span v-if="tpl.grants_admin" class="adm-badge accent">{{ $t('access.users.role_admin') }}</span>
+              <span v-if="tpl.permissions.from_source" class="adm-badge">{{ $t('access.summary.from_source') }}</span>
               <span v-if="tpl.permissions.read_only" class="adm-badge">{{ $t('access.summary.read_only') }}</span>
               <span v-if="tpl.permissions.own_tasks_only" class="adm-badge">{{ $t('access.summary.own_tasks') }}</span>
               <div v-if="tpl.description" class="adm-muted">{{ tpl.description }}</div>

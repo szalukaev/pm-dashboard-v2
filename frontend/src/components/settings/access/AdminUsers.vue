@@ -366,6 +366,7 @@ function summary(p: Permissions): string {
     p.all_projects ? t('access.summary.all_projects') : t('access.summary.projects', { n: p.project_ids.length }),
     p.all_team ? t('access.summary.all_team') : t('access.summary.team', { n: p.team_ids.length }),
   ]
+  if (p.from_source) parts.push(t('access.summary.from_source'))
   if (p.own_tasks_only) parts.push(t('access.summary.own_tasks'))
   if (p.read_only) parts.push(t('access.summary.read_only'))
   if (p.visible_tabs) parts.push(t('access.summary.tabs', { n: p.visible_tabs.length }))
@@ -497,13 +498,30 @@ async function resetPassword(u: AdminUser) {
   }
 }
 
+// The clipboard API exists only on https and localhost; the dashboard is
+// often opened by plain http inside a network, so there is a fallback.
 async function copyPassword() {
+  let copied = false
   try {
-    await navigator.clipboard.writeText(tempPassword.value)
-    toast(t('common.copied'), 'success')
-  } catch {
-    toast(t('access.password.copy_failed'), 'error')
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(tempPassword.value)
+      copied = true
+    }
+  } catch {}
+  if (!copied) {
+    const field = document.createElement('textarea')
+    field.value = tempPassword.value
+    field.setAttribute('readonly', '')
+    field.style.position = 'fixed'
+    field.style.opacity = '0'
+    document.body.appendChild(field)
+    field.select()
+    try {
+      copied = document.execCommand('copy')
+    } catch {}
+    field.remove()
   }
+  toast(t(copied ? 'common.copied' : 'access.password.copy_failed'), copied ? 'success' : 'error')
 }
 
 onMounted(load)

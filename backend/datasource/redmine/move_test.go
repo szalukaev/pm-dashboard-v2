@@ -50,6 +50,28 @@ func TestGetCurrentUser(t *testing.T) {
 	}
 }
 
+func TestGetCurrentProjects(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("include") != "memberships" {
+			w.Write([]byte(`{"user":{"id":42}}`))
+			return
+		}
+		w.Write([]byte(`{"user":{"id":42,"memberships":[
+			{"id":1,"project":{"id":310,"name":"A"},"roles":[{"id":4,"name":"Developer"}]},
+			{"id":2,"project":{"id":285,"name":"B"},"roles":[{"id":3,"name":"Manager"}]}
+		]}}`))
+	}))
+	defer srv.Close()
+
+	projects, err := NewClient(srv.URL, "key", "", "").GetCurrentProjects()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(projects) != 2 || projects[0] != 310 || projects[1] != 285 {
+		t.Errorf("projects = %v, want [310 285]", projects)
+	}
+}
+
 func TestGetIssueState(t *testing.T) {
 	body := `{"issue":{"id":1,"status":{"id":3,"name":"Review"},"assigned_to":{"id":42,"name":"Ivan"}}}`
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

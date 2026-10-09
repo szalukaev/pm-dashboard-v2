@@ -11,6 +11,8 @@ export interface Permissions {
   own_tasks_only: boolean
   // Data may be viewed but not changed
   read_only: boolean
+  // Plus the projects the user is a member of in the data source
+  from_source: boolean
   // null = everything, otherwise the allowed keys
   visible_tabs: string[] | null
   widgets: string[] | null
@@ -54,6 +56,7 @@ export function emptyPermissions(): Permissions {
     all_team: false,
     own_tasks_only: false,
     read_only: false,
+    from_source: false,
     visible_tabs: null,
     widgets: null,
   }
@@ -106,4 +109,16 @@ export function withDescendants(projects: ProjectItem[], id: number): number[] {
     }
   }
   return result
+}
+
+// The subprojects covered by the given projects: a right to a project is a
+// right to its whole branch, so these need no tick of their own.
+export function coveredByParents(projects: ProjectItem[], selected: number[]): Set<number> {
+  const covered = new Set<number>()
+  for (const id of selected) {
+    for (const child of withDescendants(projects, id)) {
+      if (child !== id) covered.add(child)
+    }
+  }
+  return covered
 }

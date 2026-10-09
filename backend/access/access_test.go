@@ -90,7 +90,7 @@ func TestScope(t *testing.T) {
 
 	t.Run("administrator is never restricted", func(t *testing.T) {
 		// Whatever is stored for an administrator is ignored.
-		s := newScope(1, true, Permissions{ReadOnly: true, VisibleTabs: keys("tasks")}, nil, nil, nil)
+		s := newScope(1, true, Permissions{ReadOnly: true, VisibleTabs: keys("tasks")}, userFacts{})
 		if s.ReadOnly || !s.TabVisible("payments") || !s.AllowsProject(123) || !s.AllowsMember(5) {
 			t.Errorf("admin scope = %+v", s)
 		}
@@ -101,7 +101,7 @@ func TestScope(t *testing.T) {
 	})
 
 	t.Run("own tasks only", func(t *testing.T) {
-		s := newScope(2, false, effective(nil, nil, nil), &member, nil, nil)
+		s := newScope(2, false, effective(nil, nil, nil), userFacts{memberID: &member})
 		var args []interface{}
 		cond := s.IssueCond("i.", &args)
 		want := "((i.project_id = ANY($1) AND (i.assigned_to_id IS NULL OR i.assigned_to_id = ANY($2))) OR i.assigned_to_id = $3)"
@@ -114,7 +114,7 @@ func TestScope(t *testing.T) {
 	})
 
 	t.Run("own tasks without a linked member: nothing", func(t *testing.T) {
-		s := newScope(2, false, effective(nil, nil, nil), nil, nil, nil)
+		s := newScope(2, false, effective(nil, nil, nil), userFacts{})
 		var args []interface{}
 		if cond := s.IssueCond("", &args); cond != "(project_id = ANY($1) AND (assigned_to_id IS NULL OR assigned_to_id = ANY($2)))" {
 			t.Errorf("condition = %q", cond)
@@ -123,7 +123,7 @@ func TestScope(t *testing.T) {
 
 	t.Run("selection narrows, placeholders continue", func(t *testing.T) {
 		perms := Permissions{ProjectIDs: []int{1, 2, 3}, AllTeam: true}
-		s := newScope(3, false, perms, nil, []int{2, 99}, nil)
+		s := newScope(3, false, perms, userFacts{selectedProjects: []int{2, 99}})
 		if !reflect.DeepEqual(s.Projects, []int{2}) || !s.AllTeam {
 			t.Errorf("scope = %+v", s)
 		}
@@ -140,9 +140,38 @@ func TestScope(t *testing.T) {
 	})
 
 	t.Run("hidden tabs", func(t *testing.T) {
-		s := newScope(4, false, Permissions{VisibleTabs: keys("tasks", "kanban")}, nil, nil, nil)
+		s := newScope(4, false, Permissions{VisibleTabs: keys("tasks", "kanban")}, userFacts{})
 		if !s.TabVisible("kanban") || s.TabVisible("payments") {
 			t.Error("tab visibility is wrong")
+		}
+	})
+
+	t.Run("rights as in the data source", func(t *testing.T) {
+		facts := userFacts{sourceProjects: []int{20, 10}}
+
+		// The template gives the projects of the source and the whole team
+		template := Permissions{FromSource: true, AllTeam: true}
+		s := newScope(5, false, effective(nil, &template, nil), facts)
+		if s.AllowedAllProjects || !reflect.DeepEqual(s.AllowedProjects, []int{10, 20}) || !s.AllowedAllTeam {
+			t.Errorf("scope = %+v", s)
+		}
+
+		// Projects given by a group are added to them
+		s = newScope(5, false, effective(nil, &template, []Permissions{{ProjectIDs: []int{30}}}), facts)
+		if !reflect.DeepEqual(s.AllowedProjects, []int{10, 20, 30}) {
+			t.Errorf("with a group: projects = %v", s.AllowedProjects)
+		}
+
+		// Without the flag the membership in the source gives nothing
+		s = newScope(5, false, Permissions{ProjectIDs: []int{30}}, facts)
+		if !reflect.DeepEqual(s.AllowedProjects, []int{30}) {
+			t.Errorf("without the flag: projects = %v", s.AllowedProjects)
+		}
+
+		// A user not linked to the source yet has no projects there
+		s = newScope(5, false, effective(nil, &template, nil), userFacts{})
+		if len(s.AllowedProjects) != 0 || s.AllowsProject(10) {
+			t.Errorf("not linked: projects = %v", s.AllowedProjects)
 		}
 	})
 }

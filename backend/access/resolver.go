@@ -98,11 +98,14 @@ func (r *Resolver) Scope(userID int) (*Scope, error) {
 
 	var role string
 	var blocked bool
-	var memberID *int
-	err := db.QueryRow("SELECT role, is_blocked, member_id FROM users WHERE id = $1", userID).Scan(&role, &blocked, &memberID)
+	var facts userFacts
+	var sourceProjectsJSON []byte
+	err := db.QueryRow("SELECT role, is_blocked, member_id, source_projects FROM users WHERE id = $1", userID).
+		Scan(&role, &blocked, &facts.memberID, &sourceProjectsJSON)
 	if err != nil || blocked {
 		return nil, ErrUserNotFound
 	}
+	json.Unmarshal(sourceProjectsJSON, &facts.sourceProjects)
 
 	var projectsJSON, teamJSON []byte
 	db.QueryRow("SELECT selected_projects, selected_team FROM user_settings WHERE user_id = $1", userID).Scan(&projectsJSON, &teamJSON)
@@ -116,14 +119,33 @@ func (r *Resolver) Scope(userID int) (*Scope, error) {
 		}
 	}
 
+	facts.selectedProjects, facts.selectedTeam = selectedProjects, selectedTeam
+
 	if role == "admin" {
-		return newScope(userID, true, Permissions{}, memberID, selectedProjects, selectedTeam), nil
+		return newScope(userID, true, Permissions{}, facts), nil
 	}
 	grants, err := r.Grants(userID)
 	if err != nil {
 		return nil, err
 	}
-	return newScope(userID, false, grants.Effective, memberID, selectedProjects, selectedTeam), nil
+	perms := grants.Effective
+	// A right to a project covers all its subprojects, including the ones
+	// created later: the list is expanded every time, not when it is saved.
+	if len(perms.ProjectIDs) > 0 {
+		expanded, err := datasource.ExpandProjects(db, perms.ProjectIDs)
+		if err != nil {
+			return nil, err
+		}
+		perms.ProjectIDs = expanded
+	}
+	return newScope(userID, false, perms, facts), nil
+}
+
+// UsesSourceProjects reports whether the rights of the user include the
+// projects of the data source, i.e. whether they must be kept up to date.
+func (r *Resolver) UsesSourceProjects(userID int) bool {
+	grants, err := r.Grants(userID)
+	return err == nil && grants.Effective.FromSource
 }
 
 // SyncProjects returns the projects whose issues must be synced: the union

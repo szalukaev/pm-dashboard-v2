@@ -52,6 +52,8 @@ type Manager struct {
 	snapshot func() (map[int]string, error)
 	// projectSource decides which projects are synced; nil = the syncer's default.
 	projectSource func() ([]int, error)
+	// beforeSync runs at the start of every sync; nil = nothing.
+	beforeSync func()
 	// notify reports sync events to open pages; nil = nobody listens.
 	notify func(event string, data interface{})
 
@@ -188,6 +190,9 @@ func (m *Manager) run(s syncer) {
 	}()
 
 	m.emit(EventSyncStatus, SyncStatus{Status: "running", At: time.Now()})
+	if m.beforeSync != nil {
+		m.beforeSync()
+	}
 	before := m.takeSnapshot()
 
 	err := s.SyncAll(context.Background(), m.db)
@@ -220,6 +225,12 @@ func (m *Manager) Running() bool {
 func (m *Manager) SetProjectSource(source func() ([]int, error)) {
 	m.projectSource = source
 	m.Reload()
+}
+
+// SetBeforeSync sets what runs at the start of every sync, before the
+// projects to sync are chosen. Call it before Run.
+func (m *Manager) SetBeforeSync(hook func()) {
+	m.beforeSync = hook
 }
 
 // SetNotifier sets where the manager reports sync events (the WebSocket hub).

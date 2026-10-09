@@ -28,6 +28,9 @@ type Permissions struct {
 	OwnTasksOnly bool `json:"own_tasks_only"`
 	// ReadOnly: data may be viewed but not changed.
 	ReadOnly bool `json:"read_only"`
+	// FromSource adds the projects the user is a member of in the data
+	// source ("rights as in Redmine"), kept up to date by the sync.
+	FromSource bool `json:"from_source"`
 	// VisibleTabs / Widgets: nil = everything, otherwise the allowed keys.
 	VisibleTabs *[]string `json:"visible_tabs"`
 	Widgets     *[]string `json:"widgets"`
@@ -35,7 +38,7 @@ type Permissions struct {
 
 // Columns is the list of permission columns shared by user_permissions,
 // group_permissions and role_templates, in the order Scan and Values use.
-const Columns = "project_ids, team_ids, visible_tabs, widgets, all_projects, all_team, own_tasks_only, read_only"
+const Columns = "project_ids, team_ids, visible_tabs, widgets, all_projects, all_team, own_tasks_only, read_only, from_source"
 
 // rawPermissions receives the permission columns of a row.
 type rawPermissions struct {
@@ -46,7 +49,7 @@ type rawPermissions struct {
 // dest returns the scan destinations for Columns.
 func (r *rawPermissions) dest() []interface{} {
 	return []interface{}{&r.projects, &r.team, &r.tabs, &r.widgets,
-		&r.p.AllProjects, &r.p.AllTeam, &r.p.OwnTasksOnly, &r.p.ReadOnly}
+		&r.p.AllProjects, &r.p.AllTeam, &r.p.OwnTasksOnly, &r.p.ReadOnly, &r.p.FromSource}
 }
 
 func (r *rawPermissions) permissions() Permissions {
@@ -82,7 +85,7 @@ func (p Permissions) Values() []interface{} {
 		data, _ := json.Marshal(*p.Widgets)
 		widgets = data
 	}
-	return []interface{}{projects, team, tabs, widgets, p.AllProjects, p.AllTeam, p.OwnTasksOnly, p.ReadOnly}
+	return []interface{}{projects, team, tabs, widgets, p.AllProjects, p.AllTeam, p.OwnTasksOnly, p.ReadOnly, p.FromSource}
 }
 
 // Normalized returns the set with sorted lists without duplicates, non-nil
@@ -96,8 +99,8 @@ func (p Permissions) Normalized() Permissions {
 }
 
 // union merges permission sets: a user gets everything any of them gives.
-// Only data access and visibility are merged; OwnTasksOnly and ReadOnly are
-// personal and come from the user's own set.
+// Only data access and visibility are merged; OwnTasksOnly, ReadOnly and
+// FromSource are personal and come from the user's own set.
 func union(sets ...Permissions) Permissions {
 	result := Permissions{VisibleTabs: &[]string{}, Widgets: &[]string{}}
 	for _, s := range sets {

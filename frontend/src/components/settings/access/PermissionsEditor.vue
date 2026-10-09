@@ -10,6 +10,10 @@
         <input type="checkbox" v-model="model.read_only" data-testid="perm-read-only" />
         {{ $t('access.editor.read_only') }}
       </label>
+      <label class="adm-check" :title="$t('access.editor.from_source_hint')">
+        <input type="checkbox" v-model="model.from_source" data-testid="perm-from-source" />
+        {{ $t('access.editor.from_source') }}
+      </label>
     </div>
 
     <div class="perm-columns">
@@ -29,16 +33,20 @@
             <button type="button" class="adm-link-btn" @click="model.project_ids = []">{{ $t('access.editor.clear') }}</button>
           </div>
           <div class="adm-pick-list">
+            <!-- A subproject of a ticked project is covered by it: shown
+                 ticked and locked -->
             <label
               v-for="item in visibleProjects"
               :key="item.id"
               class="adm-pick-item"
-              :class="{ selected: model.project_ids.includes(item.id) }"
+              :class="{ selected: projectChecked(item.id), inherited: covered.has(item.id) }"
               :style="{ paddingLeft: (projectQuery ? 8 : item.depth * 18 + 8) + 'px' }"
+              :title="covered.has(item.id) ? $t('access.editor.covered_by_parent') : undefined"
             >
               <input
                 type="checkbox"
-                :checked="model.project_ids.includes(item.id)"
+                :checked="projectChecked(item.id)"
+                :disabled="covered.has(item.id)"
                 @change="toggleProject(item.id, ($event.target as HTMLInputElement).checked)"
               />
               <span :class="{ 'perm-parent': item.hasChildren }">{{ item.name }}</span>
@@ -122,7 +130,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import {
-  TABS, WIDGETS, projectTree, withDescendants,
+  TABS, WIDGETS, projectTree, withDescendants, coveredByParents,
   type Permissions, type ProjectItem, type MemberItem,
 } from '../../../utils/access'
 
@@ -151,14 +159,25 @@ const visibleMembers = computed(() => {
   return q ? props.members.filter(m => m.name.toLowerCase().includes(q)) : props.members
 })
 
-// Ticking a project ticks its subprojects as well; each can be unticked
-// afterwards — rights are given per project, not per branch.
+// A right to a project is a right to its whole branch, including the
+// subprojects created later. Only the ticked project itself is stored; its
+// subprojects are covered by it.
+const covered = computed(() => coveredByParents(props.projects, model.value.project_ids))
+
+function projectChecked(id: number): boolean {
+  return model.value.project_ids.includes(id) || covered.value.has(id)
+}
+
 function toggleProject(id: number, checked: boolean) {
-  const branch = withDescendants(props.projects, id)
   const current = new Set(model.value.project_ids)
-  for (const pid of branch) {
-    if (checked) current.add(pid)
-    else current.delete(pid)
+  if (checked) {
+    current.add(id)
+    // Ticks of its subprojects are now redundant
+    for (const child of withDescendants(props.projects, id)) {
+      if (child !== id) current.delete(child)
+    }
+  } else {
+    current.delete(id)
   }
   model.value.project_ids = [...current]
 }
@@ -210,6 +229,11 @@ function toggleAll(field: 'visible_tabs' | 'widgets', all: string[], e: Event) {
 
 .perm-note {
   margin-top: 6px;
+}
+
+.adm-pick-item.inherited {
+  cursor: default;
+  color: var(--text-muted);
 }
 
 .perm-keys {

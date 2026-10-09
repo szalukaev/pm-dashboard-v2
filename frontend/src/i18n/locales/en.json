@@ -397,6 +397,7 @@
       "all_team": "all members",
       "team": "members: {n}",
       "own_tasks": "own tasks",
+      "from_source": "projects as in Redmine",
       "read_only": "read only",
       "tabs": "tabs: {n}"
     },
@@ -453,6 +454,9 @@
       "own_tasks_hint": "Tasks assigned to the user are always visible, in any project",
       "read_only": "Read only",
       "read_only_hint": "Data can be viewed, but tasks cannot be changed and comments cannot be written",
+      "from_source": "Projects as in the source system",
+      "from_source_hint": "The user gets the projects they are a member of in Redmine. The list is read with their personal API key and refreshed on every synchronization; until the key is entered there are no such projects.",
+      "covered_by_parent": "Covered by the ticked parent project",
       "projects": "Projects",
       "all_projects": "All projects",
       "team": "Members",
@@ -466,7 +470,7 @@
       "selected": "Selected: {n}",
       "clear": "Clear all",
       "nothing_found": "Nothing found",
-      "projects_note": "Ticking a project ticks its subprojects too; each can be unticked separately."
+      "projects_note": "A right to a project covers all its subprojects, including the ones created later."
     },
     "clone": {
       "title_short": "Clone rights",

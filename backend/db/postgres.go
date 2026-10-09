@@ -109,15 +109,21 @@ func runFallbackMigrations(db *sql.DB) error {
 	if _, err := db.Exec(fallbackMigrationSQL); err != nil {
 		return err
 	}
-	_, err := db.Exec(accessControlSQL)
+	if _, err := db.Exec(accessControlSQL); err != nil {
+		return err
+	}
+	_, err := db.Exec(rightsFromSourceSQL)
 	return err
 }
 
 // The access control schema is idempotent, so the fallback runs the very
-// migration file instead of keeping a second copy of it.
+// migration files instead of keeping a second copy of them.
 //
 //go:embed migrations/006_access_control.up.sql
 var accessControlSQL string
+
+//go:embed migrations/007_rights_from_source.up.sql
+var rightsFromSourceSQL string
 
 // fallbackMigrationSQL is kept as a safety net when migration files are not available
 const fallbackMigrationSQL = `

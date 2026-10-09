@@ -255,6 +255,34 @@ func (c *Client) doRequest(path string) ([]byte, error) {
 // ErrUnauthorized: Redmine did not accept the API key.
 var ErrUnauthorized = errors.New("redmine api key is not valid")
 
+// GetCurrentProjects returns the ids of the projects the owner of the API
+// key of this client is a member of — what they have rights to in Redmine.
+func (c *Client) GetCurrentProjects() ([]int, error) {
+	data, err := c.doRequest("/users/current.json?include=memberships")
+	if err != nil {
+		return nil, err
+	}
+	var resp struct {
+		User struct {
+			Memberships []struct {
+				Project struct {
+					ID int `json:"id"`
+				} `json:"project"`
+			} `json:"memberships"`
+		} `json:"user"`
+	}
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return nil, err
+	}
+	projects := make([]int, 0, len(resp.User.Memberships))
+	for _, m := range resp.User.Memberships {
+		if m.Project.ID > 0 {
+			projects = append(projects, m.Project.ID)
+		}
+	}
+	return projects, nil
+}
+
 // GetCurrentUser returns the Redmine user the API key of this client belongs
 // to. A personal key identifies its owner, which is how a dashboard user is
 // tied to their Redmine account.
