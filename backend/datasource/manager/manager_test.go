@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -54,8 +55,77 @@ func newTestManager(store *fakeStore, s syncer) *Manager {
 	db := &sql.DB{}
 	m := New(store, &db, nil)
 	m.newSyncer = func(*redmine.Client) syncer { return s }
+	m.snapshot = nil // no real database in tests
 	m.Reload()
 	return m
+}
+
+func TestDiffIssues(t *testing.T) {
+	before := map[int]string{1: "a", 2: "b", 3: "c"}
+	after := map[int]string{1: "a", 2: "changed", 4: "new"}
+
+	got := DiffIssues(before, after)
+	want := IssueChanges{Added: []int{4}, Updated: []int{2}, Removed: []int{3}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("DiffIssues = %+v, want %+v", got, want)
+	}
+	if !DiffIssues(before, before).Empty() {
+		t.Error("identical snapshots must give no changes")
+	}
+}
+
+// stepSyncer changes the "database" during its pass.
+type stepSyncer struct {
+	pass func()
+	err  error
+}
+
+func (s *stepSyncer) SyncAll(context.Context, **sql.DB) error {
+	s.pass()
+	return s.err
+}
+
+func TestSyncReportsEvents(t *testing.T) {
+	store := &fakeStore{values: map[string]string{"redmine_url": "http://redmine.test", "redmine_api_key": "key"}}
+	issues := map[int]string{1: "a", 2: "b"}
+	s := &stepSyncer{pass: func() { issues = map[int]string{1: "a", 2: "changed", 3: "new"} }}
+	m := newTestManager(store, s)
+	m.snapshot = func() (map[int]string, error) { return issues, nil }
+
+	var events []string
+	var changes IssueChanges
+	m.SetNotifier(func(event string, data interface{}) {
+		if status, ok := data.(SyncStatus); ok {
+			event += ":" + status.Status
+		}
+		if c, ok := data.(IssueChanges); ok {
+			changes = c
+		}
+		events = append(events, event)
+	})
+
+	current, err := m.begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.run(current)
+
+	wantEvents := []string{"sync-status:running", "issues-changed", "collection-complete", "sync-status:success"}
+	if !reflect.DeepEqual(events, wantEvents) {
+		t.Errorf("events = %v, want %v", events, wantEvents)
+	}
+	if want := (IssueChanges{Added: []int{3}, Updated: []int{2}, Removed: []int{}}); !reflect.DeepEqual(changes, want) {
+		t.Errorf("changes = %+v, want %+v", changes, want)
+	}
+
+	// A failed pass that changed nothing reports only its status.
+	events = nil
+	s.pass, s.err = func() {}, errors.New("redmine is down")
+	current, _ = m.begin()
+	m.run(current)
+	if want := []string{"sync-status:running", "sync-status:error"}; !reflect.DeepEqual(events, want) {
+		t.Errorf("events after a failure = %v, want %v", events, want)
+	}
 }
 
 func TestTriggerSyncRunsOnePassAtATime(t *testing.T) {

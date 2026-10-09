@@ -22,6 +22,8 @@ import (
 type TaskHandler struct {
 	DB     **sql.DB
 	Source *manager.Manager
+	// Events reports changes to open pages (WebSocket); may be nil.
+	Events func(event string, data interface{})
 }
 
 type TaskResponse struct {
@@ -464,6 +466,8 @@ func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 		return
 	}
+
+	notifyIssuesUpdated(h.Events, externalID)
 
 	utils.JSON(w, http.StatusOK, map[string]interface{}{
 		"success":       true,

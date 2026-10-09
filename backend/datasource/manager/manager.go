@@ -48,6 +48,10 @@ type Manager struct {
 
 	// newSyncer builds the syncer for a client; replaced in tests.
 	newSyncer func(*redmine.Client) syncer
+	// snapshot reads issue fingerprints for change detection; replaced in tests.
+	snapshot func() (map[int]string, error)
+	// notify reports sync events to open pages; nil = nobody listens.
+	notify func(event string, data interface{})
 
 	mu      sync.Mutex
 	client  *redmine.Client
@@ -66,6 +70,7 @@ func New(store ConfigStore, db **sql.DB, readOnly func() bool) *Manager {
 		newSyncer: func(c *redmine.Client) syncer { return redmine.NewSyncer(c) },
 		wake:      make(chan struct{}, 1),
 	}
+	m.snapshot = m.issueFingerprints
 	m.Reload()
 	return m
 }
@@ -156,13 +161,89 @@ func (m *Manager) run(s syncer) {
 		m.running = false
 		m.mu.Unlock()
 	}()
-	if err := s.SyncAll(context.Background(), m.db); err != nil {
-		slog.Error("Sync failed", "error", err)
+
+	m.emit(EventSyncStatus, SyncStatus{Status: "running", At: time.Now()})
+	before := m.takeSnapshot()
+
+	err := s.SyncAll(context.Background(), m.db)
+
+	// Tell open pages what the sync changed, even a failed one: a part of
+	// the issues may have been updated before the failure.
+	if before != nil {
+		if changes := DiffIssues(before, m.takeSnapshot()); !changes.Empty() {
+			m.emit(EventIssuesChanged, changes)
+		}
 	}
+	if err != nil {
+		slog.Error("Sync failed", "error", err)
+		m.emit(EventSyncStatus, SyncStatus{Status: "error", At: time.Now()})
+		return
+	}
+	m.emit(EventCollectionComplete, nil)
+	m.emit(EventSyncStatus, SyncStatus{Status: "success", At: time.Now()})
+}
+
+// Running reports whether a sync is in progress.
+func (m *Manager) Running() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.running
+}
+
+// SetNotifier sets where the manager reports sync events (the WebSocket hub).
+// Call it before Run.
+func (m *Manager) SetNotifier(notify func(event string, data interface{})) {
+	m.notify = notify
+}
+
+func (m *Manager) emit(event string, data interface{}) {
+	if m.notify != nil {
+		m.notify(event, data)
+	}
+}
+
+func (m *Manager) takeSnapshot() map[int]string {
+	if m.snapshot == nil {
+		return nil
+	}
+	snap, err := m.snapshot()
+	if err != nil {
+		slog.Warn("Could not snapshot issues for change detection", "error", err)
+		return nil
+	}
+	return snap
+}
+
+// issueFingerprints returns a hash of the visible fields of every issue.
+func (m *Manager) issueFingerprints() (map[int]string, error) {
+	rows, err := (*m.db).Query(`SELECT external_id, md5(ROW(
+			project_id, subject, status_id, priority_id, assigned_to_id, category_name,
+			start_date, due_date, estimated_hours, spent_hours, bug_fix_hours, done_ratio, tracker_name
+		)::text) FROM issues WHERE data_source = 'redmine'`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	snap := make(map[int]string)
+	for rows.Next() {
+		var id int
+		var hash string
+		if err := rows.Scan(&id, &hash); err != nil {
+			return nil, err
+		}
+		snap[id] = hash
+	}
+	return snap, rows.Err()
 }
 
 // Run syncs once shortly after start and then periodically until ctx is done.
 func (m *Manager) Run(ctx context.Context) {
+	// A sync cut short by a restart left its log entry "running" forever.
+	if *m.db != nil {
+		(*m.db).Exec(`UPDATE collection_log SET status = 'error', finished_at = NOW(),
+			error_text = 'interrupted by a server restart' WHERE status = 'running'`)
+	}
+
 	wait := 2 * time.Second
 	for {
 		timer := time.NewTimer(wait)

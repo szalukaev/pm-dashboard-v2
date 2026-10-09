@@ -21,6 +21,8 @@ import (
 type KanbanHandler struct {
 	DB     **sql.DB
 	Source *manager.Manager
+	// Events reports changes to open pages (WebSocket); may be nil.
+	Events func(event string, data interface{})
 }
 
 type KanbanCard struct {
@@ -368,6 +370,7 @@ func (h *KanbanHandler) MoveCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	notifyIssuesUpdated(h.Events, body.IssueID)
 	utils.Success(w)
 }
 

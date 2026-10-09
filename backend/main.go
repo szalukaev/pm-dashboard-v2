@@ -114,6 +114,12 @@ func main() {
 	adminH.Source = source
 	setupH.Source = source
 	settingsH.Source = source
+	syncStatusH := &handlers.SyncStatusHandler{DB: &pgDB, Source: source}
+
+	// Real-time: the sync and user edits report changes to open pages
+	source.SetNotifier(wsHub.BroadcastEvent)
+	taskH.Events = wsHub.BroadcastEvent
+	kanbanH.Events = wsHub.BroadcastEvent
 	go source.Run(context.Background())
 
 	// Router
@@ -175,6 +181,7 @@ func main() {
 	api.HandleFunc("/auth/change-password", authH.ChangePassword).Methods("POST")
 	api.HandleFunc("/auth/avatar", authH.UploadAvatar).Methods("POST")
 	api.HandleFunc("/auth/avatar", authH.DeleteAvatar).Methods("DELETE")
+	api.HandleFunc("/sync/status", syncStatusH.GetStatus).Methods("GET")
 	api.HandleFunc("/settings", settingsH.GetSettings).Methods("GET")
 	api.HandleFunc("/settings", settingsH.UpdateSettings).Methods("PUT")
 
