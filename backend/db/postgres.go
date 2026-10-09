@@ -124,7 +124,10 @@ func runFallbackMigrations(db *sql.DB) error {
 	if _, err := db.Exec(licenseEventsSQL); err != nil {
 		return err
 	}
-	_, err := db.Exec(paginationSQL)
+	if _, err := db.Exec(paginationSQL); err != nil {
+		return err
+	}
+	_, err := db.Exec(sourceMembersSQL)
 	return err
 }
 
@@ -148,6 +151,9 @@ var licenseEventsSQL string
 
 //go:embed migrations/011_pagination.up.sql
 var paginationSQL string
+
+//go:embed migrations/012_source_members.up.sql
+var sourceMembersSQL string
 
 // fallbackMigrationSQL is kept as a safety net when migration files are not available
 const fallbackMigrationSQL = `

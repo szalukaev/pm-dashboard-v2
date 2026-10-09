@@ -1,8 +1,9 @@
 // Package access decides what data a user may see and change.
 //
-// The administrator sets the maximum: individually, through a role template
-// or through groups. The user may narrow it in their settings (selected
-// projects and team) but can never widen it. Every handler that returns data
+// The administrator gives rights individually or through a role template;
+// the groups of a user never add to them, they only narrow them. The user
+// may narrow the result further in their settings (selected projects and
+// team) but can never widen it. Every handler that returns data
 // asks this package for a Scope and filters by it in SQL.
 package access
 
@@ -121,20 +122,53 @@ func (p Permissions) Normalized() Permissions {
 	return p
 }
 
-// union merges permission sets: a user gets everything any of them gives.
-// Only access to data is merged. OwnTasksOnly, ReadOnly and FromSource are
-// personal and come from the user's own set; tabs, widgets and sprint
-// actions follow their own rule (see effective).
-func union(sets ...Permissions) Permissions {
-	result := Permissions{}
-	for _, s := range sets {
-		result.ProjectIDs = append(result.ProjectIDs, s.ProjectIDs...)
-		result.TeamIDs = append(result.TeamIDs, s.TeamIDs...)
-		result.AllProjects = result.AllProjects || s.AllProjects
-		result.AllTeam = result.AllTeam || s.AllTeam
-		result.ShowUnassigned = result.ShowUnassigned || s.ShowUnassigned
+// Limit is the most the groups of a user allow, for projects and for the
+// team separately. A nil list means the groups do not restrict that side.
+//
+// Several groups are summed: what at least one of them allows is allowed.
+// A group that names no projects (or no members) has no say about them — it
+// may exist only to hide tabs — and a group that allows all of them lifts
+// the restriction.
+type Limit struct {
+	Projects *[]int
+	Team     *[]int
+}
+
+func limitOf(groups []Permissions) Limit {
+	side := func(all func(Permissions) bool, list func(Permissions) []int) *[]int {
+		var ids []int
+		restricted := false
+		for _, g := range groups {
+			if all(g) {
+				return nil
+			}
+			if len(list(g)) > 0 {
+				restricted = true
+				ids = append(ids, list(g)...)
+			}
+		}
+		if !restricted {
+			return nil
+		}
+		ids = uniqueInts(ids)
+		return &ids
 	}
-	return result.Normalized()
+	return Limit{
+		Projects: side(func(p Permissions) bool { return p.AllProjects }, func(p Permissions) []int { return p.ProjectIDs }),
+		Team:     side(func(p Permissions) bool { return p.AllTeam }, func(p Permissions) []int { return p.TeamIDs }),
+	}
+}
+
+// restrict narrows what a user has (everything, or a list) to a limit.
+func restrict(all bool, list []int, limit *[]int) (bool, []int) {
+	switch {
+	case limit == nil:
+		return all, uniqueInts(list)
+	case all:
+		return false, uniqueInts(*limit)
+	default:
+		return false, intersect(uniqueInts(list), *limit)
+	}
 }
 
 func uniqueInts(list []int) []int {

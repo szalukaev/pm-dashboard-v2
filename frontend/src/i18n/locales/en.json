@@ -467,7 +467,7 @@
       "from_group": "Inherited from group \"{name}\"",
       "effective": "Effective rights",
       "inherited_hint": "The user's own rights come from the role template. They can be set individually — then changes of the template no longer affect this user.",
-      "individual_hint": "Individual rights replace the role template and add to the rights of groups. If tabs, widgets or sprint actions are set in a group of the user, the group's settings apply.",
+      "individual_hint": "Individual rights replace the role template. The user's groups add no access, they only narrow it: what remains is the projects and members allowed both here and in the groups. If tabs, widgets or sprint actions are set in a group of the user, the group's settings apply.",
       "set_individually": "Set individually",
       "save_as_template": "Create a template from current rights",
       "reset": "Back to the template",
@@ -481,7 +481,7 @@
       "read_only": "Read only",
       "read_only_hint": "Data can be viewed, but tasks cannot be changed and comments cannot be written",
       "from_source": "Projects as in the source system",
-      "from_source_hint": "The user gets the projects they are a member of in Redmine. The list is read with their personal API key and refreshed on every synchronization; until the key is entered there are no such projects.",
+      "from_source_hint": "The user gets the projects they are a member of in Redmine and sees only the members Redmine shows them in these projects. The lists are read with their personal API key: projects on every synchronization, members once an hour; until the key is entered there are no such projects.",
       "covered_by_parent": "Covered by the ticked parent project",
       "show_unassigned": "Show tasks without an assignee",
       "show_unassigned_hint": "Without this tick tasks that have no assignee are not shown to the user",
@@ -527,7 +527,7 @@
     },
     "groups": {
       "title": "Groups",
-      "hint": "Rights are given to a group, and users are added to groups. The rights of several groups and the user's own rights add up.",
+      "hint": "A group restricts its members: of the user's own projects and members only those allowed by the group remain. A group adds no access. With several groups, what at least one of them allows is allowed.",
       "add": "Create a group",
       "name": "Name",
       "description": "Description",
@@ -541,10 +541,10 @@
       "tab_rights": "Rights",
       "tab_general": "Name",
       "search_user": "Search a user…",
-      "rights_hint": "Every member of the group gets these rights — in addition to their own. Tabs, widgets and sprint actions set in a group have priority over the member's own settings.",
+      "rights_hint": "The projects and members here are the limit for a member of the group: they see only those of their own that are checked. If no projects or no members are checked, the group does not restrict them. Tabs, widgets and sprint actions set in a group have priority over the member's own settings.",
       "saved": "Group saved",
       "delete_title": "Delete group \"{name}\"?",
-      "delete_text": "Its members will lose the rights they got through this group."
+      "delete_text": "The restrictions the group put on its members will no longer apply."
     },
     "templates": {
       "title": "Role templates",

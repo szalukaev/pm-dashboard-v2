@@ -6,29 +6,35 @@ import (
 	"github.com/lib/pq"
 )
 
-// effective combines everything the administrator gave a user.
+// effective returns the rights of a user before the groups narrow them.
 //
 // The user's own set is the individual one, or the role template when rights
-// are not set individually, or the default — own tasks only. Groups add to
-// it.
+// are not set individually, or the default — own tasks only. Access to
+// projects and to the team comes from this set alone: groups give nothing,
+// they narrow it (see limitOf and newScope).
 //
-// Tabs and widgets are not summed with the user's own: a group that sets
+// Tabs, widgets and sprint actions follow another rule: a group that sets
 // them has priority, so that a group can hide a tab from its members
 // whatever their own rights say. Several such groups are summed with each
 // other; a group that leaves them at "everything" has no say.
 func effective(individual, template *Permissions, groups []Permissions) Permissions {
 	own := Permissions{OwnTasksOnly: true}
-	sets := groups
 	switch {
 	case individual != nil:
 		own = *individual
-		sets = append([]Permissions{own}, groups...)
 	case template != nil:
 		own = *template
-		sets = append([]Permissions{own}, groups...)
 	}
 
-	result := union(sets...)
+	result := Permissions{
+		ProjectIDs: own.ProjectIDs, TeamIDs: own.TeamIDs,
+		AllProjects: own.AllProjects, AllTeam: own.AllTeam,
+		ShowUnassigned: own.ShowUnassigned,
+	}
+	// Seeing issues without an assignee is a right any source may give
+	for _, g := range groups {
+		result.ShowUnassigned = result.ShowUnassigned || g.ShowUnassigned
+	}
 	result.VisibleTabs = groupKeys(groups, func(p Permissions) *[]string { return p.VisibleTabs }, own.VisibleTabs)
 	result.Widgets = groupKeys(groups, func(p Permissions) *[]string { return p.Widgets }, own.Widgets)
 	// What may be done with sprints follows the same rule.
@@ -98,6 +104,12 @@ type userFacts struct {
 	memberID *int
 	// sourceProjects: the projects the user is a member of in the source.
 	sourceProjects []int
+	// sourceMembers: the members the source shows to the user; nil when
+	// they have not been read yet.
+	sourceMembers *[]int
+	// limit: the most the groups of the user allow (projects with their
+	// subprojects).
+	limit Limit
 	// selectedProjects (with subprojects) and selectedTeam: the user's own
 	// choice in the settings.
 	selectedProjects []int
@@ -126,6 +138,16 @@ func newScope(userID int, admin bool, perms Permissions, facts userFacts) *Scope
 			s.AllowedProjects = uniqueInts(append(append([]int{}, perms.ProjectIDs...), facts.sourceProjects...))
 		}
 		s.AllowedAllTeam, s.AllowedTeam = perms.AllTeam, perms.TeamIDs
+		if perms.FromSource {
+			// "As in the source" is a ceiling for the team too: nobody the
+			// source hides from the user is shown here.
+			s.AllowedAllTeam, s.AllowedTeam = restrict(s.AllowedAllTeam, s.AllowedTeam, facts.sourceMembers)
+		}
+		// The groups narrow what the user has and never add to it — after
+		// the source, so that a group cannot open a project or a member
+		// the source does not give.
+		s.AllowedAllProjects, s.AllowedProjects = restrict(s.AllowedAllProjects, s.AllowedProjects, facts.limit.Projects)
+		s.AllowedAllTeam, s.AllowedTeam = restrict(s.AllowedAllTeam, s.AllowedTeam, facts.limit.Team)
 		if perms.OwnTasksOnly && memberID != nil {
 			s.OwnMember = memberID
 		}

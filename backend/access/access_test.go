@@ -18,10 +18,10 @@ func TestEffective(t *testing.T) {
 		}
 	})
 
-	t.Run("groups are summed", func(t *testing.T) {
+	t.Run("groups give no access, their tabs are summed", func(t *testing.T) {
 		got := effective(nil, nil, []Permissions{groupA, groupB})
-		if !reflect.DeepEqual(got.ProjectIDs, []int{1, 2, 3}) || !reflect.DeepEqual(got.TeamIDs, []int{10, 11}) {
-			t.Errorf("lists = %v / %v", got.ProjectIDs, got.TeamIDs)
+		if len(got.ProjectIDs) != 0 || len(got.TeamIDs) != 0 || got.AllProjects || got.AllTeam {
+			t.Errorf("a group must not give access: %v / %v", got.ProjectIDs, got.TeamIDs)
 		}
 		if !reflect.DeepEqual(*got.VisibleTabs, []string{"tasks", "kanban"}) {
 			t.Errorf("tabs = %v", *got.VisibleTabs)
@@ -41,10 +41,10 @@ func TestEffective(t *testing.T) {
 		}
 	})
 
-	t.Run("individual rights add to groups, group tabs have priority", func(t *testing.T) {
+	t.Run("individual rights stay the user's own, group tabs have priority", func(t *testing.T) {
 		individual := Permissions{ProjectIDs: []int{9}, VisibleTabs: keys("analytics")}
 		got := effective(&individual, nil, []Permissions{groupA})
-		if !reflect.DeepEqual(got.ProjectIDs, []int{1, 2, 9}) {
+		if !reflect.DeepEqual(got.ProjectIDs, []int{9}) {
 			t.Errorf("projects = %v", got.ProjectIDs)
 		}
 		if !reflect.DeepEqual(*got.VisibleTabs, []string{"tasks"}) {
@@ -112,8 +112,77 @@ func TestEffective(t *testing.T) {
 	t.Run("a group cannot make a read-only user a writer", func(t *testing.T) {
 		individual := Permissions{ReadOnly: true}
 		got := effective(&individual, nil, []Permissions{{AllProjects: true}})
-		if !got.ReadOnly || !got.AllProjects {
+		if !got.ReadOnly || got.AllProjects {
 			t.Errorf("got %+v", got)
+		}
+	})
+}
+
+func TestGroupsNarrow(t *testing.T) {
+	scope := func(own Permissions, facts userFacts, groups ...Permissions) *Scope {
+		facts.limit = limitOf(groups)
+		return newScope(1, false, effective(&own, nil, groups), facts)
+	}
+	own := Permissions{ProjectIDs: []int{1, 2, 3, 4, 5}, TeamIDs: []int{10, 11, 12, 13}}
+
+	t.Run("a group narrows the user's own rights", func(t *testing.T) {
+		s := scope(own, userFacts{}, Permissions{ProjectIDs: []int{2, 3, 4}, TeamIDs: []int{10, 11}})
+		if !reflect.DeepEqual(s.AllowedProjects, []int{2, 3, 4}) || !reflect.DeepEqual(s.AllowedTeam, []int{10, 11}) {
+			t.Errorf("projects = %v, team = %v", s.AllowedProjects, s.AllowedTeam)
+		}
+	})
+
+	t.Run("a group never adds anything", func(t *testing.T) {
+		s := scope(own, userFacts{}, Permissions{ProjectIDs: []int{3, 99}, TeamIDs: []int{10, 77}})
+		if !reflect.DeepEqual(s.AllowedProjects, []int{3}) || !reflect.DeepEqual(s.AllowedTeam, []int{10}) {
+			t.Errorf("projects = %v, team = %v", s.AllowedProjects, s.AllowedTeam)
+		}
+		// Not even to a user with no rights of their own
+		none := newScope(1, false, effective(nil, nil, []Permissions{{AllProjects: true, AllTeam: true}}),
+			userFacts{limit: limitOf([]Permissions{{AllProjects: true, AllTeam: true}})})
+		if none.AllowedAllProjects || len(none.AllowedProjects) != 0 || none.AllowedAllTeam {
+			t.Errorf("no own rights: %+v", none)
+		}
+	})
+
+	t.Run("a group narrows a user who has everything", func(t *testing.T) {
+		s := scope(Permissions{AllProjects: true, AllTeam: true}, userFacts{}, Permissions{ProjectIDs: []int{7}, TeamIDs: []int{20}})
+		if s.AllowedAllProjects || !reflect.DeepEqual(s.AllowedProjects, []int{7}) || s.AllowedAllTeam || !reflect.DeepEqual(s.AllowedTeam, []int{20}) {
+			t.Errorf("scope = %+v", s)
+		}
+	})
+
+	t.Run("several groups are summed", func(t *testing.T) {
+		s := scope(own, userFacts{}, Permissions{ProjectIDs: []int{1}, TeamIDs: []int{10}}, Permissions{ProjectIDs: []int{5}, TeamIDs: []int{13}})
+		if !reflect.DeepEqual(s.AllowedProjects, []int{1, 5}) || !reflect.DeepEqual(s.AllowedTeam, []int{10, 13}) {
+			t.Errorf("projects = %v, team = %v", s.AllowedProjects, s.AllowedTeam)
+		}
+		// A group that allows everything lifts the restriction of the others
+		s = scope(own, userFacts{}, Permissions{ProjectIDs: []int{1}}, Permissions{AllProjects: true})
+		if !reflect.DeepEqual(s.AllowedProjects, []int{1, 2, 3, 4, 5}) {
+			t.Errorf("with an unrestricted group: projects = %v", s.AllowedProjects)
+		}
+	})
+
+	t.Run("a group that names nothing has no say", func(t *testing.T) {
+		// A group made only to hide tabs must not take the data away
+		s := scope(own, userFacts{}, Permissions{VisibleTabs: keys("tasks")})
+		if !reflect.DeepEqual(s.AllowedProjects, []int{1, 2, 3, 4, 5}) || !reflect.DeepEqual(s.AllowedTeam, []int{10, 11, 12, 13}) {
+			t.Errorf("projects = %v, team = %v", s.AllowedProjects, s.AllowedTeam)
+		}
+		// It restricts one side only when it names only that side
+		s = scope(own, userFacts{}, Permissions{ProjectIDs: []int{2}})
+		if !reflect.DeepEqual(s.AllowedProjects, []int{2}) || !reflect.DeepEqual(s.AllowedTeam, []int{10, 11, 12, 13}) {
+			t.Errorf("projects = %v, team = %v", s.AllowedProjects, s.AllowedTeam)
+		}
+	})
+
+	t.Run("own tasks stay visible whatever the groups say", func(t *testing.T) {
+		member := 42
+		ownTasks := Permissions{ProjectIDs: []int{1}, TeamIDs: []int{10}, OwnTasksOnly: true}
+		s := scope(ownTasks, userFacts{memberID: &member}, Permissions{ProjectIDs: []int{2}, TeamIDs: []int{11}})
+		if !s.AllowsMember(member) || s.AllowsMember(10) || s.AllowsProject(1) {
+			t.Errorf("scope = %+v", s)
 		}
 	})
 }
@@ -236,10 +305,28 @@ func TestScope(t *testing.T) {
 			t.Errorf("scope = %+v", s)
 		}
 
-		// Projects given by a group are added to them
-		s = newScope(5, false, effective(nil, &template, []Permissions{{ProjectIDs: []int{30}}}), facts)
-		if !reflect.DeepEqual(s.AllowedProjects, []int{10, 20, 30}) {
+		// A group narrows them and cannot open a project the source does not give
+		group := []Permissions{{ProjectIDs: []int{20, 30}}}
+		withGroup := facts
+		withGroup.limit = limitOf(group)
+		s = newScope(5, false, effective(nil, &template, group), withGroup)
+		if !reflect.DeepEqual(s.AllowedProjects, []int{20}) {
 			t.Errorf("with a group: projects = %v", s.AllowedProjects)
+		}
+
+		// The source is the ceiling for the team too: of the two members a
+		// group allows, only the one the source shows is visible
+		visible := []int{7}
+		group = []Permissions{{TeamIDs: []int{7, 8}}}
+		s = newScope(5, false, effective(nil, &template, group),
+			userFacts{sourceProjects: []int{10}, sourceMembers: &visible, limit: limitOf(group)})
+		if s.AllowedAllTeam || !reflect.DeepEqual(s.AllowedTeam, []int{7}) {
+			t.Errorf("team = %v (all: %v), want [7]", s.AllowedTeam, s.AllowedAllTeam)
+		}
+		// Until the members are read from the source there is no ceiling yet
+		s = newScope(5, false, effective(nil, &template, nil), userFacts{sourceProjects: []int{10}})
+		if !s.AllowedAllTeam {
+			t.Error("members not read yet: the template's own team must apply")
 		}
 
 		// Without the flag the membership in the source gives nothing

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"pm-dashboard/datasource/manager"
 	"pm-dashboard/datasource/redmine"
@@ -87,6 +88,57 @@ func (k *UserKeys) RefreshProjects(userID int) {
 	data, _ := json.Marshal(projects)
 	if _, err := (*k.DB).Exec("UPDATE users SET source_projects = $1, source_projects_at = NOW() WHERE id = $2", data, userID); err != nil {
 		slog.Warn("Could not save the user's projects from the data source", "user", userID, "error", err)
+		return
+	}
+	k.refreshMembers(userID, client, projects)
+}
+
+// sourceMembersMaxAge is how long the members read from the source are
+// trusted. They are read project by project, which is too heavy to repeat
+// before every sync.
+const sourceMembersMaxAge = time.Hour
+
+// refreshMembers re-reads whom the data source shows to the user: the
+// members of the user's projects, asked with the user's own key. With
+// "rights as in the source" nobody else is visible to the user here.
+func (k *UserKeys) refreshMembers(userID int, client *redmine.Client, projects []int) {
+	var fresh bool
+	(*k.DB).QueryRow(`SELECT source_members IS NOT NULL AND source_members_at > NOW() - $1 * INTERVAL '1 second'
+		FROM users WHERE id = $2`, int(sourceMembersMaxAge.Seconds()), userID).Scan(&fresh)
+	if fresh {
+		return
+	}
+
+	members := []int{}
+	seen := map[int]bool{}
+	// The user always sees themselves
+	var own *int
+	(*k.DB).QueryRow("SELECT member_id FROM users WHERE id = $1", userID).Scan(&own)
+	if own != nil {
+		seen[*own] = true
+		members = append(members, *own)
+	}
+	for _, projectID := range projects {
+		list, err := client.GetProjectMembers(projectID)
+		switch {
+		case errors.Is(err, redmine.ErrUnauthorized):
+			return
+		case err != nil:
+			// The source does not show the members of this project to the
+			// user: it adds nobody.
+			slog.Debug("The user's key cannot read the members of a project", "user", userID, "project", projectID, "error", err)
+			continue
+		}
+		for _, m := range list {
+			if m.ExternalID != 0 && !seen[m.ExternalID] {
+				seen[m.ExternalID] = true
+				members = append(members, m.ExternalID)
+			}
+		}
+	}
+	data, _ := json.Marshal(members)
+	if _, err := (*k.DB).Exec("UPDATE users SET source_members = $1, source_members_at = NOW() WHERE id = $2", data, userID); err != nil {
+		slog.Warn("Could not save the members the data source shows to the user", "user", userID, "error", err)
 	}
 }
 
@@ -234,7 +286,8 @@ func (h *AuthHandler) SetSourceToken(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) ClearSourceToken(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.GetUserID(r)
 	if _, err := (*h.DB).Exec(`UPDATE users SET member_id = NULL, source_token_enc = '', source_token_hint = '',
-		source_projects = '[]', source_projects_at = NULL WHERE id = $1`, userID); err != nil {
+		source_projects = '[]', source_projects_at = NULL,
+		source_members = NULL, source_members_at = NULL WHERE id = $1`, userID); err != nil {
 		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 		return
 	}
