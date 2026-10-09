@@ -14,6 +14,8 @@
       >
         {{ $t('access.tabs.' + tab) }}
       </button>
+      <!-- The license has a screen of its own: it must work when nothing else does -->
+      <router-link to="/license" class="adm-tab" data-testid="admin-tab-license">{{ $t('license.title') }}</router-link>
     </div>
 
     <!-- Access control. Each screen loads its own data when it is opened,

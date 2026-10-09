@@ -85,6 +85,13 @@ router.beforeEach(async (to, _from, next) => {
       const authStore = useAuthStore()
       await authStore.fetchMe()
       if (authStore.isAuthenticated) {
+        // Without an activated license only the license screen works
+        const { useLicenseStore } = await import('../stores/license')
+        const licenseStore = useLicenseStore()
+        await licenseStore.fetchStatus(licenseStore.notActivated)
+        if (licenseStore.notActivated && to.name !== 'license') {
+          return next({ name: 'license' })
+        }
         // A tab hidden by the administrator: go to the first one allowed
         const tab = typeof to.name === 'string' ? to.name : ''
         if (DATA_TABS.includes(tab) && !authStore.tabVisible(tab)) {

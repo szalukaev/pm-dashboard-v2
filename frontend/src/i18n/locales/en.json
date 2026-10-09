@@ -577,6 +577,71 @@
       "DATA_SOURCE_NOT_CONFIGURED": "The data source is not configured."
     }
   },
+  "license": {
+    "title": "License",
+    "ask_admin": "Only a system administrator can activate the license. Please contact them.",
+    "load_error": "Failed to load the license details",
+    "state": {
+      "active": "The license is active",
+      "grace": "Grace period",
+      "read_only": "Read-only mode",
+      "not_activated": "The license is not activated"
+    },
+    "text": {
+      "active": "The system works without restrictions.",
+      "grace": "The last license check failed. The system works in full until {time}, then it switches to read-only mode.",
+      "read_only": "The grace period is over: data can be viewed but not changed. Load a valid license to restore full access.",
+      "not_activated": "Until the license is activated the system cannot be used. Send the hardware fingerprint to the vendor and load the license file you receive."
+    },
+    "reason": {
+      "signature": "The license signature did not verify",
+      "hwid_mismatch": "The hardware of the server is not the one the license was issued for",
+      "hwid_unavailable": "The hardware fingerprint of the server could not be read"
+    },
+    "info": "License details",
+    "client": "Client",
+    "edition": "Edition",
+    "grace_days": "Grace period, days",
+    "activated_at": "Activated",
+    "last_check_ok": "Last successful check",
+    "hwid": "Hardware fingerprint of the server",
+    "hwid_hint": "Send this string to the vendor — the license is issued for it.",
+    "hwid_missing": "The hardware fingerprint is not available. On the server (not in the container) run scripts/collect-hwid.sh as root and restart the backend container.",
+    "copy": "Copy",
+    "copy_failed": "Could not copy — select the string manually",
+    "activate_title": "License activation",
+    "replace_title": "Load a new license",
+    "token_hint": "Paste the license token or load the license file (.lic) received from the vendor.",
+    "token_placeholder": "License token…",
+    "load_file": "Load a file",
+    "activate": "Activate",
+    "activated": "License activated: {client}",
+    "events": "License event log",
+    "event_time": "Date and time",
+    "event_name": "Event",
+    "event_details": "Details",
+    "event": {
+      "activated": "License activated",
+      "activation_failed": "Failed activation attempt",
+      "check_failed": "License check failed",
+      "grace_started": "Grace period started",
+      "read_only_entered": "Switched to read-only mode",
+      "restored": "The license is valid again"
+    },
+    "errors": {
+      "generic": "Failed to activate the license",
+      "LICENSE_FORMAT_INVALID": "This is not a license token: check that it is copied in full.",
+      "LICENSE_SIGNATURE_INVALID": "The license signature is not valid.",
+      "LICENSE_HWID_MISMATCH": "The license was issued for another server: the hardware fingerprint does not match.",
+      "HWID_UNAVAILABLE": "The hardware fingerprint of the server is not available — there is nothing to bind the license to.",
+      "INVALID_REQUEST": "Paste the license token."
+    },
+    "banner": {
+      "grace": "The license check failed. From {time} the system will be read-only.",
+      "read_only": "The system is in read-only mode: changes are unavailable until a valid license is loaded.",
+      "open": "Open the license"
+    }
+  },
   "sync_status": {
     "success": "Last synchronization: {time}",
     "running": "Data synchronization is in progress...",
