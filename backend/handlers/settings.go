@@ -40,9 +40,12 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 		NotificationsEnabled      bool     `json:"notifications_enabled"`
 		OverdueAlerts             bool     `json:"overdue_alerts"`
 		DataSourceURL             string   `json:"data_source_url"`
+		// Rows per page chosen for each table; a table not listed uses the default
+		Pagination map[string]int `json:"pagination"`
 	}
+	settings.Pagination = map[string]int{}
 
-	var selectedProjects, selectedTeam, tabOrder, kanbanStatuses, kanbanUsers, lastFilters []byte
+	var selectedProjects, selectedTeam, tabOrder, kanbanStatuses, kanbanUsers, lastFilters, pagination []byte
 	var theme, language string
 	var notificationsEnabled, overdueAlerts bool
 
@@ -50,12 +53,12 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 		SELECT selected_projects, selected_team, theme, language, tab_order,
 		       kanban_column_order_statuses, kanban_column_order_users,
 		       last_filters, notifications_enabled, overdue_alerts,
-		       kanban_last_mode, kanban_last_project
+		       kanban_last_mode, kanban_last_project, pagination
 		FROM user_settings WHERE user_id = $1
 	`, userID).Scan(
 		&selectedProjects, &selectedTeam, &theme, &language,
 		&tabOrder, &kanbanStatuses, &kanbanUsers, &lastFilters, &notificationsEnabled, &overdueAlerts,
-		&settings.KanbanLastMode, &settings.KanbanLastProject,
+		&settings.KanbanLastMode, &settings.KanbanLastProject, &pagination,
 	)
 
 	if err == sql.ErrNoRows {
@@ -88,6 +91,10 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 	json.Unmarshal(kanbanStatuses, &settings.KanbanColumnOrderStatuses)
 	json.Unmarshal(kanbanUsers, &settings.KanbanColumnOrderUsers)
 	json.Unmarshal(lastFilters, &settings.LastFilters)
+	json.Unmarshal(pagination, &settings.Pagination)
+	if settings.Pagination == nil {
+		settings.Pagination = map[string]int{}
+	}
 	settings.Theme = theme
 	settings.Language = language
 	settings.NotificationsEnabled = notificationsEnabled
@@ -207,6 +214,27 @@ func (h *SettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request)
 	if v, ok := body["kanban_column_order_users"]; ok {
 		data, _ := json.Marshal(v)
 		if _, err := (*h.DB).Exec("UPDATE user_settings SET kanban_column_order_users = $1 WHERE user_id = $2", data, userID); err != nil {
+			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+			return
+		}
+	}
+
+	if v, ok := body["pagination"]; ok {
+		// {"table": rows per page}; the sent tables are merged into the saved ones
+		sizes, isObject := v.(map[string]interface{})
+		if !isObject {
+			utils.Error(w, http.StatusBadRequest, "INVALID_PAGINATION")
+			return
+		}
+		for table, size := range sizes {
+			n, isNumber := size.(float64)
+			if !isNumber || len(table) > 50 || !validPageSize(int(n)) || n != float64(int(n)) {
+				utils.Error(w, http.StatusBadRequest, "INVALID_PAGINATION")
+				return
+			}
+		}
+		data, _ := json.Marshal(sizes)
+		if _, err := (*h.DB).Exec("UPDATE user_settings SET pagination = pagination || $1::jsonb WHERE user_id = $2", string(data), userID); err != nil {
 			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 			return
 		}

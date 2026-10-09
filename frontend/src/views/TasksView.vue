@@ -38,16 +38,25 @@
       :groups="groups"
       :group-by="filters.group_by"
       @open-task="openTask"
+      @sort-change="handleSortChange"
     />
 
     <!-- Flat table view -->
-    <TaskTable
-      v-else-if="tasks.length > 0"
-      :tasks="tasks"
-      @open-task="openTask"
-      @sort-change="handleSortChange"
-      @inline-edit="handleInlineEdit"
-    />
+    <template v-else-if="tasks.length > 0">
+      <TaskTable
+        :tasks="tasks"
+        @open-task="openTask"
+        @sort-change="handleSortChange"
+        @inline-edit="handleInlineEdit"
+      />
+      <AppPagination
+        :total="total"
+        :limit="pageSize"
+        :offset="offset"
+        @update:offset="store.setPage"
+        @update:limit="store.setPageSize"
+      />
+    </template>
 
     <!-- Task detail modal -->
     <TaskModal
@@ -67,9 +76,10 @@ import TaskAccordion from '../components/tasks/TaskAccordion.vue'
 import TaskTable from '../components/tasks/TaskTable.vue'
 import TaskModal from '../components/tasks/TaskModal.vue'
 import AppEmptyState from '../components/ui/AppEmptyState.vue'
+import AppPagination from '../components/ui/AppPagination.vue'
 
 const store = useTasksStore()
-const { tasks, groups, loading, error, total, useGrouping, filters } = storeToRefs(store)
+const { tasks, groups, loading, error, total, useGrouping, filters, offset, pageSize } = storeToRefs(store)
 const { fetchTasks, resetFilters, hasActiveFilters } = store
 
 const selectedTaskId = ref<number | null>(null)

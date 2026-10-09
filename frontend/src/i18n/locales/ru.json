@@ -24,7 +24,14 @@
     "confirm_delete_title": "Удалить {entity}?",
     "confirm_delete_text": "Действие необратимо.",
     "success": "Успешно",
-    "copied": "Скопировано"
+    "copied": "Скопировано",
+    "pagination": {
+      "range": "{from}–{to} из {total}",
+      "page": "Стр. {page} из {pages}",
+      "per_page": "На странице",
+      "prev": "Предыдущая страница",
+      "next": "Следующая страница"
+    }
   },
   "auth": {
     "login": "Войти",

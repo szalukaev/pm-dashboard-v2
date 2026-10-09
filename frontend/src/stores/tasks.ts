@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import axios from 'axios'
+import { useSettingsStore } from './settings'
 
 export interface Task {
   id: number
@@ -31,7 +32,27 @@ export interface TaskGroup {
   task_count: number
   estimate_total: number
   fact_total: number
+  // The loaded page of the group
   tasks: Task[]
+  offset: number
+  loading: boolean
+}
+
+// Name of the table in the user's page size settings
+const PAGE_TABLE = 'tasks_table'
+
+interface GroupHeader {
+  name: string
+  task_count: number
+  estimate_total: number
+  fact_total: number
+}
+
+interface GroupPage {
+  ids: number[]
+  offset: number
+  loading: boolean
+  loaded: boolean
 }
 
 export interface TaskFilters {
@@ -45,12 +66,22 @@ export interface TaskFilters {
 }
 
 export const useTasksStore = defineStore('tasks', () => {
+  const settingsStore = useSettingsStore()
+
   // Every loaded task lives once in this map (number → task). The flat list
   // and the groups only refer to it, so a change of a task shows everywhere
   // and its table row is updated in place instead of being rebuilt.
+  //
+  // Tasks are loaded page by page: the flat list holds one page, and every
+  // expanded group holds one page of its own. The headers of the groups
+  // (number of tasks, totals) come from the server and cover the whole group.
   const taskMap = ref(new Map<number, Task>())
   const taskOrder = ref<number[]>([])
-  const groupDefs = ref<{ name: string; task_count: number; ids: number[] }[]>([])
+  const groupDefs = ref<GroupHeader[]>([])
+  const groupPages = ref<Record<string, GroupPage>>({})
+  const offset = ref(0)
+
+  const pageSize = computed(() => settingsStore.pageSize(PAGE_TABLE))
 
   function tasksByIds(ids: number[]): Task[] {
     const list: Task[] = []
@@ -63,30 +94,41 @@ export const useTasksStore = defineStore('tasks', () => {
 
   const tasks = computed<Task[]>(() => tasksByIds(taskOrder.value))
   const groups = computed<TaskGroup[]>(() => groupDefs.value.map(def => {
-    const list = tasksByIds(def.ids)
+    const page = groupPages.value[def.name]
     return {
-      name: def.name,
-      task_count: def.task_count,
-      estimate_total: list.reduce((s, t) => s + (Number(t.estimated_hours) || 0), 0),
-      fact_total: list.reduce((s, t) => s + (Number(t.spent_hours) || 0), 0),
-      tasks: list,
+      ...def,
+      tasks: page ? tasksByIds(page.ids) : [],
+      offset: page?.offset || 0,
+      loading: !!page?.loading && !page.loaded,
     }
   }))
 
-  // Replaces the loaded tasks with a fresh server answer. A task that was
-  // already loaded keeps its object and only gets the new field values.
+  // Puts a fresh server answer into the map. A task that was already loaded
+  // keeps its object and only gets the new field values.
   function storeTasks(incoming: Task[]) {
     const map = taskMap.value
-    const fresh = new Set<number>()
     for (const task of incoming) {
-      fresh.add(task.external_id)
       const existing = map.get(task.external_id)
       if (existing) Object.assign(existing, task)
       else map.set(task.external_id, task)
     }
-    for (const id of [...map.keys()]) {
-      if (!fresh.has(id)) map.delete(id)
+  }
+
+  // Drops the tasks no loaded page refers to any more
+  function pruneTasks() {
+    const used = new Set<number>(taskOrder.value)
+    for (const page of Object.values(groupPages.value)) {
+      for (const id of page.ids) used.add(id)
     }
+    for (const id of [...taskMap.value.keys()]) {
+      if (!used.has(id)) taskMap.value.delete(id)
+    }
+  }
+
+  // The page the user was on may be gone after a refresh (tasks were closed
+  // or filtered out): the last page that still exists is shown instead.
+  function lastPageOffset(count: number): number {
+    return count > 0 ? Math.floor((count - 1) / pageSize.value) * pageSize.value : 0
   }
 
   const loading = ref(false)
@@ -126,40 +168,132 @@ export const useTasksStore = defineStore('tasks', () => {
       error.value = ''
     }
     try {
-      const params: Record<string, string> = {}
-      if (filters.value.type) params.type = filters.value.type
-      if (filters.value.project_id) params.project_id = filters.value.project_id
-      if (filters.value.search) params.search = filters.value.search
-      if (filters.value.category) params.category = filters.value.category
-      if (filters.value.sort_by) {
-        params.sort_by = filters.value.sort_by
-        params.sort_dir = filters.value.sort_dir
-      }
-
-      if (useGrouping.value) params.group_by = filters.value.group_by
-      const { data } = await axios.get('/api/tasks', { params })
-      if (requestId !== tasksRequest) return
+      await settingsStore.ensureLoaded()
       if (useGrouping.value) {
-        const serverGroups: TaskGroup[] = data.groups || []
-        storeTasks(serverGroups.flatMap(g => g.tasks || []))
-        groupDefs.value = serverGroups.map(g => ({
+        const { data } = await axios.get('/api/tasks', { params: { ...queryParams(), group_by: filters.value.group_by } })
+        if (requestId !== tasksRequest) return
+        const headers: GroupHeader[] = (data.groups || []).map((g: GroupHeader) => ({
           name: g.name,
           task_count: g.task_count,
-          ids: (g.tasks || []).map(t => t.external_id),
+          estimate_total: g.estimate_total,
+          fact_total: g.fact_total,
         }))
+        // Pages of the groups that are gone or collapsed are not kept
+        const kept: Record<string, GroupPage> = {}
+        for (const g of headers) {
+          const page = groupPages.value[g.name]
+          if (page && isGroupExpanded(g.name)) kept[g.name] = page
+        }
+        groupPages.value = kept
+        groupDefs.value = headers
         taskOrder.value = []
+        total.value = data.total || 0
+        await Promise.all(headers.filter(g => isGroupExpanded(g.name)).map(g => loadGroup(g.name)))
       } else {
+        let data = await fetchPage(offset.value)
+        if (requestId !== tasksRequest) return
+        if ((data.tasks || []).length === 0 && data.total > 0) {
+          offset.value = lastPageOffset(data.total)
+          data = await fetchPage(offset.value)
+          if (requestId !== tasksRequest) return
+        }
         const list: Task[] = data.tasks || []
         storeTasks(list)
         taskOrder.value = list.map(t => t.external_id)
         groupDefs.value = []
+        groupPages.value = {}
+        total.value = data.total || 0
       }
-      total.value = taskOrder.value.length || groupDefs.value.reduce((s, g) => s + g.task_count, 0)
+      pruneTasks()
     } catch (e: any) {
       if (requestId === tasksRequest && !opts.silent) error.value = 'Не удалось загрузить данные'
     } finally {
       if (requestId === tasksRequest) loading.value = false
     }
+  }
+
+  function queryParams(): Record<string, string> {
+    const params: Record<string, string> = {}
+    if (filters.value.type) params.type = filters.value.type
+    if (filters.value.project_id) params.project_id = filters.value.project_id
+    if (filters.value.search) params.search = filters.value.search
+    if (filters.value.category) params.category = filters.value.category
+    if (filters.value.sort_by) {
+      params.sort_by = filters.value.sort_by
+      params.sort_dir = filters.value.sort_dir
+    }
+    return params
+  }
+
+  async function fetchPage(pageOffset: number, group?: string): Promise<{ tasks: Task[]; total: number }> {
+    const params: Record<string, string | number> = { ...queryParams(), limit: pageSize.value, offset: pageOffset }
+    if (group !== undefined) {
+      params.group_by = filters.value.group_by
+      params.group = group
+    }
+    const { data } = await axios.get('/api/tasks', { params })
+    return data
+  }
+
+  // Loads the current page of a group. Only the latest request for a group
+  // may fill it.
+  const groupRequests = new Map<string, number>()
+
+  async function loadGroup(name: string) {
+    const requestId = (groupRequests.get(name) || 0) + 1
+    groupRequests.set(name, requestId)
+    const page: GroupPage = groupPages.value[name] || { ids: [], offset: 0, loading: false, loaded: false }
+    groupPages.value = { ...groupPages.value, [name]: { ...page, loading: true } }
+    try {
+      let pageOffset = page.offset
+      let data = await fetchPage(pageOffset, name)
+      if ((data.tasks || []).length === 0 && data.total > 0) {
+        pageOffset = lastPageOffset(data.total)
+        data = await fetchPage(pageOffset, name)
+      }
+      if (groupRequests.get(name) !== requestId || !groupPages.value[name]) return
+      const list: Task[] = data.tasks || []
+      storeTasks(list)
+      groupPages.value = {
+        ...groupPages.value,
+        [name]: { ids: list.map(t => t.external_id), offset: pageOffset, loading: false, loaded: true },
+      }
+    } catch {
+      if (groupRequests.get(name) === requestId && groupPages.value[name]) {
+        groupPages.value = { ...groupPages.value, [name]: { ...groupPages.value[name], loading: false } }
+      }
+    }
+  }
+
+  // Page of the flat list
+  async function setPage(pageOffset: number) {
+    offset.value = pageOffset
+    await fetchTasks({ silent: true })
+  }
+
+  // Page of one group
+  async function setGroupPage(name: string, pageOffset: number) {
+    const page = groupPages.value[name]
+    if (!page) return
+    groupPages.value = { ...groupPages.value, [name]: { ...page, offset: pageOffset } }
+    await loadGroup(name)
+    pruneTasks()
+  }
+
+  // The page size is one for every table of tasks; changing it starts from
+  // the first page.
+  async function setPageSize(size: number) {
+    await settingsStore.setPageSize(PAGE_TABLE, size)
+    resetPages()
+    await fetchTasks({ silent: true })
+  }
+
+  // A new filter or sorting makes the current pages meaningless
+  function resetPages() {
+    offset.value = 0
+    const pages: Record<string, GroupPage> = {}
+    for (const [name, page] of Object.entries(groupPages.value)) pages[name] = { ...page, offset: 0 }
+    groupPages.value = pages
   }
 
   // Applies a saved change to the loaded task right away; the list, the
@@ -251,6 +385,7 @@ export const useTasksStore = defineStore('tasks', () => {
 
   function setFilter(key: keyof TaskFilters, value: string) {
     filters.value[key] = value
+    resetPages()
     saveFilters()
   }
 
@@ -274,6 +409,7 @@ export const useTasksStore = defineStore('tasks', () => {
       sort_by: 'external_id',
       sort_dir: 'desc',
     }
+    resetPages()
     await saveFilters()
     await fetchTasks()
   }
@@ -309,15 +445,20 @@ export const useTasksStore = defineStore('tasks', () => {
   }
 
   function toggleGroup(name: string) {
-    expandedGroups.value = isGroupExpanded(name)
-      ? expandedGroups.value.filter(n => n !== name)
-      : [...expandedGroups.value, name]
+    const expand = !isGroupExpanded(name)
+    expandedGroups.value = expand
+      ? [...expandedGroups.value, name]
+      : expandedGroups.value.filter(n => n !== name)
+    // The tasks of a group are loaded when it is opened
+    if (expand && !groupPages.value[name]?.loaded) loadGroup(name)
     saveFilters()
   }
 
   // A new grouping starts with every group collapsed.
   function setGrouping(mode: string) {
     expandedGroups.value = []
+    groupPages.value = {}
+    offset.value = 0
     if (mode === '') {
       useGrouping.value = false
       saveFilters()
@@ -329,6 +470,7 @@ export const useTasksStore = defineStore('tasks', () => {
 
   return {
     tasks, groups, loading, error, total, useGrouping, filters, expandedGroups,
+    offset, pageSize, setPage, setGroupPage, setPageSize,
     isGroupExpanded, toggleGroup, setGrouping,
     projects, categories, projectCategories, members, statuses, priorities,
     fetchTasks, fetchTask, updateTask,

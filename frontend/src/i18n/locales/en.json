@@ -24,7 +24,14 @@
     "confirm_delete_title": "Delete {entity}?",
     "confirm_delete_text": "This action cannot be undone.",
     "success": "Success",
-    "copied": "Copied"
+    "copied": "Copied",
+    "pagination": {
+      "range": "{from}–{to} of {total}",
+      "page": "Page {page} of {pages}",
+      "per_page": "Per page",
+      "prev": "Previous page",
+      "next": "Next page"
+    }
   },
   "auth": {
     "login": "Sign in",

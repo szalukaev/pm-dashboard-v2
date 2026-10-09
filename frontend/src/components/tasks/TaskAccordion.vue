@@ -18,7 +18,22 @@
             {{ $t('tasks.accordions.fact') }}: <b class="fact">{{ formatTotal(group.fact_total) }}</b>
           </span>
         </h2>
-        <TaskTable v-if="isOpen(group.name)" :tasks="group.tasks" @open-task="$emit('open-task', $event)" />
+        <template v-if="isOpen(group.name)">
+          <p v-if="group.loading" class="group-loading">{{ $t('common.loading') }}</p>
+          <TaskTable
+            v-else
+            :tasks="group.tasks"
+            @open-task="$emit('open-task', $event)"
+            @sort-change="$emit('sort-change', $event)"
+          />
+          <AppPagination
+            :total="group.task_count"
+            :limit="store.pageSize"
+            :offset="group.offset"
+            @update:offset="store.setGroupPage(group.name, $event)"
+            @update:limit="store.setPageSize"
+          />
+        </template>
       </section>
     </template>
 
@@ -41,7 +56,23 @@
             {{ $t('tasks.accordions.fact') }}: <b class="fact">{{ formatTotal(group.fact_total) }}</b>
           </span>
         </div>
-        <TaskTable v-if="isOpen(group.name)" :tasks="group.tasks" flat @open-task="$emit('open-task', $event)" />
+        <template v-if="isOpen(group.name)">
+          <p v-if="group.loading" class="group-loading">{{ $t('common.loading') }}</p>
+          <TaskTable
+            v-else
+            :tasks="group.tasks"
+            flat
+            @open-task="$emit('open-task', $event)"
+            @sort-change="$emit('sort-change', $event)"
+          />
+          <AppPagination
+            :total="group.task_count"
+            :limit="store.pageSize"
+            :offset="group.offset"
+            @update:offset="store.setGroupPage(group.name, $event)"
+            @update:limit="store.setPageSize"
+          />
+        </template>
       </div>
     </template>
   </div>
@@ -52,10 +83,11 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ChevronDown, User } from 'lucide-vue-next'
 import TaskTable from './TaskTable.vue'
+import AppPagination from '../ui/AppPagination.vue'
 import { useTasksStore, type TaskGroup } from '../../stores/tasks'
 
 const props = defineProps<{ groups: TaskGroup[]; groupBy: string }>()
-defineEmits(['open-task'])
+defineEmits(['open-task', 'sort-change'])
 
 const { t } = useI18n()
 
@@ -180,6 +212,12 @@ function formatTotal(h: number): string {
   color: #fff;
   font-size: 11px;
   font-weight: 700;
+}
+
+.group-loading {
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--text-muted);
 }
 
 /* Totals */

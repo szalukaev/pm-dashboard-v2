@@ -115,6 +115,26 @@ func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 		argIdx++
 	}
 
+	// Grouped view: without a group the answer is the headers of the groups
+	// (name, number of tasks, totals), with one — the tasks of that group.
+	groupExpr := ""
+	switch groupBy {
+	case "":
+	case "assignee":
+		groupExpr = "COALESCE(NULLIF(assigned_to_name, ''), 'Без исполнителя')"
+	default:
+		groupExpr = "COALESCE(NULLIF(project_name, ''), 'Без проекта')"
+	}
+	if groupExpr != "" && !r.URL.Query().Has("group") {
+		h.listTaskGroups(w, groupExpr, strings.Join(where, " AND "), args)
+		return
+	}
+	if groupExpr != "" {
+		where = append(where, groupExpr+" = $"+strconv.Itoa(argIdx))
+		args = append(args, r.URL.Query().Get("group"))
+		argIdx++
+	}
+
 	// Sort
 	orderBy := "external_id DESC"
 	if sortBy != "" {
@@ -137,7 +157,19 @@ func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 			if sortDir == "desc" {
 				dir = "DESC"
 			}
-			orderBy = col + " " + dir
+			// The number breaks ties: without it rows with equal values could
+			// move between pages from one request to the next
+			orderBy = col + " " + dir + ", external_id DESC"
+		}
+	}
+
+	condition := strings.Join(where, " AND ")
+	limit, offset := pageOf(r)
+	total := 0
+	if limit > 0 {
+		if err := (*h.DB).QueryRow("SELECT COUNT(*) FROM issues WHERE "+condition, args...).Scan(&total); err != nil {
+			utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
+			return
 		}
 	}
 
@@ -146,8 +178,8 @@ func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 		assigned_to_name, assigned_to_id, category_name,
 		start_date, due_date, estimated_hours, spent_hours,
 		done_ratio, tracker_name, author_name, COALESCE(bug_fix_hours, 0)
-		FROM issues WHERE ` + strings.Join(where, " AND ") + `
-		ORDER BY ` + orderBy
+		FROM issues WHERE ` + condition + `
+		ORDER BY ` + orderBy + pageClause(limit, offset)
 
 	rows, err := (*h.DB).Query(query, args...)
 	if err != nil {
@@ -176,58 +208,45 @@ func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 		tasks = []TaskResponse{}
 	}
 
-	// Group if requested
-	if groupBy != "" {
-		groups := groupTasks(tasks, groupBy)
-		utils.JSON(w, http.StatusOK, map[string]interface{}{
-			"groups": groups,
-			"total":  len(tasks),
-		})
-		return
+	// Not paged: everything was returned
+	if limit == 0 {
+		total = len(tasks)
 	}
 
 	utils.JSON(w, http.StatusOK, map[string]interface{}{
 		"tasks": tasks,
-		"total": len(tasks),
+		"total": total,
 	})
 }
 
-func groupTasks(tasks []TaskResponse, groupBy string) []TaskGroup {
-	groupMap := make(map[string]*TaskGroup)
+// listTaskGroups answers the grouped view with the headers of the groups;
+// the tasks of a group are requested separately, page by page.
+func (h *TaskHandler) listTaskGroups(w http.ResponseWriter, groupExpr, condition string, args []interface{}) {
+	rows, err := (*h.DB).Query(`SELECT `+groupExpr+` AS name, COUNT(*),
+		COALESCE(SUM(estimated_hours), 0), COALESCE(SUM(spent_hours), 0)
+		FROM issues WHERE `+condition+`
+		GROUP BY 1 ORDER BY 1`, args...)
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
+		return
+	}
+	defer rows.Close()
 
-	for _, t := range tasks {
-		var key string
-		switch groupBy {
-		case "assignee":
-			if t.AssignedToName != "" {
-				key = t.AssignedToName
-			} else {
-				key = "Без исполнителя"
-			}
-		default: // "project"
-			key = t.ProjectName
-			if key == "" {
-				key = "Без проекта"
-			}
+	groups := []TaskGroup{}
+	total := 0
+	for rows.Next() {
+		g := TaskGroup{Tasks: []TaskResponse{}}
+		if rows.Scan(&g.Name, &g.TaskCount, &g.EstimateTotal, &g.FactTotal) != nil {
+			continue
 		}
-
-		if _, ok := groupMap[key]; !ok {
-			groupMap[key] = &TaskGroup{Name: key}
-		}
-		g := groupMap[key]
-		g.Tasks = append(g.Tasks, t)
-		g.TaskCount++
-		if t.EstimatedHours != nil {
-			g.EstimateTotal += *t.EstimatedHours
-		}
-		g.FactTotal += t.SpentHours
+		total += g.TaskCount
+		groups = append(groups, g)
 	}
 
-	groups := make([]TaskGroup, 0, len(groupMap))
-	for _, g := range groupMap {
-		groups = append(groups, *g)
-	}
-	return groups
+	utils.JSON(w, http.StatusOK, map[string]interface{}{
+		"groups": groups,
+		"total":  total,
+	})
 }
 
 func (h *TaskHandler) GetTask(w http.ResponseWriter, r *http.Request) {
