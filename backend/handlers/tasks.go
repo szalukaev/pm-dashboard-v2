@@ -24,6 +24,8 @@ type TaskHandler struct {
 	Source *manager.Manager
 	// Events reports changes to open pages (WebSocket); may be nil.
 	Events func(event string, data interface{})
+	// Keys gives the personal API keys to write under the user's name.
+	Keys *UserKeys
 }
 
 type TaskResponse struct {
@@ -295,7 +297,9 @@ func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := h.getRedmineClient()
+	// Changes go to the source under the user's own name when they gave
+	// their personal API key.
+	client := h.writeClient(r)
 
 	// localSets: column -> new value for the local cache;
 	// redmineFields: payload for the data source. An empty string clears a field in Redmine.
@@ -483,6 +487,15 @@ func parseHours(value interface{}) (*float64, bool) {
 	}
 }
 
+// writeClient returns the client to change data with: the user's personal
+// one when they have a key, otherwise the system one.
+func (h *TaskHandler) writeClient(r *http.Request) *redmine.Client {
+	if h.Keys != nil {
+		return h.Keys.ClientFor(middleware.GetUserID(r))
+	}
+	return h.getRedmineClient()
+}
+
 // getRedmineClient returns the current data source client, nil when the
 // source is not configured.
 func (h *TaskHandler) getRedmineClient() *redmine.Client {
@@ -651,7 +664,8 @@ func (h *TaskHandler) AddComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := h.getRedmineClient()
+	// The comment is written under the user's own name when possible
+	client := h.writeClient(r)
 	if client == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "REDMINE_NOT_CONFIGURED")
 		return

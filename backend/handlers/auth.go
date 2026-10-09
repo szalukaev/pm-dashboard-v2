@@ -14,6 +14,7 @@ import (
 	"pm-dashboard/datasource/manager"
 	"pm-dashboard/db"
 	"pm-dashboard/middleware"
+	"pm-dashboard/secrets"
 	"pm-dashboard/utils"
 
 	"github.com/google/uuid"
@@ -26,6 +27,8 @@ type AuthHandler struct {
 	Audit    *middleware.AuditMiddleware
 	// Source checks personal API keys of the data source, see source_link.go.
 	Source *manager.Manager
+	// Secrets encrypts the personal API keys.
+	Secrets *secrets.Box
 }
 
 type loginRequest struct {

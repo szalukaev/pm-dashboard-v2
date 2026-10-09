@@ -17,6 +17,7 @@ import (
 	"pm-dashboard/datasource/manager"
 	"pm-dashboard/handlers"
 	"pm-dashboard/middleware"
+	"pm-dashboard/secrets"
 	"pm-dashboard/utils"
 
 	"github.com/gorilla/mux"
@@ -116,6 +117,18 @@ func main() {
 	setupH.Source = source
 	settingsH.Source = source
 	authH.Source = source
+
+	// Personal API keys of the data source are stored encrypted; with them
+	// changes go to the source under the user's own name.
+	secretBox, err := secrets.Open(sqliteStore)
+	if err != nil {
+		slog.Error("Failed to open the secret store", "error", err)
+		os.Exit(1)
+	}
+	authH.Secrets = secretBox
+	userKeys := &handlers.UserKeys{DB: &pgDB, Source: source, Box: secretBox}
+	taskH.Keys = userKeys
+	kanbanH.Keys = userKeys
 	syncStatusH := &handlers.SyncStatusHandler{DB: &pgDB, Source: source}
 	accessH := &handlers.AccessHandler{DB: &pgDB, Source: source}
 	// Issues are synced for the projects the users are shown within their rights

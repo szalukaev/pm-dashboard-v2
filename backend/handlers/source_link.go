@@ -1,14 +1,17 @@
 package handlers
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
 
+	"pm-dashboard/datasource/manager"
 	"pm-dashboard/datasource/redmine"
 	"pm-dashboard/middleware"
+	"pm-dashboard/secrets"
 	"pm-dashboard/utils"
 )
 
@@ -20,9 +23,43 @@ import (
 // may do it differently, so the client is told the kind of the source and
 // shows the matching form.
 //
-// The key is used once, to ask the source who it belongs to, and is not
-// stored: only the member id and the last characters of the key (to show
-// which key was used) are kept.
+// The key is checked in the source (who does it belong to?) and stored
+// encrypted, so that changes the user makes go to the source under their
+// own name. It is never sent back to the client: only its last characters
+// are shown, to recognise which key is in use.
+
+// UserKeys reads the personal API keys of users.
+type UserKeys struct {
+	DB     **sql.DB
+	Source *manager.Manager
+	Box    *secrets.Box
+}
+
+// ClientFor returns the client of the data source to change data with on
+// behalf of the user: with their personal key when they have one, otherwise
+// the system client. nil when the source is not configured.
+func (k *UserKeys) ClientFor(userID int) *redmine.Client {
+	if k == nil || k.Source == nil {
+		return nil
+	}
+	system := k.Source.Client()
+	if system == nil || k.Box == nil {
+		return system
+	}
+	var encrypted string
+	if err := (*k.DB).QueryRow("SELECT source_token_enc FROM users WHERE id = $1", userID).Scan(&encrypted); err != nil || encrypted == "" {
+		return system
+	}
+	token, err := k.Box.Decrypt(encrypted)
+	if err != nil {
+		slog.Warn("Stored personal API key cannot be read, using the system key", "user", userID, "error", err)
+		return system
+	}
+	if personal := k.Source.ClientWithKey(token); personal != nil {
+		return personal
+	}
+	return system
+}
 
 // sourceInfo describes the link for /auth/me and the login answer.
 func (h *AuthHandler) sourceInfo(userID int) map[string]interface{} {
@@ -108,8 +145,17 @@ func (h *AuthHandler) SetSourceToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := (*h.DB).Exec("UPDATE users SET member_id = $1, source_token_hint = $2 WHERE id = $3",
-		member.ExternalID, tokenHint(token), userID); err != nil {
+	if h.Secrets == nil {
+		utils.Error(w, http.StatusInternalServerError, "SECRET_STORE_UNAVAILABLE")
+		return
+	}
+	encrypted, err := h.Secrets.Encrypt(token)
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "SECRET_STORE_UNAVAILABLE")
+		return
+	}
+	if _, err := (*h.DB).Exec("UPDATE users SET member_id = $1, source_token_enc = $2, source_token_hint = $3 WHERE id = $4",
+		member.ExternalID, encrypted, tokenHint(token), userID); err != nil {
 		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 		return
 	}
@@ -125,7 +171,7 @@ func (h *AuthHandler) SetSourceToken(w http.ResponseWriter, r *http.Request) {
 // ClearSourceToken removes the link of the current user.
 func (h *AuthHandler) ClearSourceToken(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.GetUserID(r)
-	if _, err := (*h.DB).Exec("UPDATE users SET member_id = NULL, source_token_hint = '' WHERE id = $1", userID); err != nil {
+	if _, err := (*h.DB).Exec("UPDATE users SET member_id = NULL, source_token_enc = '', source_token_hint = '' WHERE id = $1", userID); err != nil {
 		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 		return
 	}

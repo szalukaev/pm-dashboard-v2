@@ -24,6 +24,8 @@ type KanbanHandler struct {
 	Source *manager.Manager
 	// Events reports changes to open pages (WebSocket); may be nil.
 	Events func(event string, data interface{})
+	// Keys gives the personal API keys to write under the user's name.
+	Keys *UserKeys
 }
 
 type KanbanCard struct {
@@ -342,11 +344,18 @@ func (h *KanbanHandler) MoveCard(w http.ResponseWriter, r *http.Request) {
 	// The data source is the system of record: write there first and touch
 	// the local cache only on success, otherwise the next sync would silently
 	// roll the move back.
-	if h.Source == nil || h.Source.Client() == nil {
+	// The move is made under the user's own name when they gave their
+	// personal API key.
+	var client *redmine.Client
+	if h.Keys != nil {
+		client = h.Keys.ClientFor(scope.UserID)
+	} else if h.Source != nil {
+		client = h.Source.Client()
+	}
+	if client == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATA_SOURCE_NOT_CONFIGURED")
 		return
 	}
-	client := h.Source.Client()
 	if err := client.UpdateIssue(body.IssueID, redmineFields); err != nil {
 		slog.Warn("Failed to move issue in Redmine", "issue", body.IssueID, "error", err)
 		utils.JSON(w, http.StatusBadGateway, map[string]string{
