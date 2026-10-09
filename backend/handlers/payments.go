@@ -311,6 +311,8 @@ func (h *PaymentsHandler) CreateContract(w http.ResponseWriter, r *http.Request)
 		if body.ContactName == nil && orgContact.Valid { body.ContactName = &orgContact.String }
 		if body.ContactPhone == nil && orgPhone.Valid { body.ContactPhone = &orgPhone.String }
 	}
+	// A date left blank in the form is "not set", not an empty string
+	body.StartDate, body.EndDate = emptyToNil(body.StartDate), emptyToNil(body.EndDate)
 	vatRate := "none"
 	if body.VatRate != nil { vatRate = *body.VatRate }
 	amount := 0.0
@@ -344,6 +346,12 @@ func (h *PaymentsHandler) UpdateContract(w http.ResponseWriter, r *http.Request)
 	}
 	var body map[string]interface{}
 	json.NewDecoder(r.Body).Decode(&body)
+	// A date left blank in the form is "not set", not an empty string
+	for _, field := range []string{"start_date", "end_date"} {
+		if text, isText := body[field].(string); isText && strings.TrimSpace(text) == "" {
+			body[field] = nil
+		}
+	}
 	sets, args, idx := buildUpdateSets(body, map[string]bool{
 		"name": true, "contract_type": true, "organization_id": true, "company_name": true,
 		"company_address": true, "amount": true, "vat_rate": true, "contact_name": true,

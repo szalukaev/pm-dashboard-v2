@@ -9,17 +9,21 @@
         <ChevronDown :size="16" class="chevron" :class="{ collapsed: !isOpen(org.id) }" />
         <Building2 :size="16" class="org-icon" />
         <span class="org-name">{{ org.name }}</span>
-        <span class="org-stat">{{ orgContracts(org.id).length }} дог.</span>
-        <span class="org-stat">{{ formatMoney(orgTotal(org.id)) }}</span>
+        <span class="org-stat">{{ $t('payments.org.contracts', { count: orgContracts(org.id).length }) }}</span>
+        <span class="org-stat" :title="$t('payments.stats.total_amount')">{{ formatMoney(orgSum(org.id, 'total_amount')) }}</span>
+        <span class="org-stat" :title="$t('payments.stats.invoiced')">{{ $t('payments.org.invoiced', { amount: formatMoney(orgSum(org.id, 'invoiced_amount')) }) }}</span>
+        <span class="org-stat" :class="{ 'has-debt': orgSum(org.id, 'debt_amount') > 0 }" :title="$t('payments.stats.debt')">
+          {{ $t('payments.org.debt', { amount: formatMoney(orgSum(org.id, 'debt_amount')) }) }}
+        </span>
 
         <div class="org-actions" @click.stop>
-          <button class="action-btn" @click="$emit('add-contract', org.id)" title="Добавить договор">
+          <button class="action-btn" @click="$emit('add-contract', org.id)" :title="$t('payments.add_contract')" data-testid="org-add-contract">
             <Plus :size="14" />
           </button>
-          <button class="action-btn" @click="$emit('edit-org', org)" title="Редактировать">
+          <button class="action-btn" @click="$emit('edit-org', org)" :title="$t('common.edit')">
             <Pencil :size="14" />
           </button>
-          <button class="action-btn danger-btn" @click="$emit('delete-org', org.id)" title="Удалить">
+          <button class="action-btn danger-btn" @click="$emit('delete-org', org.id)" :title="$t('common.delete')">
             <Trash2 :size="14" />
           </button>
         </div>
@@ -33,7 +37,6 @@
           @edit="$emit('edit-contract', contract)"
           @delete="$emit('delete-contract', contract.id)"
           @issue-invoice="$emit('issue-invoice', contract.id)"
-          @view-invoices="$emit('view-invoices', contract)"
         />
       </div>
     </div>
@@ -44,7 +47,7 @@
         <ChevronDown :size="16" class="chevron" :class="{ collapsed: !isOpen(0) }" />
         <Building2 :size="16" class="org-icon" style="opacity: 0.3" />
         <span class="org-name">{{ $t('payments.without_org') }}</span>
-        <span class="org-stat">{{ noOrgContracts.length }} дог.</span>
+        <span class="org-stat">{{ $t('payments.org.contracts', { count: noOrgContracts.length }) }}</span>
       </div>
       <div v-if="isOpen(0)" class="org-body">
         <ContractRow
@@ -54,7 +57,6 @@
           @edit="$emit('edit-contract', contract)"
           @delete="$emit('delete-contract', contract.id)"
           @issue-invoice="$emit('issue-invoice', contract.id)"
-          @view-invoices="$emit('view-invoices', contract)"
         />
       </div>
     </div>
@@ -73,7 +75,7 @@ const props = defineProps<{
   contracts: Contract[]
 }>()
 
-defineEmits(['add-contract', 'edit-org', 'delete-org', 'edit-contract', 'delete-contract', 'issue-invoice', 'view-invoices'])
+defineEmits(['add-contract', 'edit-org', 'delete-org', 'edit-contract', 'delete-contract', 'issue-invoice'])
 
 const openOrgs = ref<Set<number>>(new Set())
 
@@ -93,8 +95,9 @@ function orgContracts(orgId: number) {
 
 const noOrgContracts = computed(() => props.contracts.filter(c => !c.organization_id))
 
-function orgTotal(orgId: number) {
-  return orgContracts(orgId).reduce((sum, c) => sum + c.amount * (c.vat_rate === '5' ? 1.05 : 1), 0)
+// A figure of the organization: the sum over its contracts
+function orgSum(orgId: number, field: 'total_amount' | 'invoiced_amount' | 'debt_amount') {
+  return orgContracts(orgId).reduce((sum, c) => sum + (c[field] || 0), 0)
 }
 </script>
 
@@ -181,5 +184,9 @@ function orgTotal(orgId: number) {
 
 .org-body {
   border-top: 1px solid var(--border-light);
+}
+
+.org-stat.has-debt {
+  color: var(--danger);
 }
 </style>

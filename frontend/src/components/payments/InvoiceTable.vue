@@ -7,36 +7,38 @@
     <table v-else-if="invoices.length > 0" class="invoice-table">
       <thead>
         <tr>
-          <th>№</th>
+          <th>{{ $t('payments.invoice.number') }}</th>
           <th>{{ $t('payments.invoice.date') }}</th>
           <th class="num">{{ $t('payments.invoice.amount') }}</th>
           <th class="num">{{ $t('payments.invoice.paid') }}</th>
           <th class="num">{{ $t('payments.invoice.remainder') }}</th>
+          <th>{{ $t('payments.invoice.pay_date') }}</th>
           <th>{{ $t('payments.invoice.status') }}</th>
           <th></th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="(inv, idx) in invoices" :key="inv.id">
-          <td>{{ offset + idx + 1 }}</td>
+        <tr v-for="inv in invoices" :key="inv.id" :data-testid="'invoice-' + inv.id">
+          <td class="number">{{ inv.number || '—' }}</td>
           <td>{{ formatDate(inv.issued_at) }}</td>
           <td class="num">{{ formatMoney(inv.total) }}</td>
           <td class="num">{{ formatMoney(inv.paid_amount) }}</td>
           <td class="num" :class="{ 'has-remainder': inv.remainder > 0 }">{{ formatMoney(inv.remainder) }}</td>
+          <td>{{ formatDate(inv.paid_at) }}</td>
           <td>
             <span class="status-badge" :class="inv.status">{{ statusLabel(inv.status) }}</span>
           </td>
           <td class="actions-cell">
-            <button v-if="inv.status !== 'paid'" class="action-btn" @click="$emit('pay', { contractId, invoiceId: inv.id, remainder: inv.remainder })" title="Оплатить">
+            <button v-if="inv.status !== 'paid'" class="action-btn" :title="$t('payments.invoice.pay')" data-testid="invoice-pay" @click="actions?.pay(contractId, inv)">
               <CreditCard :size="14" />
             </button>
-            <button class="action-btn" @click="$emit('download', inv.id)" title="Скачать">
+            <button class="action-btn" :title="$t('payments.invoice.download')" data-testid="invoice-download" @click="actions?.download(contractId, inv)">
               <Download :size="14" />
             </button>
-            <button class="action-btn" @click="copyInvoiceInfo(inv, offset + idx)" title="Копировать">
+            <button class="action-btn" :title="$t('payments.invoice.copy')" data-testid="invoice-copy" @click="copyInvoiceInfo(inv)">
               <Copy :size="14" />
             </button>
-            <button class="action-btn danger-btn" @click="$emit('delete-invoice', inv.id)" title="Удалить">
+            <button class="action-btn danger-btn" :title="$t('common.delete')" data-testid="invoice-delete" @click="actions?.remove(contractId, inv)">
               <Trash2 :size="14" />
             </button>
           </td>
@@ -53,22 +55,29 @@
     />
 
     <div v-if="!loading && invoices.length === 0" class="empty-invoices">
-      Нет счетов
+      {{ $t('payments.invoice.empty') }}
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, inject, watch, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { CreditCard, Download, Copy, Trash2 } from 'lucide-vue-next'
 import AppSpinner from '../ui/AppSpinner.vue'
 import AppPagination from '../ui/AppPagination.vue'
 import { useSettingsStore } from '../../stores/settings'
 import { usePaymentsStore, type Invoice } from '../../stores/payments'
 import { formatMoney, formatDate } from '../../utils/format'
+import { useSwal } from '../../composables/useSwal'
+import { invoiceActionsKey } from './invoiceActions'
 
 const props = defineProps<{ contractId: number }>()
-defineEmits(['pay', 'download', 'delete-invoice'])
+
+const { t, te } = useI18n()
+const { toast } = useSwal()
+// Paying, downloading and deleting belong to the page
+const actions = inject(invoiceActionsKey)
 
 const store = usePaymentsStore()
 const settingsStore = useSettingsStore()
@@ -97,18 +106,36 @@ async function setPageSize(size: number) {
 }
 
 function statusLabel(status: string): string {
-  const map: Record<string, string> = {
-    unpaid: 'Не оплачен',
-    partial: 'Частично',
-    paid: 'Оплачен',
-  }
-  return map[status] || status
+  const key = `payments.statuses.${status}`
+  return te(key) ? t(key) : status
 }
 
-function copyInvoiceInfo(inv: Invoice, idx: number) {
-  const text = `Счёт №${idx + 1} от ${formatDate(inv.issued_at)}\nСумма: ${formatMoney(inv.total)}\nОплачено: ${formatMoney(inv.paid_amount)}\nОстаток: ${formatMoney(inv.remainder)}\nСтатус: ${statusLabel(inv.status)}`
-  navigator.clipboard.writeText(text)
+async function copyInvoiceInfo(inv: Invoice) {
+  const text = t('payments.invoice.copy_text', {
+    number: inv.number,
+    date: formatDate(inv.issued_at),
+    amount: formatMoney(inv.total),
+    paid: formatMoney(inv.paid_amount),
+    remainder: formatMoney(inv.remainder),
+    status: statusLabel(inv.status),
+  })
+  try {
+    await navigator.clipboard.writeText(text)
+    toast(t('common.copied'), 'success')
+  } catch {
+    toast(t('payments.invoice.copy_error'), 'error')
+  }
 }
+
+// An invoice was issued, paid or deleted somewhere on the page
+watch(() => store.invoicesVersion, async () => {
+  await load()
+  // The last invoice of the last page was deleted: show the page before it
+  if (invoices.value.length === 0 && total.value > 0) {
+    offset.value = Math.floor((total.value - 1) / pageSize.value) * pageSize.value
+    await load()
+  }
+})
 
 onMounted(async () => {
   await settingsStore.ensureLoaded()

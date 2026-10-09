@@ -307,7 +307,7 @@
       "invoiced": "Invoiced",
       "debt": "Outstanding",
       "paid": "Paid",
-      "closed": "Closed"
+      "closed_amount": "Closed amount"
     },
     "filters": {
       "all": "All",
@@ -344,12 +344,70 @@
       "total": "Total",
       "pay_form_title": "Pay Invoice",
       "amount_label": "Payment Amount",
-      "pay_date_label": "Payment Date"
+      "pay_date_label": "Payment Date",
+      "empty": "No invoices yet",
+      "default_item": "Service",
+      "copy_error": "Could not copy",
+      "copy_text": "Invoice No. {number} of {date}\nAmount: {amount}\nPaid: {paid}\nRemainder: {remainder}\nStatus: {status}",
+      "paid_ok": "The payment is recorded",
+      "clamped": "{applied} of the entered {entered} was taken: it is the whole remainder of the invoice"
     },
     "statuses": {
       "unpaid": "Unpaid",
       "partial": "Partial",
       "paid": "Paid"
+    },
+    "contract_types_short": {
+      "service": "S",
+      "onetime": "O"
+    },
+    "org": {
+      "contracts": "{count} contracts",
+      "invoiced": "invoiced {amount}",
+      "debt": "debt {amount}"
+    },
+    "contract": {
+      "amount_with_vat": "Contract amount with VAT",
+      "overdue": "The term has passed and the contract is not fully paid"
+    },
+    "org_form": {
+      "title": "Organization",
+      "name": "Name",
+      "address": "Address",
+      "inn": "Tax ID",
+      "contact": "Contact person",
+      "phone": "Phone"
+    },
+    "contract_form": {
+      "title": "Contract",
+      "type": "Type",
+      "name": "Name",
+      "organization": "Organization",
+      "address": "Address",
+      "amount": "Amount without VAT",
+      "vat": "VAT",
+      "vat_none": "No VAT",
+      "vat_5": "VAT 5%",
+      "contact": "Contact person",
+      "phone": "Phone",
+      "start_date": "Start date",
+      "end_date": "Term"
+    },
+    "delete": {
+      "org_title": "Delete the organization?",
+      "org_text": "Its contracts are not deleted: they stay in the \"Without organization\" group.",
+      "contract_title": "Delete the contract?",
+      "contract_text": "All its invoices and payments will be deleted with it. This cannot be undone.",
+      "invoice_title": "Delete invoice {number}?",
+      "invoice_text": "The invoice will be deleted. This cannot be undone.",
+      "invoice_paid_text": "The invoice already has payments of {paid}: they will be deleted with it. This cannot be undone."
+    },
+    "errors": {
+      "action_failed": "Could not save the changes",
+      "export_failed": "Could not export the CSV",
+      "download_failed": "Could not download the invoice",
+      "pay_failed": "Could not record the payment",
+      "delete_failed": "Could not delete"
     }
   },
   "settings": {

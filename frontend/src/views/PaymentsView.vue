@@ -56,83 +56,99 @@
         @edit-contract="editContract"
         @delete-contract="deleteContract"
         @issue-invoice="issueInvoice"
-        @view-invoices="viewInvoices"
       />
     </template>
 
-    <!-- Org Form Modal -->
-    <AppModal :model-value="showOrgForm" title="Организация" width="480px" @update:model-value="showOrgForm = $event">
+    <!-- Organization -->
+    <AppModal :model-value="showOrgForm" :title="$t('payments.org_form.title')" width="480px" @update:model-value="showOrgForm = $event">
       <form class="modal-form" @submit.prevent="submitOrg">
         <div class="form-field">
-          <label>Название *</label>
-          <input v-model="orgForm.name" type="text" required />
+          <label>{{ $t('payments.org_form.name') }} *</label>
+          <input v-model="orgForm.name" type="text" required data-testid="org-name" />
         </div>
         <div class="form-field">
-          <label>Адрес</label>
+          <label>{{ $t('payments.org_form.address') }}</label>
           <input v-model="orgForm.address" type="text" />
         </div>
         <div class="form-field">
-          <label>ИНН</label>
+          <label>{{ $t('payments.org_form.inn') }}</label>
           <input v-model="orgForm.inn" type="text" />
         </div>
         <div class="form-field">
-          <label>Контактное лицо</label>
+          <label>{{ $t('payments.org_form.contact') }}</label>
           <input v-model="orgForm.contact_name" type="text" />
         </div>
         <div class="form-field">
-          <label>Телефон</label>
+          <label>{{ $t('payments.org_form.phone') }}</label>
           <input v-model="orgForm.contact_phone" type="text" />
         </div>
       </form>
       <template #footer>
         <AppButton variant="ghost" @click="showOrgForm = false">{{ $t('common.cancel') }}</AppButton>
-        <AppButton variant="primary" @click="submitOrg" :disabled="!orgForm.name">{{ $t('common.save') }}</AppButton>
+        <AppButton variant="primary" @click="submitOrg" :disabled="!orgForm.name.trim()">{{ $t('common.save') }}</AppButton>
       </template>
     </AppModal>
 
-    <!-- Contract Form Modal -->
-    <AppModal :model-value="showContractForm" title="Договор" width="520px" @update:model-value="showContractForm = $event">
+    <!-- Contract -->
+    <AppModal :model-value="showContractForm" :title="$t('payments.contract_form.title')" width="520px" @update:model-value="showContractForm = $event">
       <form class="modal-form" @submit.prevent="submitContract">
         <div class="form-field">
-          <label>Тип *</label>
-          <select v-model="contractForm.contract_type">
-            <option value="service">Сопровождение</option>
-            <option value="onetime">Разовый</option>
+          <label>{{ $t('payments.contract_form.type') }} *</label>
+          <select v-model="contractForm.contract_type" data-testid="contract-type">
+            <option value="service">{{ $t('payments.contract_types.service') }}</option>
+            <option value="onetime">{{ $t('payments.contract_types.onetime') }}</option>
           </select>
         </div>
         <div class="form-field">
-          <label>Название *</label>
-          <input v-model="contractForm.name" type="text" required />
+          <label>{{ $t('payments.contract_form.name') }} *</label>
+          <input v-model="contractForm.name" type="text" required data-testid="contract-name" />
         </div>
         <div class="form-field">
-          <label>Сумма</label>
-          <input v-model.number="contractForm.amount" type="number" min="0" step="0.01" />
+          <label>{{ $t('payments.contract_form.organization') }}</label>
+          <input :value="contractOrgName" type="text" disabled />
         </div>
         <div class="form-field">
-          <label>НДС</label>
-          <select v-model="contractForm.vat_rate">
-            <option value="none">Без НДС</option>
-            <option value="5">НДС 5%</option>
-          </select>
+          <label>{{ $t('payments.contract_form.address') }}</label>
+          <input v-model="contractForm.company_address" type="text" />
         </div>
-        <div class="form-field">
-          <label>Контактное лицо</label>
-          <input v-model="contractForm.contact_name" type="text" />
-        </div>
-        <div class="form-row" v-if="contractForm.contract_type === 'service'">
+        <div class="form-row">
           <div class="form-field">
-            <label>Дата начала</label>
+            <label>{{ $t('payments.contract_form.amount') }}</label>
+            <input v-model.number="contractForm.amount" type="number" min="0" step="0.01" />
+          </div>
+          <div class="form-field">
+            <label>{{ $t('payments.contract_form.vat') }}</label>
+            <select v-model="contractForm.vat_rate">
+              <option value="none">{{ $t('payments.contract_form.vat_none') }}</option>
+              <option value="5">{{ $t('payments.contract_form.vat_5') }}</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>{{ $t('payments.contract_form.contact') }} *</label>
+            <input v-model="contractForm.contact_name" type="text" required data-testid="contract-contact" />
+          </div>
+          <div class="form-field">
+            <label>{{ $t('payments.contract_form.phone') }}</label>
+            <input v-model="contractForm.contact_phone" type="text" />
+          </div>
+        </div>
+        <div class="form-row">
+          <!-- A one-time contract has no start date -->
+          <div class="form-field" v-if="contractForm.contract_type === 'service'">
+            <label>{{ $t('payments.contract_form.start_date') }}</label>
             <input v-model="contractForm.start_date" type="date" />
           </div>
           <div class="form-field">
-            <label>Срок</label>
+            <label>{{ $t('payments.contract_form.end_date') }}</label>
             <input v-model="contractForm.end_date" type="date" />
           </div>
         </div>
       </form>
       <template #footer>
         <AppButton variant="ghost" @click="showContractForm = false">{{ $t('common.cancel') }}</AppButton>
-        <AppButton variant="primary" @click="submitContract" :disabled="!contractForm.name">{{ $t('common.save') }}</AppButton>
+        <AppButton variant="primary" test-id="contract-save" @click="submitContract" :disabled="!canSaveContract">{{ $t('common.save') }}</AppButton>
       </template>
     </AppModal>
 
@@ -156,7 +172,8 @@
     <!-- Delete Confirm -->
     <AppConfirmDialog
       :model-value="showDeleteConfirm"
-      :title="'Удалить ' + deleteTarget + '?'"
+      :title="deleteTitle"
+      :message="deleteMessage"
       @update:model-value="showDeleteConfirm = $event"
       @confirm="handleDelete"
     />
@@ -164,10 +181,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, provide, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { Download } from 'lucide-vue-next'
-import { usePaymentsStore, type Organization, type Contract } from '../stores/payments'
+import { usePaymentsStore, type Organization, type Contract, type Invoice } from '../stores/payments'
+import { useSwal } from '../composables/useSwal'
+import { formatMoney } from '../utils/format'
+import { invoiceActionsKey } from '../components/payments/invoiceActions'
 import PaymentStats from '../components/payments/PaymentStats.vue'
 import OrganizationAccordion from '../components/payments/OrganizationAccordion.vue'
 import InvoiceForm from '../components/payments/InvoiceForm.vue'
@@ -180,7 +201,24 @@ import AppConfirmDialog from '../components/ui/AppConfirmDialog.vue'
 
 const store = usePaymentsStore()
 const { organizations, contracts, stats, loading, error, filterType } = storeToRefs(store)
-const { fetchAll, exportCSV } = store
+const { fetchAll } = store
+const { t } = useI18n()
+const { toast } = useSwal()
+
+// Whatever fails on this page is told to the user instead of failing quietly
+async function guarded(action: () => Promise<unknown>, failure = 'payments.errors.action_failed'): Promise<boolean> {
+  try {
+    await action()
+    return true
+  } catch {
+    toast(t(failure), 'error')
+    return false
+  }
+}
+
+function exportCSV() {
+  guarded(() => store.exportCSV(), 'payments.errors.export_failed')
+}
 
 // Filters
 const filterOptions = [
@@ -206,7 +244,7 @@ function doSearch() {
   store.fetchContracts()
 }
 
-// Org form
+// Organization form
 const showOrgForm = ref(false)
 const editingOrg = ref<Organization | null>(null)
 const orgForm = reactive({ name: '', address: '', inn: '', contact_name: '', contact_phone: '' })
@@ -218,33 +256,46 @@ function editOrg(org: Organization) {
 }
 
 async function submitOrg() {
-  if (editingOrg.value) {
-    await store.updateOrganization(editingOrg.value.id, { ...orgForm })
-  } else {
-    await store.createOrganization({ ...orgForm })
-  }
+  if (!orgForm.name.trim()) return
+  const editing = editingOrg.value
+  const saved = await guarded(() => (editing ? store.updateOrganization(editing.id, { ...orgForm }) : store.createOrganization({ ...orgForm })))
+  if (!saved) return
   showOrgForm.value = false
   editingOrg.value = null
   Object.assign(orgForm, { name: '', address: '', inn: '', contact_name: '', contact_phone: '' })
 }
 
-async function deleteOrg(id: number) {
-  deleteTarget.value = 'организацию'
-  deleteAction.value = () => store.deleteOrganization(id)
-  showDeleteConfirm.value = true
+function deleteOrg(id: number) {
+  askDelete(t('payments.delete.org_title'), t('payments.delete.org_text'), () => store.deleteOrganization(id))
 }
 
 // Contract form
 const showContractForm = ref(false)
 const editingContract = ref<Contract | null>(null)
-const contractForm = reactive({
+const emptyContract = {
   contract_type: 'service', name: '', organization_id: null as number | null,
-  amount: 0, vat_rate: 'none', contact_name: '', start_date: '', end_date: '',
-})
+  company_address: '', amount: 0, vat_rate: 'none', contact_name: '', contact_phone: '',
+  start_date: '', end_date: '',
+}
+const contractForm = reactive({ ...emptyContract })
 
+const contractOrgName = computed(() =>
+  organizations.value.find(o => o.id === contractForm.organization_id)?.name || t('payments.without_org')
+)
+// The name and the contact person are required
+const canSaveContract = computed(() => contractForm.name.trim() !== '' && contractForm.contact_name.trim() !== '')
+
+// A new contract takes the address and the contact of its organization
 function startAddContract(orgId: number) {
+  const org = organizations.value.find(o => o.id === orgId)
   editingContract.value = null
-  Object.assign(contractForm, { contract_type: 'service', name: '', organization_id: orgId, amount: 0, vat_rate: 'none', contact_name: '', start_date: '', end_date: '' })
+  Object.assign(contractForm, {
+    ...emptyContract,
+    organization_id: orgId,
+    company_address: org?.address || '',
+    contact_name: org?.contact_name || '',
+    contact_phone: org?.contact_phone || '',
+  })
   showContractForm.value = true
 }
 
@@ -252,29 +303,35 @@ function editContract(contract: Contract) {
   editingContract.value = contract
   Object.assign(contractForm, {
     contract_type: contract.contract_type, name: contract.name,
-    organization_id: contract.organization_id, amount: contract.amount,
-    vat_rate: contract.vat_rate, contact_name: contract.contact_name || '',
-    start_date: contract.start_date || '', end_date: contract.end_date || '',
+    organization_id: contract.organization_id,
+    company_address: contract.company_address || '',
+    amount: contract.amount, vat_rate: contract.vat_rate,
+    contact_name: contract.contact_name || '', contact_phone: contract.contact_phone || '',
+    start_date: (contract.start_date || '').slice(0, 10), end_date: (contract.end_date || '').slice(0, 10),
   })
   showContractForm.value = true
 }
 
 async function submitContract() {
-  if (editingContract.value) {
-    await store.updateContract(editingContract.value.id, { ...contractForm } as any)
-  } else {
-    await store.createContract({ ...contractForm } as any)
+  if (!canSaveContract.value) return
+  // A date left blank is "not set"; a one-time contract has no start date
+  const fields = {
+    ...contractForm,
+    name: contractForm.name.trim(),
+    amount: Number(contractForm.amount) || 0,
+    start_date: contractForm.contract_type === 'service' ? contractForm.start_date || null : null,
+    end_date: contractForm.end_date || null,
   }
-  showContractForm.value = false
+  const editing = editingContract.value
+  const saved = await guarded(() => (editing ? store.updateContract(editing.id, fields as any) : store.createContract(fields as any)))
+  if (saved) showContractForm.value = false
 }
 
-async function deleteContract(id: number) {
-  deleteTarget.value = 'договор'
-  deleteAction.value = () => store.deleteContract(id)
-  showDeleteConfirm.value = true
+function deleteContract(id: number) {
+  askDelete(t('payments.delete.contract_title'), t('payments.delete.contract_text'), () => store.deleteContract(id))
 }
 
-// Invoice
+// Issuing an invoice
 const showInvoiceForm = ref(false)
 const invoiceContractId = ref(0)
 const invoiceContractName = ref('')
@@ -288,40 +345,73 @@ function issueInvoice(contractId: number) {
   showInvoiceForm.value = true
 }
 
+// The invoice is saved, and its document is downloaded at once
 async function handleCreateInvoice(items: any[]) {
-  await store.createInvoice(invoiceContractId.value, items)
+  const contractId = invoiceContractId.value
+  let invoiceId = 0
+  const created = await guarded(async () => {
+    const data = await store.createInvoice(contractId, items)
+    invoiceId = data?.id || 0
+  })
+  if (!created) return
   showInvoiceForm.value = false
+  if (invoiceId) await guarded(() => store.downloadInvoice(contractId, invoiceId), 'payments.errors.download_failed')
 }
 
-// Pay
+// Paying an invoice
 const showPayForm = ref(false)
 const payContractId = ref(0)
 const payInvoiceId = ref(0)
 const payDefaultAmount = ref(0)
 
-function viewInvoices(contract: Contract) {
-  // The InvoiceTable handles this internally now
-}
-
-function handlePayFromTable(payload: any) {
-  payContractId.value = payload.contractId
-  payInvoiceId.value = payload.invoiceId
-  payDefaultAmount.value = payload.remainder
-  showPayForm.value = true
-}
-
 async function handlePay(data: { amount: number; paid_at: string }) {
-  await store.payInvoice(payContractId.value, payInvoiceId.value, data.amount, data.paid_at)
-  showPayForm.value = false
+  await guarded(async () => {
+    const result = await store.payInvoice(payContractId.value, payInvoiceId.value, data.amount, data.paid_at)
+    showPayForm.value = false
+    // More than was left to pay: the user is told how much was taken
+    if (result?.clamped) {
+      toast(t('payments.invoice.clamped', { applied: formatMoney(result.applied), entered: formatMoney(data.amount) }), 'info')
+    } else {
+      toast(t('payments.invoice.paid_ok'), 'success')
+    }
+  }, 'payments.errors.pay_failed')
 }
 
-// Delete confirm
+// The table of invoices sits deep inside the accordions; what it does with
+// an invoice is done here
+provide(invoiceActionsKey, {
+  pay(contractId: number, invoice: Invoice) {
+    payContractId.value = contractId
+    payInvoiceId.value = invoice.id
+    payDefaultAmount.value = invoice.remainder
+    showPayForm.value = true
+  },
+  download(contractId: number, invoice: Invoice) {
+    guarded(() => store.downloadInvoice(contractId, invoice.id), 'payments.errors.download_failed')
+  },
+  remove(contractId: number, invoice: Invoice) {
+    const text = invoice.paid_amount > 0
+      ? t('payments.delete.invoice_paid_text', { paid: formatMoney(invoice.paid_amount) })
+      : t('payments.delete.invoice_text')
+    askDelete(t('payments.delete.invoice_title', { number: invoice.number }), text, () => store.deleteInvoice(contractId, invoice.id))
+  },
+})
+
+// Delete confirmation
 const showDeleteConfirm = ref(false)
-const deleteTarget = ref('')
-const deleteAction = ref<() => Promise<void>>(() => Promise.resolve())
+const deleteTitle = ref('')
+const deleteMessage = ref('')
+const deleteAction = ref<() => Promise<unknown>>(() => Promise.resolve())
+
+function askDelete(title: string, message: string, action: () => Promise<unknown>) {
+  deleteTitle.value = title
+  deleteMessage.value = message
+  deleteAction.value = action
+  showDeleteConfirm.value = true
+}
 
 async function handleDelete() {
-  await deleteAction.value()
+  await guarded(deleteAction.value, 'payments.errors.delete_failed')
   showDeleteConfirm.value = false
 }
 

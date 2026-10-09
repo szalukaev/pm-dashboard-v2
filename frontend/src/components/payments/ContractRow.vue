@@ -1,65 +1,52 @@
 <template>
-  <div class="contract-row" :class="{ overdue: contract.is_overdue, 'fully-paid': isFullyPaid }">
+  <div class="contract-row" :class="{ overdue: contract.is_overdue, 'fully-paid': contract.is_fully_paid }" :data-testid="'contract-' + contract.id">
     <div class="row-main" @click="expanded = !expanded">
       <ChevronDown :size="14" class="chevron" :class="{ collapsed: !expanded }" />
-      <span class="type-badge" :class="contract.contract_type">
-        {{ contract.contract_type === 'service' ? 'С' : 'Р' }}
+      <span class="type-badge" :class="contract.contract_type" :title="$t('payments.contract_types.' + contract.contract_type)">
+        {{ $t('payments.contract_types_short.' + contract.contract_type) }}
       </span>
       <span class="contract-name" :title="contract.name">{{ contract.name }}</span>
-      <span class="amount">{{ formatMoney(contract.amount * (contract.vat_rate === '5' ? 1.05 : 1)) }}</span>
-      <span class="invoiced">{{ formatMoney(contract.invoiced_amount) }}</span>
-      <span class="debt" :class="{ 'has-debt': contract.debt_amount > 0 }">
+      <span class="amount" :title="$t('payments.contract.amount_with_vat')">{{ formatMoney(contract.total_amount) }}</span>
+      <span class="invoiced" :title="$t('payments.stats.invoiced')">{{ formatMoney(contract.invoiced_amount) }}</span>
+      <span class="debt" :class="{ 'has-debt': contract.debt_amount > 0 }" :title="$t('payments.stats.debt')">
         {{ formatMoney(contract.debt_amount) }}
       </span>
       <span class="end-date" v-if="contract.end_date">
-        <AlertCircle v-if="contract.is_overdue" :size="12" class="overdue-icon" />
+        <span v-if="contract.is_overdue" class="overdue-icon" :title="$t('payments.contract.overdue')"><AlertCircle :size="12" /></span>
         {{ formatDate(contract.end_date) }}
       </span>
 
       <div class="row-actions" @click.stop>
-        <button class="action-btn" @click="$emit('issue-invoice')" title="Выставить счёт">
+        <button class="action-btn" @click="$emit('issue-invoice')" :title="$t('payments.issue_invoice')" data-testid="contract-issue-invoice">
           <Receipt :size="14" />
         </button>
-        <button class="action-btn" @click="$emit('edit')" title="Редактировать">
+        <button class="action-btn" @click="$emit('edit')" :title="$t('common.edit')">
           <Pencil :size="14" />
         </button>
-        <button class="action-btn danger-btn" @click="$emit('delete')" title="Удалить">
+        <button class="action-btn danger-btn" @click="$emit('delete')" :title="$t('common.delete')">
           <Trash2 :size="14" />
         </button>
       </div>
     </div>
 
     <div v-if="expanded" class="row-details">
-      <InvoiceTable
-        :contract-id="contract.id"
-        @pay="onPay"
-        @download="onDownload"
-        @delete-invoice="onDeleteInvoice"
-      />
+      <InvoiceTable :contract-id="contract.id" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { ChevronDown, AlertCircle, Receipt, Pencil, Trash2 } from 'lucide-vue-next'
 import InvoiceTable from './InvoiceTable.vue'
 import { formatMoney, formatDate } from '../../utils/format'
 import type { Contract } from '../../stores/payments'
 
-const props = defineProps<{ contract: Contract }>()
-const emit = defineEmits(['edit', 'delete', 'issue-invoice', 'view-invoices', 'pay', 'download', 'delete-invoice'])
+defineProps<{ contract: Contract }>()
+defineEmits(['edit', 'delete', 'issue-invoice'])
 
+// The invoices of the contract are shown when it is opened
 const expanded = ref(false)
-
-const isFullyPaid = computed(() => {
-  const total = props.contract.amount * (props.contract.vat_rate === '5' ? 1.05 : 1)
-  return props.contract.total_paid >= total && props.contract.total_paid > 0
-})
-
-function onPay(payload: any) { emit('pay', payload) }
-function onDownload(invoiceId: number) { emit('download', invoiceId) }
-function onDeleteInvoice(invoiceId: number) { emit('delete-invoice', invoiceId) }
 </script>
 
 <style scoped>

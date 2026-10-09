@@ -307,7 +307,7 @@
       "invoiced": "Выставлено",
       "debt": "Задолженность",
       "paid": "Оплачено",
-      "closed": "Закрытых"
+      "closed_amount": "Сумма закрытых"
     },
     "filters": {
       "all": "Все",
@@ -344,12 +344,70 @@
       "total": "Итого",
       "pay_form_title": "Оплата счёта",
       "amount_label": "Сумма оплаты",
-      "pay_date_label": "Дата оплаты"
+      "pay_date_label": "Дата оплаты",
+      "empty": "Счетов пока нет",
+      "default_item": "Услуга",
+      "copy_error": "Не удалось скопировать",
+      "copy_text": "Счёт № {number} от {date}\nСумма: {amount}\nОплачено: {paid}\nОстаток: {remainder}\nСтатус: {status}",
+      "paid_ok": "Оплата отмечена",
+      "clamped": "Зачтено {applied} из введённых {entered}: это весь остаток по счёту"
     },
     "statuses": {
       "unpaid": "Не оплачен",
       "partial": "Частично",
       "paid": "Оплачен"
+    },
+    "contract_types_short": {
+      "service": "С",
+      "onetime": "Р"
+    },
+    "org": {
+      "contracts": "{count} дог.",
+      "invoiced": "выставлено {amount}",
+      "debt": "долг {amount}"
+    },
+    "contract": {
+      "amount_with_vat": "Сумма договора с НДС",
+      "overdue": "Срок договора прошёл, договор не оплачен полностью"
+    },
+    "org_form": {
+      "title": "Организация",
+      "name": "Название",
+      "address": "Адрес",
+      "inn": "ИНН",
+      "contact": "Контактное лицо",
+      "phone": "Телефон"
+    },
+    "contract_form": {
+      "title": "Договор",
+      "type": "Тип",
+      "name": "Название",
+      "organization": "Организация",
+      "address": "Адрес",
+      "amount": "Сумма без НДС",
+      "vat": "НДС",
+      "vat_none": "Без НДС",
+      "vat_5": "НДС 5%",
+      "contact": "Контактное лицо",
+      "phone": "Телефон",
+      "start_date": "Дата начала",
+      "end_date": "Срок"
+    },
+    "delete": {
+      "org_title": "Удалить организацию?",
+      "org_text": "Договоры организации не удаляются: они останутся в группе «Без организации».",
+      "contract_title": "Удалить договор?",
+      "contract_text": "Вместе с договором будут удалены все его счета и оплаты. Действие необратимо.",
+      "invoice_title": "Удалить счёт {number}?",
+      "invoice_text": "Счёт будет удалён. Действие необратимо.",
+      "invoice_paid_text": "По счёту уже есть оплаты на {paid}: они будут удалены вместе со счётом. Действие необратимо."
+    },
+    "errors": {
+      "action_failed": "Не удалось сохранить изменения",
+      "export_failed": "Не удалось выгрузить CSV",
+      "download_failed": "Не удалось скачать счёт",
+      "pay_failed": "Не удалось отметить оплату",
+      "delete_failed": "Не удалось удалить"
     }
   },
   "settings": {

@@ -18,7 +18,7 @@ import { formatMoney } from '../../utils/format'
 defineProps<{ stats: PaymentStat[] }>()
 
 function formatValue(stat: PaymentStat): string {
-  if (['total_amount', 'invoiced', 'debt', 'paid'].includes(stat.label)) {
+  if (['total_amount', 'invoiced', 'debt', 'paid', 'closed_amount'].includes(stat.label)) {
     return formatMoney(stat.value)
   }
   return String(stat.value)

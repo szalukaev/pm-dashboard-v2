@@ -12,7 +12,7 @@
             <th>{{ $t('payments.invoice.service_name') }}</th>
             <th class="num">{{ $t('payments.invoice.quantity') }}</th>
             <th class="num">{{ $t('payments.invoice.price') }}</th>
-            <th class="num">Сумма</th>
+            <th class="num">{{ $t('payments.invoice.amount') }}</th>
             <th></th>
           </tr>
         </thead>
@@ -56,6 +56,7 @@ import { Plus, X } from 'lucide-vue-next'
 import AppModal from '../ui/AppModal.vue'
 import AppButton from '../ui/AppButton.vue'
 import { formatMoney } from '../../utils/format'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps<{
   visible: boolean
@@ -64,6 +65,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits(['close', 'submit'])
+const { t } = useI18n()
 
 interface InvoiceItem {
   name: string
@@ -75,7 +77,7 @@ const items = ref<InvoiceItem[]>([{ name: '', quantity: 1, price: 0 }])
 
 watch(() => props.visible, (v) => {
   if (v) {
-    items.value = [{ name: props.contractName || 'Услуга', quantity: 1, price: props.contractAmount || 0 }]
+    items.value = [{ name: props.contractName || t('payments.invoice.default_item'), quantity: 1, price: props.contractAmount || 0 }]
   }
 })
 
