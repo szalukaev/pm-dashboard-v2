@@ -1,6 +1,7 @@
 package redmine
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -22,6 +23,30 @@ func TestUpdateIssueReportsRedmineErrors(t *testing.T) {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error %q does not mention %q", err, want)
 		}
+	}
+}
+
+func TestGetCurrentUser(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/users/current.json" || r.Header.Get("X-Redmine-API-Key") != "personal-key" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.Write([]byte(`{"user":{"id":42,"login":"ivanov","firstname":"Иван","lastname":"Иванов"}}`))
+	}))
+	defer srv.Close()
+
+	user, err := NewClient(srv.URL, "personal-key", "", "").GetCurrentUser()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if user.ExternalID != 42 || user.Login != "ivanov" || user.Name != "Иван Иванов" {
+		t.Errorf("user = %+v", user)
+	}
+
+	_, err = NewClient(srv.URL, "wrong-key", "", "").GetCurrentUser()
+	if !errors.Is(err, ErrUnauthorized) {
+		t.Errorf("wrong key: err = %v, want ErrUnauthorized", err)
 	}
 }
 

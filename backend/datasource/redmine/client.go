@@ -2,6 +2,7 @@ package redmine
 
 import (
 	"encoding/json"
+	"errors"
 	"strconv"
 	"strings"
 	"fmt"
@@ -242,10 +243,45 @@ func (c *Client) doRequest(path string) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusUnauthorized {
+		return nil, fmt.Errorf("%w (redmine returned 401 for %s)", ErrUnauthorized, path)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("redmine returned %d for %s", resp.StatusCode, path)
 	}
 	return io.ReadAll(resp.Body)
+}
+
+// ErrUnauthorized: Redmine did not accept the API key.
+var ErrUnauthorized = errors.New("redmine api key is not valid")
+
+// GetCurrentUser returns the Redmine user the API key of this client belongs
+// to. A personal key identifies its owner, which is how a dashboard user is
+// tied to their Redmine account.
+func (c *Client) GetCurrentUser() (*Member, error) {
+	data, err := c.doRequest("/users/current.json")
+	if err != nil {
+		return nil, err
+	}
+	var resp struct {
+		User struct {
+			ID        int    `json:"id"`
+			Login     string `json:"login"`
+			FirstName string `json:"firstname"`
+			LastName  string `json:"lastname"`
+		} `json:"user"`
+	}
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return nil, err
+	}
+	if resp.User.ID == 0 {
+		return nil, fmt.Errorf("redmine returned no current user")
+	}
+	return &Member{
+		ExternalID: resp.User.ID,
+		Name:       strings.TrimSpace(resp.User.FirstName + " " + resp.User.LastName),
+		Login:      resp.User.Login,
+	}, nil
 }
 
 const (

@@ -68,7 +68,10 @@ CREATE TABLE IF NOT EXISTS group_permissions (
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN NOT NULL DEFAULT false;
 -- The member of the data source this user is ("own tasks" are assigned to it).
+-- It is found by the personal API key the user enters; the key itself is not
+-- stored, only its last characters to show which key is in use.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS member_id INTEGER;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS source_token_hint VARCHAR(16) NOT NULL DEFAULT '';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS role_template_id INTEGER REFERENCES role_templates(id) ON DELETE SET NULL;
 
 -- Preset role templates.

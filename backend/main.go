@@ -115,6 +115,7 @@ func main() {
 	adminH.Source = source
 	setupH.Source = source
 	settingsH.Source = source
+	authH.Source = source
 	syncStatusH := &handlers.SyncStatusHandler{DB: &pgDB, Source: source}
 	accessH := &handlers.AccessHandler{DB: &pgDB, Source: source}
 	// Issues are synced for the projects the users are shown within their rights
@@ -198,6 +199,9 @@ func main() {
 	api.HandleFunc("/auth/change-password", authH.ChangePassword).Methods("POST")
 	api.HandleFunc("/auth/avatar", authH.UploadAvatar).Methods("POST")
 	api.HandleFunc("/auth/avatar", authH.DeleteAvatar).Methods("DELETE")
+	// The link to the user's account in the data source: own only, no admin route
+	api.HandleFunc("/auth/source-token", authH.SetSourceToken).Methods("PUT")
+	api.HandleFunc("/auth/source-token", authH.ClearSourceToken).Methods("DELETE")
 	api.HandleFunc("/sync/status", syncStatusH.GetStatus).Methods("GET")
 	api.HandleFunc("/settings", settingsH.GetSettings).Methods("GET")
 	api.HandleFunc("/settings", settingsH.UpdateSettings).Methods("PUT")

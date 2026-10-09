@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"pm-dashboard/access"
+	"pm-dashboard/datasource/manager"
 	"pm-dashboard/db"
 	"pm-dashboard/middleware"
 	"pm-dashboard/utils"
@@ -20,9 +21,11 @@ import (
 )
 
 type AuthHandler struct {
-	DB **sql.DB
+	DB       **sql.DB
 	Sessions db.SessionStore
 	Audit    *middleware.AuditMiddleware
+	// Source checks personal API keys of the data source, see source_link.go.
+	Source *manager.Manager
 }
 
 type loginRequest struct {
@@ -252,6 +255,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 			"last_login":            lastLogin,
 			"force_password_change": forcePasswordChange,
 			"access":                h.accessInfo(id),
+			"source":                h.sourceInfo(id),
 		},
 	})
 }
@@ -330,6 +334,7 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		"last_login":            lastLogin,
 		"force_password_change": forcePasswordChange,
 		"access":                scopeInfo(middleware.GetScope(r)),
+		"source":                h.sourceInfo(userID),
 	})
 }
 

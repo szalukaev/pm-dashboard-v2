@@ -105,6 +105,25 @@ func (m *Manager) Client() *redmine.Client {
 	return m.client
 }
 
+// SourceType returns the kind of the configured data source ("redmine"),
+// or "" when none is configured.
+func (m *Manager) SourceType() string {
+	if m.Client() == nil {
+		return ""
+	}
+	return m.store.LoadAppConfig().DataSourceType
+}
+
+// ClientWithKey returns a client of the data source that acts with the given
+// personal API key instead of the system one; nil when not configured.
+func (m *Manager) ClientWithKey(apiKey string) *redmine.Client {
+	cfg := m.store.LoadAppConfig()
+	if cfg.RedmineURL == "" {
+		return nil
+	}
+	return redmine.NewClient(cfg.RedmineURL, apiKey, cfg.RedmineBasicLogin, cfg.RedmineBasicPass)
+}
+
 // Interval returns the time between periodic syncs in minutes.
 func (m *Manager) Interval() int {
 	v, _ := m.store.Get(intervalKey)

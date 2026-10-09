@@ -151,6 +151,7 @@ var auditSecretKeys = map[string]bool{
 	"new_password":     true,
 	"current_password": true,
 	"api_key":          true,
+	"token":            true,
 	"basic_password":   true,
 	"dsn":              true,
 	"license_blob":     true,

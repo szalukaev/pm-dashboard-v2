@@ -107,7 +107,6 @@ func (h *AccessHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		Password       string `json:"password"`
 		DisplayName    string `json:"display_name"`
 		Role           string `json:"role"`
-		MemberID       *int   `json:"member_id"`
 		RoleTemplateID *int   `json:"role_template_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -147,10 +146,12 @@ func (h *AccessHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	if displayName == "" {
 		displayName = body.Username
 	}
-	// The password is set by the administrator, so it is temporary.
-	_, err = (*h.DB).Exec(`INSERT INTO users (username, password_hash, role, display_name, member_id, role_template_id, force_password_change)
-		VALUES ($1, $2, $3, $4, $5, $6, true)`,
-		body.Username, string(hash), body.Role, displayName, body.MemberID, body.RoleTemplateID)
+	// The password is set by the administrator, so it is temporary. Who the
+	// user is in the data source they tell themselves on the first login
+	// (a personal API key, see source_link.go).
+	_, err = (*h.DB).Exec(`INSERT INTO users (username, password_hash, role, display_name, role_template_id, force_password_change)
+		VALUES ($1, $2, $3, $4, $5, true)`,
+		body.Username, string(hash), body.Role, displayName, body.RoleTemplateID)
 	if err != nil {
 		utils.Error(w, http.StatusConflict, "USER_EXISTS")
 		return
@@ -160,7 +161,7 @@ func (h *AccessHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 // UpdateUser changes the fields present in the body: role, display_name,
-// is_blocked, member_id, role_template_id (the last two may be null).
+// is_blocked, role_template_id (may be null).
 func (h *AccessHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	userID, ok := pathID(r, "id")
 	if !ok {
@@ -225,14 +226,8 @@ func (h *AccessHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		}
 		set("is_blocked", blocked)
 	}
-	if raw, ok := body["member_id"]; ok {
-		memberID, valid := nullableInt(raw)
-		if !valid {
-			utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
-			return
-		}
-		set("member_id", memberID)
-	}
+	// member_id is not here on purpose: the link to the account in the data
+	// source is set only by the user themselves, with a personal API key.
 	if raw, ok := body["role_template_id"]; ok {
 		templateID, valid := nullableInt(raw)
 		if !valid {
