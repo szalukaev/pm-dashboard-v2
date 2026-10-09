@@ -6,8 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"pm-dashboard/invoice"
@@ -154,105 +157,117 @@ func (h *PaymentsHandler) DeleteOrganization(w http.ResponseWriter, r *http.Requ
 
 // ─── Contract ───
 
+// paymentContract is a contract with what is computed for it.
+type paymentContract struct {
+	ID             int     `json:"id"`
+	OrganizationID *int    `json:"organization_id"`
+	ContractType   string  `json:"contract_type"`
+	Name           string  `json:"name"`
+	CompanyName    *string `json:"company_name"`
+	CompanyAddress *string `json:"company_address"`
+	Amount         float64 `json:"amount"`
+	VatRate        string  `json:"vat_rate"`
+	ContactName    *string `json:"contact_name"`
+	ContactPhone   *string `json:"contact_phone"`
+	StartDate      *string `json:"start_date"`
+	EndDate        *string `json:"end_date"`
+	OrgName        string  `json:"org_name"`
+	// TotalAmount: the amount of the contract with VAT.
+	TotalAmount float64 `json:"total_amount"`
+	// InvoicedAmount: the sum of the invoices, with VAT.
+	InvoicedAmount float64 `json:"invoiced_amount"`
+	TotalPaid      float64 `json:"total_paid"`
+	// DebtAmount: invoiced and not paid yet.
+	DebtAmount  float64 `json:"debt_amount"`
+	IsClosed    bool    `json:"is_closed"`
+	IsOverdue   bool    `json:"is_overdue"`
+	IsFullyPaid bool    `json:"is_fully_paid"`
+
+	money contractMoney
+}
+
+// contractFilter is what the list of contracts is narrowed by.
+type contractFilter struct {
+	Type       string // "service" | "onetime" | "" for both
+	Search     string // in the name of the contract or of the organization
+	ShowClosed bool
+}
+
+func contractFilterOf(r *http.Request) contractFilter {
+	q := r.URL.Query()
+	return contractFilter{
+		Type:       q.Get("type"),
+		Search:     strings.TrimSpace(q.Get("search")),
+		ShowClosed: q.Get("show_closed") == "true",
+	}
+}
+
+// loadContracts returns the contracts of the user with their computed
+// state. A nil filter gives every contract.
+func (h *PaymentsHandler) loadContracts(userID int, filter *contractFilter) ([]paymentContract, error) {
+	where := []string{"c.user_id = $1"}
+	args := []interface{}{userID}
+	if filter != nil && filter.Type != "" {
+		args = append(args, filter.Type)
+		where = append(where, "c.contract_type = $"+utils.Itoa(len(args)))
+	}
+	if filter != nil && filter.Search != "" {
+		args = append(args, "%"+strings.ToLower(filter.Search)+"%")
+		n := utils.Itoa(len(args))
+		where = append(where, "(LOWER(c.name) LIKE $"+n+" OR LOWER(COALESCE(c.company_name, '')) LIKE $"+n+
+			" OR LOWER(COALESCE(o.name, '')) LIKE $"+n+")")
+	}
+
+	rows, err := (*h.DB).Query(`SELECT c.id, c.organization_id, c.contract_type, c.name, c.company_name, c.company_address,
+		c.amount, c.vat_rate, c.contact_name, c.contact_phone, c.start_date, c.end_date,
+		COALESCE(o.name, '') AS org_name,
+		COALESCE((SELECT SUM(i.amount * CASE WHEN i.vat_rate = '5' THEN 1.05 ELSE 1 END)
+			FROM invoices i WHERE i.contract_id = c.id), 0) AS invoiced_amount,
+		COALESCE((SELECT SUM(p.amount) FROM contract_payments p
+			JOIN invoices i ON p.invoice_id = i.id WHERE i.contract_id = c.id), 0) AS total_paid
+		FROM contracts c LEFT JOIN organizations o ON c.organization_id = o.id
+		WHERE `+utils.JoinStrings(where, " AND ")+` ORDER BY c.created_at DESC`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	contracts := []paymentContract{}
+	today := time.Now().Format("2006-01-02")
+	for rows.Next() {
+		var c paymentContract
+		if err := rows.Scan(&c.ID, &c.OrganizationID, &c.ContractType, &c.Name, &c.CompanyName, &c.CompanyAddress,
+			&c.Amount, &c.VatRate, &c.ContactName, &c.ContactPhone, &c.StartDate, &c.EndDate,
+			&c.OrgName, &c.InvoicedAmount, &c.TotalPaid); err != nil {
+			return nil, err
+		}
+		c.InvoicedAmount = utils.Round2(c.InvoicedAmount)
+		c.money = contractMoney{Type: c.ContractType, Amount: c.Amount, VatRate: c.VatRate,
+			Invoiced: c.InvoicedAmount, Paid: c.TotalPaid, EndDate: c.EndDate}
+		c.TotalAmount = c.money.Total()
+		c.DebtAmount = c.money.Debt()
+		c.IsFullyPaid = c.money.FullyPaid()
+		c.IsClosed = c.money.Closed(today)
+		c.IsOverdue = c.money.Overdue(today)
+
+		if filter != nil && !filter.ShowClosed && c.IsClosed {
+			continue
+		}
+		contracts = append(contracts, c)
+	}
+	return contracts, rows.Err()
+}
+
 func (h *PaymentsHandler) ListContracts(w http.ResponseWriter, r *http.Request) {
 	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
 		return
 	}
-
-	userID := middleware.GetUserID(r)
-	filterType := r.URL.Query().Get("type")      // "service", "onetime"
-	showClosed := r.URL.Query().Get("show_closed") // "true"
-	search := r.URL.Query().Get("search")
-
-	where := []string{"c.user_id = $1"}
-	args := []interface{}{userID}
-	idx := 2
-
-	if filterType != "" {
-		where = append(where, "c.contract_type = $"+utils.Itoa(idx))
-		args = append(args, filterType)
-		idx++
-	}
-	if search != "" {
-		where = append(where, "(LOWER(c.name) LIKE $"+utils.Itoa(idx)+" OR LOWER(c.company_name) LIKE $"+utils.Itoa(idx)+")")
-		args = append(args, "%"+search+"%")
-		idx++
-	}
-
-	query := `SELECT c.id, c.organization_id, c.contract_type, c.name, c.company_name, c.company_address,
-		c.amount, c.vat_rate, c.contact_name, c.contact_phone, c.start_date, c.end_date,
-		COALESCE(o.name, '') as org_name,
-		COALESCE((SELECT SUM(i.amount) FROM invoices i WHERE i.contract_id = c.id), 0) as invoiced_amount,
-		COALESCE((SELECT SUM(p.amount) FROM contract_payments p JOIN invoices i ON p.invoice_id = i.id WHERE i.contract_id = c.id), 0) as total_paid
-		FROM contracts c LEFT JOIN organizations o ON c.organization_id = o.id
-		WHERE ` + utils.JoinStrings(where, " AND ") + ` ORDER BY c.created_at DESC`
-
-	rows, err := (*h.DB).Query(query, args...)
+	filter := contractFilterOf(r)
+	contracts, err := h.loadContracts(middleware.GetUserID(r), &filter)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
-	}
-	defer rows.Close()
-
-	type Contract struct {
-		ID             int      `json:"id"`
-		OrganizationID *int     `json:"organization_id"`
-		ContractType   string   `json:"contract_type"`
-		Name           string   `json:"name"`
-		CompanyName    *string  `json:"company_name"`
-		CompanyAddress *string  `json:"company_address"`
-		Amount         float64  `json:"amount"`
-		VatRate        string   `json:"vat_rate"`
-		ContactName    *string  `json:"contact_name"`
-		ContactPhone   *string  `json:"contact_phone"`
-		StartDate      *string  `json:"start_date"`
-		EndDate        *string  `json:"end_date"`
-		OrgName        string   `json:"org_name"`
-		InvoicedAmount float64  `json:"invoiced_amount"`
-		TotalPaid      float64  `json:"total_paid"`
-		DebtAmount     float64  `json:"debt_amount"`
-		IsClosed       bool     `json:"is_closed"`
-		IsOverdue      bool     `json:"is_overdue"`
-	}
-
-	var contracts []Contract
-	today := time.Now().Format("2006-01-02")
-	for rows.Next() {
-		var c Contract
-		if rows.Scan(&c.ID, &c.OrganizationID, &c.ContractType, &c.Name, &c.CompanyName, &c.CompanyAddress,
-			&c.Amount, &c.VatRate, &c.ContactName, &c.ContactPhone, &c.StartDate, &c.EndDate,
-			&c.OrgName, &c.InvoicedAmount, &c.TotalPaid) != nil {
-			continue
-		}
-		vatMul := 1.0
-		if c.VatRate == "5" {
-			vatMul = 1.05
-		}
-		totalObligation := c.Amount * vatMul
-		c.DebtAmount = totalObligation - c.TotalPaid
-		if c.DebtAmount < 0 {
-			c.DebtAmount = 0
-		}
-
-		// Is closed?
-		if c.ContractType == "onetime" {
-			c.IsClosed = c.TotalPaid >= totalObligation && c.TotalPaid > 0
-		} else {
-			c.IsClosed = c.EndDate != nil && *c.EndDate <= today && c.DebtAmount <= 0
-		}
-
-		// Is overdue?
-		c.IsOverdue = c.EndDate != nil && *c.EndDate < today && c.DebtAmount > 0
-
-		// Filter closed
-		if showClosed != "true" && c.IsClosed {
-			continue
-		}
-		contracts = append(contracts, c)
-	}
-	if contracts == nil {
-		contracts = []Contract{}
 	}
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"contracts": contracts})
 }
@@ -394,7 +409,8 @@ func (h *PaymentsHandler) ListInvoices(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
 	}
-	rows, err := (*h.DB).Query(`SELECT i.id, i.amount, i.vat_rate, i.issued_at, i.paid_amount, i.status
+	rows, err := (*h.DB).Query(`SELECT i.id, i.amount, i.vat_rate, i.issued_at, i.paid_amount, i.status,
+			(SELECT MAX(p.paid_at)::text FROM contract_payments p WHERE p.invoice_id = i.id)
 		FROM invoices i JOIN contracts c ON i.contract_id = c.id
 		WHERE i.contract_id=$1 AND c.user_id=$2 ORDER BY i.issued_at DESC, i.id DESC`+pageClause(limit, offset), contractID, userID)
 	if err != nil {
@@ -411,18 +427,23 @@ func (h *PaymentsHandler) ListInvoices(w http.ResponseWriter, r *http.Request) {
 		Status    string  `json:"status"`
 		Total     float64 `json:"total"`
 		Remainder float64 `json:"remainder"`
+		// Number: the date of issue as YYYYMM-DD
+		Number string `json:"number"`
+		// PaidAt: the date of the last payment, nil when nothing is paid
+		PaidAt *string `json:"paid_at"`
 	}
 	var invoices []Invoice
 	for rows.Next() {
 		var inv Invoice
-		if rows.Scan(&inv.ID, &inv.Amount, &inv.VatRate, &inv.IssuedAt, &inv.PaidAmount, &inv.Status) != nil {
+		if rows.Scan(&inv.ID, &inv.Amount, &inv.VatRate, &inv.IssuedAt, &inv.PaidAmount, &inv.Status, &inv.PaidAt) != nil {
 			continue
 		}
-		vatMul := 1.0
-		if inv.VatRate == "5" { vatMul = 1.05 }
-		inv.Total = inv.Amount * vatMul
-		inv.Remainder = inv.Total - inv.PaidAmount
-		if inv.Remainder < 0 { inv.Remainder = 0 }
+		inv.Total = utils.Round2(inv.Amount * vatMultiplier(inv.VatRate))
+		inv.Remainder = utils.Round2(inv.Total - inv.PaidAmount)
+		if inv.Remainder < 0 {
+			inv.Remainder = 0
+		}
+		inv.Number = invoiceNumber(inv.IssuedAt)
 		invoices = append(invoices, inv)
 	}
 	if invoices == nil { invoices = []Invoice{} }
@@ -538,9 +559,7 @@ func (h *PaymentsHandler) PayInvoice(w http.ResponseWriter, r *http.Request) {
 		WHERE i.id=$1 AND c.user_id=$2`, invoiceID, userID).Scan(&inv.Amount, &inv.VatRate, &inv.PaidAmount)
 	if err != nil { utils.Error(w, http.StatusNotFound, "INVOICE_NOT_FOUND"); return }
 
-	vatMul := 1.0
-	if inv.VatRate == "5" { vatMul = 1.05 }
-	totalObligation := utils.Round2(inv.Amount * vatMul)
+	totalObligation := utils.Round2(inv.Amount * vatMultiplier(inv.VatRate))
 	remainder := totalObligation - inv.PaidAmount
 
 	var body struct{ Amount *float64 `json:"amount"`; PaidAt *string `json:"paid_at"` }
@@ -549,18 +568,13 @@ func (h *PaymentsHandler) PayInvoice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	payAmount := remainder
-	if body.Amount != nil { payAmount = *body.Amount }
-	// Reject non-positive and over-payment amounts instead of clamping silently.
-	if payAmount <= 0 {
+	// More than is left to pay is cut to the remainder; the answer says so,
+	// and the page tells the user how much was taken.
+	payAmount, clamped, ok := appliedPayment(body.Amount, remainder)
+	if !ok {
 		utils.Error(w, http.StatusBadRequest, "INVALID_AMOUNT")
 		return
 	}
-	if payAmount > remainder {
-		utils.Error(w, http.StatusBadRequest, "INVALID_AMOUNT")
-		return
-	}
-	payAmount = utils.Round2(payAmount)
 
 	payDate := time.Now().Format("2006-01-02")
 	if body.PaidAt != nil { payDate = *body.PaidAt }
@@ -592,7 +606,10 @@ func (h *PaymentsHandler) PayInvoice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	utils.JSON(w, http.StatusOK, map[string]interface{}{"success": true, "paid_amount": newPaid, "status": status})
+	utils.JSON(w, http.StatusOK, map[string]interface{}{
+		"success": true, "paid_amount": newPaid, "status": status,
+		"applied": payAmount, "clamped": clamped,
+	})
 }
 
 func (h *PaymentsHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request) {
@@ -666,6 +683,7 @@ func (h *PaymentsHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request
 		ContactName:    contract.ContactName,
 		VatRate:        contract.VatRate,
 		Name:           contract.Name,
+		IssuedAt:       firstN(inv.IssuedAt, 10),
 	}, items)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "DOCX_GENERATION_FAILED")
@@ -674,7 +692,10 @@ func (h *PaymentsHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request
 
 	// Serve file
 	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", downloadName))
+	// The name is in Russian: filename* carries it encoded, filename is the
+	// fallback for what cannot read that
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"invoice.docx\"; filename*=UTF-8''%s", url.PathEscape(downloadName)))
+	w.Header().Set("Access-Control-Expose-Headers", "Content-Disposition")
 	http.ServeFile(w, r, outPath)
 
 	// Cleanup after 60 seconds
@@ -686,85 +707,56 @@ func (h *PaymentsHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request
 
 // ─── Statistics ───
 
+// GetStats returns the figures of the cards above the list. They always
+// cover every contract of the user, whatever the filters show.
 func (h *PaymentsHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
 		return
 	}
-
-	userID := middleware.GetUserID(r)
-
-	var contractCount int
-	var totalAmount, totalInvoiced, totalPaid, totalDebt float64
-	var closedCount int
-
-	(*h.DB).QueryRow("SELECT COUNT(*) FROM contracts WHERE user_id=$1", userID).Scan(&contractCount)
-	(*h.DB).QueryRow("SELECT COALESCE(SUM(amount),0) FROM contracts WHERE user_id=$1", userID).Scan(&totalAmount)
-
-	// Total invoiced (net)
-	(*h.DB).QueryRow(`SELECT COALESCE(SUM(i.amount),0) FROM invoices i
-		JOIN contracts c ON i.contract_id=c.id WHERE c.user_id=$1`, userID).Scan(&totalInvoiced)
-
-	// Total paid
-	(*h.DB).QueryRow(`SELECT COALESCE(SUM(p.amount),0) FROM contract_payments p
-		JOIN invoices i ON p.invoice_id=i.id JOIN contracts c ON i.contract_id=c.id WHERE c.user_id=$1`, userID).Scan(&totalPaid)
-
-	// Debt = Σ(total_amount * (1 + vat_rate/100)) − totalPaid, по фактическому НДС каждого счёта
-	// (раньше стояло грубое *1.025 на всю сумму).
-	_ = (*h.DB).QueryRow(`SELECT COALESCE(SUM(i.amount * (1 + CASE
-			WHEN i.vat_rate = '5' THEN 0.05
-			ELSE 0
-		END)), 0)
-		FROM invoices i JOIN contracts c ON i.contract_id=c.id WHERE c.user_id=$1`, userID).Scan(&totalDebt)
-	totalDebt = totalDebt - totalPaid
-	if totalDebt < 0 {
-		totalDebt = 0
+	contracts, err := h.loadContracts(middleware.GetUserID(r), nil)
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
+		return
 	}
-
-	// Closed count — та же логика закрытия, что в ListContracts:
-	// onetime: оплачено полностью; service: дата окончания прошла и долга нет.
-	(*h.DB).QueryRow(`SELECT COUNT(*) FROM contracts c WHERE c.user_id=$1 AND (
-		(c.contract_type = 'onetime' AND EXISTS (
-			SELECT 1 FROM invoices i WHERE i.contract_id = c.id
-		) AND COALESCE((SELECT SUM(p.amount) FROM contract_payments p
-			JOIN invoices i ON p.invoice_id = i.id WHERE i.contract_id = c.id), 0) >=
-			COALESCE((SELECT SUM(i.amount * (1 + CASE WHEN i.vat_rate = '5' THEN 0.05 ELSE 0 END))
-				FROM invoices i WHERE i.contract_id = c.id), 0)
-			AND COALESCE((SELECT SUM(p.amount) FROM contract_payments p
-			JOIN invoices i ON p.invoice_id = i.id WHERE i.contract_id = c.id), 0) > 0)
-		OR (c.contract_type = 'service' AND c.end_date IS NOT NULL AND c.end_date <= CURRENT_DATE
-			AND COALESCE((SELECT SUM(p.amount) FROM contract_payments p
-				JOIN invoices i ON p.invoice_id = i.id WHERE i.contract_id = c.id), 0) >=
-				COALESCE((SELECT SUM(i.amount * (1 + CASE WHEN i.vat_rate = '5' THEN 0.05 ELSE 0 END))
-					FROM invoices i WHERE i.contract_id = c.id), 0))
-	)`, userID).Scan(&closedCount)
+	money := make([]contractMoney, len(contracts))
+	for i, c := range contracts {
+		money[i] = c.money
+	}
+	totals := sumContracts(money, time.Now().Format("2006-01-02"))
 
 	stats := []map[string]interface{}{
-		{"label": "contracts", "value": contractCount},
-		{"label": "total_amount", "value": utils.Round2(totalAmount)},
-		{"label": "invoiced", "value": utils.Round2(totalInvoiced)},
-		{"label": "debt", "value": utils.Round2(totalDebt), "variant": "danger"},
-		{"label": "paid", "value": utils.Round2(totalPaid)},
-		{"label": "closed", "value": closedCount},
+		{"label": "contracts", "value": totals.Contracts},
+		{"label": "total_amount", "value": totals.TotalAmount},
+		{"label": "invoiced", "value": totals.Invoiced},
+		{"label": "debt", "value": totals.Debt},
+		{"label": "paid", "value": totals.Paid},
+		{"label": "closed_amount", "value": totals.ClosedAmount},
+	}
+	// The debt card is red only when there is a debt
+	if totals.Debt > 0 {
+		stats[3]["variant"] = "danger"
 	}
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"stats": stats})
 }
 
 // ─── CSV Export ───
 
+// ExportCSV writes the contracts the list shows — the same filters apply.
 func (h *PaymentsHandler) ExportCSV(w http.ResponseWriter, r *http.Request) {
 	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
 		return
 	}
-
-	userID := middleware.GetUserID(r)
-	rows, err := (*h.DB).Query(`SELECT c.contract_type, c.name, COALESCE(c.company_name,''), COALESCE(c.company_address,''),
-		c.amount, c.vat_rate, COALESCE(c.contact_name,''), COALESCE(c.contact_phone,''),
-		COALESCE(c.start_date::text,''), COALESCE(c.end_date::text,'')
-		FROM contracts c WHERE c.user_id=$1 ORDER BY c.name`, userID)
-	if err != nil { utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED"); return }
-	defer rows.Close()
+	filter := contractFilterOf(r)
+	contracts, err := h.loadContracts(middleware.GetUserID(r), &filter)
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
+		return
+	}
+	sort.SliceStable(contracts, func(i, j int) bool {
+		return strings.ToLower(contracts[i].Name) < strings.ToLower(contracts[j].Name)
+	})
 
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", "attachment; filename=contracts.csv")
@@ -773,25 +765,45 @@ func (h *PaymentsHandler) ExportCSV(w http.ResponseWriter, r *http.Request) {
 
 	writer := csv.NewWriter(w)
 	writer.Comma = ';'
-	writer.Write([]string{"Тип", "Название", "Организация", "Адрес", "Сумма", "НДС", "Контакт", "Телефон", "Дата начала", "Срок", "Статус"})
-
-	today := time.Now().Format("2006-01-02")
-	for rows.Next() {
-		var ct, name, company, addr, vat, contact, phone, start, end string
-		var amount float64
-		rows.Scan(&ct, &name, &company, &addr, &amount, &vat, &contact, &phone, &start, &end)
-
-		typeName := "Сопровождение"
-		if ct == "onetime" { typeName = "Разовый" }
-		vatLabel := "Без НДС"
-		if vat == "5" { vatLabel = "НДС 5%" }
-
-		status := "Активен"
-		if end != "" && end <= today { status = "Просрочен" }
-
-		writer.Write([]string{typeName, name, company, addr, fmt.Sprintf("%.2f", amount), vatLabel, contact, phone, start, end, status})
+	for _, row := range contractsCSV(contracts, time.Now().Format("2006-01-02")) {
+		writer.Write(row)
 	}
 	writer.Flush()
+}
+
+// contractsCSV builds the rows of the export, the header first. Amounts
+// are with VAT and use a decimal comma, as spreadsheets expect it here.
+func contractsCSV(contracts []paymentContract, today string) [][]string {
+	text := func(s *string) string {
+		if s == nil {
+			return ""
+		}
+		return *s
+	}
+	money := func(v float64) string {
+		return strings.Replace(fmt.Sprintf("%.2f", v), ".", ",", 1)
+	}
+	rows := [][]string{{"Тип", "Название", "Организация", "Адрес", "Сумма", "НДС", "Выставлено", "Долг",
+		"Контакт", "Телефон", "Дата начала", "Срок", "Статус"}}
+	for _, c := range contracts {
+		typeName := "Сопровождение"
+		if c.ContractType == "onetime" {
+			typeName = "Разовый"
+		}
+		vatLabel := "Без НДС"
+		if c.VatRate == "5" {
+			vatLabel = "НДС 5%"
+		}
+		organization := c.OrgName
+		if organization == "" {
+			organization = text(c.CompanyName)
+		}
+		rows = append(rows, []string{typeName, c.Name, organization, text(c.CompanyAddress),
+			money(c.TotalAmount), vatLabel, money(c.InvoicedAmount), money(c.DebtAmount),
+			text(c.ContactName), text(c.ContactPhone),
+			firstN(text(c.StartDate), 10), firstN(text(c.EndDate), 10), c.money.ExportStatus(today)})
+	}
+	return rows
 }
 
 // ─── Helpers ───

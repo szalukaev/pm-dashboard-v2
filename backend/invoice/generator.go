@@ -20,6 +20,8 @@ type ContractInfo struct {
 	ContactName    string
 	VatRate        string // "none" or "5"
 	Name           string
+	// IssuedAt: the day the invoice was issued on (YYYY-MM-DD); empty = today.
+	IssuedAt string
 }
 
 // InvoiceItem is a line item in the invoice
@@ -55,7 +57,12 @@ func GenerateInvoice(templatePath string, contract ContractInfo, items []Invoice
 		vatLabel = "НДС 5%"
 	}
 
+	// The number and the date are those of the day the invoice was issued
+	// on: downloading it again later gives the same document.
 	now := time.Now()
+	if issued, err := time.Parse("2006-01-02", contract.IssuedAt); err == nil {
+		now = issued
+	}
 	invNum := fmt.Sprintf("%d%02d-%02d", now.Year(), now.Month(), now.Day())
 	today := now.Format("2006-01-02")
 
