@@ -6,13 +6,15 @@ import (
 	"net/http"
 
 	"pm-dashboard/config"
+	"pm-dashboard/datasource/manager"
 	"pm-dashboard/middleware"
 	"pm-dashboard/utils"
 )
 
 type SettingsHandler struct {
-	DB **sql.DB
+	DB     **sql.DB
 	SQLite *config.SQLiteStore
+	Source *manager.Manager
 }
 
 func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
@@ -124,6 +126,11 @@ func (h *SettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request)
 		if _, err := (*h.DB).Exec("UPDATE user_settings SET selected_projects = $1 WHERE user_id = $2", data, userID); err != nil {
 			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 			return
+		}
+		// Issues are synced only for selected projects: fetch the new ones
+		// now instead of waiting for the next periodic sync.
+		if h.Source != nil {
+			h.Source.TriggerSync()
 		}
 	}
 	if v, ok := body["selected_team"]; ok {

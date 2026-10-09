@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"pm-dashboard/config"
+	"pm-dashboard/datasource/manager"
 	"pm-dashboard/db"
 	"pm-dashboard/utils"
 
@@ -24,6 +25,7 @@ import (
 type SetupHandler struct {
 	SQLite *config.SQLiteStore
 	PGDB   **sql.DB
+	Source *manager.Manager
 }
 
 type dbTestRequest struct {
@@ -336,6 +338,13 @@ func (h *SetupHandler) CreateAdmin(w http.ResponseWriter, r *http.Request) {
 	h.SQLite.Set("admin_created", "true")
 	if req.Language != "" {
 		h.SQLite.Set("default_language", req.Language)
+	}
+
+	// The wizard is done: start syncing without a restart, so statuses and
+	// projects are there when the administrator opens the settings.
+	if h.Source != nil {
+		h.Source.Reload()
+		h.Source.TriggerSync()
 	}
 
 	utils.Success(w)

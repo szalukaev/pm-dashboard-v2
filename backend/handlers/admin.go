@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"pm-dashboard/config"
+	"pm-dashboard/datasource/manager"
 	"pm-dashboard/middleware"
 	"pm-dashboard/utils"
 
@@ -21,6 +23,7 @@ import (
 type AdminHandler struct {
 	DB     **sql.DB
 	SQLite *config.SQLiteStore
+	Source *manager.Manager
 }
 
 // ─── User Management ───
@@ -481,6 +484,13 @@ func (h *AdminHandler) SaveDataSourceConfig(w http.ResponseWriter, r *http.Reque
 		h.SQLite.Set("redmine_basic_password", body.BasicPasswd)
 	}
 
+	// Apply on the fly: handlers use the new connection at once and a sync
+	// with it starts right away.
+	if h.Source != nil {
+		h.Source.Reload()
+		h.Source.TriggerSync()
+	}
+
 	utils.Success(w)
 }
 
@@ -559,6 +569,62 @@ func (h *AdminHandler) GetSyncLog(w http.ResponseWriter, r *http.Request) {
 		logs = []LogEntry{}
 	}
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"logs": logs})
+}
+
+// RunSync starts an unscheduled sync. The sync runs in the background; its
+// outcome appears in the sync log.
+func (h *AdminHandler) RunSync(w http.ResponseWriter, r *http.Request) {
+	if h.Source == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "SYNC_NOT_AVAILABLE")
+		return
+	}
+	switch err := h.Source.TriggerSync(); {
+	case err == nil:
+		utils.Success(w)
+	case errors.Is(err, manager.ErrAlreadyRunning):
+		utils.Error(w, http.StatusConflict, "SYNC_ALREADY_RUNNING")
+	case errors.Is(err, manager.ErrNotConfigured):
+		utils.Error(w, http.StatusBadRequest, "DATA_SOURCE_NOT_CONFIGURED")
+	case errors.Is(err, manager.ErrReadOnly):
+		utils.Error(w, http.StatusForbidden, "READ_ONLY_MODE")
+	default:
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+	}
+}
+
+func (h *AdminHandler) GetSyncSettings(w http.ResponseWriter, r *http.Request) {
+	if h.Source == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "SYNC_NOT_AVAILABLE")
+		return
+	}
+	utils.JSON(w, http.StatusOK, map[string]interface{}{
+		"interval_minutes": h.Source.Interval(),
+		"min":              manager.MinInterval,
+		"max":              manager.MaxInterval,
+	})
+}
+
+func (h *AdminHandler) UpdateSyncSettings(w http.ResponseWriter, r *http.Request) {
+	if h.Source == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "SYNC_NOT_AVAILABLE")
+		return
+	}
+	var body struct {
+		IntervalMinutes int `json:"interval_minutes"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
+		return
+	}
+	if body.IntervalMinutes < manager.MinInterval || body.IntervalMinutes > manager.MaxInterval {
+		utils.Error(w, http.StatusBadRequest, "INVALID_INTERVAL")
+		return
+	}
+	if err := h.Source.SetInterval(body.IntervalMinutes); err != nil {
+		utils.Error(w, http.StatusInternalServerError, "CONFIG_SAVE_FAILED")
+		return
+	}
+	utils.Success(w)
 }
 
 // ─── Audit Log ───

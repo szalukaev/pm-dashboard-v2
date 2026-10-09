@@ -1,23 +1,37 @@
 <template>
   <div class="settings-sync">
-    <h3 class="section-title">Синхронизация</h3>
-    <p class="section-hint">Журнал запусков воркера синхронизации данных из системы-источника.</p>
+    <h3 class="section-title">{{ $t('settings.sync.title') }}</h3>
+    <p class="section-hint">{{ $t('settings.sync.hint') }}</p>
 
     <div class="sync-actions">
-      <AppButton variant="primary" :loading="syncing" @click="runSync">
+      <AppButton variant="primary" :loading="syncing" data-testid="sync-run" @click="runSync">
         <RefreshCw :size="14" />
-        Запустить синхронизацию сейчас
+        {{ $t('settings.sync.run') }}
       </AppButton>
+
+      <label class="interval">
+        <span class="interval-label">{{ $t('settings.sync.interval') }}</span>
+        <input
+          v-model="intervalInput"
+          type="text"
+          inputmode="numeric"
+          class="interval-input"
+          data-testid="sync-interval"
+          @change="saveInterval"
+          @keyup.enter="($event.target as HTMLInputElement).blur()"
+        />
+        <span class="interval-label">{{ $t('settings.sync.minutes') }}</span>
+      </label>
     </div>
 
     <table class="sync-table">
       <thead>
         <tr>
-          <th>Дата/время</th>
-          <th>Длительность</th>
-          <th>Задач собрано</th>
-          <th>Статус</th>
-          <th>Ошибка</th>
+          <th>{{ $t('settings.sync.col_time') }}</th>
+          <th>{{ $t('settings.sync.col_duration') }}</th>
+          <th>{{ $t('settings.sync.col_issues') }}</th>
+          <th>{{ $t('settings.sync.col_status') }}</th>
+          <th>{{ $t('settings.sync.col_error') }}</th>
         </tr>
       </thead>
       <tbody>
@@ -26,7 +40,7 @@
           <td>{{ formatDuration(log.duration_ms) }}</td>
           <td>{{ log.issues_collected }}</td>
           <td>
-            <span class="status-badge" :class="log.status">{{ log.status }}</span>
+            <span class="status-badge" :class="log.status">{{ statusLabel(log.status) }}</span>
           </td>
           <td class="error-cell" :title="log.error_text || undefined">
             {{ log.error_text ? truncate(log.error_text, 60) : '—' }}
@@ -36,7 +50,7 @@
     </table>
 
     <div v-if="logs.length === 0" class="empty-hint">
-      Пока не было запусков синхронизации
+      {{ $t('settings.sync.empty') }}
     </div>
   </div>
 </template>
@@ -44,7 +58,9 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
+import { useI18n } from 'vue-i18n'
 import { RefreshCw } from 'lucide-vue-next'
+import { useSwal } from '../../composables/useSwal'
 import AppButton from '../ui/AppButton.vue'
 
 interface SyncLog {
@@ -57,8 +73,49 @@ interface SyncLog {
   error_text: string | null
 }
 
+const { t, te, locale } = useI18n()
+const { toast } = useSwal()
+
 const logs = ref<SyncLog[]>([])
 const syncing = ref(false)
+
+// Interval between periodic syncs, minutes
+const interval = ref(5)
+const intervalInput = ref('5')
+const intervalLimits = ref({ min: 1, max: 1440 })
+
+async function loadSettings() {
+  try {
+    const { data } = await axios.get('/api/admin/sync-settings')
+    interval.value = data.interval_minutes
+    intervalInput.value = String(data.interval_minutes)
+    intervalLimits.value = { min: data.min, max: data.max }
+  } catch {}
+}
+
+async function saveInterval() {
+  const value = Number(intervalInput.value.trim())
+  const { min, max } = intervalLimits.value
+  if (!Number.isInteger(value) || value < min || value > max) {
+    intervalInput.value = String(interval.value)
+    toast(t('settings.sync.interval_invalid', { min, max }), 'error')
+    return
+  }
+  if (value === interval.value) return
+  try {
+    await axios.put('/api/admin/sync-settings', { interval_minutes: value })
+    interval.value = value
+    toast(t('settings.sync.interval_saved'), 'success')
+  } catch {
+    intervalInput.value = String(interval.value)
+    toast(t('settings.sync.interval_error'), 'error')
+  }
+}
+
+function statusLabel(status: string): string {
+  const key = `settings.sync.status_${status}`
+  return te(key) ? t(key) : status
+}
 
 async function loadLogs() {
   try {
@@ -70,16 +127,26 @@ async function loadLogs() {
 async function runSync() {
   syncing.value = true
   try {
-    await axios.post('/api/admin/sync-now')
-    // Reload after a short delay
-    setTimeout(loadLogs, 3000)
-  } catch {}
-  finally { syncing.value = false }
+    await axios.post('/api/admin/sync/run')
+    toast(t('settings.sync.started'), 'success')
+    // The sync runs in the background: show the new entry, then its outcome
+    loadLogs()
+    setTimeout(loadLogs, 5000)
+  } catch (e: any) {
+    const code = e?.response?.data?.error
+    const key = code === 'SYNC_ALREADY_RUNNING' ? 'already_running'
+      : code === 'DATA_SOURCE_NOT_CONFIGURED' ? 'not_configured'
+      : 'run_error'
+    toast(t(`settings.sync.${key}`), code === 'SYNC_ALREADY_RUNNING' ? 'info' : 'error')
+    loadLogs()
+  } finally {
+    syncing.value = false
+  }
 }
 
 function formatDateTime(s: string): string {
   if (!s) return '—'
-  return new Date(s).toLocaleString('ru-RU', {
+  return new Date(s).toLocaleString(locale.value === 'en' ? 'en-GB' : 'ru-RU', {
     day: '2-digit', month: '2-digit', year: '2-digit',
     hour: '2-digit', minute: '2-digit', second: '2-digit',
   })
@@ -87,15 +154,18 @@ function formatDateTime(s: string): string {
 
 function formatDuration(ms: number | null): string {
   if (!ms) return '—'
-  if (ms < 1000) return ms + ' мс'
-  return (ms / 1000).toFixed(1) + ' сек'
+  if (ms < 1000) return `${ms} ${t('settings.sync.ms')}`
+  return `${(ms / 1000).toFixed(1)} ${t('settings.sync.sec')}`
 }
 
 function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max) + '…' : s
 }
 
-onMounted(loadLogs)
+onMounted(() => {
+  loadLogs()
+  loadSettings()
+})
 </script>
 
 <style scoped>
@@ -113,7 +183,37 @@ onMounted(loadLogs)
 }
 
 .sync-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 24px;
   margin-bottom: 20px;
+}
+
+.interval {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.interval-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.interval-input {
+  width: 64px;
+  padding: 6px 10px;
+  font-size: 13px;
+  text-align: center;
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  color: var(--text-bright);
+}
+
+.interval-input:focus {
+  border-color: var(--accent);
 }
 
 .sync-table {

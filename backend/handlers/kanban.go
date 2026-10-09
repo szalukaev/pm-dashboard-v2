@@ -8,12 +8,14 @@ import (
 	"strings"
 	"time"
 
+	"pm-dashboard/datasource/manager"
 	"pm-dashboard/middleware"
 	"pm-dashboard/utils"
 )
 
 type KanbanHandler struct {
-	DB **sql.DB
+	DB     **sql.DB
+	Source *manager.Manager
 }
 
 type KanbanCard struct {

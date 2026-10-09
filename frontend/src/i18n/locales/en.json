@@ -306,6 +306,31 @@
       "toast": "Toast Notifications",
       "overdue_alerts": "Overdue Task Alerts"
     },
+    "sync": {
+      "title": "Synchronization",
+      "hint": "Log of data synchronization runs from the source system.",
+      "run": "Run synchronization now",
+      "interval": "Interval",
+      "minutes": "min",
+      "interval_saved": "Synchronization interval saved",
+      "interval_invalid": "The interval is a whole number from {min} to {max} minutes",
+      "interval_error": "Failed to save the interval",
+      "started": "Synchronization started",
+      "already_running": "Synchronization is already running",
+      "not_configured": "The data source is not configured",
+      "run_error": "Failed to start synchronization",
+      "col_time": "Date/time",
+      "col_duration": "Duration",
+      "col_issues": "Tasks collected",
+      "col_status": "Status",
+      "col_error": "Error",
+      "status_success": "success",
+      "status_running": "running",
+      "status_error": "error",
+      "empty": "No synchronization runs yet",
+      "ms": "ms",
+      "sec": "s"
+    },
     "priorities": {
       "title": "Priority order",
       "order_hint": "The larger the number, the more important the priority. The priority with the largest number is counted as High in Analytics and highlighted in deadlines; tasks are sorted by this order."

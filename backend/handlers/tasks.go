@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"pm-dashboard/datasource/manager"
 	"pm-dashboard/datasource/redmine"
 	"pm-dashboard/middleware"
 	"pm-dashboard/utils"
@@ -19,8 +20,8 @@ import (
 )
 
 type TaskHandler struct {
-	DB **sql.DB
-	RedmineClient *redmine.Client
+	DB     **sql.DB
+	Source *manager.Manager
 }
 
 type TaskResponse struct {
@@ -499,10 +500,13 @@ func parseHours(value interface{}) (*float64, bool) {
 	}
 }
 
+// getRedmineClient returns the current data source client, nil when the
+// source is not configured.
 func (h *TaskHandler) getRedmineClient() *redmine.Client {
-	// Try to build client from SQLite config
-	// For now return nil — client is injected via middleware or main.go
-	return h.RedmineClient
+	if h.Source == nil {
+		return nil
+	}
+	return h.Source.Client()
 }
 
 func (h *TaskHandler) GetComments(w http.ResponseWriter, r *http.Request) {

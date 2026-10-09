@@ -13,7 +13,7 @@ import (
 
 	"pm-dashboard/config"
 	"pm-dashboard/db"
-	"pm-dashboard/datasource/redmine"
+	"pm-dashboard/datasource/manager"
 	"pm-dashboard/handlers"
 	"pm-dashboard/middleware"
 	"pm-dashboard/utils"
@@ -103,40 +103,18 @@ func main() {
 	}
 
 
-	// Create Redmine client for task sync
-	var redmineClient *redmine.Client
-	if cfg.RedmineURL != "" && cfg.RedmineAPIKey != "" {
-		redmineClient = redmine.NewClient(cfg.RedmineURL, cfg.RedmineAPIKey, cfg.RedmineBasicLogin, cfg.RedmineBasicPass)
-		taskH.RedmineClient = redmineClient
-	}
-
-	// Start Redmine sync if configured (checks read-only before each sync)
-	if redmineClient != nil && pgDB != nil {
-		client := redmineClient
-		syncer := redmine.NewSyncer(client)
-		go func() {
-			time.Sleep(2 * time.Second)
-			if licenseChecker == nil || !licenseChecker.IsReadOnly() {
-				if err := syncer.SyncAll(context.Background(), &pgDB); err != nil {
-					slog.Error("Initial sync failed", "error", err)
-				}
-			} else {
-				slog.Warn("Skipping initial sync — system is in read-only mode")
-			}
-			// Periodic sync every 5 minutes
-			ticker := time.NewTicker(5 * time.Minute)
-			defer ticker.Stop()
-			for range ticker.C {
-				if licenseChecker != nil && licenseChecker.IsReadOnly() {
-					slog.Warn("Skipping periodic sync — system is in read-only mode")
-					continue
-				}
-				if err := syncer.SyncAll(context.Background(), &pgDB); err != nil {
-					slog.Error("Periodic sync failed", "error", err)
-				}
-			}
-		}()
-	}
+	// Data source client and background sync. The manager re-reads connection
+	// settings and the interval on the fly, so the loop runs even while the
+	// source or the database is not configured yet (setup wizard).
+	source := manager.New(sqliteStore, &pgDB, func() bool {
+		return licenseChecker != nil && licenseChecker.IsReadOnly()
+	})
+	taskH.Source = source
+	kanbanH.Source = source
+	adminH.Source = source
+	setupH.Source = source
+	settingsH.Source = source
+	go source.Run(context.Background())
 
 	// Router
 	r := mux.NewRouter()
@@ -277,6 +255,9 @@ func main() {
 	admin.HandleFunc("/db-config", adminH.GetDBConfig).Methods("GET")
 	admin.HandleFunc("/db-config/test", adminH.TestDBConfig).Methods("POST")
 	admin.HandleFunc("/sync-log", adminH.GetSyncLog).Methods("GET")
+	admin.HandleFunc("/sync/run", adminH.RunSync).Methods("POST")
+	admin.HandleFunc("/sync-settings", adminH.GetSyncSettings).Methods("GET")
+	admin.HandleFunc("/sync-settings", adminH.UpdateSyncSettings).Methods("PUT")
 	admin.HandleFunc("/audit-log", adminH.GetAuditLog).Methods("GET")
 
 	// WebSocket (session cookie required — not public)
