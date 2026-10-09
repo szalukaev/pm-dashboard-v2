@@ -91,11 +91,6 @@
     <AppButton variant="ghost" @click="resetToDefaults">
       {{ $t('settings.data.reset') }}
     </AppButton>
-
-    <!-- Status Groups (admin only) -->
-    <div v-if="isAdmin" class="setting-block">
-      <SettingsStatusGroups />
-    </div>
   </div>
 </template>
 
@@ -103,15 +98,11 @@
 import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 import { useSettingsStore } from '../../stores/settings'
-import { useAuthStore } from '../../stores/auth'
 import { Pencil } from 'lucide-vue-next'
 import AppButton from '../ui/AppButton.vue'
 import AppModal from '../ui/AppModal.vue'
-import SettingsStatusGroups from './SettingsStatusGroups.vue'
 
 const settingsStore = useSettingsStore()
-const auth = useAuthStore()
-const isAdmin = computed(() => auth.user?.role === 'admin')
 
 const projects = ref<{ id: number; name: string; parent_id: number | null }[]>([])
 const members = ref<{ id: number; name: string }[]>([])

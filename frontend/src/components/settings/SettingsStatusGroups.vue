@@ -1,6 +1,6 @@
 <template>
   <div class="status-groups">
-    <h3 class="section-title">{{ $t('settings.statuses.title') }}</h3>
+    <h4 class="section-title">{{ $t('settings.statuses.title') }}</h4>
     <p class="block-hint">{{ $t('settings.statuses.hint') }}</p>
 
     <!-- Unassigned statuses as tiles -->

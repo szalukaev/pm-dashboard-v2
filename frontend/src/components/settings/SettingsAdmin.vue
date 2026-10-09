@@ -46,37 +46,9 @@
       </table>
     </div>
 
-    <!-- Status Mapping -->
+    <!-- Status groups: shared by all users, so they live here -->
     <div class="admin-section">
-      <h4 class="block-title">Маппинг статусов</h4>
-      <p class="block-hint">Настройте, к какой группе относится каждый статус из системы-источника.</p>
-
-      <table class="admin-table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Название</th>
-            <th>Группа</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="s in statuses" :key="s.external_id">
-            <td>{{ s.external_id }}</td>
-            <td>{{ s.name }}</td>
-            <td>
-              <select
-                :value="s.group"
-                @change="updateStatusGroup(s.external_id, ($event.target as HTMLSelectElement).value)"
-                class="inline-select"
-              >
-                <option value="open">open</option>
-                <option value="testing">testing</option>
-                <option value="closed">closed</option>
-              </select>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <SettingsStatusGroups />
     </div>
 
     <!-- Priority Order -->
@@ -159,26 +131,24 @@ import axios from 'axios'
 import { Trash2 } from 'lucide-vue-next'
 import AppButton from '../ui/AppButton.vue'
 import AppModal from '../ui/AppModal.vue'
+import SettingsStatusGroups from './SettingsStatusGroups.vue'
 import { formatDate } from '../../utils/format'
 import { useSwal } from '../../composables/useSwal'
 
 const { toast } = useSwal()
 
 const users = ref<any[]>([])
-const statuses = ref<any[]>([])
 const priorities = ref<any[]>([])
 const showUserForm = ref(false)
 const newUser = reactive({ username: '', password: '', role: 'user' })
 
 async function loadData() {
   try {
-    const [uRes, sRes, pRes] = await Promise.all([
+    const [uRes, pRes] = await Promise.all([
       axios.get('/api/admin/users'),
-      axios.get('/api/admin/statuses'),
       axios.get('/api/admin/priorities'),
     ])
     users.value = uRes.data.users || []
-    statuses.value = sRes.data.statuses || []
     priorities.value = pRes.data.priorities || []
   } catch {
     // May fail if not admin
@@ -211,11 +181,6 @@ async function updateUserRole(id: number, role: string) {
 async function deleteUser(id: number) {
   if (!confirm('Удалить пользователя?')) return
   await axios.delete(`/api/admin/users/${id}`)
-  await loadData()
-}
-
-async function updateStatusGroup(id: number, group: string) {
-  await axios.put(`/api/admin/statuses/${id}`, { group })
   await loadData()
 }
 
