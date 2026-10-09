@@ -305,6 +305,21 @@
       "title": "Notifications",
       "toast": "Toast Notifications",
       "overdue_alerts": "Overdue Task Alerts"
+    },
+    "statuses": {
+      "title": "Status groups",
+      "hint": "Assign statuses to groups. This drives the Tasks filters and the numbers in Analytics, Kanban and Sprint. The setting is shared by all users.",
+      "all": "All statuses",
+      "open": "Open",
+      "closed": "Closed",
+      "testing": "Testing",
+      "empty": "No statuses",
+      "bug_mark": "Mark as Bugs",
+      "bug_unmark": "Remove the Bugs mark",
+      "bug_marked": "The status counts as Bugs",
+      "admin_hint": "Click a status, then a column to move it. The bug icon marks a status as Bugs — such tasks are counted in the Bugs figures in Analytics.",
+      "readonly_hint": "Only an administrator can change status groups.",
+      "save_error": "Failed to save the change"
     }
   },
   "errors": {

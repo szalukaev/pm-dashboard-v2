@@ -820,7 +820,7 @@ func (h *TaskHandler) GetStatuses(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := (*h.DB).Query("SELECT external_id, name, is_closed, group_name FROM statuses ORDER BY external_id")
+	rows, err := (*h.DB).Query("SELECT external_id, name, is_closed, group_name, is_bug FROM statuses ORDER BY external_id")
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
@@ -832,11 +832,12 @@ func (h *TaskHandler) GetStatuses(w http.ResponseWriter, r *http.Request) {
 		Name     string `json:"name"`
 		IsClosed bool   `json:"is_closed"`
 		Group    string `json:"group"`
+		IsBug    bool   `json:"is_bug"`
 	}
 	var statuses []StatusInfo
 	for rows.Next() {
 		var s StatusInfo
-		if rows.Scan(&s.ID, &s.Name, &s.IsClosed, &s.Group) == nil {
+		if rows.Scan(&s.ID, &s.Name, &s.IsClosed, &s.Group, &s.IsBug) == nil {
 			statuses = append(statuses, s)
 		}
 	}

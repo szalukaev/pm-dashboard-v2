@@ -204,7 +204,7 @@ func (h *AdminHandler) ListStatuses(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := (*h.DB).Query("SELECT external_id, name, is_closed, group_name FROM statuses ORDER BY name")
+	rows, err := (*h.DB).Query("SELECT external_id, name, is_closed, group_name, is_bug FROM statuses ORDER BY name")
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
@@ -216,11 +216,12 @@ func (h *AdminHandler) ListStatuses(w http.ResponseWriter, r *http.Request) {
 		Name       string `json:"name"`
 		IsClosed   bool   `json:"is_closed"`
 		Group      string `json:"group"`
+		IsBug      bool   `json:"is_bug"`
 	}
 	var statuses []StatusMapping
 	for rows.Next() {
 		var s StatusMapping
-		if rows.Scan(&s.ExternalID, &s.Name, &s.IsClosed, &s.Group) == nil {
+		if rows.Scan(&s.ExternalID, &s.Name, &s.IsClosed, &s.Group, &s.IsBug) == nil {
 			statuses = append(statuses, s)
 		}
 	}
@@ -241,18 +242,28 @@ func (h *AdminHandler) UpdateStatusGroup(w http.ResponseWriter, r *http.Request)
 		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
 		return
 	}
+	// Either field may be sent alone: moving a status between groups and
+	// marking it as a bug status are separate actions in the settings.
 	var body struct {
-		Group string `json:"group"` // "open", "testing", "closed"
+		Group *string `json:"group"` // "open", "testing", "closed"
+		IsBug *bool   `json:"is_bug"`
 	}
 	json.NewDecoder(r.Body).Decode(&body)
 
-	if body.Group != "open" && body.Group != "testing" && body.Group != "closed" {
+	if body.Group == nil && body.IsBug == nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
+		return
+	}
+	if body.Group != nil && *body.Group != GroupOpen && *body.Group != GroupTesting && *body.Group != GroupClosed {
 		utils.Error(w, http.StatusBadRequest, "INVALID_GROUP")
 		return
 	}
 
-	isClosed := body.Group == "closed"
-	res, err := (*h.DB).Exec("UPDATE statuses SET group_name=$1, is_closed=$2 WHERE external_id=$3", body.Group, isClosed, statusID)
+	res, err := (*h.DB).Exec(`UPDATE statuses SET
+		group_name = COALESCE($1::varchar, group_name),
+		is_closed = COALESCE($1::varchar = 'closed', is_closed),
+		is_bug = COALESCE($2::boolean, is_bug)
+		WHERE external_id = $3`, body.Group, body.IsBug, statusID)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 		return

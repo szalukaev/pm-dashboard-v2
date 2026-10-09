@@ -102,7 +102,7 @@ func (h *AnalyticsHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	// Bugs
 	var bugs int
 	q = `SELECT COUNT(*) FROM issues WHERE ` + projectFilter + `
-		AND LOWER(status_name) LIKE '%bug%'`
+		AND ` + bugStatus("status_id")
 	(*h.DB).QueryRow(q, args...).Scan(&bugs)
 	stats = append(stats, StatCard{Label: "bugs", Value: float64(bugs)})
 
@@ -151,7 +151,7 @@ func (h *AnalyticsHandler) GetTeamLoad(w http.ResponseWriter, r *http.Request) {
 		COUNT(CASE WHEN ` + statusIn("status_id", GroupTesting) + ` THEN 1 END),
 		COUNT(CASE WHEN ` + statusIn("status_id", GroupClosed) + ` THEN 1 END),
 		COUNT(CASE WHEN due_date IS NOT NULL AND due_date < $` + itoa(len(args)+1) + ` AND ` + statusIn("status_id", GroupOpen, GroupTesting) + ` THEN 1 END),
-		COUNT(CASE WHEN LOWER(status_name) LIKE '%bug%' THEN 1 END),
+		COUNT(CASE WHEN ` + bugStatus("status_id") + ` THEN 1 END),
 		COUNT(CASE WHEN priority_id = $` + itoa(len(args)+2) + ` THEN 1 END),
 		COUNT(CASE WHEN (estimated_hours IS NULL OR estimated_hours = 0) AND ` + statusIn("status_id", GroupOpen) + ` THEN 1 END)
 		FROM issues WHERE ` + projectFilter + teamFilter + `

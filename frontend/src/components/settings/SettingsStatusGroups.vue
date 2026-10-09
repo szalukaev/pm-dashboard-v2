@@ -1,11 +1,11 @@
 <template>
   <div class="status-groups">
-    <h3 class="section-title">Статусы по типам</h3>
-    <p class="block-hint">Распределите статусы по группам. Это влияет на фильтры вкладки «Задачи». Настройка общая для всех пользователей.</p>
+    <h3 class="section-title">{{ $t('settings.statuses.title') }}</h3>
+    <p class="block-hint">{{ $t('settings.statuses.hint') }}</p>
 
     <!-- Unassigned statuses as tiles -->
     <div class="tiles-area">
-      <h4 class="block-title">Все статусы</h4>
+      <h4 class="block-title">{{ $t('settings.statuses.all') }}</h4>
       <div class="tiles-grid">
         <div
           v-for="s in allStatuses"
@@ -28,7 +28,7 @@
         :class="{ 'drop-active': selectedStatus !== null }"
         @click="assignSelected(col.key)"
       >
-        <h4 class="col-title" :class="col.key">{{ col.label }}</h4>
+        <h4 class="col-title" :class="col.key">{{ $t(col.label) }}</h4>
         <div class="col-items">
           <div
             v-for="s in statusesByGroup(col.key)"
@@ -38,14 +38,25 @@
             @click.stop="selectStatus(s.id)"
           >
             {{ s.name }}
+            <button
+              v-if="isAdmin || s.is_bug"
+              type="button"
+              class="bug-toggle"
+              :class="{ on: s.is_bug }"
+              :disabled="!isAdmin"
+              :title="bugTitle(s)"
+              :data-testid="'status-bug-' + s.id"
+              @click.stop="toggleBug(s)"
+            >
+              <Bug :size="12" />
+            </button>
           </div>
-          <div v-if="statusesByGroup(col.key).length === 0" class="col-empty">Перетащите сюда</div>
+          <div v-if="statusesByGroup(col.key).length === 0" class="col-empty">{{ $t('settings.statuses.empty') }}</div>
         </div>
       </div>
     </div>
 
-    <div v-if="isAdmin" class="hint-text">Кликните на статус, затем на столбец, чтобы переместить.</div>
-    <div v-else class="hint-text">Только администратор может изменять распределение статусов.</div>
+    <div class="hint-text">{{ $t(isAdmin ? 'settings.statuses.admin_hint' : 'settings.statuses.readonly_hint') }}</div>
   </div>
 </template>
 
@@ -54,13 +65,20 @@ import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../../stores/auth'
 import { storeToRefs } from 'pinia'
 import axios from 'axios'
+import { useI18n } from 'vue-i18n'
+import { Bug } from 'lucide-vue-next'
+import { useSwal } from '../../composables/useSwal'
 
 interface Status {
   id: number
   name: string
   is_closed: boolean
   group: string
+  is_bug: boolean
 }
+
+const { t } = useI18n()
+const { toast } = useSwal()
 
 const authStore = useAuthStore()
 const { user } = storeToRefs(authStore)
@@ -70,10 +88,27 @@ const allStatuses = ref<Status[]>([])
 const selectedStatus = ref<number | null>(null)
 
 const columns = [
-  { key: 'open', label: 'Открытые' },
-  { key: 'closed', label: 'Закрытые' },
-  { key: 'testing', label: 'Тестирование' },
+  { key: 'open', label: 'settings.statuses.open' },
+  { key: 'closed', label: 'settings.statuses.closed' },
+  { key: 'testing', label: 'settings.statuses.testing' },
 ]
+
+function bugTitle(s: Status): string {
+  if (!isAdmin.value) return t('settings.statuses.bug_marked')
+  return t(s.is_bug ? 'settings.statuses.bug_unmark' : 'settings.statuses.bug_mark')
+}
+
+// Bugs is a mark on top of the group: the status stays in its column.
+async function toggleBug(status: Status) {
+  if (!isAdmin.value) return
+  status.is_bug = !status.is_bug
+  try {
+    await axios.put(`/api/admin/statuses/${status.id}`, { is_bug: status.is_bug })
+  } catch {
+    status.is_bug = !status.is_bug
+    toast(t('settings.statuses.save_error'), 'error')
+  }
+}
 
 function statusesByGroup(group: string): Status[] {
   return allStatuses.value.filter(s => s.group === group)
@@ -88,15 +123,17 @@ async function assignSelected(group: string) {
   if (!isAdmin.value || selectedStatus.value === null) return
   const status = allStatuses.value.find(s => s.id === selectedStatus.value)
   if (!status) return
+  const previous = status.group
   status.group = group
   status.is_closed = group === 'closed'
-  try {
-    await axios.put(`/api/admin/statuses/${status.id}`, {
-      group: group,
-      is_closed: group === 'closed',
-    })
-  } catch {}
   selectedStatus.value = null
+  try {
+    await axios.put(`/api/admin/statuses/${status.id}`, { group })
+  } catch {
+    status.group = previous
+    status.is_closed = previous === 'closed'
+    toast(t('settings.statuses.save_error'), 'error')
+  }
 }
 
 onMounted(async () => {
@@ -227,8 +264,33 @@ onMounted(async () => {
 }
 
 .status-tile.in-column {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 11px;
   padding: 4px 10px;
+}
+
+.bug-toggle {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 4px;
+  color: var(--text-faintest);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.bug-toggle:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.bug-toggle.on {
+  color: var(--danger);
+  background: var(--danger-bg, transparent);
+}
+
+.bug-toggle:disabled {
+  cursor: default;
 }
 
 .col-empty {

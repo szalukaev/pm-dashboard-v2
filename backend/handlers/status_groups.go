@@ -23,6 +23,12 @@ func statusNotIn(col string, groups ...string) string {
 	return col + " NOT IN (" + statusGroupSubquery(groups) + ")"
 }
 
+// bugStatus is true for statuses marked as Bugs in the settings. The mark is
+// independent of the group: a bug status is usually an open one as well.
+func bugStatus(col string) string {
+	return col + " IN (SELECT external_id FROM statuses WHERE data_source = 'redmine' AND is_bug)"
+}
+
 func statusGroupSubquery(groups []string) string {
 	return "SELECT external_id FROM statuses WHERE data_source = 'redmine' AND group_name IN ('" +
 		strings.Join(groups, "','") + "')"
