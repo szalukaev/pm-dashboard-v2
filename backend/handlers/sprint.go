@@ -351,7 +351,7 @@ func (h *SprintHandler) GetBacklog(w http.ResponseWriter, r *http.Request) {
 		FROM issues i
 		WHERE ` + utils.JoinStrings(where, " AND ") + `
 		AND i.external_id NOT IN (SELECT issue_external_id FROM sprint_issues)
-		ORDER BY i.project_name, i.priority_id DESC`
+		ORDER BY i.project_name, ` + priorityRank("i.priority_id") + ` DESC NULLS LAST`
 
 	rows, err := (*h.DB).Query(query, args...)
 	if err != nil {
@@ -433,7 +433,7 @@ func (h *SprintHandler) getSprintTasks(sprintID int) []SprintTask {
 		COALESCE(st.group_name, 'open')
 		FROM sprint_issues si JOIN issues i ON si.issue_external_id = i.external_id
 		LEFT JOIN statuses st ON st.external_id = i.status_id AND st.data_source = 'redmine'
-		WHERE si.sprint_id = $1 ORDER BY i.priority_id DESC`, sprintID)
+		WHERE si.sprint_id = $1 ORDER BY `+priorityRank("i.priority_id")+` DESC NULLS LAST`, sprintID)
 	if err != nil {
 		return []SprintTask{}
 	}

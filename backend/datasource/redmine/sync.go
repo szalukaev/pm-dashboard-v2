@@ -127,12 +127,14 @@ func (s *Syncer) syncPriorities(_ context.Context, db **sql.DB) error {
 		return err
 	}
 	for i, p := range priorities {
+		// sort_order is user configuration (the administrator reorders
+		// priorities in the settings): seed it from the Redmine order on
+		// first insert only, never overwrite it afterwards.
 		_, err := (*db).Exec(`
 			INSERT INTO priorities (external_id, name, sort_order, data_source, synced_at)
 			VALUES ($1, $2, $3, 'redmine', NOW())
 			ON CONFLICT (external_id, data_source) DO UPDATE SET
 				name = EXCLUDED.name,
-				sort_order = EXCLUDED.sort_order,
 				synced_at = NOW()
 		`, p.ExternalID, p.Name, i)
 		if err != nil {

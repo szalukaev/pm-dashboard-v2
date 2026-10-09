@@ -81,7 +81,8 @@
 
     <!-- Priority Order -->
     <div class="admin-section">
-      <h4 class="block-title">Порядок приоритетов</h4>
+      <h4 class="block-title">{{ $t('settings.priorities.title') }}</h4>
+      <p class="block-hint">{{ $t('settings.priorities.order_hint') }}</p>
 
       <table class="admin-table">
         <thead>

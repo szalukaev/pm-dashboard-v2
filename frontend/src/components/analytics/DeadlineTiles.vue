@@ -27,7 +27,7 @@
             v-for="task in group.tasks"
             :key="task.external_id"
             class="task-tile"
-            :class="{ 'high-priority': task.priority_id >= 5 }"
+            :class="{ 'high-priority': task.is_high_priority }"
             @click="$emit('open-task', task.external_id)"
             :data-testid="'deadline-task-' + task.external_id"
           >

@@ -34,9 +34,14 @@ type TeamLoadRow struct {
 	NoEstimate int    `json:"no_estimate"`
 }
 
+type DeadlineTask struct {
+	TaskResponse
+	IsHighPriority bool `json:"is_high_priority"`
+}
+
 type DeadlineGroup struct {
 	Name  string         `json:"name"`
-	Tasks []TaskResponse `json:"tasks"`
+	Tasks []DeadlineTask `json:"tasks"`
 }
 
 type ProjectDist struct {
@@ -130,10 +135,6 @@ func (h *AnalyticsHandler) GetTeamLoad(w http.ResponseWriter, r *http.Request) {
 
 	projectFilter, args := h.buildProjectFilter(projects, 1)
 
-	// Get max priority ID for "high priority" check
-	var maxPriorityID int
-	(*h.DB).QueryRow("SELECT COALESCE(MAX(external_id), 0) FROM priorities").Scan(&maxPriorityID)
-
 	// Build team filter
 	teamFilter := ""
 	if len(team) > 0 {
@@ -152,13 +153,13 @@ func (h *AnalyticsHandler) GetTeamLoad(w http.ResponseWriter, r *http.Request) {
 		COUNT(CASE WHEN ` + statusIn("status_id", GroupClosed) + ` THEN 1 END),
 		COUNT(CASE WHEN due_date IS NOT NULL AND due_date < $` + itoa(len(args)+1) + ` AND ` + statusIn("status_id", GroupOpen, GroupTesting) + ` THEN 1 END),
 		COUNT(CASE WHEN ` + bugStatus("status_id") + ` THEN 1 END),
-		COUNT(CASE WHEN priority_id = $` + itoa(len(args)+2) + ` THEN 1 END),
+		COUNT(CASE WHEN ` + highPriority("priority_id") + ` THEN 1 END),
 		COUNT(CASE WHEN (estimated_hours IS NULL OR estimated_hours = 0) AND ` + statusIn("status_id", GroupOpen) + ` THEN 1 END)
 		FROM issues WHERE ` + projectFilter + teamFilter + `
 		GROUP BY assigned_to_name
 		ORDER BY assigned_to_name`
 
-	args = append(args, today, maxPriorityID)
+	args = append(args, today)
 	rows, err := (*h.DB).Query(q, args...)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
@@ -257,7 +258,8 @@ func (h *AnalyticsHandler) GetDeadlines(w http.ResponseWriter, r *http.Request) 
 		status_name, status_id, priority_name, priority_id,
 		assigned_to_name, assigned_to_id, category_name,
 		start_date, due_date, estimated_hours, spent_hours,
-		done_ratio, tracker_name, author_name, COALESCE(bug_fix_hours, 0)
+		done_ratio, tracker_name, author_name, COALESCE(bug_fix_hours, 0),
+		COALESCE(` + highPriority("priority_id") + `, false)
 		FROM issues WHERE ` + projectFilter + `
 		AND due_date IS NOT NULL
 		AND ` + statusNotIn("status_id", GroupClosed) + `
@@ -279,13 +281,14 @@ func (h *AnalyticsHandler) GetDeadlines(w http.ResponseWriter, r *http.Request) 
 	}
 
 	for rows.Next() {
-		var t TaskResponse
+		var t DeadlineTask
 		if rows.Scan(
 			&t.ExternalID, &t.ProjectID, &t.ProjectName, &t.Subject, &t.Description,
 			&t.StatusName, &t.StatusID, &t.PriorityName, &t.PriorityID,
 			&t.AssignedToName, &t.AssignedToID, &t.CategoryName,
 			&t.StartDate, &t.DueDate, &t.EstimatedHours, &t.SpentHours,
 			&t.DoneRatio, &t.TrackerName, &t.AuthorName, &t.BugFixHours,
+			&t.IsHighPriority,
 		) != nil {
 			continue
 		}
@@ -310,7 +313,7 @@ func (h *AnalyticsHandler) GetDeadlines(w http.ResponseWriter, r *http.Request) 
 	result := []DeadlineGroup{}
 	for _, g := range groups {
 		if g.Tasks == nil {
-			g.Tasks = []TaskResponse{}
+			g.Tasks = []DeadlineTask{}
 		}
 		result = append(result, *g)
 	}

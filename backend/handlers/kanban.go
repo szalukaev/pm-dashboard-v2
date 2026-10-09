@@ -95,7 +95,7 @@ func (h *KanbanHandler) GetBoard(w http.ResponseWriter, r *http.Request) {
 		priority_name, priority_id, assigned_to_name, assigned_to_id,
 		category_name, due_date, estimated_hours
 		FROM issues WHERE ` + strings.Join(where, " AND ") + `
-		ORDER BY priority_id DESC, external_id`
+		ORDER BY ` + priorityRank("priority_id") + ` DESC NULLS LAST, external_id`
 
 	rows, err := (*h.DB).Query(query, args...)
 	if err != nil {

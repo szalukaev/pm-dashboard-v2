@@ -306,6 +306,10 @@
       "toast": "Toast Notifications",
       "overdue_alerts": "Overdue Task Alerts"
     },
+    "priorities": {
+      "title": "Priority order",
+      "order_hint": "The larger the number, the more important the priority. The priority with the largest number is counted as High in Analytics and highlighted in deadlines; tasks are sorted by this order."
+    },
     "statuses": {
       "title": "Status groups",
       "hint": "Assign statuses to groups. This drives the Tasks filters and the numbers in Analytics, Kanban and Sprint. The setting is shared by all users.",
