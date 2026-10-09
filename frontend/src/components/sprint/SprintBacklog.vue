@@ -57,6 +57,7 @@
             v-for="task in group.tasks"
             :key="task.external_id"
             :card="mapToKanbanCard(task)"
+            compact
             draggable="true"
             @dragstart="onDragStart($event, task)"
             @open-task="$emit('open-task', $event)"
@@ -280,7 +281,8 @@ function mapToKanbanCard(task: SprintTask): KanbanCardType {
 .group-body {
   padding: 8px;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px;
 }
 </style>

@@ -57,6 +57,7 @@
           v-for="task in sprint.tasks"
           :key="task.external_id"
           :card="toKanbanCard(task)"
+          compact
           @open-task="$emit('open-task', $event)"
         />
       </div>
@@ -253,9 +254,10 @@ function formatDate(d: string | null): string {
 }
 
 .tasks-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px;
   min-height: 60px;
 }
 

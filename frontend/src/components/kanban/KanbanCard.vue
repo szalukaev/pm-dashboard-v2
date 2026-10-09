@@ -1,7 +1,7 @@
 <template>
   <div
     class="kanban-card"
-    :class="{ 'is-overdue': card.is_overdue, 'is-dragging': isDragging, 'flash-update': isFlashing(card.external_id) }"
+    :class="{ 'is-overdue': card.is_overdue, 'is-dragging': isDragging, 'is-compact': compact, 'flash-update': isFlashing(card.external_id) }"
     :style="{ borderLeftColor: priorityColor }"
     draggable="true"
     @dragstart="onDragStart"
@@ -24,7 +24,7 @@
     </div>
 
     <div class="card-subject" :title="card.subject">
-      {{ card.subject }}
+      {{ subject }}
     </div>
 
     <div class="card-badges">
@@ -60,7 +60,16 @@ import { isFlashing } from '../../composables/useFlash'
 const settingsStore = useSettingsStore()
 const { settings } = storeToRefs(settingsStore)
 
-const props = defineProps<{ card: KanbanCard }>()
+// compact: a tile as wide as its subject, several in a row (sprints, backlog)
+const props = defineProps<{ card: KanbanCard; compact?: boolean }>()
+
+const COMPACT_SUBJECT_MAX = 150
+
+const subject = computed(() => {
+  const text = props.card.subject
+  if (!props.compact || text.length <= COMPACT_SUBJECT_MAX) return text
+  return text.slice(0, COMPACT_SUBJECT_MAX).trimEnd() + '…'
+})
 defineEmits(['open-task'])
 
 const issueLink = computed(() => {
@@ -127,6 +136,31 @@ function formatDate(d: string): string {
 
 .kanban-card.is-overdue {
   border-left-color: var(--critical);
+}
+
+.kanban-card.is-compact {
+  width: fit-content;
+  max-width: 100%;
+  padding: 8px 10px;
+}
+
+.kanban-card.is-compact .card-header {
+  margin-bottom: 2px;
+}
+
+.kanban-card.is-compact .card-subject {
+  display: block;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  margin-bottom: 6px;
+}
+
+.kanban-card.is-compact .card-badges {
+  margin-bottom: 4px;
+}
+
+.kanban-card.is-compact .card-footer {
+  gap: 12px;
 }
 
 .card-header {
