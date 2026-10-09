@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	_ "embed"
 	"fmt"
 	"log/slog"
 	"os"
@@ -105,9 +106,18 @@ func RunMigrations(db *sql.DB) error {
 
 // runFallbackMigrations runs the inline SQL if no migration files found
 func runFallbackMigrations(db *sql.DB) error {
-	_, err := db.Exec(fallbackMigrationSQL)
+	if _, err := db.Exec(fallbackMigrationSQL); err != nil {
+		return err
+	}
+	_, err := db.Exec(accessControlSQL)
 	return err
 }
+
+// The access control schema is idempotent, so the fallback runs the very
+// migration file instead of keeping a second copy of it.
+//
+//go:embed migrations/006_access_control.up.sql
+var accessControlSQL string
 
 // fallbackMigrationSQL is kept as a safety net when migration files are not available
 const fallbackMigrationSQL = `
