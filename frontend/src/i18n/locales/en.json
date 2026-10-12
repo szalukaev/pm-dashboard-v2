@@ -233,6 +233,7 @@
       "high_priority": "High"
     },
     "stats_title": "Statistics",
+    "show_tasks": "Show tasks",
     "team_load": "Team Workload",
     "distribution": "Task Distribution by Project",
     "deadlines": "Upcoming Deadlines",

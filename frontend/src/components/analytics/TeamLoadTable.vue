@@ -12,13 +12,20 @@
             <!-- The cells follow the columns the user chose and their order -->
             <template v-for="col in shownColumns" :key="col.key">
               <td v-if="col.key === 'employee'" class="name-cell">{{ row.name }}</td>
-              <td v-else-if="col.key === 'open'" class="num-cell">{{ row.open }}</td>
-              <td v-else-if="col.key === 'testing'" class="num-cell">{{ row.testing }}</td>
-              <td v-else-if="col.key === 'closed'" class="num-cell">{{ row.closed }}</td>
-              <td v-else-if="col.key === 'overdue'" class="num-cell" :class="{ 'danger-text': row.overdue > 0 }">{{ row.overdue }}</td>
-              <td v-else-if="col.key === 'bugs'" class="num-cell" :class="{ 'danger-text': row.bugs > 0 }">{{ row.bugs }}</td>
-              <td v-else-if="col.key === 'high'" class="num-cell">{{ row.high_priority }}</td>
-              <td v-else-if="col.key === 'no_estimate'" class="num-cell" :class="{ 'warning-text': row.no_estimate > 0 }">{{ row.no_estimate }}</td>
+              <!-- A figure opens the tasks it counts -->
+              <td v-else class="num-cell">
+                <button
+                  v-if="count(row, col.key) > 0"
+                  type="button"
+                  class="num-btn"
+                  :class="tone(col.key)"
+                  :title="$t('analytics.show_tasks')"
+                  @click="$emit('open-tasks', row.name, METRICS[col.key], col.label)"
+                >
+                  {{ count(row, col.key) }}
+                </button>
+                <span v-else>0</span>
+              </td>
             </template>
           </tr>
         </tbody>
@@ -35,6 +42,34 @@ import { TEAM_LOAD_TABLE as TABLE, TEAM_LOAD_COLUMNS as COLUMNS } from './teamLo
 
 // The button that sets up the columns lives in the header of the widget
 defineProps<{ team: TeamLoadRow[] }>()
+
+// open-tasks: a figure was clicked — the employee, the figure in the list of
+// tasks behind it and the dictionary key of the column
+defineEmits<{
+  (e: 'open-tasks', name: string, metric: string, label: string): void
+}>()
+
+// The figure each column of numbers stands for
+const METRICS: Record<string, keyof TeamLoadRow> = {
+  open: 'open',
+  testing: 'testing',
+  closed: 'closed',
+  overdue: 'overdue',
+  bugs: 'bugs',
+  high: 'high_priority',
+  no_estimate: 'no_estimate',
+}
+
+function count(row: TeamLoadRow, column: string): number {
+  const value = row[METRICS[column]]
+  return typeof value === 'number' ? value : 0
+}
+
+// Problems stand out
+function tone(column: string): string {
+  if (column === 'overdue' || column === 'bugs') return 'danger-text'
+  return column === 'no_estimate' ? 'warning-text' : ''
+}
 
 const settingsStore = useSettingsStore()
 const shownColumns = computed(() =>
@@ -71,7 +106,7 @@ const shownColumns = computed(() =>
 }
 
 .team-table th.num {
-  text-align: right;
+  text-align: center;
 }
 
 .team-table td {
@@ -90,8 +125,32 @@ const shownColumns = computed(() =>
 }
 
 .num-cell {
-  text-align: right;
+  text-align: center;
   font-variant-numeric: tabular-nums;
+}
+
+.num-btn {
+  min-width: 32px;
+  padding: 2px 8px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.num-btn:hover {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.num-btn.danger-text {
+  color: var(--danger);
+}
+
+.num-btn.warning-text {
+  color: var(--warning);
 }
 
 .danger-text {

@@ -70,6 +70,15 @@ export interface Health {
   parts: HealthPart[]
 }
 
+// The tasks behind a figure of the tab. metric is the figure; assignee, when
+// given, is the employee whose row of the team load table was clicked —
+// otherwise the figure is a card of the statistics.
+export interface TaskListQuery {
+  title: string
+  metric: string
+  assignee?: string
+}
+
 // A bar of the timeline, from start to due (YYYY-MM-DD)
 export interface GanttTask {
   external_id: number

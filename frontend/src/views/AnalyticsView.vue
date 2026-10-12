@@ -22,7 +22,7 @@
       </template>
 
       <template #stats>
-        <StatCards :stats="stats" />
+        <StatCards :stats="stats" @open-tasks="openStatTasks" />
       </template>
 
       <template #health>
@@ -45,7 +45,7 @@
         <AppColumnSettings :table="TEAM_LOAD_TABLE" :columns="TEAM_LOAD_COLUMNS" />
       </template>
       <template #team_load>
-        <TeamLoadTable :team="teamLoad" />
+        <TeamLoadTable :team="teamLoad" @open-tasks="openTeamTasks" />
       </template>
 
       <template #distribution-actions>
@@ -72,6 +72,9 @@
     </DashboardGrid>
 
     <!-- Task modal (shared with Tasks) -->
+    <!-- The tasks behind a clicked figure; a task opens over the list -->
+    <AnalyticsTasksModal :query="taskList" @close="taskList = null" @open-task="openTask" />
+
     <TaskModal :task-id="selectedTaskId" @close="selectedTaskId = null" />
   </div>
 </template>
@@ -99,6 +102,8 @@ import { TEAM_LOAD_TABLE, TEAM_LOAD_COLUMNS } from '../components/analytics/team
 import AppColumnSettings from '../components/ui/AppColumnSettings.vue'
 import AppEmptyState from '../components/ui/AppEmptyState.vue'
 import TaskModal from '../components/tasks/TaskModal.vue'
+import AnalyticsTasksModal from '../components/analytics/AnalyticsTasksModal.vue'
+import type { TaskListQuery } from '../stores/analytics'
 
 // The widgets of the tab in the standard order with their standard widths.
 // The ids are the keys of the widgets in the access rights.
@@ -181,6 +186,16 @@ const available = computed(() => WIDGETS.map(w => w.id).filter(id => auth.widget
 // The saved arrangement is known: the widgets do not jump after appearing
 const ready = ref(false)
 const selectedTaskId = ref<number | null>(null)
+
+const taskList = ref<TaskListQuery | null>(null)
+
+function openStatTasks(metric: string, label: string) {
+  taskList.value = { title: t('analytics.stats.' + label), metric }
+}
+
+function openTeamTasks(name: string, metric: string, label: string) {
+  taskList.value = { title: name + ' — ' + t(label), metric, assignee: name }
+}
 
 function openTask(id: number) {
   selectedTaskId.value = id
