@@ -302,6 +302,7 @@ func main() {
 	api.HandleFunc("/contracts/{id}/invoices", paymentsH.ListInvoices).Methods("GET")
 	api.HandleFunc("/contracts/{id}/invoices", paymentsH.CreateInvoice).Methods("POST")
 	api.HandleFunc("/contracts/{id}/invoices/{invoiceId}", paymentsH.DeleteInvoice).Methods("DELETE")
+	api.HandleFunc("/contracts/{id}/invoices/{invoiceId}/items", paymentsH.GetInvoiceItems).Methods("GET")
 	api.HandleFunc("/contracts/{id}/invoices/{invoiceId}/pay", paymentsH.PayInvoice).Methods("POST")
 	api.HandleFunc("/contracts/{id}/invoices/{invoiceId}/download", paymentsH.DownloadInvoice).Methods("GET")
 	api.HandleFunc("/contracts/export/csv", paymentsH.ExportCSV).Methods("GET")

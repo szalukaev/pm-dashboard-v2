@@ -335,7 +335,7 @@
       "status": "Status",
       "pay": "Pay",
       "download": "Download",
-      "copy": "Copy",
+      "copy": "Issue an invoice like this",
       "form_title": "Issue Invoice",
       "service_name": "Service Name",
       "quantity": "Quantity",
@@ -347,10 +347,9 @@
       "pay_date_label": "Payment Date",
       "empty": "No invoices yet",
       "default_item": "Service",
-      "copy_error": "Could not copy",
-      "copy_text": "Invoice No. {number} of {date}\nAmount: {amount}\nPaid: {paid}\nRemainder: {remainder}\nStatus: {status}",
       "paid_ok": "The payment is recorded",
-      "clamped": "{applied} of the entered {entered} was taken: it is the whole remainder of the invoice"
+      "clamped": "{applied} of the entered {entered} was taken: it is the whole remainder of the invoice",
+      "copy_form_title": "New invoice like No. {number}"
     },
     "statuses": {
       "unpaid": "Unpaid",
@@ -407,7 +406,8 @@
       "export_failed": "Could not export the CSV",
       "download_failed": "Could not download the invoice",
       "pay_failed": "Could not record the payment",
-      "delete_failed": "Could not delete"
+      "delete_failed": "Could not delete",
+      "copy_failed": "Could not open the invoice for copying"
     }
   },
   "settings": {

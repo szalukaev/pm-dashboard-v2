@@ -54,6 +54,12 @@ export interface Invoice {
   paid_at: string | null
 }
 
+export interface InvoiceLine {
+  name: string
+  quantity: number
+  price: number
+}
+
 // What the server answers to a payment: applied may be less than what was
 // entered when it was more than the remainder (clamped).
 export interface PaymentResult {
@@ -164,6 +170,12 @@ export const usePaymentsStore = defineStore('payments', () => {
     } catch { return { invoices: [], total: 0 } }
   }
 
+  // The lines of an invoice: name, quantity and price of each
+  async function fetchInvoiceItems(contractId: number, invoiceId: number): Promise<InvoiceLine[]> {
+    const { data } = await axios.get(`/api/contracts/${contractId}/invoices/${invoiceId}/items`)
+    return data.items || []
+  }
+
   async function createInvoice(contractId: number, items: { name: string; quantity: number; price: number }[]) {
     const { data } = await axios.post(`/api/contracts/${contractId}/invoices`, { items })
     invoicesVersion.value++
@@ -209,7 +221,7 @@ export const usePaymentsStore = defineStore('payments', () => {
     fetchAll, fetchOrganizations, fetchContracts, fetchStats,
     createOrganization, updateOrganization, deleteOrganization,
     createContract, updateContract, deleteContract,
-    fetchInvoices, createInvoice, deleteInvoice, payInvoice,
+    fetchInvoices, fetchInvoiceItems, createInvoice, deleteInvoice, payInvoice,
     exportCSV, downloadInvoice, invoicesVersion, refresh,
   }
 })

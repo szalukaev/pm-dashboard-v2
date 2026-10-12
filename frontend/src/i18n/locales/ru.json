@@ -335,7 +335,7 @@
       "status": "Статус",
       "pay": "Оплатить",
       "download": "Скачать",
-      "copy": "Копировать",
+      "copy": "Создать такой же счёт",
       "form_title": "Выставление счёта",
       "service_name": "Наименование услуги",
       "quantity": "Количество",
@@ -347,10 +347,9 @@
       "pay_date_label": "Дата оплаты",
       "empty": "Счетов пока нет",
       "default_item": "Услуга",
-      "copy_error": "Не удалось скопировать",
-      "copy_text": "Счёт № {number} от {date}\nСумма: {amount}\nОплачено: {paid}\nОстаток: {remainder}\nСтатус: {status}",
       "paid_ok": "Оплата отмечена",
-      "clamped": "Зачтено {applied} из введённых {entered}: это весь остаток по счёту"
+      "clamped": "Зачтено {applied} из введённых {entered}: это весь остаток по счёту",
+      "copy_form_title": "Новый счёт по образцу № {number}"
     },
     "statuses": {
       "unpaid": "Не оплачен",
@@ -407,7 +406,8 @@
       "export_failed": "Не удалось выгрузить CSV",
       "download_failed": "Не удалось скачать счёт",
       "pay_failed": "Не удалось отметить оплату",
-      "delete_failed": "Не удалось удалить"
+      "delete_failed": "Не удалось удалить",
+      "copy_failed": "Не удалось открыть счёт для копирования"
     }
   },
   "settings": {

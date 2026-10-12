@@ -35,7 +35,7 @@
             <button class="action-btn" :title="$t('payments.invoice.download')" data-testid="invoice-download" @click="actions?.download(contractId, inv)">
               <Download :size="14" />
             </button>
-            <button class="action-btn" :title="$t('payments.invoice.copy')" data-testid="invoice-copy" @click="copyInvoiceInfo(inv)">
+            <button class="action-btn" :title="$t('payments.invoice.copy')" data-testid="invoice-copy" @click="actions?.copy(contractId, inv)">
               <Copy :size="14" />
             </button>
             <button class="action-btn danger-btn" :title="$t('common.delete')" data-testid="invoice-delete" @click="actions?.remove(contractId, inv)">
@@ -69,14 +69,11 @@ import AppPagination from '../ui/AppPagination.vue'
 import { useSettingsStore } from '../../stores/settings'
 import { usePaymentsStore, type Invoice } from '../../stores/payments'
 import { formatMoney, formatDate } from '../../utils/format'
-import { useSwal } from '../../composables/useSwal'
 import { invoiceActionsKey } from './invoiceActions'
-import { copyText } from '../../utils/clipboard'
 
 const props = defineProps<{ contractId: number }>()
 
 const { t, te } = useI18n()
-const { toast } = useSwal()
 // Paying, downloading and deleting belong to the page
 const actions = inject(invoiceActionsKey)
 
@@ -109,19 +106,6 @@ async function setPageSize(size: number) {
 function statusLabel(status: string): string {
   const key = `payments.statuses.${status}`
   return te(key) ? t(key) : status
-}
-
-async function copyInvoiceInfo(inv: Invoice) {
-  const text = t('payments.invoice.copy_text', {
-    number: inv.number,
-    date: formatDate(inv.issued_at),
-    amount: formatMoney(inv.total),
-    paid: formatMoney(inv.paid_amount),
-    remainder: formatMoney(inv.remainder),
-    status: statusLabel(inv.status),
-  })
-  const copied = await copyText(text)
-  toast(t(copied ? 'common.copied' : 'payments.invoice.copy_error'), copied ? 'success' : 'error')
 }
 
 // An invoice was issued, paid or deleted somewhere on the page

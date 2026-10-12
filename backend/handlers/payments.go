@@ -524,6 +524,53 @@ func (h *PaymentsHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"id": invoiceID, "success": true})
 }
 
+// GetInvoiceItems returns the lines of an invoice: a new invoice may be
+// issued from them.
+func (h *PaymentsHandler) GetInvoiceItems(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+	invoiceID, err := strconv.Atoi(mux.Vars(r)["invoiceId"])
+	if err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
+		return
+	}
+	// Ownership: only an invoice of the caller's own contract
+	var amount float64
+	var contractName string
+	err = (*h.DB).QueryRow(`SELECT i.amount, c.name FROM invoices i JOIN contracts c ON i.contract_id = c.id
+		WHERE i.id=$1 AND c.user_id=$2`, invoiceID, middleware.GetUserID(r)).Scan(&amount, &contractName)
+	if err != nil {
+		utils.Error(w, http.StatusNotFound, "INVOICE_NOT_FOUND")
+		return
+	}
+
+	type item struct {
+		Name     string  `json:"name"`
+		Quantity float64 `json:"quantity"`
+		Price    float64 `json:"price"`
+	}
+	items := []item{}
+	rows, err := (*h.DB).Query("SELECT name, quantity, price FROM invoice_items WHERE invoice_id=$1 ORDER BY id", invoiceID)
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var it item
+		if rows.Scan(&it.Name, &it.Quantity, &it.Price) == nil {
+			items = append(items, it)
+		}
+	}
+	// An old invoice may have no lines stored: it was one line of the contract
+	if len(items) == 0 {
+		items = append(items, item{Name: contractName, Quantity: 1, Price: amount})
+	}
+	utils.JSON(w, http.StatusOK, map[string]interface{}{"items": items})
+}
+
 func (h *PaymentsHandler) DeleteInvoice(w http.ResponseWriter, r *http.Request) {
 	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")

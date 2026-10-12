@@ -1,7 +1,7 @@
 <template>
   <AppModal
     :model-value="visible"
-    :title="$t('payments.invoice.form_title')"
+    :title="sourceNumber ? $t('payments.invoice.copy_form_title', { number: sourceNumber }) : $t('payments.invoice.form_title')"
     width="600px"
     @update:model-value="!$event && $emit('close')"
   >
@@ -58,26 +58,33 @@ import AppButton from '../ui/AppButton.vue'
 import { formatMoney } from '../../utils/format'
 import { useI18n } from 'vue-i18n'
 
-const props = defineProps<{
-  visible: boolean
-  contractName: string
-  contractAmount: number
-}>()
-
-const emit = defineEmits(['close', 'submit'])
-const { t } = useI18n()
-
 interface InvoiceItem {
   name: string
   quantity: number
   price: number
 }
 
+const props = defineProps<{
+  visible: boolean
+  contractName: string
+  contractAmount: number
+  // Lines to start from: those of the invoice being copied. Without them
+  // the form starts with one line of the contract.
+  initialItems?: InvoiceItem[]
+  // The number of the invoice being copied, for the title
+  sourceNumber?: string
+}>()
+
+const emit = defineEmits(['close', 'submit'])
+const { t } = useI18n()
+
 const items = ref<InvoiceItem[]>([{ name: '', quantity: 1, price: 0 }])
 
 watch(() => props.visible, (v) => {
   if (v) {
-    items.value = [{ name: props.contractName || t('payments.invoice.default_item'), quantity: 1, price: props.contractAmount || 0 }]
+    items.value = props.initialItems?.length
+      ? props.initialItems.map(i => ({ name: i.name, quantity: Number(i.quantity) || 0, price: Number(i.price) || 0 }))
+      : [{ name: props.contractName || t('payments.invoice.default_item'), quantity: 1, price: props.contractAmount || 0 }]
   }
 })
 

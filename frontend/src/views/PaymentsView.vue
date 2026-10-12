@@ -157,6 +157,8 @@
       :visible="showInvoiceForm"
       :contract-name="invoiceContractName"
       :contract-amount="invoiceContractAmount"
+      :initial-items="invoiceInitialItems"
+      :source-number="invoiceSourceNumber"
       @close="showInvoiceForm = false"
       @submit="handleCreateInvoice"
     />
@@ -185,7 +187,7 @@ import { ref, reactive, computed, provide, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { Download } from 'lucide-vue-next'
-import { usePaymentsStore, type Organization, type Contract, type Invoice } from '../stores/payments'
+import { usePaymentsStore, type Organization, type Contract, type Invoice, type InvoiceLine } from '../stores/payments'
 import { useSwal } from '../composables/useSwal'
 import { formatMoney } from '../utils/format'
 import { invoiceActionsKey } from '../components/payments/invoiceActions'
@@ -337,12 +339,31 @@ const invoiceContractId = ref(0)
 const invoiceContractName = ref('')
 const invoiceContractAmount = ref(0)
 
-function issueInvoice(contractId: number) {
+// The lines the form starts from when an invoice is copied, and its number
+const invoiceInitialItems = ref<InvoiceLine[]>([])
+const invoiceSourceNumber = ref('')
+
+function openInvoiceForm(contractId: number, lines: InvoiceLine[] = [], sourceNumber = '') {
   const contract = contracts.value.find(c => c.id === contractId)
   invoiceContractId.value = contractId
   invoiceContractName.value = contract?.name || ''
   invoiceContractAmount.value = contract?.amount || 0
+  invoiceInitialItems.value = lines
+  invoiceSourceNumber.value = sourceNumber
   showInvoiceForm.value = true
+}
+
+function issueInvoice(contractId: number) {
+  openInvoiceForm(contractId)
+}
+
+// A new invoice like an existing one: the form opens with its lines, and
+// nothing is saved until the user confirms
+async function copyInvoice(contractId: number, invoice: Invoice) {
+  await guarded(async () => {
+    const lines = await store.fetchInvoiceItems(contractId, invoice.id)
+    openInvoiceForm(contractId, lines, invoice.number)
+  }, 'payments.errors.copy_failed')
 }
 
 // The invoice is saved, and its document is downloaded at once
@@ -385,6 +406,9 @@ provide(invoiceActionsKey, {
     payInvoiceId.value = invoice.id
     payDefaultAmount.value = invoice.remainder
     showPayForm.value = true
+  },
+  copy(contractId: number, invoice: Invoice) {
+    copyInvoice(contractId, invoice)
   },
   download(contractId: number, invoice: Invoice) {
     guarded(() => store.downloadInvoice(contractId, invoice.id), 'payments.errors.download_failed')

@@ -7,6 +7,8 @@ import type { Invoice } from '../../stores/payments'
 export interface InvoiceActions {
   pay(contractId: number, invoice: Invoice): void
   download(contractId: number, invoice: Invoice): void
+  // Opens the form of a new invoice filled with the lines of this one
+  copy(contractId: number, invoice: Invoice): void
   remove(contractId: number, invoice: Invoice): void
 }
 
