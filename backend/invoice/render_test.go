@@ -160,25 +160,71 @@ func TestRenderItemsTable(t *testing.T) {
 	if strings.Count(doc, "<w:tbl>") != 1 || strings.Count(doc, "</w:tbl>") != 1 {
 		t.Fatalf("expected one table: %s", doc)
 	}
-	// A header and three lines, five columns each
-	if rows := strings.Count(doc, "</w:tr>"); rows != 4 {
-		t.Errorf("the table has %d rows, want 4", rows)
+	// A header, three lines of five columns, and three rows of totals of
+	// three cells each: an empty one, the label, the amount
+	if rows := strings.Count(doc, "</w:tr>"); rows != 7 {
+		t.Errorf("the table has %d rows, want 7", rows)
 	}
-	if cells := strings.Count(doc, "</w:tc>"); cells != 20 {
-		t.Errorf("the table has %d cells, want 20", cells)
+	if cells := strings.Count(doc, "</w:tc>"); cells != 29 {
+		t.Errorf("the table has %d cells, want 29", cells)
 	}
-	for _, want := range []string{"Наименование", "Кол-во", "Доработка отчётов", "12,5", "20 000,00", "После: 110 251,05"} {
+	for _, want := range []string{"Наименование услуги", "Кол-во", "Цена, руб.", "Сумма, руб.",
+		"Доработка отчётов", "12,5", "20 000,00",
+		"Итого", "105 001,00", "НДС 5%", "5 250,05", "Всего (в том числе НДС):", "После: 110 251,05"} {
 		if !strings.Contains(doc, want) {
 			t.Errorf("the document lacks %q", want)
 		}
 	}
-	// The text of the table takes the font of the place it stands in
-	if got := strings.Count(doc, `w:ascii="Arial"`); got != 20 {
-		t.Errorf("the font of the placeholder is used in %d cells, want all 20", got)
+	// The amount to pay closes the table
+	if strings.LastIndex(doc[:strings.Index(doc, "</w:tbl>")], "110 251,05") < strings.Index(doc, "Всего (в том числе НДС):") {
+		t.Error("the amount to pay must stand in the last row, after its label")
 	}
-	// Bold in the header goes after the fonts, as the schema of Word wants
-	if !strings.Contains(doc, `<w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:b/><w:sz w:val="20"/>`) {
-		t.Error("the header is not bold, or bold is in the wrong place")
+	// Every cell carries its own frame. A cell of the lines has all four
+	// sides; in a row of totals only the amount is framed, the label keeps
+	// the side it shares with the amount, and the first of these rows keeps
+	// the line that closes the lines of the invoice.
+	line := func(side string) string {
+		return `<w:` + side + ` w:val="single" w:sz="4" w:space="0" w:color="4A85B0"/>`
+	}
+	none := func(side string) string { return `<w:` + side + ` w:val="nil"/>` }
+	borders := func(top, left, bottom, right string) string {
+		return `<w:tcBorders>` + top + left + bottom + right + `</w:tcBorders>`
+	}
+	counts := map[string]struct {
+		pattern string
+		want    int
+	}{
+		"framed cells (5 header, 15 lines, 3 amounts)": {borders(line("top"), line("left"), line("bottom"), line("right")), 23},
+		"the empty cell of the first row of totals":    {borders(line("top"), none("left"), none("bottom"), none("right")), 1},
+		"the empty cells of the other rows":            {borders(none("top"), none("left"), none("bottom"), none("right")), 2},
+		"the label of the first row of totals":         {borders(line("top"), none("left"), none("bottom"), line("right")), 1},
+		"the labels of the other rows":                 {borders(none("top"), none("left"), none("bottom"), line("right")), 2},
+	}
+	for name, c := range counts {
+		if got := strings.Count(doc, c.pattern); got != c.want {
+			t.Errorf("%s: %d, want %d", name, got, c.want)
+		}
+	}
+	// No frame is set for the table as a whole: it would draw lines through
+	// the totals
+	if strings.Contains(doc, "<w:tblBorders>") {
+		t.Error("the frame must be set cell by cell, not for the table")
+	}
+	// Rows are compact, and a long name stays at the top of its row
+	if got := strings.Count(doc, `<w:spacing w:after="0"/>`); got != 29 {
+		t.Errorf("%d cells have no space after the text, want all 29", got)
+	}
+	if got := strings.Count(doc, `<w:vAlign w:val="center"/>`); got != 29-3-3 {
+		t.Errorf("%d cells are centered vertically, want all but the 3 names and the 3 empty cells", got)
+	}
+	// The text of the table takes the font of the place it stands in
+	if got := strings.Count(doc, `w:ascii="Arial"`); got != 29 {
+		t.Errorf("the font of the placeholder is used in %d cells, want all 29", got)
+	}
+	// Bold — the labels of the totals and the amount to pay — goes after the
+	// fonts, as the schema of Word wants
+	if got := strings.Count(doc, `<w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:b/><w:sz w:val="20"/>`); got != 4 {
+		t.Errorf("bold is used %d times, want 4: three labels and the amount to pay", got)
 	}
 	// A paragraph follows the table
 	if !strings.Contains(doc, "</w:tbl><w:p/>") {
@@ -187,6 +233,25 @@ func TestRenderItemsTable(t *testing.T) {
 	if strings.Index(doc, "До") > strings.Index(doc, "<w:tbl>") || strings.Index(doc, "После") < strings.Index(doc, "</w:tbl>") {
 		t.Error("the table is not where its variable stood")
 	}
+}
+
+func TestRenderItemsTableWithoutVAT(t *testing.T) {
+	data := Sample()
+	data.VatRate = "none"
+	out, err := Render(docx(t, para("{{items_table}}"), nil), data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := part(t, out, "word/document.xml")
+	for _, want := range []string{"Итого", "Без НДС", "—", "Всего к оплате:", "105 001,00"} {
+		if !strings.Contains(doc, want) {
+			t.Errorf("the document lacks %q", want)
+		}
+	}
+	if strings.Contains(doc, "в том числе НДС") {
+		t.Error("an invoice without VAT must not speak of VAT in the amount to pay")
+	}
+	wellFormed(t, "the table without VAT", doc)
 }
 
 func TestRenderHeadersFootersAndEscaping(t *testing.T) {
@@ -286,7 +351,7 @@ func TestInspect(t *testing.T) {
 	}
 
 	// The table variable alone on its line is all the lines need
-	report, _ = Inspect(docx(t, para("{{items_table}}")+para("{{total_words}}"), nil))
+	report, _ = Inspect(docx(t, para("{{items_table}}"), nil))
 	if len(report.Warnings) != 0 {
 		t.Errorf("warnings = %v", report.Warnings)
 	}

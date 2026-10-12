@@ -103,7 +103,8 @@ func Inspect(template []byte) (*Report, error) {
 	if !tableAlone && !itemsInRow {
 		report.Warnings = append(report.Warnings, WarnNoItems)
 	}
-	if !found["total"] && !found["total_words"] {
+	// The built table ends with the amount to pay
+	if !found["total"] && !found["total_words"] && !tableAlone {
 		report.Warnings = append(report.Warnings, WarnNoTotal)
 	}
 	if tableNotAlone {

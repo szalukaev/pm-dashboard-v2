@@ -2,7 +2,7 @@
   <AppModal
     :model-value="visible"
     :title="sourceNumber ? $t('payments.invoice.copy_form_title', { number: sourceNumber }) : $t('payments.invoice.form_title')"
-    width="600px"
+    width="1200px"
     @update:model-value="!$event && $emit('close')"
   >
     <div class="invoice-form">
@@ -104,6 +104,17 @@ function submit() {
 </script>
 
 <style scoped>
+/* A roomy form: an invoice of a dozen lines is seen without scrolling */
+.invoice-form {
+  display: flex;
+  flex-direction: column;
+  min-height: 55vh;
+}
+
+.total-section {
+  margin-top: auto;
+}
+
 .items-table {
   width: 100%;
   border-collapse: collapse;
@@ -194,7 +205,6 @@ function submit() {
   justify-content: flex-end;
   align-items: center;
   gap: 12px;
-  margin-top: 16px;
   padding-top: 12px;
   border-top: 1px solid var(--border-light);
 }

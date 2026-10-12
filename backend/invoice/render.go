@@ -125,7 +125,7 @@ func textPart(name string) bool {
 // fillPart substitutes the variables in one XML part of the document.
 func fillPart(content string, data Data) string {
 	content = joinSplitVariables(content)
-	content = insertItemsTable(content, data.Items)
+	content = insertItemsTable(content, data)
 	content = repeatItemRows(content, data.Items)
 	return substitute(content, data.Values())
 }
@@ -361,9 +361,10 @@ func isItemsTablePlaceholder(paragraph string) bool {
 	return m != nil && strings.ToLower(m[1]) == ItemsTable && m[0] == strings.TrimSpace(paragraphText(paragraph))
 }
 
-// insertItemsTable puts a table of the lines in place of the paragraph that
-// is {{items_table}}. The text of the table takes the font of that paragraph.
-func insertItemsTable(content string, items []Item) string {
+// insertItemsTable puts the table of the invoice — its lines and totals —
+// in place of the paragraph that is {{items_table}}. The text of the table
+// takes the font of that paragraph.
+func insertItemsTable(content string, data Data) string {
 	var placeholders []span
 	for _, p := range leafSpans(elementSpans(content, "w:p")) {
 		if isItemsTablePlaceholder(content[p.start:p.end]) {
@@ -373,22 +374,48 @@ func insertItemsTable(content string, items []Item) string {
 	return rewrite(content, placeholders, func(paragraph string) string {
 		// A table may not be the last thing in a cell or in the document:
 		// an empty paragraph follows it
-		return itemsTable(items, runProperties.FindString(paragraph)) + "<w:p/>"
+		return itemsTable(data, runProperties.FindString(paragraph)) + "<w:p/>"
 	})
 }
 
-// Columns of the built table: title, width in twentieths of a point (the
-// whole is the text width of an A4 page with usual margins), alignment.
+// Columns of the built table: title, width in twentieths of a point, how
+// the title and the values are aligned, and whether the values stand in the
+// middle of the row (a long name wraps and stays at the top).
 var tableColumns = []struct {
-	title string
-	width int
-	align string
+	title      string
+	width      int
+	titleAlign string
+	align      string
+	middle     bool
 }{
-	{"№", 600, "center"},
-	{"Наименование", 4800, "left"},
-	{"Кол-во", 1100, "right"},
-	{"Цена", 1500, "right"},
-	{"Сумма", 1638, "right"},
+	{"№", 454, "center", "center", true},
+	{"Наименование услуги", 5530, "left", "left", false},
+	{"Кол-во", 850, "center", "center", true},
+	{"Цена, руб.", 1419, "center", "center", true},
+	{"Сумма, руб.", 1416, "center", "center", true},
+}
+
+const (
+	// tableBorderColor is the color of the frame of the built table.
+	tableBorderColor = "4A85B0"
+	// totalsLabelColumns: the labels of the totals take this many columns
+	// before the last one; a long label wraps inside them.
+	totalsLabelColumns = 2
+)
+
+// cellBorders describes the frame of a cell: which of its sides have a line.
+type cellBorders struct{ top, left, bottom, right bool }
+
+var framed = cellBorders{true, true, true, true}
+
+func (c cellBorders) xml() string {
+	side := func(name string, on bool) string {
+		if !on {
+			return `<w:` + name + ` w:val="nil"/>`
+		}
+		return `<w:` + name + ` w:val="single" w:sz="4" w:space="0" w:color="` + tableBorderColor + `"/>`
+	}
+	return `<w:tcBorders>` + side("top", c.top) + side("left", c.left) + side("bottom", c.bottom) + side("right", c.right) + `</w:tcBorders>`
 }
 
 // bold returns run properties with bold added in the place the schema of
@@ -411,38 +438,79 @@ func bold(rPr string) string {
 	return rPr[:at] + "<w:b/>" + rPr[at:]
 }
 
-func itemsTable(items []Item, rPr string) string {
+// itemsTable builds the whole table of an invoice: the header, a row for
+// every line, and the totals under the last column — the subtotal, the VAT
+// and the amount to pay. Of the totals only the amounts are framed.
+//
+// Every cell carries its own frame: the totals must have none, and a frame
+// set for the whole table would draw lines through them.
+func itemsTable(data Data, rPr string) string {
 	var b strings.Builder
-	b.WriteString(`<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/><w:tblBorders>`)
-	for _, side := range []string{"top", "left", "bottom", "right", "insideH", "insideV"} {
-		fmt.Fprintf(&b, `<w:%s w:val="single" w:sz="4" w:space="0" w:color="auto"/>`, side)
-	}
-	b.WriteString(`</w:tblBorders></w:tblPr><w:tblGrid>`)
+	b.WriteString(`<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/>` +
+		`<w:tblCellMar><w:top w:w="11" w:type="dxa"/><w:bottom w:w="4" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>`)
 	for _, col := range tableColumns {
 		fmt.Fprintf(&b, `<w:gridCol w:w="%d"/>`, col.width)
 	}
 	b.WriteString(`</w:tblGrid>`)
 
-	cell := func(column int, text, properties, shading string) {
-		col := tableColumns[column]
-		fmt.Fprintf(&b, `<w:tc><w:tcPr><w:tcW w:w="%d" w:type="dxa"/>%s</w:tcPr><w:p><w:pPr><w:jc w:val="%s"/></w:pPr><w:r>%s<w:t xml:space="preserve">%s</w:t></w:r></w:p></w:tc>`,
-			col.width, shading, col.align, properties, escape(text))
+	// cell writes a cell over span columns starting at column.
+	cell := func(column, span int, borders cellBorders, middle bool, text, align, properties string) {
+		width := 0
+		for _, col := range tableColumns[column : column+span] {
+			width += col.width
+		}
+		fmt.Fprintf(&b, `<w:tc><w:tcPr><w:tcW w:w="%d" w:type="dxa"/>`, width)
+		if span > 1 {
+			fmt.Fprintf(&b, `<w:gridSpan w:val="%d"/>`, span)
+		}
+		b.WriteString(borders.xml())
+		if middle {
+			b.WriteString(`<w:vAlign w:val="center"/>`)
+		}
+		fmt.Fprintf(&b, `</w:tcPr><w:p><w:pPr><w:spacing w:after="0"/><w:jc w:val="%s"/></w:pPr><w:r>%s<w:t xml:space="preserve">%s</w:t></w:r></w:p></w:tc>`,
+			align, properties, escape(text))
 	}
 
 	// The header is repeated when the table goes on to another page
 	b.WriteString(`<w:tr><w:trPr><w:tblHeader/></w:trPr>`)
 	for i, col := range tableColumns {
-		cell(i, col.title, bold(rPr), `<w:shd w:val="clear" w:color="auto" w:fill="F2F2F2"/>`)
+		cell(i, 1, framed, true, col.title, col.titleAlign, rPr)
 	}
 	b.WriteString(`</w:tr>`)
 
-	for i, item := range items {
+	for i, item := range data.Items {
 		values := itemValues(i+1, item)
 		b.WriteString(`<w:tr>`)
 		for column, name := range itemVariables {
-			cell(column, values[name], rPr, "")
+			col := tableColumns[column]
+			cell(column, 1, framed, col.middle, values[name], col.align, rPr)
 		}
 		b.WriteString(`</w:tr>`)
+	}
+
+	// The totals: nothing under the first columns, a bold label before the
+	// last column and the amount in it. The first of these rows keeps the
+	// line that closes the lines of the invoice.
+	last := len(tableColumns) - 1
+	labelAt := last - totalsLabelColumns
+	values := data.Values()
+	rows := 0
+	total := func(label, amount, properties string) {
+		first := rows == 0
+		rows++
+		b.WriteString(`<w:tr>`)
+		cell(0, labelAt, cellBorders{top: first}, false, "", "left", rPr)
+		cell(labelAt, totalsLabelColumns, cellBorders{top: first, right: true}, true, label, "right", bold(rPr))
+		cell(last, 1, framed, true, amount, tableColumns[last].align, properties)
+		b.WriteString(`</w:tr>`)
+	}
+	total("Итого", values["subtotal"], rPr)
+	if data.vatFraction() > 0 {
+		total(values["vat_label"], values["vat_amount"], rPr)
+		total("Всего (в том числе НДС):", values["total"], bold(rPr))
+	} else {
+		total(values["vat_label"], "—", rPr)
+		total("Всего к оплате:", values["total"], bold(rPr))
 	}
 	b.WriteString(`</w:tbl>`)
 	return b.String()
