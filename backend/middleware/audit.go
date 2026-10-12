@@ -71,7 +71,9 @@ func (m *AuditMiddleware) Log(next http.Handler) http.Handler {
 
 		// Read request body (capped — a huge payload must not OOM the process)
 		var bodyBytes []byte
-		if r.Body != nil {
+		// An uploaded file is not something to keep in the trail, and it may
+		// be larger than the cap: its handler reads it itself.
+		if r.Body != nil && !strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/") {
 			r.Body = http.MaxBytesReader(w, r.Body, maxAuditBodyBytes)
 			bodyBytes, _ = io.ReadAll(r.Body)
 			r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))

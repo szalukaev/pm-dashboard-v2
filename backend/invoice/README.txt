@@ -1,24 +1,14 @@
-This directory should contain the invoice_template.docx file.
+invoice_template.docx is the built-in template of invoices. It is used
+until the administrator uploads another one (Settings → Administration →
+Invoice template); the uploaded file is kept in the data directory.
 
-The template is a Word document (.docx) that contains placeholder text
-that gets replaced during invoice generation:
+A template is an ordinary Word document. What changes from invoice to
+invoice is written as variables — {{company}}, {{total}} and so on; the
+full list is in data.go and on the screen of the administrator.
 
-Placeholders:
-  {{company}}      - Company name
-  {{address}}      - Company address
-  {{phone}}        - Contact phone
-  {{contact}}      - Contact name
-  {{invoice_num}}  - Invoice number (YYYYMM-DD format)
-  {{date}}         - Invoice date (YYYY-MM-DD)
-  {{vat_label}}    - "НДС 5%" or "Без НДС"
-  {{item_name}}    - First item name
-  {{item_qty}}     - First item quantity
-  {{item_price}}   - First item price
-  {{item_amount}}  - First item amount
-  {{subtotal}}     - Subtotal (without VAT)
-  {{vat_amount}}   - VAT amount
-  {{total}}        - Total (with VAT)
+The lines of an invoice go into the template in one of two ways:
+  - {{items_table}} alone on a line is replaced by a ready table;
+  - a table row with item variables ({{item_name}}, {{item_amount}}, …) is
+    repeated for every line and keeps its formatting.
 
-The template file must be a valid .docx (ZIP archive with word/document.xml).
-Create it in Word/LibreOffice, add the placeholders above as regular text,
-and save as .docx.
+generate_template.py builds the built-in template.

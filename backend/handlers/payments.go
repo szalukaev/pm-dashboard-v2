@@ -5,9 +5,8 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
-	"net/url"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -22,6 +21,8 @@ import (
 
 type PaymentsHandler struct {
 	DB **sql.DB
+	// Templates gives the template the invoices are made from.
+	Templates *InvoiceTemplates
 }
 
 // ─── Organization ───
@@ -633,84 +634,60 @@ func (h *PaymentsHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Get invoice + contract info (only the caller's own invoice)
-	var inv struct {
-		ContractID int
-		Amount     float64
-		VatRate    string
-		IssuedAt   string
-	}
-	err = (*h.DB).QueryRow(`SELECT i.contract_id, i.amount, i.vat_rate, i.issued_at
+	// The invoice with its contract and organization (only the caller's own)
+	var issuedAt string
+	var amount float64
+	data := invoice.Data{}
+	err = (*h.DB).QueryRow(`SELECT i.amount, i.vat_rate, i.issued_at::text,
+			c.name, COALESCE(c.company_name, o.name, ''), COALESCE(c.company_address, o.address, ''),
+			COALESCE(c.contact_phone, ''), COALESCE(c.contact_name, ''), COALESCE(o.inn, ''),
+			COALESCE(c.start_date::text, ''), COALESCE(c.end_date::text, '')
 		FROM invoices i JOIN contracts c ON i.contract_id = c.id
+		LEFT JOIN organizations o ON o.id = c.organization_id
 		WHERE i.id=$1 AND c.user_id=$2`, invoiceID, userID).Scan(
-		&inv.ContractID, &inv.Amount, &inv.VatRate, &inv.IssuedAt)
+		&amount, &data.VatRate, &issuedAt,
+		&data.ContractName, &data.Company, &data.Address,
+		&data.Phone, &data.Contact, &data.INN,
+		&data.ContractStart, &data.ContractEnd)
 	if err != nil {
 		utils.Error(w, http.StatusNotFound, "INVOICE_NOT_FOUND")
 		return
 	}
-
-	var contract struct {
-		CompanyName    string
-		CompanyAddress string
-		ContactPhone   string
-		ContactName    string
-		VatRate        string
-		Name           string
+	// The number and the date of the document are those of the day the
+	// invoice was issued on: downloading it again gives the same document
+	data.IssuedAt, err = time.ParseInLocation("2006-01-02", firstN(issuedAt, 10), time.Local)
+	if err != nil {
+		data.IssuedAt = time.Now()
 	}
-	(*h.DB).QueryRow(`SELECT COALESCE(company_name,''), COALESCE(company_address,''),
-		COALESCE(contact_phone,''), COALESCE(contact_name,''), vat_rate, name
-		FROM contracts WHERE id=$1 AND user_id=$2`, inv.ContractID, userID).Scan(
-		&contract.CompanyName, &contract.CompanyAddress, &contract.ContactPhone,
-		&contract.ContactName, &contract.VatRate, &contract.Name)
 
-	// Get invoice items
-	rows, err := (*h.DB).Query("SELECT name, quantity, price FROM invoice_items WHERE invoice_id=$1", invoiceID)
+	rows, err := (*h.DB).Query("SELECT name, quantity, price FROM invoice_items WHERE invoice_id=$1 ORDER BY id", invoiceID)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
 	}
 	defer rows.Close()
-
-	var items []invoice.InvoiceItem
 	for rows.Next() {
-		var it invoice.InvoiceItem
-		if rows.Scan(&it.Name, &it.Quantity, &it.Price) == nil {
-			items = append(items, it)
+		var item invoice.Item
+		if rows.Scan(&item.Name, &item.Quantity, &item.Price) == nil {
+			data.Items = append(data.Items, item)
 		}
 	}
-	if len(items) == 0 {
-		items = []invoice.InvoiceItem{{Name: contract.Name, Quantity: 1, Price: inv.Amount}}
+	if len(data.Items) == 0 {
+		data.Items = []invoice.Item{{Name: data.ContractName, Quantity: 1, Price: amount}}
 	}
 
-	// Generate .docx
-	templatePath := "invoice/invoice_template.docx"
-	outPath, downloadName, err := invoice.GenerateInvoice(templatePath, invoice.ContractInfo{
-		CompanyName:    contract.CompanyName,
-		CompanyAddress: contract.CompanyAddress,
-		ContactPhone:   contract.ContactPhone,
-		ContactName:    contract.ContactName,
-		VatRate:        contract.VatRate,
-		Name:           contract.Name,
-		IssuedAt:       firstN(inv.IssuedAt, 10),
-	}, items)
+	template, _, err := h.Templates.Current()
 	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "TEMPLATE_NOT_FOUND")
+		return
+	}
+	document, err := invoice.Render(template, data)
+	if err != nil {
+		slog.Error("Could not make the invoice document", "invoice", invoiceID, "error", err)
 		utils.Error(w, http.StatusInternalServerError, "DOCX_GENERATION_FAILED")
 		return
 	}
-
-	// Serve file
-	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-	// The name is in Russian: filename* carries it encoded, filename is the
-	// fallback for what cannot read that
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"invoice.docx\"; filename*=UTF-8''%s", url.PathEscape(downloadName)))
-	w.Header().Set("Access-Control-Expose-Headers", "Content-Disposition")
-	http.ServeFile(w, r, outPath)
-
-	// Cleanup after 60 seconds
-	go func() {
-		time.Sleep(60 * time.Second)
-		os.Remove(outPath)
-	}()
+	serveDocx(w, data.FileName(), document)
 }
 
 // ─── Statistics ───

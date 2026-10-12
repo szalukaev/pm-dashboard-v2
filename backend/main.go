@@ -92,7 +92,11 @@ func main() {
 	analyticsH := &handlers.AnalyticsHandler{DB: &pgDB}
 	kanbanH := &handlers.KanbanHandler{DB: &pgDB}
 	sprintH := &handlers.SprintHandler{DB: &pgDB}
-	paymentsH := &handlers.PaymentsHandler{DB: &pgDB}
+	// Invoices are made from the template the administrator uploaded, or
+	// from the one that ships with the application
+	invoiceTemplates := &handlers.InvoiceTemplates{DB: &pgDB, Dir: dataDir, BuiltIn: "invoice/invoice_template.docx"}
+	paymentsH := &handlers.PaymentsHandler{DB: &pgDB, Templates: invoiceTemplates}
+	invoiceTemplateH := &handlers.InvoiceTemplateHandler{DB: &pgDB, Templates: invoiceTemplates}
 	adminH := &handlers.AdminHandler{DB: &pgDB, SQLite: sqliteStore}
 	licenseH := &handlers.LicenseHandler{License: licenseSvc}
 	notifH := &handlers.NotificationsHandler{DB: &pgDB}
@@ -338,6 +342,12 @@ func main() {
 	admin.HandleFunc("/sync-settings", adminH.GetSyncSettings).Methods("GET")
 	admin.HandleFunc("/sync-settings", adminH.UpdateSyncSettings).Methods("PUT")
 	admin.HandleFunc("/audit-log", adminH.GetAuditLog).Methods("GET")
+	// The template of invoices
+	admin.HandleFunc("/invoice-template", invoiceTemplateH.Get).Methods("GET")
+	admin.HandleFunc("/invoice-template", invoiceTemplateH.Upload).Methods("POST")
+	admin.HandleFunc("/invoice-template", invoiceTemplateH.Reset).Methods("DELETE")
+	admin.HandleFunc("/invoice-template/file", invoiceTemplateH.File).Methods("GET")
+	admin.HandleFunc("/invoice-template/preview", invoiceTemplateH.Preview).Methods("GET")
 	// Background workers and the history they collect
 	admin.HandleFunc("/workers", workersH.ListWorkers).Methods("GET")
 	admin.HandleFunc("/workers/{key}/run", workersH.RunWorker).Methods("POST")
