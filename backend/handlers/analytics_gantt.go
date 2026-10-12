@@ -1,0 +1,103 @@
+package handlers
+
+import (
+	"net/http"
+	"strconv"
+
+	"pm-dashboard/utils"
+)
+
+// ganttLimit is how many tasks the timeline shows: the nearest deadlines.
+const ganttLimit = 40
+
+// GanttTask is a bar of the timeline, from Start to Due (YYYY-MM-DD).
+type GanttTask struct {
+	ExternalID     int    `json:"external_id"`
+	Subject        string `json:"subject"`
+	ProjectID      int    `json:"project_id"`
+	ProjectName    string `json:"project_name"`
+	AssignedToName string `json:"assigned_to_name"`
+	Start          string `json:"start"`
+	Due            string `json:"due"`
+}
+
+type GanttProject struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
+
+// GetGantt returns the tasks that are not closed and have a deadline, the
+// nearest deadlines first, and the projects they belong to for the filter.
+// ?project_id= leaves the tasks of one project.
+func (h *AnalyticsHandler) GetGantt(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+
+	projectFilter, args := projectIssues(r)
+	base := projectFilter + `
+		AND due_date IS NOT NULL
+		AND ` + statusNotIn("status_id", GroupClosed)
+
+	projects := []GanttProject{}
+	rows, err := (*h.DB).Query(`SELECT DISTINCT project_id, COALESCE(project_name, '')
+		FROM issues WHERE `+base+` AND project_id IS NOT NULL
+		ORDER BY 2, 1`, args...)
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
+		return
+	}
+	for rows.Next() {
+		var p GanttProject
+		if rows.Scan(&p.ID, &p.Name) == nil {
+			projects = append(projects, p)
+		}
+	}
+	rows.Close()
+
+	// The filter only narrows what the user may see anyway
+	taskFilter := base
+	if raw := r.URL.Query().Get("project_id"); raw != "" {
+		id, err := strconv.Atoi(raw)
+		if err != nil {
+			utils.Error(w, http.StatusBadRequest, "INVALID_PROJECT")
+			return
+		}
+		args = append(args, id)
+		taskFilter += ` AND project_id = $` + itoa(len(args))
+	}
+
+	var total int
+	if err := (*h.DB).QueryRow(`SELECT COUNT(*) FROM issues WHERE `+taskFilter, args...).Scan(&total); err != nil {
+		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
+		return
+	}
+
+	// A task without a start date starts when it was created; a start after
+	// the deadline is shown as a one-day bar at the deadline.
+	q := `SELECT external_id, COALESCE(subject, ''), COALESCE(project_id, 0), COALESCE(project_name, ''),
+		COALESCE(assigned_to_name, ''),
+		to_char(LEAST(COALESCE(start_date, created_on::date, due_date), due_date), 'YYYY-MM-DD'),
+		to_char(due_date, 'YYYY-MM-DD')
+		FROM issues WHERE ` + taskFilter + `
+		ORDER BY due_date ASC, external_id ASC
+		LIMIT ` + itoa(ganttLimit)
+
+	taskRows, err := (*h.DB).Query(q, args...)
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
+		return
+	}
+	defer taskRows.Close()
+
+	tasks := []GanttTask{}
+	for taskRows.Next() {
+		var t GanttTask
+		if taskRows.Scan(&t.ExternalID, &t.Subject, &t.ProjectID, &t.ProjectName, &t.AssignedToName, &t.Start, &t.Due) == nil {
+			tasks = append(tasks, t)
+		}
+	}
+
+	utils.JSON(w, http.StatusOK, map[string]interface{}{"tasks": tasks, "projects": projects, "total": total})
+}

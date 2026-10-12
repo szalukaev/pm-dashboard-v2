@@ -55,6 +55,17 @@
       <template #deadlines>
         <DeadlineTiles :deadlines="deadlines" @open-task="openTask" />
       </template>
+
+      <template #gantt>
+        <GanttChart
+          :tasks="gantt.tasks"
+          :projects="gantt.projects"
+          :total="gantt.total"
+          :project="ganttProject"
+          @update:project="store.setGanttProject($event)"
+          @open-task="openTask"
+        />
+      </template>
     </DashboardGrid>
 
     <!-- Task modal (shared with Tasks) -->
@@ -75,6 +86,7 @@ import { roundHours } from '../utils/chartTheme'
 import DashboardGrid from '../components/analytics/DashboardGrid.vue'
 import BarChart from '../components/analytics/BarChart.vue'
 import HealthGauge from '../components/analytics/HealthGauge.vue'
+import GanttChart from '../components/analytics/GanttChart.vue'
 import StatCards from '../components/analytics/StatCards.vue'
 import TeamLoadTable from '../components/analytics/TeamLoadTable.vue'
 import ProjectDistribution from '../components/analytics/ProjectDistribution.vue'
@@ -95,13 +107,14 @@ const WIDGETS: WidgetDef[] = [
   { id: 'bug_hours', title: 'analytics.bug_hours', cols: 6 },
   { id: 'distribution', title: 'analytics.distribution', cols: 12 },
   { id: 'deadlines', title: 'analytics.deadlines', cols: 12 },
+  { id: 'gantt', title: 'analytics.gantt', cols: 12 },
 ]
 
 const { t } = useI18n()
 const store = useAnalyticsStore()
 const auth = useAuthStore()
 const settingsStore = useSettingsStore()
-const { stats, teamLoad, distribution, deadlines, hours, velocity, health, loading, error } = storeToRefs(store)
+const { stats, teamLoad, distribution, deadlines, hours, velocity, health, gantt, ganttProject, loading, error } = storeToRefs(store)
 const { fetchAll } = store
 
 // An employee without hours adds nothing to a chart of hours

@@ -15,7 +15,7 @@ import (
 // Tabs and analytics widgets that can be hidden from a user.
 var (
 	Tabs    = []string{"tasks", "analytics", "kanban", "sprint", "payments"}
-	Widgets = []string{"stats", "health", "velocity", "team_load", "hours", "bug_hours", "distribution", "deadlines"}
+	Widgets = []string{"stats", "health", "velocity", "team_load", "hours", "bug_hours", "distribution", "deadlines", "gantt"}
 )
 
 // What a user may do with sprints, each allowed separately.

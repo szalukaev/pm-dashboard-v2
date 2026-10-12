@@ -69,7 +69,26 @@ export interface Health {
   parts: HealthPart[]
 }
 
+// A bar of the timeline, from start to due (YYYY-MM-DD)
+export interface GanttTask {
+  external_id: number
+  subject: string
+  project_id: number
+  project_name: string
+  assigned_to_name: string
+  start: string
+  due: string
+}
+
+export interface GanttProject {
+  id: number
+  name: string
+}
+
 export const useAnalyticsStore = defineStore('analytics', () => {
+  const gantt = ref<{ tasks: GanttTask[]; projects: GanttProject[]; total: number }>({ tasks: [], projects: [], total: 0 })
+  // The project chosen in the filter of the timeline; null — every project
+  const ganttProject = ref<number | null>(null)
   const health = ref<Health | null>(null)
   const stats = ref<StatCard[]>([])
   const hours = ref<HoursRow[]>([])
@@ -96,6 +115,7 @@ export const useAnalyticsStore = defineStore('analytics', () => {
         fetchHours(),
         fetchVelocity(),
         fetchHealth(),
+        fetchGantt(),
       ])
     } catch {
       if (!silent) error.value = i18n.global.t('common.error')
@@ -153,8 +173,28 @@ export const useAnalyticsStore = defineStore('analytics', () => {
     } catch {}
   }
 
+  async function fetchGantt(): Promise<void> {
+    try {
+      const params = ganttProject.value === null ? {} : { project_id: ganttProject.value }
+      const { data } = await axios.get('/api/analytics/gantt', { params })
+      const projects: GanttProject[] = data.projects || []
+      // The chosen project has no tasks with a deadline left: back to all
+      if (ganttProject.value !== null && !projects.some(p => p.id === ganttProject.value)) {
+        ganttProject.value = null
+        return fetchGantt()
+      }
+      gantt.value = { tasks: data.tasks || [], projects, total: data.total || 0 }
+    } catch {}
+  }
+
+  function setGanttProject(id: number | null) {
+    ganttProject.value = id
+    return fetchGantt()
+  }
+
   return {
-    stats, teamLoad, distribution, deadlines, hours, velocity, health, loading, error,
+    stats, teamLoad, distribution, deadlines, hours, velocity, health, gantt, ganttProject, loading, error,
     fetchAll, fetchStats, fetchTeamLoad, fetchDistribution, fetchDeadlines, fetchHours, fetchVelocity, fetchHealth,
+    fetchGantt, setGanttProject,
   }
 })

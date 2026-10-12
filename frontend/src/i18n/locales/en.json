@@ -249,6 +249,10 @@
       "no_estimate": "No estimate"
     },
     "health_share": "{count} ({pct}%)",
+    "gantt": "Gantt: tasks with a deadline",
+    "gantt_all_projects": "All projects",
+    "gantt_shown": "The nearest {shown} of {total} are shown",
+    "gantt_today": "Today",
     "velocity": "Velocity: tasks closed per week",
     "hours": "Hours by Employee",
     "bug_hours": "Bug Hours by Employee",
@@ -580,7 +584,8 @@
       "bug_hours": "Bug hours by employee",
       "team_load": "Team load",
       "distribution": "Task distribution by project",
-      "deadlines": "Upcoming deadlines"
+      "deadlines": "Upcoming deadlines",
+      "gantt": "Gantt"
     },
     "sprint": {
       "create": "Create",

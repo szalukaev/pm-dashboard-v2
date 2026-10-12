@@ -249,6 +249,10 @@
       "no_estimate": "Без оценки"
     },
     "health_share": "{count} ({pct}%)",
+    "gantt": "Gantt: задачи с дедлайном",
+    "gantt_all_projects": "Все проекты",
+    "gantt_shown": "Показаны ближайшие {shown} из {total}",
+    "gantt_today": "Сегодня",
     "velocity": "Velocity: закрыто задач по неделям",
     "hours": "Часы по сотрудникам",
     "bug_hours": "Баг-часы по сотрудникам",
@@ -580,7 +584,8 @@
       "bug_hours": "Баг-часы по сотрудникам",
       "team_load": "Нагрузка на команду",
       "distribution": "Распределение задач по проектам",
-      "deadlines": "Ближайшие дедлайны"
+      "deadlines": "Ближайшие дедлайны",
+      "gantt": "Gantt"
     },
     "sprint": {
       "create": "Создание",
