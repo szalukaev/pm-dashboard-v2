@@ -341,7 +341,15 @@
     "refresh_from_redmine": "Refresh from Redmine",
     "action_forbidden": "You have no right to do this with a sprint",
     "action_failed": "The sprint action failed",
+    "kind_owner_only": "Only the creator of a sprint can change its kind",
+    "kind": {
+      "personal": "Personal",
+      "shared": "Shared",
+      "personal_hint": "Visible only to you. It does not take tasks out of the backlog: they stay available for shared sprints.",
+      "shared_hint": "Visible to you and the members of the team you selected. Tasks of a shared sprint leave the backlog."
+    },
     "form": {
+      "kind": "Sprint kind",
       "name": "Name",
       "project": "Project",
       "category": "Category",
@@ -358,6 +366,7 @@
     },
     "drag_hint": "Drag tasks from the backlog",
     "no_tasks": "No tasks",
+    "no_project": "No project",
     "no_data": "No data. Make sure projects are selected in the filter.",
     "state": {
       "open": "Open",

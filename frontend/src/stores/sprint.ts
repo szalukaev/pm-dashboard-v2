@@ -14,6 +14,8 @@ export interface SprintTask {
   due_date: string | null
   estimated_hours: number | null
   is_overdue: boolean
+  // Группа статуса: open, testing или closed
+  status_group: string
 }
 
 export interface Sprint {
@@ -26,6 +28,17 @@ export interface Sprint {
   description: string | null
   category_name: string | null
   auto_fill_category: boolean
+  // Общий спринт виден команде создателя и забирает задачи из бэклога;
+  // личный виден только создателю
+  is_shared: boolean
+  // Создан ли спринт самим пользователем и кем он создан
+  is_own: boolean
+  owner_name: string
+  // Открыт, а дата окончания прошла
+  is_overdue: boolean
+  // Когда закрыт и закрыт ли позже даты окончания
+  closed_at: string | null
+  closed_late: boolean
   tasks: SprintTask[]
   task_count: number
   open_count: number

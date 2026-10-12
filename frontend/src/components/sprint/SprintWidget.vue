@@ -13,6 +13,13 @@
       <Flag :size="16" class="flag-icon" />
       <span class="sprint-name">{{ sprint.name }}</span>
       <SprintStateBadge :sprint="sprint" />
+      <!-- Вид спринта; у чужого общего — кто его создал -->
+      <span class="sprint-kind" :title="$t(sprint.is_shared ? 'sprint.kind.shared_hint' : 'sprint.kind.personal_hint')">
+        <Users v-if="sprint.is_shared" :size="13" />
+        <Lock v-else :size="13" />
+        {{ $t(sprint.is_shared ? 'sprint.kind.shared' : 'sprint.kind.personal') }}
+        <template v-if="sprint.is_shared && !sprint.is_own && sprint.owner_name"> · {{ sprint.owner_name }}</template>
+      </span>
       <span class="task-count">{{ sprint.task_count }}</span>
       <span v-if="sprint.start_date || sprint.due_date" class="date-range">
         {{ formatDate(sprint.start_date) }} — {{ formatDate(sprint.due_date) }}
@@ -71,7 +78,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { ChevronDown, Flag, CheckCircle2, Pencil, RefreshCw, Trash2 } from 'lucide-vue-next'
+import { ChevronDown, Flag, CheckCircle2, Pencil, RefreshCw, Trash2, Users, Lock } from 'lucide-vue-next'
 import SprintProgressBar from './SprintProgressBar.vue'
 import SprintStateBadge from './SprintStateBadge.vue'
 import KanbanCard from '../kanban/KanbanCard.vue'
@@ -205,6 +212,15 @@ function formatDate(d: string | null): string {
 .task-count {
   font-size: 12px;
   color: var(--text-muted);
+}
+
+.sprint-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
 .date-range {

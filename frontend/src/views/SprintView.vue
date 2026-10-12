@@ -118,8 +118,10 @@ async function guarded(action: () => Promise<unknown>) {
   try {
     await action()
   } catch (e: any) {
-    const forbidden = e?.response?.data?.error === 'SPRINT_ACTION_FORBIDDEN'
-    toast(t(forbidden ? 'sprint.action_forbidden' : 'sprint.action_failed'), 'error')
+    const code = e?.response?.data?.error
+    const forbidden = code === 'SPRINT_ACTION_FORBIDDEN'
+    const message = code === 'SPRINT_KIND_OWNER_ONLY' ? 'sprint.kind_owner_only' : forbidden ? 'sprint.action_forbidden' : 'sprint.action_failed'
+    toast(t(message), 'error')
     if (forbidden) auth.fetchMe()
   }
 }

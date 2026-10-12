@@ -48,7 +48,7 @@
             class="chevron"
             :class="{ collapsed: !isOpen(group.project_name) }"
           />
-          <span class="group-name">{{ group.project_name }}</span>
+          <span class="group-name">{{ group.project_name || $t('sprint.no_project') }}</span>
           <span class="group-count">{{ group.task_count }}</span>
         </div>
 

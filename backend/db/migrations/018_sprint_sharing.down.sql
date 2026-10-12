@@ -1,0 +1,2 @@
+ALTER TABLE sprints DROP COLUMN IF EXISTS closed_at;
+ALTER TABLE sprints DROP COLUMN IF EXISTS is_shared;

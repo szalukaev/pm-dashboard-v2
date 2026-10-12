@@ -15,6 +15,22 @@
         <input v-model="form.name" type="text" required />
       </div>
 
+      <!-- Вид спринта меняет только его создатель -->
+      <div class="form-field">
+        <label>{{ $t('sprint.form.kind') }}</label>
+        <div class="kind-switch">
+          <label class="kind-option">
+            <input v-model="form.is_shared" type="radio" :value="false" :disabled="!canChangeKind" />
+            {{ $t('sprint.kind.personal') }}
+          </label>
+          <label class="kind-option">
+            <input v-model="form.is_shared" type="radio" :value="true" :disabled="!canChangeKind" />
+            {{ $t('sprint.kind.shared') }}
+          </label>
+        </div>
+        <div class="kind-hint">{{ $t(form.is_shared ? 'sprint.kind.shared_hint' : 'sprint.kind.personal_hint') }}</div>
+      </div>
+
       <div class="form-field">
         <label>{{ $t('sprint.form.project') }}</label>
         <select v-model="form.project_name" @change="onProjectChange">
@@ -93,7 +109,11 @@ const form = reactive({
   start_date: '',
   due_date: '',
   description: '',
+  is_shared: false,
 })
+
+// Новый спринт — свой; у чужого общего спринта вид не меняется
+const canChangeKind = computed(() => !props.sprint || props.sprint.is_own)
 
 const projectId = computed(() => props.projects.find(p => p.name === form.project_name)?.id)
 
@@ -126,7 +146,9 @@ watch([() => props.visible, () => props.sprint], ([visible, s]) => {
     form.start_date = (s.start_date || '').slice(0, 10)
     form.due_date = (s.due_date || '').slice(0, 10)
     form.description = s.description || ''
+    form.is_shared = s.is_shared
   } else {
+    form.is_shared = false
     form.name = ''
     form.project_name = ''
     form.category_name = ''
@@ -212,6 +234,29 @@ function submit() {
   text-transform: none;
   font-size: 13px;
   cursor: pointer;
+}
+
+.kind-switch {
+  display: flex;
+  gap: 20px;
+}
+
+.form-field .kind-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 0;
+  text-transform: none;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.kind-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-muted);
 }
 
 .form-row {
