@@ -236,6 +236,17 @@
     "team_load": "Team Workload",
     "distribution": "Task Distribution by Project",
     "deadlines": "Upcoming Deadlines",
+    "velocity": "Velocity: tasks closed per week",
+    "hours": "Hours by Employee",
+    "bug_hours": "Bug Hours by Employee",
+    "charts": {
+      "closed": "Tasks closed",
+      "estimate_sum": "Total estimate: {hours} h",
+      "estimated": "Estimate, h",
+      "spent": "Spent, h",
+      "bug_hours": "Bug hours",
+      "bug_share": "Share of spent: {pct}%"
+    },
     "dashboard": {
       "add_widget": "Add widget",
       "reset": "Reset layout",
@@ -550,6 +561,9 @@
     },
     "widgets": {
       "stats": "Project statistics",
+      "velocity": "Weekly velocity",
+      "hours": "Hours by employee",
+      "bug_hours": "Bug hours by employee",
       "team_load": "Team load",
       "distribution": "Task distribution by project",
       "deadlines": "Upcoming deadlines"

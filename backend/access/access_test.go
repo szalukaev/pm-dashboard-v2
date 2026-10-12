@@ -367,3 +367,16 @@ func TestPrefixed(t *testing.T) {
 		t.Errorf("prefixed = %q", got)
 	}
 }
+
+// Every widget of the Analytics tab can be allowed or hidden through rights.
+func TestWidgetKeys(t *testing.T) {
+	all := []string{"stats", "velocity", "team_load", "hours", "bug_hours", "distribution", "deadlines"}
+	if !reflect.DeepEqual(Widgets, all) {
+		t.Fatalf("widgets = %v, want %v", Widgets, all)
+	}
+	// Given in any order with an unknown key, they are kept in the standard order
+	p := Permissions{Widgets: keys("deadlines", "bug_hours", "nonsense", "velocity", "hours")}.Normalized()
+	if want := []string{"velocity", "hours", "bug_hours", "deadlines"}; !reflect.DeepEqual(*p.Widgets, want) {
+		t.Errorf("widgets = %v, want %v", *p.Widgets, want)
+	}
+}

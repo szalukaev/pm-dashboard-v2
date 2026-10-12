@@ -36,8 +36,26 @@ export interface DeadlineGroup {
   tasks: any[]
 }
 
+// Hours of an employee over their tasks that are not closed
+export interface HoursRow {
+  name: string
+  estimated_hours: number
+  spent_hours: number
+  bug_hours: number
+  bug_percent: number
+}
+
+// Tasks closed during a week; week_start is its Monday, YYYY-MM-DD
+export interface VelocityWeek {
+  week_start: string
+  closed: number
+  estimated_hours: number
+}
+
 export const useAnalyticsStore = defineStore('analytics', () => {
   const stats = ref<StatCard[]>([])
+  const hours = ref<HoursRow[]>([])
+  const velocity = ref<VelocityWeek[]>([])
   const teamLoad = ref<TeamLoadRow[]>([])
   const distribution = ref<ProjectDist[]>([])
   const deadlines = ref<DeadlineGroup[]>([])
@@ -57,6 +75,8 @@ export const useAnalyticsStore = defineStore('analytics', () => {
         fetchTeamLoad(),
         fetchDistribution(),
         fetchDeadlines(),
+        fetchHours(),
+        fetchVelocity(),
       ])
     } catch {
       if (!silent) error.value = i18n.global.t('common.error')
@@ -93,8 +113,22 @@ export const useAnalyticsStore = defineStore('analytics', () => {
     } catch {}
   }
 
+  async function fetchHours() {
+    try {
+      const { data } = await axios.get('/api/analytics/hours')
+      hours.value = data.hours || []
+    } catch {}
+  }
+
+  async function fetchVelocity() {
+    try {
+      const { data } = await axios.get('/api/analytics/velocity')
+      velocity.value = data.weeks || []
+    } catch {}
+  }
+
   return {
-    stats, teamLoad, distribution, deadlines, loading, error,
-    fetchAll, fetchStats, fetchTeamLoad, fetchDistribution, fetchDeadlines,
+    stats, teamLoad, distribution, deadlines, hours, velocity, loading, error,
+    fetchAll, fetchStats, fetchTeamLoad, fetchDistribution, fetchDeadlines, fetchHours, fetchVelocity,
   }
 })
