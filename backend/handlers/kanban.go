@@ -381,6 +381,7 @@ func (h *KanbanHandler) MoveCard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	notifyIssuesUpdated(h.Events, body.IssueID)
+	issueEdited(r, body.IssueID)
 	utils.Success(w)
 }
 

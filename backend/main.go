@@ -19,6 +19,7 @@ import (
 	"pm-dashboard/jobs"
 	"pm-dashboard/license"
 	"pm-dashboard/middleware"
+	"pm-dashboard/notify"
 	"pm-dashboard/secrets"
 	"pm-dashboard/snapshots"
 	"pm-dashboard/utils"
@@ -99,7 +100,6 @@ func main() {
 	invoiceTemplateH := &handlers.InvoiceTemplateHandler{DB: &pgDB, Templates: invoiceTemplates}
 	adminH := &handlers.AdminHandler{DB: &pgDB, SQLite: sqliteStore}
 	licenseH := &handlers.LicenseHandler{License: licenseSvc}
-	notifH := &handlers.NotificationsHandler{DB: &pgDB}
 	wsHub := handlers.NewWSHub()
 
 	// Data source client and background sync. The manager re-reads connection
@@ -149,10 +149,17 @@ func main() {
 	cleaner.ReadOnly = func() bool { return !licenseSvc.Usable() || licenseSvc.IsReadOnly() }
 	cleaner.Notify = wsHub.BroadcastEvent
 	workersH := &handlers.WorkersHandler{DB: &pgDB, Source: source, Cleaner: cleaner, Settings: jobSettings, Events: wsHub.BroadcastEvent}
+	// Уведомления: после синхронизации задачи сравниваются с последним
+	// виденным состоянием, а правка задачи в самом дашборде сообщается сразу.
+	notifier := &notify.Engine{DB: &pgDB, Send: wsHub.SendToUser}
+	handlers.IssueEdited = notifier.IssueEdited
+	notificationsH := &handlers.NotificationsHandler{DB: &pgDB}
 	source.SetAfterSync(func() {
 		if pgDB == nil {
 			return
 		}
+		// Уведомления не зависят от снимка дня: сбой снимка их не отменяет
+		defer notifier.AfterSync(time.Now())
 		counts, err := snapshots.Record(pgDB, time.Now())
 		if err != nil {
 			slog.Error("Failed to record the snapshot of the day", "error", err)
@@ -244,12 +251,6 @@ func main() {
 	api.HandleFunc("/settings", settingsH.GetSettings).Methods("GET")
 	api.HandleFunc("/settings", settingsH.UpdateSettings).Methods("PUT")
 
-	// Notifications & Alerts
-	api.HandleFunc("/notifications/settings", notifH.GetSettings).Methods("GET")
-	api.HandleFunc("/notifications/settings", notifH.UpdateSettings).Methods("PUT")
-	api.HandleFunc("/notifications/thresholds", notifH.GetAlertThresholds).Methods("GET")
-	api.HandleFunc("/notifications/thresholds", notifH.UpdateAlertThresholds).Methods("PUT")
-
 	// Tasks
 	api.HandleFunc("/tasks", taskH.ListTasks).Methods("GET")
 	api.HandleFunc("/tasks/categories", taskH.GetCategories).Methods("GET")
@@ -294,6 +295,11 @@ func main() {
 	api.Handle("/sprints/{id}/assign", middleware.RequireSprint(access.SprintTasks, sprintH.AssignTask)).Methods("POST")
 	api.Handle("/sprints/{id}/assign/{issueId}", middleware.RequireSprint(access.SprintTasks, sprintH.UnassignTask)).Methods("DELETE")
 	api.Handle("/sprints/{id}/refresh", middleware.RequireSprint(access.SprintTasks, sprintH.RefreshSprint)).Methods("POST")
+
+	// Уведомления пользователя (колокольчик)
+	api.HandleFunc("/notifications", notificationsH.List).Methods("GET")
+	api.HandleFunc("/notifications/read-all", notificationsH.MarkAllRead).Methods("POST")
+	api.HandleFunc("/notifications/{id}/read", notificationsH.MarkRead).Methods("POST")
 
 	// Payments
 	api.HandleFunc("/organizations", paymentsH.ListOrganizations).Methods("GET")

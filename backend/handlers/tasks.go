@@ -471,6 +471,7 @@ func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	notifyIssuesUpdated(h.Events, externalID)
+	issueEdited(r, externalID)
 
 	utils.JSON(w, http.StatusOK, map[string]interface{}{
 		"success":       true,

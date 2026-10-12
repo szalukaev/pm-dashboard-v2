@@ -28,6 +28,7 @@
 
     <div class="header-actions">
       <AppSyncStatus />
+      <NotificationBell />
       <button
         class="action-btn"
         @click="toggleMode"
@@ -79,6 +80,7 @@ import {
 import { useTheme } from '../../composables/useTheme'
 import { useAuthStore } from '../../stores/auth'
 import AppSyncStatus from '../ui/AppSyncStatus.vue'
+import NotificationBell from './NotificationBell.vue'
 
 const router = useRouter()
 const route = useRoute()

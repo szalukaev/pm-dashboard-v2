@@ -2,125 +2,82 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"net/http"
+	"strconv"
+	"time"
 
 	"pm-dashboard/middleware"
+	"pm-dashboard/notify"
 	"pm-dashboard/utils"
+
+	"github.com/gorilla/mux"
 )
 
+// NotificationsHandler отдаёт колокольчик пользователя: журнал его
+// уведомлений и отметки о прочтении.
 type NotificationsHandler struct {
 	DB **sql.DB
 }
 
-// GetNotificationSettings returns user notification preferences
-func (h *NotificationsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
-	if *h.DB == nil {
-		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
-		return
+// notificationsPage — сколько уведомлений в странице колокольчика по умолчанию.
+const notificationsPage = 20
+
+// IssueEdited сообщает уведомлениям, что пользователь изменил задачу в самом
+// дашборде: остальным об этом сообщается сразу, а ему самому — нет. Задаётся
+// при запуске; nil — уведомления не подключены.
+var IssueEdited func(issueID, actorID int, at time.Time)
+
+// issueEdited вызывается обработчиками после сохранения изменения задачи.
+func issueEdited(r *http.Request, issueID int) {
+	if IssueEdited != nil {
+		go IssueEdited(issueID, middleware.GetUserID(r), time.Now())
 	}
-
-	userID := middleware.GetUserID(r)
-
-	var settings struct {
-		ToastsEnabled      bool `json:"toasts_enabled"`
-		OverdueAlerts      bool `json:"overdue_alerts"`
-		SoundEnabled       bool `json:"sound_enabled"`
-		EmailNotifications bool `json:"email_notifications"`
-	}
-
-	var notifJSON []byte
-	err := (*h.DB).QueryRow(`SELECT value FROM admin_settings WHERE key='notification_config'`).Scan(&notifJSON)
-	if err == nil && len(notifJSON) > 0 {
-		json.Unmarshal(notifJSON, &settings)
-	} else {
-		settings.ToastsEnabled = true
-		settings.OverdueAlerts = true
-	}
-
-	// Override with user settings
-	var userNotifs []byte
-	(*h.DB).QueryRow(`SELECT value FROM admin_settings WHERE key='user_notif_' || $1`, userID).Scan(&userNotifs)
-	if len(userNotifs) > 0 {
-		var userSettings struct {
-			ToastsEnabled *bool `json:"toasts_enabled"`
-			OverdueAlerts *bool `json:"overdue_alerts"`
-		}
-		json.Unmarshal(userNotifs, &userSettings)
-		if userSettings.ToastsEnabled != nil {
-			settings.ToastsEnabled = *userSettings.ToastsEnabled
-		}
-		if userSettings.OverdueAlerts != nil {
-			settings.OverdueAlerts = *userSettings.OverdueAlerts
-		}
-	}
-
-	utils.JSON(w, http.StatusOK, settings)
 }
 
-// UpdateNotificationSettings updates user notification preferences
-func (h *NotificationsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
+// List возвращает страницу уведомлений, новые сверху, число всех и число
+// непрочитанных.
+func (h *NotificationsHandler) List(w http.ResponseWriter, r *http.Request) {
 	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
 		return
 	}
+	limit, offset := pageOf(r)
+	if limit == 0 {
+		limit = notificationsPage
+	}
+	list, total, unread, err := notify.List(*h.DB, middleware.GetUserID(r), limit, offset)
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
+		return
+	}
+	utils.JSON(w, http.StatusOK, map[string]interface{}{
+		"notifications": list, "total": total, "unread": unread, "limit": limit, "offset": offset,
+	})
+}
 
-	userID := middleware.GetUserID(r)
-	var body map[string]interface{}
-	json.NewDecoder(r.Body).Decode(&body)
+// MarkRead помечает одно уведомление прочитанным.
+func (h *NotificationsHandler) MarkRead(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(mux.Vars(r)["id"], 10, 64)
+	if err != nil || id <= 0 {
+		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
+		return
+	}
+	h.markRead(w, r, id)
+}
 
-	data, _ := json.Marshal(body)
-	if _, err := (*h.DB).Exec(`INSERT INTO admin_settings (key, value, updated_at) VALUES ($1, $2, NOW())
-		ON CONFLICT (key) DO UPDATE SET value=$2, updated_at=NOW()`, "user_notif_"+utils.Itoa(userID), data); err != nil {
+// MarkAllRead помечает прочитанными все уведомления пользователя.
+func (h *NotificationsHandler) MarkAllRead(w http.ResponseWriter, r *http.Request) {
+	h.markRead(w, r, 0)
+}
+
+func (h *NotificationsHandler) markRead(w http.ResponseWriter, r *http.Request, id int64) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+	if err := notify.MarkRead(*h.DB, middleware.GetUserID(r), id); err != nil {
 		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 		return
 	}
-
-	utils.Success(w)
-}
-
-// GetAlertThresholds returns configured alert thresholds
-func (h *NotificationsHandler) GetAlertThresholds(w http.ResponseWriter, r *http.Request) {
-	if *h.DB == nil {
-		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
-		return
-	}
-
-	var thresholdsJSON []byte
-	err := (*h.DB).QueryRow("SELECT value FROM admin_settings WHERE key='alert_thresholds'").Scan(&thresholdsJSON)
-	if err == sql.ErrNoRows {
-		// Default thresholds
-		defaults := map[string]interface{}{
-			"overdue_critical_days": 7,
-			"overdue_warning_days":  3,
-			"no_estimate_alert":     true,
-			"high_priority_alert":   true,
-		}
-		utils.JSON(w, http.StatusOK, defaults)
-		return
-	}
-
-	var thresholds map[string]interface{}
-	json.Unmarshal(thresholdsJSON, &thresholds)
-	utils.JSON(w, http.StatusOK, thresholds)
-}
-
-// UpdateAlertThresholds updates alert thresholds (admin only)
-func (h *NotificationsHandler) UpdateAlertThresholds(w http.ResponseWriter, r *http.Request) {
-	if *h.DB == nil {
-		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
-		return
-	}
-
-	var body map[string]interface{}
-	json.NewDecoder(r.Body).Decode(&body)
-
-	data, _ := json.Marshal(body)
-	if _, err := (*h.DB).Exec(`INSERT INTO admin_settings (key, value, updated_at) VALUES ('alert_thresholds', $1, NOW())
-		ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=NOW()`, data); err != nil {
-		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
-		return
-	}
-
 	utils.Success(w)
 }

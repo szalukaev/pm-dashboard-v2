@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"pm-dashboard/middleware"
+
 	"github.com/gorilla/websocket"
 )
 
@@ -55,6 +57,8 @@ var upgrader = websocket.Upgrader{
 // wsClient is one connection with a dedicated outbound buffer.
 // Only writePump writes to the websocket.Conn (gorilla allows a single writer).
 type wsClient struct {
+	// userID — чьё это соединение: по нему уходят личные события.
+	userID    int
 	conn      *websocket.Conn
 	send      chan []byte
 	closeOnce sync.Once
@@ -158,6 +162,28 @@ func (h *WSHub) BroadcastEvent(event string, data interface{}) {
 	h.broadcast <- jsonData
 }
 
+// SendToUser отправляет событие только открытым страницам одного
+// пользователя. Клиент, не успевающий читать, пропускает событие: оно
+// останется в журнале и будет прочитано при следующей загрузке.
+func (h *WSHub) SendToUser(userID int, event string, data interface{}) {
+	jsonData, err := json.Marshal(WSMessage{Event: event, Data: data})
+	if err != nil {
+		slog.Warn("WS marshal failed", "event", event, "error", err)
+		return
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for client := range h.clients {
+		if client.userID != userID {
+			continue
+		}
+		select {
+		case client.send <- jsonData:
+		default:
+		}
+	}
+}
+
 // writePump is the only writer to the connection.
 func (c *wsClient) writePump() {
 	ticker := time.NewTicker(wsPingPeriod)
@@ -207,7 +233,8 @@ func (h *WSHub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	client := &wsClient{
-		conn: conn,
+		userID: middleware.GetUserID(r),
+		conn:   conn,
 		send: make(chan []byte, wsSendBuffer),
 	}
 	h.register <- client

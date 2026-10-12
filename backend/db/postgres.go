@@ -153,7 +153,10 @@ func runFallbackMigrations(db *sql.DB) error {
 	if _, err := db.Exec(dashboardLayoutSQL); err != nil {
 		return err
 	}
-	_, err := db.Exec(sprintSharingSQL)
+	if _, err := db.Exec(sprintSharingSQL); err != nil {
+		return err
+	}
+	_, err := db.Exec(notificationsSQL)
 	return err
 }
 
@@ -198,6 +201,9 @@ var dashboardLayoutSQL string
 
 //go:embed migrations/018_sprint_sharing.up.sql
 var sprintSharingSQL string
+
+//go:embed migrations/019_notifications.up.sql
+var notificationsSQL string
 
 // fallbackMigrationSQL is kept as a safety net when migration files are not available
 const fallbackMigrationSQL = `

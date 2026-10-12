@@ -9,6 +9,7 @@ import (
 	"pm-dashboard/config"
 	"pm-dashboard/datasource/manager"
 	"pm-dashboard/middleware"
+	"pm-dashboard/notify"
 	"pm-dashboard/utils"
 )
 
@@ -46,12 +47,15 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 		TableColumns json.RawMessage `json:"table_columns"`
 		// Arrangement of the widgets of the Analytics tab; {} is the standard one
 		DashboardLayout json.RawMessage `json:"dashboard_layout"`
+		// Действующие правила уведомлений: сохранённые поверх стандартных
+		AlertRules notify.Rules `json:"alert_rules"`
 	}
+	settings.AlertRules = notify.Defaults()
 	settings.Pagination = map[string]int{}
 	settings.TableColumns = json.RawMessage("{}")
 	settings.DashboardLayout = json.RawMessage("{}")
 
-	var selectedProjects, selectedTeam, tabOrder, kanbanStatuses, kanbanUsers, lastFilters, pagination, tableColumns, dashboardLayout []byte
+	var selectedProjects, selectedTeam, tabOrder, kanbanStatuses, kanbanUsers, lastFilters, pagination, tableColumns, dashboardLayout, alertRules []byte
 	var theme, language string
 	var notificationsEnabled, overdueAlerts bool
 
@@ -59,12 +63,12 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 		SELECT selected_projects, selected_team, theme, language, tab_order,
 		       kanban_column_order_statuses, kanban_column_order_users,
 		       last_filters, notifications_enabled, overdue_alerts,
-		       kanban_last_mode, kanban_last_project, pagination, table_columns, dashboard_layout
+		       kanban_last_mode, kanban_last_project, pagination, table_columns, dashboard_layout, alert_rules
 		FROM user_settings WHERE user_id = $1
 	`, userID).Scan(
 		&selectedProjects, &selectedTeam, &theme, &language,
 		&tabOrder, &kanbanStatuses, &kanbanUsers, &lastFilters, &notificationsEnabled, &overdueAlerts,
-		&settings.KanbanLastMode, &settings.KanbanLastProject, &pagination, &tableColumns, &dashboardLayout,
+		&settings.KanbanLastMode, &settings.KanbanLastProject, &pagination, &tableColumns, &dashboardLayout, &alertRules,
 	)
 
 	if err == sql.ErrNoRows {
@@ -107,6 +111,7 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 	if json.Valid(dashboardLayout) && len(dashboardLayout) > 0 {
 		settings.DashboardLayout = dashboardLayout
 	}
+	settings.AlertRules = notify.Effective(alertRules)
 	settings.Theme = theme
 	settings.Language = language
 	settings.NotificationsEnabled = notificationsEnabled
@@ -267,6 +272,21 @@ func (h *SettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request)
 		}
 		data, _ := json.Marshal(v)
 		if _, err := (*h.DB).Exec("UPDATE user_settings SET table_columns = table_columns || $1::jsonb WHERE user_id = $2", string(data), userID); err != nil {
+			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+			return
+		}
+	}
+
+	if v, ok := body["alert_rules"]; ok {
+		// Присланные правила заменяют свои сохранённые, остальные остаются
+		raw, _ := json.Marshal(v)
+		rules := notify.Rules{}
+		if json.Unmarshal(raw, &rules) != nil || !notify.Valid(rules) {
+			utils.Error(w, http.StatusBadRequest, "INVALID_ALERT_RULES")
+			return
+		}
+		data, _ := json.Marshal(rules)
+		if _, err := (*h.DB).Exec("UPDATE user_settings SET alert_rules = alert_rules || $1::jsonb WHERE user_id = $2", string(data), userID); err != nil {
 			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 			return
 		}

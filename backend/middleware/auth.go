@@ -74,11 +74,13 @@ func RequireWSSession(sessionStore db.SessionStore, next http.HandlerFunc) http.
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
-		if _, err := sessionStore.Get(r.Context(), cookie.Value); err != nil {
+		userID, err := sessionStore.Get(r.Context(), cookie.Value)
+		if err != nil {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
-		next(w, r)
+		// Соединение знает своего пользователя: ему уходят личные события
+		next(w, r.WithContext(context.WithValue(r.Context(), UserIDKey, userID)))
 	}
 }
 

@@ -22,6 +22,16 @@ interface Settings {
   table_columns: Record<string, { visible: string[]; order: string[] }>
   // Arrangement of the widgets of the Analytics tab; {} is the standard one
   dashboard_layout: DashboardLayout
+  // Правила уведомлений: куда доставлять и порог в днях
+  alert_rules: Record<string, AlertRule>
+}
+
+// Настройка одного правила уведомлений
+export interface AlertRule {
+  bell: boolean
+  email: boolean
+  days?: number
+  projects?: number[]
 }
 
 export const PAGE_SIZES = [10, 25, 50, 100]
@@ -47,6 +57,7 @@ const defaultSettings: Settings = {
   pagination: {},
   table_columns: {},
   dashboard_layout: {},
+  alert_rules: {},
 }
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -65,7 +76,7 @@ export const useSettingsStore = defineStore('settings', () => {
     loading.value = true
     try {
       const { data } = await axios.get('/api/settings')
-      settings.value = { ...defaultSettings, ...data, pagination: data.pagination || {}, table_columns: data.table_columns || {}, dashboard_layout: data.dashboard_layout || {} }
+      settings.value = { ...defaultSettings, ...data, pagination: data.pagination || {}, table_columns: data.table_columns || {}, dashboard_layout: data.dashboard_layout || {}, alert_rules: data.alert_rules || {} }
     } catch {
       // Use defaults
     } finally {
@@ -128,7 +139,15 @@ export const useSettingsStore = defineStore('settings', () => {
     } catch {}
   }
 
-  let layoutTimer:ReturnType<typeof setTimeout> | null = null
+  // Сохраняет настройку одного правила уведомлений; остальные не трогает
+  async function setAlertRule(key: string, rule: AlertRule) {
+    settings.value = { ...settings.value, alert_rules: { ...settings.value.alert_rules, [key]: rule } }
+    try {
+      await axios.put('/api/settings', { alert_rules: { [key]: rule } })
+    } catch {}
+  }
+
+  let layoutTimer: ReturnType<typeof setTimeout> | null = null
 
   // Applied at once, saved after a pause
   function setDashboardLayout(layout: DashboardLayout) {
@@ -144,6 +163,6 @@ export const useSettingsStore = defineStore('settings', () => {
 
   return {
     settings, loading, fetchSettings, ensureLoaded, updateSettings, pageSize, setPageSize,
-    columnOrder, tableColumns, setTableColumns, setDashboardLayout, setLastFilters,
+    columnOrder, tableColumns, setTableColumns, setDashboardLayout, setLastFilters, setAlertRule,
   }
 })

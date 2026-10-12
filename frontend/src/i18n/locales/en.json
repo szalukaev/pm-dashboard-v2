@@ -501,6 +501,49 @@
       "READ_ONLY_MODE": "The system is in read-only mode"
     }
   },
+  "notifications": {
+    "title": "Notifications",
+    "read_all": "Mark all as read",
+    "setup": "Set up",
+    "empty": "No notifications yet",
+    "change": "{field}: {from} → {to}",
+    "fields": {
+      "status": "Status",
+      "priority": "Priority",
+      "due_date": "Due date",
+      "estimated_hours": "Estimate, h"
+    },
+    "rules_title": "Notification rules",
+    "rules_hint": "Choose what to be told about. Notifications are collected under the bell in the header; while the dashboard is open, a new one also pops up (if toast notifications are on).",
+    "not_linked": "You are not tied to a Redmine employee, so the rules about your tasks will not fire. Enter your personal API key under “Personal”.",
+    "days": "Days",
+    "to_bell": "To the bell",
+    "groups": {
+      "tasks": "My tasks"
+    },
+    "rules": {
+      "task_assigned": {
+        "name": "A task is assigned to me",
+        "hint": "When you are made the assignee of a task",
+        "title": "A task was assigned to you"
+      },
+      "task_changed": {
+        "name": "Changes in my tasks",
+        "hint": "The status, priority, due date or estimate of a task you are assigned to. Your own edits in the dashboard do not count",
+        "title": "A task was changed"
+      },
+      "task_due_soon": {
+        "name": "A task is due soon",
+        "hint": "Once, when the given number of days or fewer is left until the due date of your task",
+        "title": "Days left until the task is due: {days}"
+      },
+      "task_overdue": {
+        "name": "A task is overdue",
+        "hint": "Every day while your overdue task is not closed",
+        "title": "The task is overdue, days: {days}"
+      }
+    }
+  },
   "settings": {
     "title": "Settings",
     "tabs": {
