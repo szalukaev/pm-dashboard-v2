@@ -25,6 +25,10 @@
         <StatCards :stats="stats" />
       </template>
 
+      <template #health>
+        <HealthGauge :health="health" />
+      </template>
+
       <template #velocity>
         <BarChart :labels="velocityChart.labels" :datasets="velocityChart.datasets" :hint="velocityHint" />
       </template>
@@ -70,6 +74,7 @@ import type { WidgetDef } from '../utils/dashboardLayout'
 import { roundHours } from '../utils/chartTheme'
 import DashboardGrid from '../components/analytics/DashboardGrid.vue'
 import BarChart from '../components/analytics/BarChart.vue'
+import HealthGauge from '../components/analytics/HealthGauge.vue'
 import StatCards from '../components/analytics/StatCards.vue'
 import TeamLoadTable from '../components/analytics/TeamLoadTable.vue'
 import ProjectDistribution from '../components/analytics/ProjectDistribution.vue'
@@ -83,6 +88,7 @@ import TaskModal from '../components/tasks/TaskModal.vue'
 // The ids are the keys of the widgets in the access rights.
 const WIDGETS: WidgetDef[] = [
   { id: 'stats', title: 'analytics.stats_title', cols: 12 },
+  { id: 'health', title: 'analytics.health', cols: 4 },
   { id: 'velocity', title: 'analytics.velocity', cols: 8 },
   { id: 'team_load', title: 'analytics.team_load', cols: 12 },
   { id: 'hours', title: 'analytics.hours', cols: 6 },
@@ -95,7 +101,7 @@ const { t } = useI18n()
 const store = useAnalyticsStore()
 const auth = useAuthStore()
 const settingsStore = useSettingsStore()
-const { stats, teamLoad, distribution, deadlines, hours, velocity, loading, error } = storeToRefs(store)
+const { stats, teamLoad, distribution, deadlines, hours, velocity, health, loading, error } = storeToRefs(store)
 const { fetchAll } = store
 
 // An employee without hours adds nothing to a chart of hours

@@ -236,6 +236,19 @@
     "team_load": "Team Workload",
     "distribution": "Task Distribution by Project",
     "deadlines": "Upcoming Deadlines",
+    "health": "Project Health",
+    "health_levels": {
+      "good": "Good",
+      "warning": "Needs attention",
+      "bad": "Bad"
+    },
+    "health_active": "Active tasks: {n}",
+    "health_parts": {
+      "overdue": "Overdue",
+      "bugs": "In Bugs statuses",
+      "no_estimate": "No estimate"
+    },
+    "health_share": "{count} ({pct}%)",
     "velocity": "Velocity: tasks closed per week",
     "hours": "Hours by Employee",
     "bug_hours": "Bug Hours by Employee",
@@ -561,6 +574,7 @@
     },
     "widgets": {
       "stats": "Project statistics",
+      "health": "Project health",
       "velocity": "Weekly velocity",
       "hours": "Hours by employee",
       "bug_hours": "Bug hours by employee",

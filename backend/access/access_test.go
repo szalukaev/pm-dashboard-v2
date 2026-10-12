@@ -370,7 +370,7 @@ func TestPrefixed(t *testing.T) {
 
 // Every widget of the Analytics tab can be allowed or hidden through rights.
 func TestWidgetKeys(t *testing.T) {
-	all := []string{"stats", "velocity", "team_load", "hours", "bug_hours", "distribution", "deadlines"}
+	all := []string{"stats", "health", "velocity", "team_load", "hours", "bug_hours", "distribution", "deadlines"}
 	if !reflect.DeepEqual(Widgets, all) {
 		t.Fatalf("widgets = %v, want %v", Widgets, all)
 	}

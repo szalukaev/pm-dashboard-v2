@@ -50,7 +50,7 @@ export interface MemberItem {
 // Keys of the tabs and analytics widgets that can be hidden; labels are
 // navigation.<tab> and access.widgets.<widget> in the dictionary.
 export const TABS = ['tasks', 'analytics', 'kanban', 'sprint', 'payments']
-export const WIDGETS = ['stats', 'velocity', 'team_load', 'hours', 'bug_hours', 'distribution', 'deadlines']
+export const WIDGETS = ['stats', 'health', 'velocity', 'team_load', 'hours', 'bug_hours', 'distribution', 'deadlines']
 // Actions with sprints, each allowed separately; labels are access.sprint.<action>
 export const SPRINT_ACTIONS = ['create', 'edit', 'tasks', 'close', 'delete']
 

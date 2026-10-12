@@ -272,6 +272,7 @@ func main() {
 	api.HandleFunc("/analytics/deadlines", analyticsH.GetDeadlines).Methods("GET")
 	api.HandleFunc("/analytics/hours", analyticsH.GetHours).Methods("GET")
 	api.HandleFunc("/analytics/velocity", analyticsH.GetVelocity).Methods("GET")
+	api.HandleFunc("/analytics/health", analyticsH.GetHealth).Methods("GET")
 
 	// Kanban
 	api.HandleFunc("/kanban/board", kanbanH.GetBoard).Methods("GET")

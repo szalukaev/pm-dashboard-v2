@@ -52,7 +52,25 @@ export interface VelocityWeek {
   estimated_hours: number
 }
 
+// One of the problems that lower the health score: share is the percent of
+// the active tasks, penalty is the points taken off
+export interface HealthPart {
+  key: string
+  count: number
+  share: number
+  penalty: number
+}
+
+// Health of the projects, 0–100, over the active tasks
+export interface Health {
+  score: number
+  level: 'good' | 'warning' | 'bad'
+  active: number
+  parts: HealthPart[]
+}
+
 export const useAnalyticsStore = defineStore('analytics', () => {
+  const health = ref<Health | null>(null)
   const stats = ref<StatCard[]>([])
   const hours = ref<HoursRow[]>([])
   const velocity = ref<VelocityWeek[]>([])
@@ -77,6 +95,7 @@ export const useAnalyticsStore = defineStore('analytics', () => {
         fetchDeadlines(),
         fetchHours(),
         fetchVelocity(),
+        fetchHealth(),
       ])
     } catch {
       if (!silent) error.value = i18n.global.t('common.error')
@@ -127,8 +146,15 @@ export const useAnalyticsStore = defineStore('analytics', () => {
     } catch {}
   }
 
+  async function fetchHealth() {
+    try {
+      const { data } = await axios.get('/api/analytics/health')
+      health.value = data && Array.isArray(data.parts) ? data : null
+    } catch {}
+  }
+
   return {
-    stats, teamLoad, distribution, deadlines, hours, velocity, loading, error,
-    fetchAll, fetchStats, fetchTeamLoad, fetchDistribution, fetchDeadlines, fetchHours, fetchVelocity,
+    stats, teamLoad, distribution, deadlines, hours, velocity, health, loading, error,
+    fetchAll, fetchStats, fetchTeamLoad, fetchDistribution, fetchDeadlines, fetchHours, fetchVelocity, fetchHealth,
   }
 })
