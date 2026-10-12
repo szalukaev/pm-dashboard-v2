@@ -65,6 +65,7 @@
           :key="task.external_id"
           :card="toKanbanCard(task)"
           compact
+          @dragstart="onTaskDragStart"
           @open-task="$emit('open-task', $event)"
         />
       </div>
@@ -83,6 +84,7 @@ import SprintProgressBar from './SprintProgressBar.vue'
 import SprintStateBadge from './SprintStateBadge.vue'
 import KanbanCard from '../kanban/KanbanCard.vue'
 import type { Sprint, SprintTask } from '../../stores/sprint'
+import { SPRINT_DRAG_TYPE } from '../../stores/sprint'
 import type { KanbanCard as KanbanCardType } from '../../stores/kanban'
 import { useAuthStore } from '../../stores/auth'
 
@@ -145,10 +147,17 @@ function onDrop(e: DragEvent) {
   if (!acceptsTasks()) return
   e.preventDefault()
   const issueId = parseInt(e.dataTransfer?.getData('text/plain') || '', 10)
-  if (issueId) {
-    expanded.value = true
-    emit('assign-task', { sprintId: props.sprint.id, issueId })
-  }
+  const fromSprintId = parseInt(e.dataTransfer?.getData(SPRINT_DRAG_TYPE) || '', 10) || null
+  // Задачу бросили в тот же спринт, из которого взяли
+  if (!issueId || fromSprintId === props.sprint.id) return
+  expanded.value = true
+  emit('assign-task', { sprintId: props.sprint.id, issueId, fromSprintId })
+}
+
+// Плитка сама кладёт в перетаскивание номер задачи; здесь добавляется спринт,
+// из которого её тянут, — по нему бэклог и другие спринты узнают источник
+function onTaskDragStart(e: DragEvent) {
+  e.dataTransfer?.setData(SPRINT_DRAG_TYPE, String(props.sprint.id))
 }
 
 function formatDate(d: string | null): string {

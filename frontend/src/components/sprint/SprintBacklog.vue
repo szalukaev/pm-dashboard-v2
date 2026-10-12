@@ -1,5 +1,13 @@
 <template>
-  <div class="sprint-backlog">
+  <!-- Весь блок принимает задачу, которую тянут из спринта обратно в бэклог -->
+  <div
+    class="sprint-backlog"
+    :class="{ 'is-drop-target': dragDepth > 0 }"
+    @dragenter="onDragEnter"
+    @dragover="onDragOver"
+    @dragleave="onDragLeave"
+    @drop="onDrop"
+  >
     <h3 class="section-title">
       {{ $t('sprint.backlog') }}
       <span class="backlog-count">{{ totalTasks }}</span>
@@ -83,10 +91,45 @@ import KanbanCard from '../kanban/KanbanCard.vue'
 import AppPagination from '../ui/AppPagination.vue'
 import { useSettingsStore } from '../../stores/settings'
 import type { BacklogGroup, SprintTask } from '../../stores/sprint'
+import { SPRINT_DRAG_TYPE } from '../../stores/sprint'
 import type { KanbanCard as KanbanCardType } from '../../stores/kanban'
 
 const props = defineProps<{ backlog: BacklogGroup[] }>()
-defineEmits(['open-task'])
+const emit = defineEmits(['open-task', 'unassign-task'])
+
+// Бэклог принимает только задачу из спринта: у неё в данных перетаскивания
+// есть номер спринта. dragenter и dragleave срабатывают на каждом вложенном
+// элементе, поэтому подсветка считается, а не переключается.
+const dragDepth = ref(0)
+
+function fromSprint(e: DragEvent): boolean {
+  return !!e.dataTransfer && Array.from(e.dataTransfer.types).includes(SPRINT_DRAG_TYPE)
+}
+
+function onDragEnter(e: DragEvent) {
+  if (!fromSprint(e)) return
+  e.preventDefault()
+  dragDepth.value++
+}
+
+function onDragOver(e: DragEvent) {
+  if (!fromSprint(e)) return
+  e.preventDefault()
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
+}
+
+function onDragLeave() {
+  if (dragDepth.value > 0) dragDepth.value--
+}
+
+function onDrop(e: DragEvent) {
+  dragDepth.value = 0
+  if (!fromSprint(e)) return
+  e.preventDefault()
+  const issueId = parseInt(e.dataTransfer?.getData('text/plain') || '', 10)
+  const sprintId = parseInt(e.dataTransfer?.getData(SPRINT_DRAG_TYPE) || '', 10)
+  if (issueId && sprintId) emit('unassign-task', { sprintId, issueId })
+}
 
 const openGroups = ref<Set<string>>(new Set())
 
@@ -193,6 +236,11 @@ function mapToKanbanCard(task: SprintTask): KanbanCardType {
   border: 1px solid var(--hairline);
   border-radius: 12px;
   padding: 16px;
+}
+
+.sprint-backlog.is-drop-target {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-bg);
 }
 
 .section-title {

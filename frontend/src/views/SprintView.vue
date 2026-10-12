@@ -40,6 +40,7 @@
       <SprintBacklog
         :backlog="backlog"
         @open-task="openTask"
+        @unassign-task="handleUnassignTask"
       />
     </div>
 
@@ -89,7 +90,7 @@ const auth = useAuthStore()
 const { t } = useI18n()
 const { toast } = useSwal()
 const { sprints, backlog, loading, error } = storeToRefs(sprintStore)
-const { fetchAll, createSprint, updateSprint, deleteSprint, assignTask, refreshSprint } = sprintStore
+const { fetchAll, createSprint, updateSprint, deleteSprint, assignTask, unassignTask, refreshSprint } = sprintStore
 
 const showForm = ref(false)
 const editingSprint = ref<Sprint | null>(null)
@@ -150,12 +151,22 @@ function confirmDelete(id: number) {
   showDeleteConfirm.value = true
 }
 
-async function handleAssignTask(payload: { sprintId: number; issueId: number }) {
+// Перенос задачи: экран меняется сразу, при отказе сервера данные
+// перечитываются и показывается ошибка
+async function handleAssignTask(payload: { sprintId: number; issueId: number; fromSprintId?: number | null }) {
   if (!auth.canSprint('tasks')) {
     toast(t('sprint.action_forbidden'), 'info')
     return
   }
-  await guarded(() => assignTask(payload.sprintId, payload.issueId))
+  await guarded(() => assignTask(payload.sprintId, payload.issueId, payload.fromSprintId ?? null))
+}
+
+async function handleUnassignTask(payload: { sprintId: number; issueId: number }) {
+  if (!auth.canSprint('tasks')) {
+    toast(t('sprint.action_forbidden'), 'info')
+    return
+  }
+  await guarded(() => unassignTask(payload.sprintId, payload.issueId))
 }
 
 async function handleRefresh(id: number) {

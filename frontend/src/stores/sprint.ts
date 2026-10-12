@@ -53,6 +53,10 @@ export interface BacklogGroup {
   task_count: number
 }
 
+// Под этим типом в данных перетаскивания лежит номер спринта, из которого
+// тянут задачу; у задачи из бэклога его нет
+export const SPRINT_DRAG_TYPE = 'application/x-sprint-id'
+
 export const useSprintStore = defineStore('sprint', () => {
   const sprints = ref<Sprint[]>([])
   const backlog = ref<BacklogGroup[]>([])
@@ -105,15 +109,106 @@ export const useSprintStore = defineStore('sprint', () => {
     await fetchAll()
   }
 
-  async function assignTask(sprintId: number, issueExternalId: number) {
-    await axios.post(`/api/sprints/${sprintId}/assign`, { issue_external_id: issueExternalId })
-    // Quietly: the page must not blink under a task that was just dropped
+  // Пересчитывает счётчики и готовность спринта по его задачам — так же, как
+  // сервер: закрытая задача — целая доля, задача в тестировании — половина
+  function recount(sprint: Sprint) {
+    const count = (group: string) => sprint.tasks.filter(t => t.status_group === group).length
+    sprint.task_count = sprint.tasks.length
+    sprint.testing_count = count('testing')
+    sprint.closed_count = count('closed')
+    sprint.open_count = sprint.task_count - sprint.testing_count - sprint.closed_count
+    sprint.progress = sprint.task_count > 0
+      ? ((sprint.closed_count + sprint.testing_count * 0.5) / sprint.task_count) * 100
+      : 0
+  }
+
+  // Порядок задач в спринте: открытые, в тестировании, закрытые
+  const GROUP_ORDER: Record<string, number> = { open: 0, testing: 1, closed: 2 }
+
+  function removeFromSprint(sprint: Sprint, issueId: number): SprintTask | undefined {
+    const task = sprint.tasks.find(t => t.external_id === issueId)
+    if (task) {
+      sprint.tasks = sprint.tasks.filter(t => t.external_id !== issueId)
+      recount(sprint)
+    }
+    return task
+  }
+
+  function removeFromBacklog(issueId: number): SprintTask | undefined {
+    let found: SprintTask | undefined
+    backlog.value = backlog.value.flatMap(group => {
+      const task = group.tasks.find(t => t.external_id === issueId)
+      if (!task) return [group]
+      found = task
+      const tasks = group.tasks.filter(t => t.external_id !== issueId)
+      return tasks.length > 0 ? [{ ...group, tasks, task_count: tasks.length }] : []
+    })
+    return found
+  }
+
+  // В бэклоге лежат только открытые задачи
+  function addToBacklog(task: SprintTask) {
+    if (task.status_group !== 'open') return
+    if (backlog.value.some(g => g.tasks.some(t => t.external_id === task.external_id))) return
+    const group = backlog.value.find(g => g.project_name === task.project_name)
+    if (group) {
+      group.tasks = [...group.tasks, task]
+      group.task_count = group.tasks.length
+    } else {
+      backlog.value = [...backlog.value, { project_name: task.project_name, tasks: [task], task_count: 1 }]
+    }
+  }
+
+  // Переносит задачу: в спринт toSprintId или, если он null, обратно в
+  // бэклог; fromSprintId — спринт, из которого её взяли (null — из бэклога).
+  // Экран меняется сразу, запрос идёт следом; после ответа данные сверяются
+  // с сервером, а при ошибке перечитываются и ошибка отдаётся вызвавшему.
+  async function moveTask(issueId: number, fromSprintId: number | null, toSprintId: number | null) {
+    if (fromSprintId === toSprintId) return
+    const from = fromSprintId === null ? undefined : sprints.value.find(s => s.id === fromSprintId)
+    const to = toSprintId === null ? undefined : sprints.value.find(s => s.id === toSprintId)
+
+    let task = from ? removeFromSprint(from, issueId) : undefined
+    if (to) {
+      // Задача лежит только в одном незакрытом спринте своего вида
+      for (const other of sprints.value) {
+        if (other.id !== to.id && other.status !== 'closed' && other.is_shared === to.is_shared) {
+          task = removeFromSprint(other, issueId) || task
+        }
+      }
+      // Общий спринт забирает задачу из бэклога, личный — нет
+      const inBacklog = to.is_shared ? removeFromBacklog(issueId) : backlog.value.flatMap(g => g.tasks).find(t => t.external_id === issueId)
+      task = task || inBacklog
+      if (task && !to.tasks.some(t => t.external_id === issueId)) {
+        to.tasks = [...to.tasks, task].sort((a, b) => (GROUP_ORDER[a.status_group] ?? 0) - (GROUP_ORDER[b.status_group] ?? 0))
+        recount(to)
+      }
+    }
+    // Задача, вышедшая из общего спринта, снова доступна в бэклоге
+    if (task && from?.is_shared && !to?.is_shared) addToBacklog(task)
+
+    try {
+      if (toSprintId !== null) {
+        await axios.post(`/api/sprints/${toSprintId}/assign`, {
+          issue_external_id: issueId,
+          from_sprint_id: fromSprintId ?? 0,
+        })
+      } else if (fromSprintId !== null) {
+        await axios.delete(`/api/sprints/${fromSprintId}/assign/${issueId}`)
+      }
+    } catch (e) {
+      await fetchAll({ silent: true })
+      throw e
+    }
     await fetchAll({ silent: true })
   }
 
-  async function unassignTask(sprintId: number, issueExternalId: number) {
-    await axios.delete(`/api/sprints/${sprintId}/assign/${issueExternalId}`)
-    await fetchAll({ silent: true })
+  function assignTask(sprintId: number, issueExternalId: number, fromSprintId: number | null = null) {
+    return moveTask(issueExternalId, fromSprintId, sprintId)
+  }
+
+  function unassignTask(sprintId: number, issueExternalId: number) {
+    return moveTask(issueExternalId, sprintId, null)
   }
 
   async function refreshSprint(id: number) {
