@@ -232,9 +232,27 @@
       "no_estimate": "No Estimate",
       "high_priority": "High"
     },
+    "stats_title": "Statistics",
     "team_load": "Team Workload",
     "distribution": "Task Distribution by Project",
     "deadlines": "Upcoming Deadlines",
+    "dashboard": {
+      "add_widget": "Add widget",
+      "reset": "Reset layout",
+      "empty": "Every widget is hidden. Bring the ones you need back with “Add widget”.",
+      "drag": "Drag",
+      "width": "Widget width",
+      "widths": {
+        "w4": "One third",
+        "w6": "Half",
+        "w8": "Two thirds",
+        "w12": "Full width"
+      },
+      "collapse": "Collapse",
+      "expand": "Expand",
+      "hide": "Hide",
+      "resize": "Drag to change the width"
+    },
     "deadline_groups": {
       "overdue": "Overdue",
       "today": "Today",

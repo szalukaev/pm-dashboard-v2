@@ -147,7 +147,10 @@ func runFallbackMigrations(db *sql.DB) error {
 			return err
 		}
 	}
-	_, err := db.Exec(invoiceItemNameSQL)
+	if _, err := db.Exec(invoiceItemNameSQL); err != nil {
+		return err
+	}
+	_, err := db.Exec(dashboardLayoutSQL)
 	return err
 }
 
@@ -186,6 +189,9 @@ var snapshotsSQL string
 
 //go:embed migrations/016_invoice_item_name.up.sql
 var invoiceItemNameSQL string
+
+//go:embed migrations/017_dashboard_layout.up.sql
+var dashboardLayoutSQL string
 
 // fallbackMigrationSQL is kept as a safety net when migration files are not available
 const fallbackMigrationSQL = `

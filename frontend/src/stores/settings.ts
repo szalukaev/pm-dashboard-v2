@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import axios from 'axios'
+import type { DashboardLayout } from '../utils/dashboardLayout'
 
 interface Settings {
   selected_projects: number[]
@@ -19,10 +20,16 @@ interface Settings {
   pagination: Record<string, number>
   // Visible columns and their order chosen for each table
   table_columns: Record<string, { visible: string[]; order: string[] }>
+  // Arrangement of the widgets of the Analytics tab; {} is the standard one
+  dashboard_layout: DashboardLayout
 }
 
 export const PAGE_SIZES = [10, 25, 50, 100]
 export const DEFAULT_PAGE_SIZE = 25
+
+// A dragged or resized widget changes the layout many times in a row; it is
+// saved once the user stops
+const LAYOUT_SAVE_DELAY_MS = 500
 
 const defaultSettings: Settings = {
   selected_projects: [],
@@ -39,6 +46,7 @@ const defaultSettings: Settings = {
   redmine_url: '',
   pagination: {},
   table_columns: {},
+  dashboard_layout: {},
 }
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -57,7 +65,7 @@ export const useSettingsStore = defineStore('settings', () => {
     loading.value = true
     try {
       const { data } = await axios.get('/api/settings')
-      settings.value = { ...defaultSettings, ...data, pagination: data.pagination || {}, table_columns: data.table_columns || {} }
+      settings.value = { ...defaultSettings, ...data, pagination: data.pagination || {}, table_columns: data.table_columns || {}, dashboard_layout: data.dashboard_layout || {} }
     } catch {
       // Use defaults
     } finally {
@@ -111,8 +119,22 @@ export const useSettingsStore = defineStore('settings', () => {
     } catch {}
   }
 
+  let layoutTimer: ReturnType<typeof setTimeout> | null = null
+
+  // Applied at once, saved after a pause
+  function setDashboardLayout(layout: DashboardLayout) {
+    settings.value = { ...settings.value, dashboard_layout: layout }
+    if (layoutTimer) clearTimeout(layoutTimer)
+    layoutTimer = setTimeout(async () => {
+      layoutTimer = null
+      try {
+        await axios.put('/api/settings', { dashboard_layout: settings.value.dashboard_layout })
+      } catch {}
+    }, LAYOUT_SAVE_DELAY_MS)
+  }
+
   return {
     settings, loading, fetchSettings, ensureLoaded, updateSettings, pageSize, setPageSize,
-    columnOrder, tableColumns, setTableColumns,
+    columnOrder, tableColumns, setTableColumns, setDashboardLayout,
   }
 })

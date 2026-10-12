@@ -1,7 +1,5 @@
 <template>
   <div class="deadlines-section">
-    <h3 class="section-title">{{ $t('analytics.deadlines') }}</h3>
-
     <div v-if="deadlines.length === 0" class="empty-hint">
       {{ $t('common.empty') }}
     </div>
@@ -74,14 +72,6 @@ function taskLink(externalId: number): string {
 </script>
 
 <style scoped>
-.section-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-bright);
-  margin-bottom: 12px;
-  letter-spacing: -0.2px;
-}
-
 .empty-hint {
   text-align: center;
   color: var(--text-muted);
@@ -91,7 +81,7 @@ function taskLink(externalId: number): string {
 
 .deadlines-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -201,15 +191,16 @@ function taskLink(externalId: number): string {
   color: var(--text-faint);
 }
 
-@media (max-width: 900px) {
+/* The columns follow the width of the widget, which the user sets */
+@container (max-width: 760px) {
   .deadlines-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 480px) {
+@container (max-width: 420px) {
   .deadlines-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>

@@ -1,9 +1,5 @@
 <template>
   <div class="team-load-section">
-    <div class="section-head">
-      <h3 class="section-title">{{ $t('analytics.team_load') }}</h3>
-      <AppColumnSettings :table="TABLE" :columns="COLUMNS" />
-    </div>
     <div class="table-wrapper">
       <table class="team-table" data-testid="team-load-table">
         <thead>
@@ -35,23 +31,10 @@
 import { computed } from 'vue'
 import type { TeamLoadRow } from '../../stores/analytics'
 import { useSettingsStore } from '../../stores/settings'
-import AppColumnSettings from '../ui/AppColumnSettings.vue'
+import { TEAM_LOAD_TABLE as TABLE, TEAM_LOAD_COLUMNS as COLUMNS } from './teamLoadColumns'
 
+// The button that sets up the columns lives in the header of the widget
 defineProps<{ team: TeamLoadRow[] }>()
-
-// Name of the table in the user's column settings and its columns in the
-// standard order
-const TABLE = 'team_load_table'
-const COLUMNS = [
-  { key: 'employee', label: 'tasks.table.assignee' },
-  { key: 'open', label: 'analytics.stats.open' },
-  { key: 'testing', label: 'analytics.stats.in_test' },
-  { key: 'closed', label: 'tasks.table.status' },
-  { key: 'overdue', label: 'analytics.stats.overdue' },
-  { key: 'bugs', label: 'analytics.stats.bugs' },
-  { key: 'high', label: 'analytics.stats.high_priority' },
-  { key: 'no_estimate', label: 'analytics.stats.no_estimate' },
-]
 
 const settingsStore = useSettingsStore()
 const shownColumns = computed(() =>
@@ -60,20 +43,6 @@ const shownColumns = computed(() =>
 </script>
 
 <style scoped>
-.section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.section-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-bright);
-  letter-spacing: -0.2px;
-}
-
 .table-wrapper {
   overflow-x: auto;
   border: 1px solid var(--hairline);

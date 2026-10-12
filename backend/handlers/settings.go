@@ -44,11 +44,14 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 		Pagination map[string]int `json:"pagination"`
 		// Visible columns and their order chosen for each table
 		TableColumns json.RawMessage `json:"table_columns"`
+		// Arrangement of the widgets of the Analytics tab; {} is the standard one
+		DashboardLayout json.RawMessage `json:"dashboard_layout"`
 	}
 	settings.Pagination = map[string]int{}
 	settings.TableColumns = json.RawMessage("{}")
+	settings.DashboardLayout = json.RawMessage("{}")
 
-	var selectedProjects, selectedTeam, tabOrder, kanbanStatuses, kanbanUsers, lastFilters, pagination, tableColumns []byte
+	var selectedProjects, selectedTeam, tabOrder, kanbanStatuses, kanbanUsers, lastFilters, pagination, tableColumns, dashboardLayout []byte
 	var theme, language string
 	var notificationsEnabled, overdueAlerts bool
 
@@ -56,12 +59,12 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 		SELECT selected_projects, selected_team, theme, language, tab_order,
 		       kanban_column_order_statuses, kanban_column_order_users,
 		       last_filters, notifications_enabled, overdue_alerts,
-		       kanban_last_mode, kanban_last_project, pagination, table_columns
+		       kanban_last_mode, kanban_last_project, pagination, table_columns, dashboard_layout
 		FROM user_settings WHERE user_id = $1
 	`, userID).Scan(
 		&selectedProjects, &selectedTeam, &theme, &language,
 		&tabOrder, &kanbanStatuses, &kanbanUsers, &lastFilters, &notificationsEnabled, &overdueAlerts,
-		&settings.KanbanLastMode, &settings.KanbanLastProject, &pagination, &tableColumns,
+		&settings.KanbanLastMode, &settings.KanbanLastProject, &pagination, &tableColumns, &dashboardLayout,
 	)
 
 	if err == sql.ErrNoRows {
@@ -100,6 +103,9 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if json.Valid(tableColumns) && len(tableColumns) > 0 {
 		settings.TableColumns = tableColumns
+	}
+	if json.Valid(dashboardLayout) && len(dashboardLayout) > 0 {
+		settings.DashboardLayout = dashboardLayout
 	}
 	settings.Theme = theme
 	settings.Language = language
@@ -255,6 +261,19 @@ func (h *SettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request)
 		}
 		data, _ := json.Marshal(v)
 		if _, err := (*h.DB).Exec("UPDATE user_settings SET table_columns = table_columns || $1::jsonb WHERE user_id = $2", string(data), userID); err != nil {
+			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+			return
+		}
+	}
+
+	if v, ok := body["dashboard_layout"]; ok {
+		// The whole arrangement is sent and replaces the saved one
+		if !validDashboardLayout(v) {
+			utils.Error(w, http.StatusBadRequest, "INVALID_DASHBOARD_LAYOUT")
+			return
+		}
+		data, _ := json.Marshal(v)
+		if _, err := (*h.DB).Exec("UPDATE user_settings SET dashboard_layout = $1::jsonb WHERE user_id = $2", string(data), userID); err != nil {
 			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 			return
 		}

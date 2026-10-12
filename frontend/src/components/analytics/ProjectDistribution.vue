@@ -1,7 +1,5 @@
 <template>
   <div class="distribution-section">
-    <h3 class="section-title">{{ $t('analytics.distribution') }}</h3>
-
     <div v-if="distribution.length === 0" class="empty-hint">
       {{ $t('common.empty') }}
     </div>
@@ -33,13 +31,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { Chart, PieController, ArcElement, Tooltip, Legend } from 'chart.js'
 import type { ProjectDist } from '../../stores/analytics'
 
 Chart.register(PieController, ArcElement, Tooltip, Legend)
 
-defineProps<{ distribution: ProjectDist[] }>()
+const props = defineProps<{ distribution: ProjectDist[] }>()
 
 const canvasMap = ref<Map<string, HTMLCanvasElement>>(new Map())
 const chartInstances = ref<Map<string, Chart<'pie'>>>(new Map())
@@ -111,27 +109,21 @@ function renderCharts(distribution: ProjectDist[]) {
   })
 }
 
-watch(
-  () => canvasMap.value.size,
-  () => {
-    nextTick(() => {
-      // Charts will be rendered by parent via distribution prop watch
-    })
-  }
-)
+// The charts are drawn once their canvases are on the page: when the widget
+// appears (also after being expanded) and whenever the data changes
+function draw() {
+  nextTick(() => renderCharts(props.distribution))
+}
 
-defineExpose({ renderCharts })
+watch(() => props.distribution, draw, { deep: true })
+onMounted(draw)
+onBeforeUnmount(() => {
+  chartInstances.value.forEach(chart => chart.destroy())
+  chartInstances.value.clear()
+})
 </script>
 
 <style scoped>
-.section-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-bright);
-  margin-bottom: 12px;
-  letter-spacing: -0.2px;
-}
-
 .empty-hint {
   text-align: center;
   color: var(--text-muted);
@@ -196,9 +188,9 @@ defineExpose({ renderCharts })
   font-variant-numeric: tabular-nums;
 }
 
-@media (max-width: 900px) {
+@container (max-width: 600px) {
   .charts-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>

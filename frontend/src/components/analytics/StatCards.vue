@@ -23,7 +23,6 @@ defineProps<{ stats: StatCard[] }>()
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 12px;
-  margin-bottom: 24px;
 }
 
 @media (max-width: 480px) {
