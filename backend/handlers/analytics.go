@@ -45,6 +45,10 @@ type DeadlineGroup struct {
 type ProjectDist struct {
 	ProjectID   int               `json:"project_id"`
 	ProjectName string            `json:"project_name"`
+	// The topmost parent of the project (the project itself when it has
+	// none): nested projects can be shown as one chart
+	RootID   int    `json:"root_id"`
+	RootName string `json:"root_name"`
 	Assignees   []AssigneeCount   `json:"assignees"`
 }
 
@@ -209,6 +213,28 @@ func (h *AnalyticsHandler) GetDistribution(w http.ResponseWriter, r *http.Reques
 		last.Assignees = append(last.Assignees, AssigneeCount{Name: assigneeName, Count: count})
 	}
 
+	// Where each project stands in the tree of projects
+	parents := map[int]int{}
+	names := map[int]string{}
+	if tree, err := (*h.DB).Query(`SELECT external_id, name, COALESCE(parent_id, 0) FROM projects WHERE data_source = 'redmine'`); err == nil {
+		for tree.Next() {
+			var id, parent int
+			var name string
+			if tree.Scan(&id, &name, &parent) == nil {
+				parents[id] = parent
+				names[id] = name
+			}
+		}
+		tree.Close()
+	}
+	for i := range dist {
+		root := projectRoot(dist[i].ProjectID, parents)
+		dist[i].RootID, dist[i].RootName = root, names[root]
+		if root == dist[i].ProjectID || dist[i].RootName == "" {
+			dist[i].RootID, dist[i].RootName = dist[i].ProjectID, dist[i].ProjectName
+		}
+	}
+
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"distribution": dist})
 }
 
@@ -281,6 +307,24 @@ func (h *AnalyticsHandler) GetDeadlines(w http.ResponseWriter, r *http.Request) 
 }
 
 // Helpers
+
+// projectRoot returns the topmost parent of a project; parents maps a project
+// to its parent, 0 or a missing entry meaning "no parent". A project whose
+// parent is unknown is its own root. A loop in the data ends the climb.
+func projectRoot(id int, parents map[int]int) int {
+	seen := map[int]bool{id: true}
+	for {
+		parent, known := parents[id]
+		if !known || parent == 0 || seen[parent] {
+			return id
+		}
+		if _, exists := parents[parent]; !exists {
+			return id
+		}
+		seen[parent] = true
+		id = parent
+	}
+}
 
 // deadlineOrder is the order of the deadline columns on the screen.
 var deadlineOrder = []string{"overdue", "today", "three_days", "week"}

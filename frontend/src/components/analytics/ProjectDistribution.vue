@@ -9,8 +9,12 @@
         v-for="proj in distribution"
         :key="proj.project_name"
         class="chart-card"
+        :class="{ clickable: nested(proj) > 1 }"
+        :title="nested(proj) > 1 ? $t('analytics.distribution_open') : undefined"
+        @click="nested(proj) > 1 && $emit('open', proj)"
       >
         <h4 class="chart-title">{{ proj.project_name }}</h4>
+        <div v-if="nested(proj) > 1" class="chart-note">{{ $t('analytics.distribution_projects', { n: nested(proj) }) }}</div>
         <div class="chart-container">
           <canvas :ref="el => setCanvas(el, proj.project_name)"></canvas>
         </div>
@@ -33,11 +37,21 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { Chart, PieController, ArcElement, Tooltip, Legend } from 'chart.js'
-import type { ProjectDist } from '../../stores/analytics'
+import type { DistChart } from '../../stores/analytics'
 
 Chart.register(PieController, ArcElement, Tooltip, Legend)
 
-const props = defineProps<{ distribution: ProjectDist[] }>()
+const props = defineProps<{ distribution: DistChart[] }>()
+
+// open: a chart that stands for several projects was clicked
+defineEmits<{
+  (e: 'open', chart: DistChart): void
+}>()
+
+// How many projects a chart stands for
+function nested(chart: DistChart): number {
+  return chart.parts ? chart.parts.length : 1
+}
 
 const canvasMap = ref<Map<string, HTMLCanvasElement>>(new Map())
 const chartInstances = ref<Map<string, Chart<'pie'>>>(new Map())
@@ -64,7 +78,7 @@ function setCanvas(el: any, name: string) {
   }
 }
 
-function renderCharts(distribution: ProjectDist[]) {
+function renderCharts(distribution: DistChart[]) {
   // Destroy old charts
   chartInstances.value.forEach(chart => chart.destroy())
   chartInstances.value.clear()
@@ -150,6 +164,24 @@ onBeforeUnmount(() => {
   color: var(--text-bright);
   margin-bottom: 12px;
   letter-spacing: -0.2px;
+}
+
+.chart-card.clickable {
+  cursor: pointer;
+}
+
+.chart-card.clickable:hover {
+  border-color: var(--accent);
+}
+
+.chart-card.clickable .chart-title {
+  margin-bottom: 2px;
+}
+
+.chart-note {
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .chart-container {

@@ -81,3 +81,26 @@ func TestBugPercent(t *testing.T) {
 		}
 	}
 }
+
+func TestProjectRoot(t *testing.T) {
+	// 1 ← 2 ← 3, 4 stands alone, 5 points to a project that is not known,
+	// 6 and 7 point to each other
+	parents := map[int]int{1: 0, 2: 1, 3: 2, 4: 0, 5: 99, 6: 7, 7: 6}
+	cases := map[int]int{
+		1:  1, // a top project is its own root
+		2:  1,
+		3:  1, // through every level
+		4:  4,
+		5:  5,  // an unknown parent cannot be the root
+		42: 42, // an unknown project
+	}
+	for id, want := range cases {
+		if got := projectRoot(id, parents); got != want {
+			t.Errorf("projectRoot(%d) = %d, want %d", id, got, want)
+		}
+	}
+	// A loop must end, wherever it ends
+	if got := projectRoot(6, parents); got != 6 && got != 7 {
+		t.Errorf("a loop: got %d", got)
+	}
+}

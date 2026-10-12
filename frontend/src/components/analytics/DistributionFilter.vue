@@ -4,7 +4,7 @@
       type="button"
       class="filter-btn"
       :class="{ active: open || hidden.length > 0 }"
-      :title="$t('analytics.distribution_filter.title')"
+      :title="$t('analytics.distribution_filter.button')"
       data-testid="distribution-filter"
       @click="open = !open"
     >
@@ -12,6 +12,10 @@
     </button>
 
     <div v-if="open" class="panel" data-testid="distribution-filter-panel">
+      <label class="project-row group-row">
+        <input type="checkbox" :checked="grouped" data-testid="distribution-grouped" @change="$emit('update:grouped', !grouped)" />
+        <span>{{ $t('analytics.distribution_filter.group_nested') }}</span>
+      </label>
       <div class="panel-title">{{ $t('analytics.distribution_filter.title') }}</div>
       <div v-if="projects.length === 0" class="panel-empty">{{ $t('common.empty') }}</div>
       <ul class="project-list">
@@ -38,10 +42,13 @@ import { Filter } from 'lucide-vue-next'
 const props = defineProps<{
   projects: { id: number; name: string }[]
   hidden: number[]
+  // A parent project and its nested ones are drawn as one chart
+  grouped: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'update:hidden', ids: number[]): void
+  (e: 'update:grouped', grouped: boolean): void
 }>()
 
 const open = ref(false)
@@ -133,6 +140,13 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
 
 .project-row:hover {
   background: var(--bg-hover);
+}
+
+.group-row {
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-light);
+  border-radius: 0;
 }
 
 .project-name {

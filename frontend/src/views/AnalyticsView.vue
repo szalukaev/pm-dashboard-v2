@@ -49,10 +49,16 @@
       </template>
 
       <template #distribution-actions>
-        <DistributionFilter :projects="distributionProjects" :hidden="distributionHidden" @update:hidden="setDistributionHidden" />
+        <DistributionFilter
+          :projects="distributionProjects"
+          :hidden="distributionHidden"
+          :grouped="distributionGrouped"
+          @update:hidden="saveDistribution({ hidden_projects: $event })"
+          @update:grouped="saveDistribution({ group_nested: $event })"
+        />
       </template>
       <template #distribution>
-        <ProjectDistribution :distribution="shownDistribution" />
+        <ProjectDistribution :distribution="shownDistribution" @open="openedChart = $event" />
       </template>
 
       <template #deadlines>
@@ -72,6 +78,19 @@
     </DashboardGrid>
 
     <!-- Task modal (shared with Tasks) -->
+    <!-- The projects a chart of nested projects is made of -->
+    <AppModal
+      :model-value="openedChart !== null"
+      :title="openedChart ? openedChart.project_name : ''"
+      width="1000px"
+      expandable
+      @close="openedChart = null"
+    >
+      <div class="nested-charts">
+        <ProjectDistribution v-if="openedChart" :distribution="openedChart.parts || []" />
+      </div>
+    </AppModal>
+
     <!-- The tasks behind a clicked figure; a task opens over the list -->
     <AnalyticsTasksModal :query="taskList" @close="taskList = null" @open-task="openTask" />
 
@@ -103,7 +122,8 @@ import AppColumnSettings from '../components/ui/AppColumnSettings.vue'
 import AppEmptyState from '../components/ui/AppEmptyState.vue'
 import TaskModal from '../components/tasks/TaskModal.vue'
 import AnalyticsTasksModal from '../components/analytics/AnalyticsTasksModal.vue'
-import type { TaskListQuery } from '../stores/analytics'
+import AppModal from '../components/ui/AppModal.vue'
+import type { TaskListQuery, DistChart, ProjectDist } from '../stores/analytics'
 
 // The widgets of the tab in the standard order with their standard widths.
 // The ids are the keys of the widgets in the access rights.
@@ -135,10 +155,41 @@ const distributionHidden = computed<number[]>(() => {
   return Array.isArray(saved) ? saved.filter((id: unknown): id is number => typeof id === 'number') : []
 })
 const distributionProjects = computed(() => distribution.value.map(p => ({ id: p.project_id, name: p.project_name })))
-const shownDistribution = computed(() => distribution.value.filter(p => !distributionHidden.value.includes(p.project_id)))
+// A parent project and its nested ones are one chart, unless switched off
+const distributionGrouped = computed<boolean>(() => settingsStore.settings.last_filters?.[DISTRIBUTION_FILTER]?.group_nested !== false)
 
-function setDistributionHidden(ids: number[]) {
-  settingsStore.setLastFilters(DISTRIBUTION_FILTER, { hidden_projects: ids })
+const shownDistribution = computed<DistChart[]>(() => {
+  const projects = distribution.value.filter(p => !distributionHidden.value.includes(p.project_id))
+  if (!distributionGrouped.value) return projects
+
+  const charts = new Map<number, DistChart & { parts: ProjectDist[] }>()
+  for (const p of projects) {
+    let chart = charts.get(p.root_id)
+    if (!chart) {
+      chart = { project_id: p.root_id, project_name: p.root_name, assignees: [], parts: [] }
+      charts.set(p.root_id, chart)
+    }
+    chart.parts.push(p)
+    for (const a of p.assignees) {
+      const same = chart.assignees.find(x => x.name === a.name)
+      if (same) same.count += a.count
+      else chart.assignees.push({ ...a })
+    }
+  }
+  return [...charts.values()]
+    .map(chart => ({ ...chart, assignees: [...chart.assignees].sort((a, b) => a.name.localeCompare(b.name)) }))
+    .sort((a, b) => a.project_name.localeCompare(b.project_name))
+})
+
+// The chart of nested projects opened to see each of its projects
+const openedChart = ref<DistChart | null>(null)
+
+function saveDistribution(change: { hidden_projects?: number[]; group_nested?: boolean }) {
+  settingsStore.setLastFilters(DISTRIBUTION_FILTER, {
+    hidden_projects: distributionHidden.value,
+    group_nested: distributionGrouped.value,
+    ...change,
+  })
 }
 
 // An employee without hours adds nothing to a chart of hours
@@ -217,6 +268,11 @@ onMounted(async () => {
   font-weight: 600;
   color: var(--text-bright);
   letter-spacing: -0.4px;
+}
+
+/* The charts in the window follow its width like those in the widget */
+.nested-charts {
+  container-type: inline-size;
 }
 
 .page-title-alone {

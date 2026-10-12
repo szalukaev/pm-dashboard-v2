@@ -250,7 +250,11 @@
       "no_estimate": "No estimate"
     },
     "health_share": "{count} ({pct}%)",
+    "distribution_open": "Show the breakdown by project",
+    "distribution_projects": "Projects: {n}",
     "distribution_filter": {
+      "button": "Widget settings",
+      "group_nested": "Group nested projects",
       "title": "Projects on the charts",
       "show_all": "Show all"
     },

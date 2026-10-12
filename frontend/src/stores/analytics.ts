@@ -26,10 +26,23 @@ export interface AssigneeCount {
   count: number
 }
 
+// root_id / root_name: the topmost parent of the project, the project itself
+// when it has none
 export interface ProjectDist {
   project_id: number
   project_name: string
+  root_id: number
+  root_name: string
   assignees: AssigneeCount[]
+}
+
+// A chart of the distribution: a project, or a parent project together with
+// its nested ones — then parts are the projects it is made of
+export interface DistChart {
+  project_id: number
+  project_name: string
+  assignees: AssigneeCount[]
+  parts?: ProjectDist[]
 }
 
 export interface DeadlineGroup {

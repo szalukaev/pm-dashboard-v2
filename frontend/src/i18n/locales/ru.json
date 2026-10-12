@@ -250,7 +250,11 @@
       "no_estimate": "Без оценки"
     },
     "health_share": "{count} ({pct}%)",
+    "distribution_open": "Показать разбивку по проектам",
+    "distribution_projects": "Проектов: {n}",
     "distribution_filter": {
+      "button": "Настройки виджета",
+      "group_nested": "Группировать по вложенным проектам",
       "title": "Проекты на диаграммах",
       "show_all": "Показать все"
     },
