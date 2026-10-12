@@ -12,6 +12,7 @@ import (
 
 	"pm-dashboard/datasource/manager"
 	"pm-dashboard/datasource/redmine"
+	"pm-dashboard/mail"
 	"pm-dashboard/middleware"
 	"pm-dashboard/secrets"
 	"pm-dashboard/utils"
@@ -75,6 +76,7 @@ func (k *UserKeys) RefreshProjects(userID int) {
 	if client == nil {
 		return
 	}
+	k.fillEmail(userID, client)
 	projects, err := client.GetCurrentProjects()
 	switch {
 	case errors.Is(err, redmine.ErrUnauthorized):
@@ -150,6 +152,31 @@ func (k *UserKeys) refreshMembers(userID int, client *redmine.Client, projects [
 	data, _ := json.Marshal(members)
 	if _, err := (*k.DB).Exec("UPDATE users SET source_members = $1, source_members_at = NOW() WHERE id = $2", data, userID); err != nil {
 		slog.Warn("Could not save the members the data source shows to the user", "user", userID, "error", err)
+	}
+}
+
+// emailTried — пользователи, чей адрес уже спрашивали у источника с момента
+// запуска: если адреса там нет, незачем спрашивать перед каждой синхронизацией.
+var emailTried sync.Map
+
+// fillEmail берёт адрес электронной почты пользователя из источника, если в
+// дашборде он не задан. Адрес, который пользователь указал сам, не трогает.
+func (k *UserKeys) fillEmail(userID int, client *redmine.Client) {
+	if _, tried := emailTried.LoadOrStore(userID, true); tried {
+		return
+	}
+	var email string
+	if (*k.DB).QueryRow("SELECT email FROM users WHERE id = $1", userID).Scan(&email) != nil || email != "" {
+		return
+	}
+	address, err := client.GetCurrentUserMail()
+	if err != nil {
+		// Источник не ответил: спросим в следующий раз
+		emailTried.Delete(userID)
+		return
+	}
+	if mail.ValidAddress(address) {
+		(*k.DB).Exec("UPDATE users SET email = $1 WHERE id = $2 AND email = ''", address, userID)
 	}
 }
 
@@ -284,6 +311,8 @@ func (h *AuthHandler) SetSourceToken(w http.ResponseWriter, r *http.Request) {
 	// The projects of the user in the source, for "rights as in Redmine";
 	// the sync then fetches the issues of the projects that became visible.
 	if h.Keys != nil {
+		// Новая связка — адрес почты спрашивается у источника заново
+		emailTried.Delete(userID)
 		h.Keys.RefreshProjects(userID)
 	}
 	if h.Source != nil {

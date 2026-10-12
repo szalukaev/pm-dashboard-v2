@@ -6,6 +6,8 @@ interface User {
   id: number
   username: string
   display_name?: string
+  // Адрес для писем; пусто — не задан
+  email?: string
   role: string
   avatar?: string
   last_login?: string
@@ -85,10 +87,14 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function updateMe(displayName: string) {
-    const { data } = await axios.put('/api/auth/me', { display_name: displayName })
+  // email задаётся, только если передан: без него адрес не меняется
+  async function updateMe(displayName: string, email?: string) {
+    const body: Record<string, string> = { display_name: displayName }
+    if (email !== undefined) body.email = email
+    const { data } = await axios.put('/api/auth/me', body)
     if (user.value) {
       user.value.display_name = data.display_name
+      user.value.email = data.email || ''
     }
   }
 

@@ -39,6 +39,31 @@
             </AppButton>
           </span>
         </div>
+        <!-- Адрес для писем: уведомления по правилам и регулярная сводка -->
+        <div class="info-row">
+          <span class="info-label">{{ $t('settings.personal.email') }}</span>
+          <span class="info-value editable-name">
+            <input
+              v-model="editEmail"
+              type="email"
+              class="name-input"
+              :placeholder="$t('settings.personal.email_placeholder')"
+              maxlength="255"
+              data-testid="profile-email"
+              @keyup.enter="saveEmail"
+            />
+            <AppButton
+              variant="ghost"
+              size="sm"
+              :loading="savingEmail"
+              :disabled="editEmail.trim() === (user?.email || '')"
+              @click="saveEmail"
+            >
+              {{ $t('common.save') }}
+            </AppButton>
+          </span>
+        </div>
+        <div v-if="emailError" class="email-error">{{ $t('settings.personal.email_invalid') }}</div>
         <div class="info-row">
           <span class="info-label">Логин</span>
           <span class="info-value">{{ user?.username || '—' }}</span>
@@ -135,6 +160,24 @@ async function saveDisplayName() {
     await authStore.updateMe(name)
   } finally {
     savingName.value = false
+  }
+}
+
+// Адрес берётся из Redmine при связывании; здесь его можно исправить
+const editEmail = ref(user.value?.email || '')
+const savingEmail = ref(false)
+const emailError = ref(false)
+
+async function saveEmail() {
+  savingEmail.value = true
+  emailError.value = false
+  try {
+    await authStore.updateMe(user.value?.display_name || user.value?.username || '', editEmail.value.trim())
+    editEmail.value = user.value?.email || ''
+  } catch {
+    emailError.value = true
+  } finally {
+    savingEmail.value = false
   }
 }
 
@@ -382,6 +425,12 @@ async function submitPasswordChange() {
   font-size: 13px;
   width: 220px;
   outline: none;
+}
+
+.email-error {
+  margin: -4px 0 8px;
+  font-size: 12px;
+  color: var(--danger);
 }
 
 .name-input:focus {

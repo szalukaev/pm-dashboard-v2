@@ -2,6 +2,7 @@ package notify
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -303,5 +304,61 @@ func TestRuleSpecs(t *testing.T) {
 	}
 	if !AdminOnly(RuleSyncFailed) || !AdminOnly(RuleLicenseState) || AdminOnly(RuleTaskAssigned) {
 		t.Error("системные правила — только администратору")
+	}
+}
+
+func TestMailTexts(t *testing.T) {
+	changed := Notification{Rule: RuleTaskChanged, CreatedAt: time.Date(2026, 10, 13, 9, 30, 0, 0, time.UTC),
+		Params: []byte(`{"issue_id": 101, "subject": "Отчёт <b>", "project": "Albank", "changes": [
+			{"field": "status", "from": "Новая", "to": "В работе"},
+			{"field": "due_date", "from": "2026-10-20", "to": ""}]}`)}
+	if got := Title(changed, "ru"); got != "Задача изменена" {
+		t.Errorf("заголовок: %q", got)
+	}
+	want := []string{"#101 Отчёт <b>", "Статус: Новая → В работе", "Срок: 20.10.2026 → —", "Albank"}
+	if got := Lines(changed, "ru"); !reflect.DeepEqual(got, want) {
+		t.Errorf("строки: %q", got)
+	}
+	if got := Lines(changed, "en"); got[1] != "Status: Новая → В работе" {
+		t.Errorf("строки по-английски: %q", got)
+	}
+
+	overdue := Notification{Rule: RuleTaskOverdue, Params: []byte(`{"issue_id": 5, "subject": "Задача", "days": 12, "due": "2026-10-01"}`)}
+	if got := Title(overdue, "ru"); got != "Задача просрочена, дней: 12" {
+		t.Errorf("просрочка: %q", got)
+	}
+	if got := Title(overdue, "de"); got != "Задача просрочена, дней: 12" {
+		t.Errorf("неизвестный язык считается русским: %q", got)
+	}
+
+	contract := Notification{Rule: RuleContractEnding, Params: []byte(`{"name": "Сопровождение 2026", "due": "2026-10-27", "days": 14}`)}
+	if got := Lines(contract, "ru"); !reflect.DeepEqual(got, []string{"Сопровождение 2026", "Срок: 27.10.2026"}) {
+		t.Errorf("договор: %q", got)
+	}
+
+	license := Notification{Rule: RuleLicenseState, Params: []byte(`{"state": "read_only"}`)}
+	if got := Title(license, "ru"); got != "Лицензия: только чтение" {
+		t.Errorf("лицензия: %q", got)
+	}
+
+	// У каждого правила есть заголовок на обоих языках
+	for _, key := range Keys() {
+		for _, lang := range []string{"ru", "en"} {
+			if titles[lang][key] == "" {
+				t.Errorf("нет заголовка правила %s на языке %s", key, lang)
+			}
+		}
+	}
+
+	subject, body := Digest([]Notification{changed, overdue}, "ru")
+	if subject != "PM Dashboard: новых уведомлений — 2" {
+		t.Errorf("тема: %q", subject)
+	}
+	// Текст из задач не должен стать разметкой письма
+	if strings.Contains(body, "<b>") || !strings.Contains(body, "Отчёт &lt;b&gt;") {
+		t.Error("название задачи должно быть экранировано")
+	}
+	if !strings.Contains(body, "Задача просрочена, дней: 12") || !strings.Contains(body, "13.10.2026 09:30") {
+		t.Error("в письме должны быть заголовки уведомлений и время")
 	}
 }

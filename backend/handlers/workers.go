@@ -10,6 +10,7 @@ import (
 	"pm-dashboard/datasource/manager"
 	"pm-dashboard/datasource/redmine"
 	"pm-dashboard/jobs"
+	"pm-dashboard/mail"
 	"pm-dashboard/snapshots"
 	"pm-dashboard/utils"
 
@@ -19,9 +20,11 @@ import (
 // WorkersHandler serves the screens where the administrator sees the
 // background workers and manages the history they collect.
 type WorkersHandler struct {
-	DB       **sql.DB
-	Source   *manager.Manager
-	Cleaner  *jobs.Cleaner
+	DB      **sql.DB
+	Source  *manager.Manager
+	Cleaner *jobs.Cleaner
+	// Mailer — рассылка почты; nil, пока не подключена.
+	Mailer   *jobs.Mailer
 	Settings *jobs.Settings
 	// Events reports changes to open pages (WebSocket); may be nil.
 	Events func(event string, data interface{})
@@ -31,6 +34,7 @@ type WorkersHandler struct {
 const (
 	workerSync    = "sync"
 	workerCleanup = jobs.CleanupKey
+	workerMail    = jobs.MailKey
 )
 
 // What the screen shows as the state of a worker.
@@ -78,8 +82,12 @@ func (h *WorkersHandler) notify() {
 // ListWorkers returns the background workers with their state.
 func (h *WorkersHandler) ListWorkers(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
+	workers := []workerInfo{h.syncWorker(), h.cleanupWorker()}
+	if h.Mailer != nil {
+		workers = append(workers, h.mailWorker())
+	}
 	utils.JSON(w, http.StatusOK, map[string]interface{}{
-		"workers":     []workerInfo{h.syncWorker(), h.cleanupWorker()},
+		"workers":     workers,
 		"server_time": now,
 		"timezone":    now.Location().String(),
 	})
@@ -139,6 +147,26 @@ func (h *WorkersHandler) cleanupWorker() workerInfo {
 	return info
 }
 
+// mailWorker описывает рассылку почты. В расписании — настроена ли почта:
+// без неё рассылке отправлять нечем.
+func (h *WorkersHandler) mailWorker() workerInfo {
+	status := h.Mailer.Status()
+	cfg, _ := h.Mailer.Mail.Load()
+	info := workerInfo{
+		Key:       workerMail,
+		Enabled:   h.Settings.MailEnabled(),
+		Running:   h.Mailer.Running(),
+		LastStart: status.LastStart,
+		Error:     status.Error,
+		Schedule:  map[string]interface{}{"configured": cfg.Ready()},
+	}
+	if status.LastStart != nil {
+		info.DurationMs, info.Processed = &status.DurationMs, &status.Processed
+	}
+	info.State = workerState(info.Enabled, info.Running, status.State == jobs.StateError)
+	return info
+}
+
 // RunWorker starts a worker now. For the sync, {"full": true} asks for a
 // pass that re-reads every project completely.
 func (h *WorkersHandler) RunWorker(w http.ResponseWriter, r *http.Request) {
@@ -170,6 +198,23 @@ func (h *WorkersHandler) RunWorker(w http.ResponseWriter, r *http.Request) {
 		}
 	case workerCleanup:
 		h.cleanup(w, h.Cleaner.RunNow)
+	case workerMail:
+		if h.Mailer == nil {
+			utils.Error(w, http.StatusNotFound, "WORKER_NOT_FOUND")
+			return
+		}
+		// Запуск администратором отправляет накопившееся, не дожидаясь часа
+		sent, err := h.Mailer.RunNow(true)
+		switch {
+		case errors.Is(err, mail.ErrNotConfigured):
+			utils.Error(w, http.StatusBadRequest, "SMTP_NOT_CONFIGURED")
+		case errors.Is(err, jobs.ErrBusy):
+			utils.Error(w, http.StatusConflict, "WORKER_ALREADY_RUNNING")
+		case err != nil:
+			utils.Error(w, http.StatusBadGateway, "MAIL_SEND_FAILED")
+		default:
+			utils.JSON(w, http.StatusOK, map[string]interface{}{"success": true, "sent": sent})
+		}
 	default:
 		utils.Error(w, http.StatusNotFound, "WORKER_NOT_FOUND")
 	}
@@ -184,7 +229,7 @@ func (h *WorkersHandler) StopWorker(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		utils.Success(w)
-	case workerCleanup:
+	case workerCleanup, workerMail:
 		// A cleanup is one short statement: there is nothing to interrupt
 		utils.Error(w, http.StatusConflict, "WORKER_NOT_RUNNING")
 	default:
@@ -212,6 +257,8 @@ func (h *WorkersHandler) setEnabled(w http.ResponseWriter, r *http.Request, enab
 	case workerCleanup:
 		err = h.Settings.SetCleanupEnabled(enabled)
 		h.Cleaner.Rescheduled()
+	case workerMail:
+		err = h.Settings.SetMailEnabled(enabled)
 	default:
 		utils.Error(w, http.StatusNotFound, "WORKER_NOT_FOUND")
 		return

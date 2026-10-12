@@ -18,6 +18,7 @@ import (
 	"pm-dashboard/handlers"
 	"pm-dashboard/jobs"
 	"pm-dashboard/license"
+	"pm-dashboard/mail"
 	"pm-dashboard/middleware"
 	"pm-dashboard/notify"
 	"pm-dashboard/secrets"
@@ -183,6 +184,13 @@ func main() {
 		}
 		slog.Info("Snapshot of the day recorded", "members", counts.Members, "issues_changed", counts.Issues)
 	})
+	// Почта: настройки SMTP у администратора и рассылка — письма с
+	// уведомлениями и регулярные сводки
+	mailStore := &mail.Store{DB: &pgDB, Box: secretBox}
+	mailH := &handlers.MailHandler{Mail: mailStore}
+	mailer := &jobs.Mailer{DB: &pgDB, Settings: jobSettings, Store: jobs.NewStore(redisURL), Mail: mailStore, Notify: wsHub.BroadcastEvent}
+	workersH.Mailer = mailer
+	go mailer.Run(context.Background())
 	go cleaner.Run(context.Background())
 	taskH.Events = wsHub.BroadcastEvent
 	kanbanH.Events = wsHub.BroadcastEvent
@@ -383,6 +391,10 @@ func main() {
 	admin.HandleFunc("/workers/{key}/enable", workersH.EnableWorker).Methods("POST")
 	admin.HandleFunc("/workers/{key}/disable", workersH.DisableWorker).Methods("POST")
 	admin.HandleFunc("/workers/{key}/schedule", workersH.UpdateSchedule).Methods("PUT")
+	// Отправка почты
+	admin.HandleFunc("/smtp", mailH.GetSMTP).Methods("GET")
+	admin.HandleFunc("/smtp", mailH.UpdateSMTP).Methods("PUT")
+	admin.HandleFunc("/smtp/test", mailH.TestSMTP).Methods("POST")
 	admin.HandleFunc("/data-retention", workersH.GetDataRetention).Methods("GET")
 	admin.HandleFunc("/data-retention", workersH.UpdateDataRetention).Methods("PUT")
 	admin.HandleFunc("/snapshots/cleanup", workersH.CleanupSnapshots).Methods("POST")

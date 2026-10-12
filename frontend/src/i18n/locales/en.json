@@ -518,6 +518,8 @@
     "not_linked": "You are not tied to a Redmine employee, so the rules about your tasks will not fire. Enter your personal API key under “Personal”.",
     "days": "Days",
     "to_bell": "To the bell",
+    "to_email": "By email",
+    "no_email": "You have no email set, so there is nowhere to send messages. The address is taken from Redmine when you tie your account with a personal key; you can also enter it under “Personal”.",
     "all_projects": "All projects",
     "projects_chosen": "Projects chosen: {n}",
     "due": "Due: {due}",
@@ -618,6 +620,11 @@
       "audit": "Audit",
       "admin": "Administration"
     },
+    "personal": {
+      "email": "Email",
+      "email_placeholder": "address for messages",
+      "email_invalid": "Enter an email address or leave the field empty"
+    },
     "data": {
       "title": "Dashboard Data Filtering",
       "projects": "Projects",
@@ -717,7 +724,8 @@
       "templates": "Role templates",
       "data": "Statuses and priorities",
       "workers": "Workers",
-      "invoice": "Invoice template"
+      "invoice": "Invoice template",
+      "mail": "Mail"
     },
     "widgets": {
       "stats": "Project statistics",
@@ -1018,7 +1026,8 @@
     "col_actions": "Actions",
     "names": {
       "sync": "Data collection (Redmine)",
-      "cleanup": "Snapshot cleanup"
+      "cleanup": "Snapshot cleanup",
+      "mail": "Email mailing"
     },
     "states": {
       "working": "Working",
@@ -1028,8 +1037,11 @@
     },
     "processed": {
       "sync": "{count} issues",
-      "cleanup": "{count} deleted"
+      "cleanup": "{count} deleted",
+      "mail": "{count} sent"
     },
+    "schedule_mail": "notification messages — at most once an hour; reports — by the users' schedules",
+    "schedule_mail_off": "mail is not set up — there is nothing to send with",
     "schedule_sync": "every {minutes} min; full synchronization at {time}",
     "schedule_cleanup": "daily at {time}; keep {days} days",
     "run_now": "Run now",
@@ -1061,7 +1073,44 @@
       "CLEANUP_ALREADY_RUNNING": "A cleanup is already running",
       "CLEANUP_FAILED": "The cleanup failed",
       "INVALID_INTERVAL": "The interval is out of range",
-      "INVALID_TIME": "Enter the time as HH:MM"
+      "INVALID_TIME": "Enter the time as HH:MM",
+      "SMTP_NOT_CONFIGURED": "Mail is not set up: fill it in and switch it on under the “Mail” tab",
+      "WORKER_ALREADY_RUNNING": "The mailing is already running",
+      "MAIL_SEND_FAILED": "Not every message could be sent — see the “Status” column"
+    }
+  },
+  "mail": {
+    "title": "Mail sending",
+    "hint": "Messages with the users' notifications and the regular reports go through this server. The password is stored encrypted and is never shown back.",
+    "enabled": "Send messages",
+    "host": "SMTP server",
+    "port": "Port",
+    "security": "Encryption",
+    "security_starttls": "STARTTLS (usually port 587)",
+    "security_tls": "SSL/TLS (usually port 465)",
+    "security_none": "No encryption",
+    "username": "Login",
+    "password": "Password",
+    "password_saved": "saved — enter a new one to replace it",
+    "clear_password": "Remove the password",
+    "from": "Sender address",
+    "from_name": "Sender name",
+    "saved": "The mail settings are saved",
+    "save_error": "Could not save the mail settings",
+    "load_error": "Could not load the mail settings",
+    "test_title": "Check",
+    "test_hint": "The test message is sent with the saved settings — save your changes first. Sending that is switched off can be checked too.",
+    "test_to": "Where to send the test message",
+    "test_send": "Send a test message",
+    "test_sent": "The message was sent — check the mailbox",
+    "errors": {
+      "INVALID_SMTP_HOST": "Enter the address of the SMTP server",
+      "INVALID_SMTP_PORT": "The port is a number from 1 to 65535",
+      "INVALID_SMTP_SECURITY": "Choose the kind of encryption",
+      "INVALID_SMTP_FROM": "The sender address must be an email address",
+      "INVALID_EMAIL": "Enter an email address",
+      "SMTP_NOT_CONFIGURED": "Fill in and save the settings first",
+      "MAIL_SEND_FAILED": "The message was not sent"
     }
   },
   "invoice_template": {

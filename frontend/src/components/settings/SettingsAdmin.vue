@@ -25,6 +25,7 @@
     <AdminTemplates v-else-if="activeTab === 'templates'" :projects="projects" :members="members" />
     <AdminWorkers v-else-if="activeTab === 'workers'" />
     <AdminInvoiceTemplate v-else-if="activeTab === 'invoice'" />
+    <AdminMail v-else-if="activeTab === 'mail'" />
 
     <!-- Settings of the data shared by all users -->
     <template v-else>
@@ -84,6 +85,7 @@ import AdminUsers from './access/AdminUsers.vue'
 import AdminGroups from './access/AdminGroups.vue'
 import AdminWorkers from './access/AdminWorkers.vue'
 import AdminInvoiceTemplate from './access/AdminInvoiceTemplate.vue'
+import AdminMail from './access/AdminMail.vue'
 import AdminTemplates from './access/AdminTemplates.vue'
 import { useSwal } from '../../composables/useSwal'
 import type { ProjectItem, MemberItem } from '../../utils/access'
@@ -95,7 +97,7 @@ interface Priority {
   color: string
 }
 
-const tabs = ['users', 'groups', 'templates', 'data', 'workers', 'invoice'] as const
+const tabs = ['users', 'groups', 'templates', 'data', 'workers', 'invoice', 'mail'] as const
 const activeTab = ref<(typeof tabs)[number]>('users')
 
 const { t } = useI18n()

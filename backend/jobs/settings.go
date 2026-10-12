@@ -100,6 +100,21 @@ func (s *Settings) SetCleanupTime(timeOfDay string) error {
 	return s.set(keyCleanupTime, timeOfDay)
 }
 
+// keyMailEnabled — включена ли рассылка почты по расписанию.
+const keyMailEnabled = "mail_enabled"
+
+// MailEnabled сообщает, отправляет ли рассылка письма сама; запуск
+// администратором работает и при выключенной.
+func (s *Settings) MailEnabled() bool {
+	enabled := true
+	s.get(keyMailEnabled, &enabled)
+	return enabled
+}
+
+func (s *Settings) SetMailEnabled(enabled bool) error {
+	return s.set(keyMailEnabled, enabled)
+}
+
 // ValidTimeOfDay reports whether the value is a time of day as "HH:MM".
 func ValidTimeOfDay(value string) bool {
 	_, err := time.Parse("15:04", value)

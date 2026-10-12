@@ -349,6 +349,24 @@ func (c *Client) GetCurrentUser() (*Member, error) {
 	}, nil
 }
 
+// GetCurrentUserMail возвращает адрес электронной почты владельца ключа API
+// этого клиента — пусто, если в источнике он не задан.
+func (c *Client) GetCurrentUserMail() (string, error) {
+	data, err := c.doRequest("/users/current.json")
+	if err != nil {
+		return "", err
+	}
+	var resp struct {
+		User struct {
+			Mail string `json:"mail"`
+		} `json:"user"`
+	}
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(resp.User.Mail), nil
+}
+
 const (
 	pageSize = 100
 	// Pages of one list requested at once.

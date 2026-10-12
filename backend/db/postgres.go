@@ -156,7 +156,10 @@ func runFallbackMigrations(db *sql.DB) error {
 	if _, err := db.Exec(sprintSharingSQL); err != nil {
 		return err
 	}
-	_, err := db.Exec(notificationsSQL)
+	if _, err := db.Exec(notificationsSQL); err != nil {
+		return err
+	}
+	_, err := db.Exec(emailSQL)
 	return err
 }
 
@@ -204,6 +207,9 @@ var sprintSharingSQL string
 
 //go:embed migrations/019_notifications.up.sql
 var notificationsSQL string
+
+//go:embed migrations/020_email.up.sql
+var emailSQL string
 
 // fallbackMigrationSQL is kept as a safety net when migration files are not available
 const fallbackMigrationSQL = `

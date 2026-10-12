@@ -95,3 +95,28 @@ func TestSettingsDefaultsAndLimits(t *testing.T) {
 		t.Error("time of day is checked wrongly")
 	}
 }
+
+func TestMailSettings(t *testing.T) {
+	// Без базы рассылка считается включённой: выключает её только администратор
+	if !(&Settings{}).MailEnabled() {
+		t.Error("рассылка включена, пока её не выключили")
+	}
+	if err := (&Settings{}).SetMailEnabled(false); err != ErrNoDatabase {
+		t.Errorf("без базы настройку не сохранить: %v", err)
+	}
+}
+
+func TestMailerNeedsDatabase(t *testing.T) {
+	m := &Mailer{Settings: &Settings{}, Store: newMemoryStore()}
+	if _, err := m.RunNow(true); err != ErrNoDatabase {
+		t.Errorf("без базы рассылка не запускается: %v", err)
+	}
+	if m.Running() {
+		t.Error("после отказа рассылка не должна числиться идущей")
+	}
+	// Запуск, прерванный перезапуском сервера, не числится идущим вечно
+	m.Store.Save(MailKey, Status{State: StateRunning})
+	if got := m.Status().State; got != StateIdle {
+		t.Errorf("состояние после прерванного запуска: %s", got)
+	}
+}

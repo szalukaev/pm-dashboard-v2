@@ -23,6 +23,11 @@
       {{ $t('notifications.not_linked') }}
     </div>
 
+    <!-- Без адреса письма отправлять некуда -->
+    <div v-if="!hasEmail" class="warning-note" data-testid="alert-rules-no-email">
+      {{ $t('notifications.no_email') }}
+    </div>
+
     <div class="rules" data-testid="alert-rules">
       <template v-for="group in groups" :key="group.key">
         <div class="rule-group">{{ $t('notifications.groups.' + group.key) }}</div>
@@ -58,6 +63,11 @@
           <label class="rule-check">
             <input type="checkbox" :checked="rule(key).bell" @change="set(key, { bell: !rule(key).bell })" />
             {{ $t('notifications.to_bell') }}
+          </label>
+          <!-- На почту: письма собираются в одно и уходят не чаще раза в час -->
+          <label class="rule-check" :title="hasEmail ? undefined : $t('notifications.no_email')">
+            <input type="checkbox" :checked="rule(key).email" :disabled="!hasEmail && !rule(key).email" @change="set(key, { email: !rule(key).email })" />
+            {{ $t('notifications.to_email') }}
           </label>
         </div>
       </template>
@@ -100,6 +110,7 @@ const auth = useAuthStore()
 const notificationsEnabled = ref(true)
 
 const linked = computed(() => !!auth.user?.source?.member_id)
+const hasEmail = computed(() => !!auth.user?.email)
 const groups = computed(() => GROUPS.filter(g => !g.adminOnly || auth.isAdmin))
 
 // Проекты для правил по проектам — доступные пользователю

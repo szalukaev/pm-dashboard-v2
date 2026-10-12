@@ -13,6 +13,7 @@ import (
 	"pm-dashboard/access"
 	"pm-dashboard/datasource/manager"
 	"pm-dashboard/db"
+	"pm-dashboard/mail"
 	"pm-dashboard/middleware"
 	"pm-dashboard/secrets"
 	"pm-dashboard/utils"
@@ -255,6 +256,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 			"id":                    id,
 			"username":              req.Username,
 			"display_name":          displayName,
+			"email":                 h.userEmail(id),
 			"role":                  role,
 			"avatar":                avatar,
 			"last_login":            lastLogin,
@@ -330,10 +332,10 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var username, role, displayName, avatar string
+	var username, role, displayName, avatar, email string
 	var lastLogin *string
 	var forcePasswordChange bool
-	err := (*h.DB).QueryRow("SELECT username, role, COALESCE(display_name,''), COALESCE(avatar,''), COALESCE(force_password_change, false), last_login FROM users WHERE id = $1", userID).Scan(&username, &role, &displayName, &avatar, &forcePasswordChange, &lastLogin)
+	err := (*h.DB).QueryRow("SELECT username, role, COALESCE(display_name,''), COALESCE(avatar,''), COALESCE(force_password_change, false), last_login, email FROM users WHERE id = $1", userID).Scan(&username, &role, &displayName, &avatar, &forcePasswordChange, &lastLogin, &email)
 	if err != nil {
 		utils.Error(w, http.StatusNotFound, "USER_NOT_FOUND")
 		return
@@ -343,6 +345,7 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		"id":                    userID,
 		"username":              username,
 		"display_name":          displayName,
+		"email":                 email,
 		"role":                  role,
 		"avatar":                avatar,
 		"last_login":            lastLogin,
@@ -350,6 +353,13 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		"access":                scopeInfo(middleware.GetScope(r)),
 		"source":                h.sourceInfo(userID),
 	})
+}
+
+// userEmail возвращает адрес электронной почты пользователя или пустую строку.
+func (h *AuthHandler) userEmail(userID int) string {
+	var email string
+	(*h.DB).QueryRow("SELECT email FROM users WHERE id = $1", userID).Scan(&email)
+	return email
 }
 
 func (h *AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
@@ -365,10 +375,24 @@ func (h *AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 
 	var body struct {
 		DisplayName string `json:"display_name"`
+		// Email: адрес для писем; пустая строка убирает его. Без поля в
+		// запросе адрес не меняется.
+		Email *string `json:"email"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
 		return
+	}
+	if body.Email != nil {
+		address := strings.TrimSpace(*body.Email)
+		if address != "" && !mail.ValidAddress(address) {
+			utils.Error(w, http.StatusBadRequest, "INVALID_EMAIL")
+			return
+		}
+		if _, err := (*h.DB).Exec("UPDATE users SET email = $1 WHERE id = $2", address, userID); err != nil {
+			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+			return
+		}
 	}
 
 	displayName := strings.TrimSpace(body.DisplayName)
@@ -393,6 +417,7 @@ func (h *AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 
 	utils.JSON(w, http.StatusOK, map[string]interface{}{
 		"display_name": displayName,
+		"email":        h.userEmail(userID),
 	})
 }
 

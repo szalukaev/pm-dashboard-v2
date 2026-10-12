@@ -49,7 +49,8 @@
                 <AppButton variant="ghost" :test-id="'worker-toggle-' + w.key" @click="act(w, w.enabled ? 'disable' : 'enable')">
                   {{ $t(w.enabled ? 'workers.disable' : 'workers.enable') }}
                 </AppButton>
-                <AppButton variant="ghost" :test-id="'worker-schedule-' + w.key" @click="openSchedule(w)">
+                <!-- У рассылки нет своего расписания: время задают сами письма -->
+                <AppButton v-if="w.key !== 'mail'" variant="ghost" :test-id="'worker-schedule-' + w.key" @click="openSchedule(w)">
                   {{ $t('workers.schedule') }}
                 </AppButton>
               </div>
@@ -99,7 +100,7 @@ import AppButton from '../../ui/AppButton.vue'
 import AppModal from '../../ui/AppModal.vue'
 
 interface Worker {
-  key: 'sync' | 'cleanup'
+  key: 'sync' | 'cleanup' | 'mail'
   // working | stopped | error | starting
   state: string
   enabled: boolean
@@ -183,6 +184,10 @@ async function saveSchedule() {
 function scheduleText(w: Worker): string {
   if (w.key === 'sync') {
     return t('workers.schedule_sync', { minutes: w.schedule.interval_minutes, time: w.schedule.full_sync_time })
+  }
+  if (w.key === 'mail') {
+    // Без настроенной почты рассылке отправлять нечем
+    return t(w.schedule.configured ? 'workers.schedule_mail' : 'workers.schedule_mail_off')
   }
   return t('workers.schedule_cleanup', { time: w.schedule.time, days: w.schedule.retention_days })
 }
