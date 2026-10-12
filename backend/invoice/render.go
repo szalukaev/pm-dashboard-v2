@@ -398,6 +398,9 @@ var tableColumns = []struct {
 const (
 	// tableBorderColor is the color of the frame of the built table.
 	tableBorderColor = "4A85B0"
+	// tableIndent moves the table so that its frame lines up with the text
+	// of the page (the padding of the first cell would shift it left).
+	tableIndent = 113
 	// totalsLabelColumns: the labels of the totals take this many columns
 	// before the last one; a long label wraps inside them.
 	totalsLabelColumns = 2
@@ -446,8 +449,15 @@ func bold(rPr string) string {
 // set for the whole table would draw lines through them.
 func itemsTable(data Data, rPr string) string {
 	var b strings.Builder
-	b.WriteString(`<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/>` +
-		`<w:tblCellMar><w:top w:w="11" w:type="dxa"/><w:bottom w:w="4" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>`)
+	// The widths of the columns are fixed: whatever the length of a name,
+	// the table keeps its shape and the name wraps inside its column.
+	tableWidth := 0
+	for _, col := range tableColumns {
+		tableWidth += col.width
+	}
+	fmt.Fprintf(&b, `<w:tbl><w:tblPr><w:tblW w:w="%d" w:type="dxa"/><w:tblInd w:w="%d" w:type="dxa"/><w:tblLayout w:type="fixed"/>`+
+		`<w:tblCellMar><w:top w:w="11" w:type="dxa"/><w:bottom w:w="4" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>`,
+		tableWidth, tableIndent)
 	for _, col := range tableColumns {
 		fmt.Fprintf(&b, `<w:gridCol w:w="%d"/>`, col.width)
 	}

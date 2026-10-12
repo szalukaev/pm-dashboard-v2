@@ -210,6 +210,20 @@ func TestRenderItemsTable(t *testing.T) {
 	if strings.Contains(doc, "<w:tblBorders>") {
 		t.Error("the frame must be set cell by cell, not for the table")
 	}
+	// The columns have the widths of the sample invoice and do not stretch:
+	// a long name wraps inside its column
+	if !strings.Contains(doc, `<w:tblW w:w="9669" w:type="dxa"/>`) || !strings.Contains(doc, `<w:tblLayout w:type="fixed"/>`) {
+		t.Error("the table must have a fixed layout of the full width")
+	}
+	for _, width := range []string{"454", "5530", "850", "1419", "1416"} {
+		if !strings.Contains(doc, `<w:gridCol w:w="`+width+`"/>`) {
+			t.Errorf("a column of width %s is missing", width)
+		}
+	}
+	// The label of a total takes the two columns before the amount
+	if got := strings.Count(doc, `<w:tcW w:w="2269" w:type="dxa"/><w:gridSpan w:val="2"/>`); got != 3 {
+		t.Errorf("%d labels of totals have the width of two columns, want 3", got)
+	}
 	// Rows are compact, and a long name stays at the top of its row
 	if got := strings.Count(doc, `<w:spacing w:after="0"/>`); got != 29 {
 		t.Errorf("%d cells have no space after the text, want all 29", got)
