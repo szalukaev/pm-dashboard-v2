@@ -24,6 +24,19 @@ interface Settings {
   dashboard_layout: DashboardLayout
   // Правила уведомлений: куда доставлять и порог в днях
   alert_rules: Record<string, AlertRule>
+  // Регулярная сводка на почту
+  email_report: EmailReport
+}
+
+// Настройка регулярной сводки: email пуст — письмо уходит на адрес из
+// профиля; period — daily, weekly (по понедельникам) или monthly (1-го числа)
+export interface EmailReport {
+  enabled: boolean
+  email: string
+  period: string
+  time: string
+  sections: string[]
+  overdue_list: boolean
 }
 
 // Настройка одного правила уведомлений
@@ -58,6 +71,7 @@ const defaultSettings: Settings = {
   table_columns: {},
   dashboard_layout: {},
   alert_rules: {},
+  email_report: { enabled: false, email: '', period: 'weekly', time: '09:00', sections: ['stats', 'team_load', 'distribution', 'deadlines'], overdue_list: true },
 }
 
 export const useSettingsStore = defineStore('settings', () => {

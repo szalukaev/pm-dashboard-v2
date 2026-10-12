@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"pm-dashboard/access"
 	"pm-dashboard/middleware"
 	"pm-dashboard/utils"
 )
@@ -64,10 +65,17 @@ func (h *AnalyticsHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	projectFilter, args := projectIssues(r)
+	utils.JSON(w, http.StatusOK, map[string]interface{}{"stats": h.stats(middleware.GetScope(r), time.Now())})
+}
+
+// stats считает карточки статистики по проектам пользователя в пределах его
+// прав. Этим же расчётом пользуется письмо со сводкой.
+func (h *AnalyticsHandler) stats(scope *access.Scope, now time.Time) []StatCard {
+	args := []interface{}{}
+	projectFilter := scope.ProjectIssueCond("", &args)
 
 	var stats []StatCard
-	today := time.Now().Format("2006-01-02")
+	today := now.Format("2006-01-02")
 
 	// Active projects: those with open or testing issues
 	var activeProjects int
@@ -121,7 +129,7 @@ func (h *AnalyticsHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	(*h.DB).QueryRow(q, args...).Scan(&noEstimate)
 	stats = append(stats, StatCard{Label: "no_estimate", Value: float64(noEstimate)})
 
-	utils.JSON(w, http.StatusOK, map[string]interface{}{"stats": stats})
+	return stats
 }
 
 func (h *AnalyticsHandler) GetTeamLoad(w http.ResponseWriter, r *http.Request) {
@@ -130,10 +138,20 @@ func (h *AnalyticsHandler) GetTeamLoad(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	today := time.Now().Format("2006-01-02")
+	team, err := h.teamLoad(middleware.GetScope(r), time.Now())
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
+		return
+	}
+	utils.JSON(w, http.StatusOK, map[string]interface{}{"team": team})
+}
+
+// teamLoad считает нагрузку на команду, которую пользователь отслеживает, в
+// пределах его прав. Этим же расчётом пользуется письмо со сводкой.
+func (h *AnalyticsHandler) teamLoad(scope *access.Scope, now time.Time) ([]TeamLoadRow, error) {
+	today := now.Format("2006-01-02")
 
 	// The team the user tracks, within rights
-	scope := middleware.GetScope(r)
 	args := []interface{}{}
 	projectFilter := scope.IssueCond("", &args)
 	teamFilter := ""
@@ -158,8 +176,7 @@ func (h *AnalyticsHandler) GetTeamLoad(w http.ResponseWriter, r *http.Request) {
 	args = append(args, today)
 	rows, err := (*h.DB).Query(q, args...)
 	if err != nil {
-		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
-		return
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -174,7 +191,7 @@ func (h *AnalyticsHandler) GetTeamLoad(w http.ResponseWriter, r *http.Request) {
 		rows_data = []TeamLoadRow{}
 	}
 
-	utils.JSON(w, http.StatusOK, map[string]interface{}{"team": rows_data})
+	return rows_data, nil
 }
 
 func (h *AnalyticsHandler) GetDistribution(w http.ResponseWriter, r *http.Request) {
@@ -183,7 +200,19 @@ func (h *AnalyticsHandler) GetDistribution(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	projectFilter, args := projectIssues(r)
+	dist, err := h.distribution(middleware.GetScope(r))
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
+		return
+	}
+	utils.JSON(w, http.StatusOK, map[string]interface{}{"distribution": dist})
+}
+
+// distribution считает открытые задачи по проектам и сотрудникам в пределах
+// прав пользователя. Этим же расчётом пользуется письмо со сводкой.
+func (h *AnalyticsHandler) distribution(scope *access.Scope) ([]ProjectDist, error) {
+	args := []interface{}{}
+	projectFilter := scope.ProjectIssueCond("", &args)
 
 	q := `SELECT COALESCE(project_id, 0), project_name, COALESCE(assigned_to_name, 'Неназначенные'), COUNT(*)
 		FROM issues WHERE ` + projectFilter + `
@@ -193,8 +222,7 @@ func (h *AnalyticsHandler) GetDistribution(w http.ResponseWriter, r *http.Reques
 
 	rows, err := (*h.DB).Query(q, args...)
 	if err != nil {
-		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
-		return
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -238,7 +266,7 @@ func (h *AnalyticsHandler) GetDistribution(w http.ResponseWriter, r *http.Reques
 		dist[i].RootID, dist[i].RootName = root, names[root]
 	}
 
-	utils.JSON(w, http.StatusOK, map[string]interface{}{"distribution": dist})
+	return dist, nil
 }
 
 func (h *AnalyticsHandler) GetDeadlines(w http.ResponseWriter, r *http.Request) {
@@ -247,8 +275,19 @@ func (h *AnalyticsHandler) GetDeadlines(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	projectFilter, args := projectIssues(r)
-	today := time.Now()
+	result, err := h.deadlines(middleware.GetScope(r), time.Now())
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
+		return
+	}
+	utils.JSON(w, http.StatusOK, map[string]interface{}{"deadlines": result})
+}
+
+// deadlines раскладывает незакрытые задачи со сроком по срочности в пределах
+// прав пользователя. Этим же расчётом пользуется письмо со сводкой.
+func (h *AnalyticsHandler) deadlines(scope *access.Scope, today time.Time) ([]DeadlineGroup, error) {
+	args := []interface{}{}
+	projectFilter := scope.ProjectIssueCond("", &args)
 
 	// All tasks that are not closed and have a due date
 	q := `SELECT external_id, project_id, project_name, subject, '',
@@ -264,8 +303,7 @@ func (h *AnalyticsHandler) GetDeadlines(w http.ResponseWriter, r *http.Request) 
 
 	rows, err := (*h.DB).Query(q, args...)
 	if err != nil {
-		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
-		return
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -306,7 +344,7 @@ func (h *AnalyticsHandler) GetDeadlines(w http.ResponseWriter, r *http.Request) 
 		result = append(result, *g)
 	}
 
-	utils.JSON(w, http.StatusOK, map[string]interface{}{"deadlines": result})
+	return result, nil
 }
 
 // Helpers

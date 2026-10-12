@@ -1079,6 +1079,39 @@
       "MAIL_SEND_FAILED": "Not every message could be sent — see the “Status” column"
     }
   },
+  "email_report": {
+    "title": "Email report",
+    "hint": "A task report comes to your mailbox on a schedule. It holds the same data as the Analytics tab — over your projects and within your rights. The time is by the clock of the server.",
+    "enabled": "Send the report regularly",
+    "email": "Email",
+    "email_placeholder": "enter an address",
+    "period": "How often",
+    "periods": {
+      "daily": "Every day",
+      "weekly": "Every week (Monday)",
+      "monthly": "Every month (the 1st)"
+    },
+    "time": "Sending time",
+    "sections": "What to include",
+    "section_names": {
+      "stats": "Statistics",
+      "team_load": "Team workload",
+      "distribution": "Task distribution by project",
+      "deadlines": "Upcoming deadlines"
+    },
+    "overdue_list": "The list of overdue tasks",
+    "test": "Send a test message",
+    "saved": "The report settings are saved. The first report will come at the next scheduled time.",
+    "save_error": "Could not save the report settings",
+    "test_sent": "The report was sent to {to} — check the mailbox",
+    "test_error": "Could not send the report",
+    "errors": {
+      "INVALID_EMAIL_REPORT": "Check the address and the sending time",
+      "EMAIL_REQUIRED": "Enter an address: none is set in your profile",
+      "SMTP_NOT_CONFIGURED": "Mail sending is not set up — ask the administrator",
+      "MAIL_SEND_FAILED": "The mail server did not accept the message — ask the administrator"
+    }
+  },
   "mail": {
     "title": "Mail sending",
     "hint": "Messages with the users' notifications and the regular reports go through this server. The password is stored encrypted and is never shown back.",

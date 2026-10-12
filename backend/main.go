@@ -189,6 +189,8 @@ func main() {
 	mailStore := &mail.Store{DB: &pgDB, Box: secretBox}
 	mailH := &handlers.MailHandler{Mail: mailStore}
 	mailer := &jobs.Mailer{DB: &pgDB, Settings: jobSettings, Store: jobs.NewStore(redisURL), Mail: mailStore, Notify: wsHub.BroadcastEvent}
+	reportH := &handlers.ReportHandler{DB: &pgDB, Mail: mailStore, Scopes: (&access.Resolver{DB: &pgDB}).Scope}
+	mailer.Reports = reportH.SendDue
 	workersH.Mailer = mailer
 	go mailer.Run(context.Background())
 	go cleaner.Run(context.Background())
@@ -274,6 +276,8 @@ func main() {
 	api.HandleFunc("/sync/status", syncStatusH.GetStatus).Methods("GET")
 	api.HandleFunc("/settings", settingsH.GetSettings).Methods("GET")
 	api.HandleFunc("/settings", settingsH.UpdateSettings).Methods("PUT")
+	// Пробная сводка на почту — по настройке из запроса, до сохранения
+	api.HandleFunc("/settings/email-report/test", reportH.SendTest).Methods("POST")
 
 	// Tasks
 	api.HandleFunc("/tasks", taskH.ListTasks).Methods("GET")

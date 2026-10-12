@@ -72,6 +72,9 @@
         </div>
       </template>
     </div>
+
+    <!-- Регулярная сводка на почту -->
+    <SettingsEmailReport />
   </div>
 </template>
 
@@ -82,6 +85,7 @@ import type { AlertRule } from '../../stores/settings'
 import { useAuthStore } from '../../stores/auth'
 import { useTasksStore } from '../../stores/tasks'
 import { useI18n } from 'vue-i18n'
+import SettingsEmailReport from './SettingsEmailReport.vue'
 
 // Правила по группам, в порядке показа. Подписи: notifications.rules.<правило>.
 // byProject: у правил группы выбираются проекты; adminOnly: группа видна

@@ -49,13 +49,16 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 		DashboardLayout json.RawMessage `json:"dashboard_layout"`
 		// Действующие правила уведомлений: сохранённые поверх стандартных
 		AlertRules notify.Rules `json:"alert_rules"`
+		// Регулярная сводка на почту
+		EmailReport ReportSettings `json:"email_report"`
 	}
 	settings.AlertRules = notify.Defaults()
+	settings.EmailReport = defaultReportSettings()
 	settings.Pagination = map[string]int{}
 	settings.TableColumns = json.RawMessage("{}")
 	settings.DashboardLayout = json.RawMessage("{}")
 
-	var selectedProjects, selectedTeam, tabOrder, kanbanStatuses, kanbanUsers, lastFilters, pagination, tableColumns, dashboardLayout, alertRules []byte
+	var selectedProjects, selectedTeam, tabOrder, kanbanStatuses, kanbanUsers, lastFilters, pagination, tableColumns, dashboardLayout, alertRules, emailReport []byte
 	var theme, language string
 	var notificationsEnabled, overdueAlerts bool
 
@@ -63,12 +66,12 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 		SELECT selected_projects, selected_team, theme, language, tab_order,
 		       kanban_column_order_statuses, kanban_column_order_users,
 		       last_filters, notifications_enabled, overdue_alerts,
-		       kanban_last_mode, kanban_last_project, pagination, table_columns, dashboard_layout, alert_rules
+		       kanban_last_mode, kanban_last_project, pagination, table_columns, dashboard_layout, alert_rules, email_report
 		FROM user_settings WHERE user_id = $1
 	`, userID).Scan(
 		&selectedProjects, &selectedTeam, &theme, &language,
 		&tabOrder, &kanbanStatuses, &kanbanUsers, &lastFilters, &notificationsEnabled, &overdueAlerts,
-		&settings.KanbanLastMode, &settings.KanbanLastProject, &pagination, &tableColumns, &dashboardLayout, &alertRules,
+		&settings.KanbanLastMode, &settings.KanbanLastProject, &pagination, &tableColumns, &dashboardLayout, &alertRules, &emailReport,
 	)
 
 	if err == sql.ErrNoRows {
@@ -112,6 +115,7 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 		settings.DashboardLayout = dashboardLayout
 	}
 	settings.AlertRules = notify.Effective(alertRules)
+	settings.EmailReport = parseReportSettings(emailReport)
 	settings.Theme = theme
 	settings.Language = language
 	settings.NotificationsEnabled = notificationsEnabled
@@ -287,6 +291,24 @@ func (h *SettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request)
 		}
 		data, _ := json.Marshal(rules)
 		if _, err := (*h.DB).Exec("UPDATE user_settings SET alert_rules = alert_rules || $1::jsonb WHERE user_id = $2", string(data), userID); err != nil {
+			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+			return
+		}
+	}
+
+	if v, ok := body["email_report"]; ok {
+		raw, _ := json.Marshal(v)
+		report := defaultReportSettings()
+		if json.Unmarshal(raw, &report) != nil || !report.valid() {
+			utils.Error(w, http.StatusBadRequest, "INVALID_EMAIL_REPORT")
+			return
+		}
+		data, _ := json.Marshal(report)
+		// Отсчёт срока идёт от момента включения: первая сводка уходит в
+		// ближайший срок по расписанию, а не сразу и не за прошедший
+		if _, err := (*h.DB).Exec(`UPDATE user_settings SET email_report = $1::jsonb,
+			email_report_sent_at = CASE WHEN $2 THEN COALESCE(email_report_sent_at, NOW()) ELSE NULL END
+			WHERE user_id = $3`, string(data), report.Enabled, userID); err != nil {
 			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 			return
 		}
