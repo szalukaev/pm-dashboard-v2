@@ -373,6 +373,8 @@
       "overdue": "Overdue",
       "closed": "Closed"
     },
+    "delete_title": "Delete the sprint?",
+    "no_open_sprints": "There are no open sprints. Create one with “New Sprint”.",
     "closed_section": "Completed",
     "reopen": "Reopen",
     "closed_late_hint": "The sprint was closed after its due date",

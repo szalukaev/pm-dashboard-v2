@@ -35,7 +35,7 @@
         <label>{{ $t('sprint.form.project') }}</label>
         <select v-model="form.project_name" @change="onProjectChange">
           <option value="">—</option>
-          <option v-for="p in projects" :key="p.name" :value="p.name">{{ p.name }}</option>
+          <option v-for="name in projectOptions" :key="name" :value="name">{{ name }}</option>
         </select>
       </div>
 
@@ -114,6 +114,13 @@ const form = reactive({
 
 // Новый спринт — свой; у чужого общего спринта вид не меняется
 const canChangeKind = computed(() => !props.sprint || props.sprint.is_own)
+
+// В списке — проекты, выбранные пользователем в настройках. Проект, уже
+// заданный у спринта, остаётся в списке, даже если его больше нет среди них.
+const projectOptions = computed(() => {
+  const names = props.projects.map(p => p.name)
+  return form.project_name && !names.includes(form.project_name) ? [form.project_name, ...names] : names
+})
 
 const projectId = computed(() => props.projects.find(p => p.name === form.project_name)?.id)
 

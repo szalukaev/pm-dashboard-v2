@@ -32,8 +32,12 @@
           @assign-task="handleAssignTask"
         />
 
-        <div v-if="openSprints.length === 0" class="empty-sprints">
-          <AppEmptyState state="empty" />
+        <!-- Нет ни спринтов, ни задач: скорее всего, не выбраны проекты -->
+        <div v-if="sprints.length === 0 && backlog.length === 0" class="empty-note" data-testid="sprint-no-data">
+          {{ $t('sprint.no_data') }}
+        </div>
+        <div v-else-if="openSprints.length === 0" class="empty-note">
+          {{ $t('sprint.no_open_sprints') }}
         </div>
       </div>
 
@@ -76,7 +80,7 @@
     <!-- Delete Confirm -->
     <AppConfirmDialog
       :model-value="showDeleteConfirm"
-      :title="$t('common.confirm_delete_title', ['спринт'])"
+      :title="$t('sprint.delete_title')"
       @update:model-value="showDeleteConfirm = $event"
       @confirm="handleDelete"
     />
@@ -94,6 +98,7 @@ import { useSprintStore, type Sprint } from '../stores/sprint'
 import { useTasksStore } from '../stores/tasks'
 import { useLiveRefresh } from '../composables/useLiveRefresh'
 import { useAuthStore } from '../stores/auth'
+import { useSettingsStore } from '../stores/settings'
 import { useI18n } from 'vue-i18n'
 import { useSwal } from '../composables/useSwal'
 import SprintWidget from '../components/sprint/SprintWidget.vue'
@@ -108,6 +113,7 @@ import TaskModal from '../components/tasks/TaskModal.vue'
 const sprintStore = useSprintStore()
 const tasksStore = useTasksStore()
 const auth = useAuthStore()
+const settingsStore = useSettingsStore()
 const { t } = useI18n()
 const { toast } = useSwal()
 const { sprints, backlog, loading, error } = storeToRefs(sprintStore)
@@ -124,7 +130,24 @@ const editingSprint = ref<Sprint | null>(null)
 const showDeleteConfirm = ref(false)
 const deletingSprintId = ref<number | null>(null)
 const selectedTaskId = ref<number | null>(null)
-const projects = ref<{ id: number; name: string }[]>([])
+// Проекты для формы спринта: те, что пользователь выбрал в настройках, вместе
+// с их подпроектами; если ничего не выбрано — все доступные, как и везде
+const projects = computed(() => {
+  const all = tasksStore.projects
+  const selected = settingsStore.settings.selected_projects || []
+  if (selected.length === 0) return all.map(p => ({ id: p.id, name: p.name }))
+
+  const parents = new Map<number, number | null>(all.map(p => [p.id, p.parent_id] as [number, number | null]))
+  const isSelected = (id: number) => {
+    const seen = new Set<number>()
+    for (let current: number | null | undefined = id; current != null && !seen.has(current); current = parents.get(current)) {
+      if (selected.includes(current)) return true
+      seen.add(current)
+    }
+    return false
+  }
+  return all.filter(p => isSelected(p.id)).map(p => ({ id: p.id, name: p.name }))
+})
 
 function openTask(id: number) {
   selectedTaskId.value = id
@@ -209,8 +232,7 @@ useLiveRefresh(() => fetchAll({ silent: true }))
 
 onMounted(async () => {
   await fetchAll()
-  await tasksStore.fetchProjects()
-  projects.value = tasksStore.projects.map(p => ({ id: p.id, name: p.name }))
+  await Promise.all([tasksStore.fetchProjects(), settingsStore.ensureLoaded()])
 })
 </script>
 
@@ -282,7 +304,12 @@ onMounted(async () => {
   color: var(--text-muted);
 }
 
-.empty-sprints {
-  margin-bottom: 24px;
+.empty-note {
+  padding: 32px 16px;
+  border: 1px dashed var(--hairline);
+  border-radius: 12px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
 }
 </style>
