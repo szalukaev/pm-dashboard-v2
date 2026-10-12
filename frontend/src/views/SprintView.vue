@@ -19,8 +19,9 @@
     <div v-else class="sprint-content">
       <!-- Sprints -->
       <div class="sprints-list">
+        <!-- Незакрытые: просроченные сверху, затем по дате окончания -->
         <SprintWidget
-          v-for="sprint in sprints"
+          v-for="sprint in openSprints"
           :key="sprint.id"
           :sprint="sprint"
           @complete="completeSprint"
@@ -31,8 +32,27 @@
           @assign-task="handleAssignTask"
         />
 
-        <div v-if="sprints.length === 0" class="empty-sprints">
+        <div v-if="openSprints.length === 0" class="empty-sprints">
           <AppEmptyState state="empty" />
+        </div>
+      </div>
+
+      <!-- Завершённые спринты: отдельный раздел, свёрнут, пока не раскроют -->
+      <div v-if="closedSprints.length > 0" class="closed-section" data-testid="closed-sprints">
+        <button type="button" class="closed-head" @click="showClosed = !showClosed">
+          <ChevronDown :size="16" class="closed-chevron" :class="{ collapsed: !showClosed }" />
+          {{ $t('sprint.closed_section') }}
+          <span class="closed-count">{{ closedSprints.length }}</span>
+        </button>
+        <div v-if="showClosed" class="sprints-list">
+          <SprintWidget
+            v-for="sprint in closedSprints"
+            :key="sprint.id"
+            :sprint="sprint"
+            @reopen="reopenSprint"
+            @delete="confirmDelete"
+            @open-task="openTask"
+          />
         </div>
       </div>
 
@@ -67,7 +87,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { ChevronDown } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
 import { useSprintStore, type Sprint } from '../stores/sprint'
 import { useTasksStore } from '../stores/tasks'
@@ -91,6 +112,12 @@ const { t } = useI18n()
 const { toast } = useSwal()
 const { sprints, backlog, loading, error } = storeToRefs(sprintStore)
 const { fetchAll, createSprint, updateSprint, deleteSprint, assignTask, unassignTask, refreshSprint } = sprintStore
+
+// Сервер отдаёт спринты уже в порядке экрана; здесь они только делятся на
+// незакрытые и завершённые
+const openSprints = computed(() => sprints.value.filter(s => s.status !== 'closed'))
+const closedSprints = computed(() => sprints.value.filter(s => s.status === 'closed'))
+const showClosed = ref(false)
 
 const showForm = ref(false)
 const editingSprint = ref<Sprint | null>(null)
@@ -135,6 +162,10 @@ async function handleFormSubmit(form: any) {
 
 async function completeSprint(id: number) {
   await guarded(() => updateSprint(id, { status: 'closed' }))
+}
+
+async function reopenSprint(id: number) {
+  await guarded(() => updateSprint(id, { status: 'open' }))
 }
 
 async function handleDelete() {
@@ -214,6 +245,41 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.closed-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.closed-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-bright);
+  cursor: pointer;
+}
+
+.closed-chevron {
+  color: var(--text-faint);
+  transition: transform 0.2s;
+}
+
+.closed-chevron.collapsed {
+  transform: rotate(-90deg);
+}
+
+.closed-count {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
 }
 
 .empty-sprints {

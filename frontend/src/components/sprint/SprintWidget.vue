@@ -2,7 +2,8 @@
   <!-- The whole block takes a dragged task: the header and a collapsed sprint too -->
   <div
     class="sprint-widget"
-    :class="{ 'is-closed': sprint.status === 'closed', 'is-drop-target': dragDepth > 0 }"
+    :class="{ 'is-closed': sprint.status === 'closed', 'is-overdue': sprint.is_overdue, 'is-drop-target': dragDepth > 0 }"
+    :data-testid="'sprint-' + sprint.id"
     @dragenter="onDragEnter"
     @dragover="onDragOver"
     @dragleave="onDragLeave"
@@ -13,6 +14,8 @@
       <Flag :size="16" class="flag-icon" />
       <span class="sprint-name">{{ sprint.name }}</span>
       <SprintStateBadge :sprint="sprint" />
+      <!-- Закрыт позже даты окончания -->
+      <span v-if="sprint.closed_late" class="late-mark" :title="$t('sprint.closed_late_hint')">{{ $t('sprint.state.overdue') }}</span>
       <!-- Вид спринта; у чужого общего — кто его создал -->
       <span class="sprint-kind" :title="$t(sprint.is_shared ? 'sprint.kind.shared_hint' : 'sprint.kind.personal_hint')">
         <Users v-if="sprint.is_shared" :size="13" />
@@ -40,6 +43,16 @@
         </button>
         <button v-if="auth.canSprint('tasks')" class="action-btn" @click="$emit('refresh', sprint.id)" :title="$t('sprint.refresh_from_redmine')">
           <RefreshCw :size="16" />
+        </button>
+        <button v-if="auth.canSprint('delete')" class="action-btn danger-btn" @click="$emit('delete', sprint.id)" :title="$t('common.delete')">
+          <Trash2 :size="16" />
+        </button>
+      </div>
+
+      <!-- Закрытый спринт можно открыть заново или удалить -->
+      <div v-else class="header-actions" @click.stop>
+        <button v-if="auth.canSprint('close')" class="action-btn" @click="$emit('reopen', sprint.id)" :title="$t('sprint.reopen')" data-testid="sprint-reopen">
+          <RotateCcw :size="16" />
         </button>
         <button v-if="auth.canSprint('delete')" class="action-btn danger-btn" @click="$emit('delete', sprint.id)" :title="$t('common.delete')">
           <Trash2 :size="16" />
@@ -85,7 +98,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { ChevronDown, Flag, CheckCircle2, Pencil, RefreshCw, Trash2, Users, Lock } from 'lucide-vue-next'
+import { ChevronDown, Flag, CheckCircle2, Pencil, RefreshCw, RotateCcw, Trash2, Users, Lock } from 'lucide-vue-next'
 import SprintProgressBar from './SprintProgressBar.vue'
 import SprintStateBadge from './SprintStateBadge.vue'
 import KanbanCard from '../kanban/KanbanCard.vue'
@@ -98,7 +111,7 @@ const props = defineProps<{
   sprint: Sprint
 }>()
 
-const emit = defineEmits(['complete', 'edit', 'refresh', 'delete', 'open-task', 'assign-task'])
+const emit = defineEmits(['complete', 'reopen', 'edit', 'refresh', 'delete', 'open-task', 'assign-task'])
 const auth = useAuthStore()
 
 const expanded = ref(props.sprint.status !== 'closed')
@@ -181,7 +194,24 @@ function formatDate(d: string | null): string {
 }
 
 .sprint-widget.is-closed {
-  opacity: 0.7;
+  opacity: 0.8;
+}
+
+/* Просроченный спринт заметен в списке: цветная рамка и полоса слева */
+.sprint-widget.is-overdue {
+  border-color: var(--warning);
+  box-shadow: inset 4px 0 0 var(--warning);
+}
+
+.late-mark {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 9999px;
+  white-space: nowrap;
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
 }
 
 .sprint-widget.is-drop-target {
