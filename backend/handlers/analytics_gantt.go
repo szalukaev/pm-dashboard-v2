@@ -7,8 +7,8 @@ import (
 	"pm-dashboard/utils"
 )
 
-// ganttLimit is how many tasks the timeline shows: the nearest deadlines.
-const ganttLimit = 40
+// ganttLimit is how many tasks a page of the timeline shows.
+const ganttLimit = 25
 
 // GanttTask is a bar of the timeline, from Start to Due (YYYY-MM-DD).
 type GanttTask struct {
@@ -17,6 +17,8 @@ type GanttTask struct {
 	ProjectID      int    `json:"project_id"`
 	ProjectName    string `json:"project_name"`
 	AssignedToName string `json:"assigned_to_name"`
+	// Hours planned for the task; null when it has no estimate
+	EstimatedHours *float64 `json:"estimated_hours"`
 	Start          string `json:"start"`
 	Due            string `json:"due"`
 }
@@ -26,9 +28,10 @@ type GanttProject struct {
 	Name string `json:"name"`
 }
 
-// GetGantt returns the tasks that are not closed and have a deadline, the
-// nearest deadlines first, and the projects they belong to for the filter.
-// ?project_id= leaves the tasks of one project.
+// GetGantt returns the tasks that are not closed and have a deadline —
+// overdue and planned alike, by deadline, a page at a time — and the
+// projects they belong to for the filter. ?project_id= leaves the tasks of
+// one project, ?offset= is the first task of the page.
 func (h *AnalyticsHandler) GetGantt(w http.ResponseWriter, r *http.Request) {
 	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
@@ -68,6 +71,11 @@ func (h *AnalyticsHandler) GetGantt(w http.ResponseWriter, r *http.Request) {
 		taskFilter += ` AND project_id = $` + itoa(len(args))
 	}
 
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	if offset < 0 {
+		offset = 0
+	}
+
 	var total int
 	if err := (*h.DB).QueryRow(`SELECT COUNT(*) FROM issues WHERE `+taskFilter, args...).Scan(&total); err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
@@ -79,10 +87,10 @@ func (h *AnalyticsHandler) GetGantt(w http.ResponseWriter, r *http.Request) {
 	q := `SELECT external_id, COALESCE(subject, ''), COALESCE(project_id, 0), COALESCE(project_name, ''),
 		COALESCE(assigned_to_name, ''),
 		to_char(LEAST(COALESCE(start_date, created_on::date, due_date), due_date), 'YYYY-MM-DD'),
-		to_char(due_date, 'YYYY-MM-DD')
+		to_char(due_date, 'YYYY-MM-DD'), NULLIF(estimated_hours, 0)
 		FROM issues WHERE ` + taskFilter + `
 		ORDER BY due_date ASC, external_id ASC
-		LIMIT ` + itoa(ganttLimit)
+		LIMIT ` + itoa(ganttLimit) + ` OFFSET ` + itoa(offset)
 
 	taskRows, err := (*h.DB).Query(q, args...)
 	if err != nil {
@@ -94,10 +102,12 @@ func (h *AnalyticsHandler) GetGantt(w http.ResponseWriter, r *http.Request) {
 	tasks := []GanttTask{}
 	for taskRows.Next() {
 		var t GanttTask
-		if taskRows.Scan(&t.ExternalID, &t.Subject, &t.ProjectID, &t.ProjectName, &t.AssignedToName, &t.Start, &t.Due) == nil {
+		if taskRows.Scan(&t.ExternalID, &t.Subject, &t.ProjectID, &t.ProjectName, &t.AssignedToName, &t.Start, &t.Due, &t.EstimatedHours) == nil {
 			tasks = append(tasks, t)
 		}
 	}
 
-	utils.JSON(w, http.StatusOK, map[string]interface{}{"tasks": tasks, "projects": projects, "total": total})
+	utils.JSON(w, http.StatusOK, map[string]interface{}{
+		"tasks": tasks, "projects": projects, "total": total, "limit": ganttLimit, "offset": offset,
+	})
 }

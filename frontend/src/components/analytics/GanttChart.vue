@@ -10,9 +10,12 @@
         <option value="">{{ $t('analytics.gantt_all_projects') }}</option>
         <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
       </select>
-      <span v-if="total > tasks.length" class="gantt-note">
-        {{ $t('analytics.gantt_shown', { shown: tasks.length, total }) }}
-      </span>
+
+      <div class="gantt-legend">
+        <span class="gantt-legend-item"><span class="gantt-legend-dot planned"></span>{{ $t('analytics.gantt_planned') }}</span>
+        <span class="gantt-legend-item"><span class="gantt-legend-dot late"></span>{{ $t('analytics.stats.overdue') }}</span>
+        <span class="gantt-legend-item"><span class="gantt-legend-today"></span>{{ $t('analytics.gantt_today') }}</span>
+      </div>
     </div>
 
     <div v-if="tasks.length === 0" class="empty-hint">{{ $t('common.empty') }}</div>
@@ -30,48 +33,69 @@
         <button type="button" class="gantt-label gantt-name" :title="task.subject" @click="$emit('open-task', task.external_id)">
           <span class="gantt-id">#{{ task.external_id }}</span> {{ task.subject }}
         </button>
-        <div class="gantt-track">
+        <div class="gantt-track" @mousemove="showTip($event, task)" @mouseleave="tip = null">
           <span class="gantt-today" :style="{ left: todayLeft + '%' }"></span>
+          <!-- What was planned for the task: from its start to the deadline -->
+          <span class="gantt-line planned" :style="{ left: task.left + '%', width: task.width + '%' }">
+            {{ $t('analytics.gantt_days', { n: task.plannedDays }) }}
+          </span>
+          <!-- An overdue task goes on from the deadline to today -->
           <span
-            class="gantt-line"
-            :class="{ overdue: task.overdue }"
-            :style="{ left: task.left + '%', width: task.width + '%' }"
-            :title="task.hint"
-          ></span>
+            v-if="task.lateDays > 0"
+            class="gantt-line late"
+            :style="{ left: task.lateLeft + '%', width: task.lateWidth + '%' }"
+          >
+            {{ $t('analytics.gantt_late_days', { n: task.lateDays }) }}
+          </span>
         </div>
       </div>
-
-      <div class="gantt-legend">
-        <span class="gantt-legend-item"><span class="gantt-legend-today"></span>{{ $t('analytics.gantt_today') }}</span>
-        <span class="gantt-legend-item"><span class="gantt-legend-dot overdue"></span>{{ $t('analytics.stats.overdue') }}</span>
-      </div>
     </div>
+
+    <AppPagination :total="total" :limit="PAGE" :offset="offset" :sizes="[PAGE]" @update:offset="$emit('update:offset', $event)" />
+
+    <!-- Follows the pointer over a bar; lives in the body so that no widget cuts it -->
+    <Teleport to="body">
+      <div v-if="tip" class="gantt-tip" :style="{ left: tip.x + 'px', top: tip.y + 'px' }">
+        <div class="gantt-tip-title">#{{ tip.task.external_id }} {{ tip.task.subject }}</div>
+        <div>{{ $t('analytics.gantt_tip_planned', { from: tip.task.startLabel, to: tip.task.dueLabel, n: tip.task.plannedDays }) }}</div>
+        <div v-if="tip.task.lateDays > 0" class="gantt-tip-late">{{ $t('analytics.gantt_tip_late', { n: tip.task.lateDays }) }}</div>
+        <div v-if="tip.task.estimated_hours !== null">{{ $t('analytics.gantt_tip_estimate', { hours: tip.task.estimated_hours }) }}</div>
+        <div class="gantt-tip-meta">{{ tip.task.meta }}</div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import type { GanttTask, GanttProject } from '../../stores/analytics'
+import AppPagination from '../ui/AppPagination.vue'
 
-// tasks: the bars, nearest deadlines first; total: how many tasks there are
-// besides the shown ones; project: the project chosen in the filter.
+// tasks: the bars of the shown page, by deadline; total and offset: all the
+// tasks and where the page starts; project: the project chosen in the filter.
 const props = defineProps<{
   tasks: GanttTask[]
   projects: GanttProject[]
   total: number
+  offset: number
   project: number | null
 }>()
 
 const emit = defineEmits<{
   (e: 'open-task', id: number): void
   (e: 'update:project', id: number | null): void
+  (e: 'update:offset', offset: number): void
 }>()
+
+const PAGE = 25
 
 // A long-running task must not squeeze the others into a sliver: the scale
 // starts at most this many days before today
 const MAX_DAYS_BACK = 90
 const MIN_DAYS_AHEAD = 7
 const TICKS = 6
+// A bar is never thinner than this, in percent of the scale
+const MIN_WIDTH = 0.8
 
 // A date as the number of its day, so that dates can be subtracted
 function dayOf(date: string): number {
@@ -81,7 +105,7 @@ function dayOf(date: string): number {
 
 function dayLabel(day: number): string {
   const d = new Date(day * 86400000)
-  return String(d.getUTCDate()).padStart(2, '0') + '.' + String(d.getUTCMonth() + 1).padStart(2, '0')
+  return String(d.getUTCDate()).padStart(2, '0') + '.' + String(d.getUTCMonth() + 1).padStart(2, '0') + '.' + d.getUTCFullYear()
 }
 
 const today = computed(() => {
@@ -102,6 +126,7 @@ const range = computed(() => {
   return { from, days: Math.max(1, to + 1 - from) }
 })
 
+// Where a day begins on the scale, in percent
 function leftOf(day: number): number {
   return Math.min(100, Math.max(0, ((day - range.value.from) / range.value.days) * 100))
 }
@@ -112,7 +137,7 @@ const ticks = computed(() => {
   const result: { day: number; left: number; label: string }[] = []
   for (let i = 0; i < TICKS; i++) {
     const day = range.value.from + Math.round((range.value.days * i) / TICKS)
-    if (!result.some(t => t.day === day)) result.push({ day, left: leftOf(day), label: dayLabel(day) })
+    if (!result.some(t => t.day === day)) result.push({ day, left: leftOf(day), label: dayLabel(day).slice(0, 5) })
   }
   return result
 })
@@ -122,10 +147,34 @@ const bars = computed(() =>
     const start = dayOf(t.start)
     const due = dayOf(t.due)
     const left = leftOf(start)
-    const hint = [dayLabel(start) + ' — ' + dayLabel(due), t.assigned_to_name, t.project_name].filter(Boolean).join(' · ')
-    return { ...t, left, width: Math.max(0.8, leftOf(due + 1) - left), overdue: due < today.value, hint }
+    const end = leftOf(due + 1)
+    // Overdue: the days after the deadline up to and including today
+    const lateDays = Math.max(0, today.value - due)
+    return {
+      ...t,
+      left,
+      width: Math.max(MIN_WIDTH, end - left),
+      plannedDays: due - start + 1,
+      lateDays,
+      lateLeft: end,
+      lateWidth: Math.max(MIN_WIDTH, leftOf(today.value + 1) - end),
+      startLabel: dayLabel(start),
+      dueLabel: dayLabel(due),
+      meta: [t.assigned_to_name, t.project_name].filter(Boolean).join(' · '),
+    }
   })
 )
+
+type Bar = (typeof bars.value)[number]
+
+const TIP_WIDTH = 320
+const tip = ref<{ x: number; y: number; task: Bar } | null>(null)
+
+function showTip(e: MouseEvent, task: Bar) {
+  // Beside the pointer, inside the window
+  const x = Math.min(e.clientX + 14, window.innerWidth - TIP_WIDTH - 8)
+  tip.value = { x: Math.max(8, x), y: e.clientY + 16, task }
+}
 
 function onProject(e: Event) {
   const value = (e.target as HTMLSelectElement).value
@@ -144,6 +193,7 @@ function onProject(e: Event) {
 .gantt-bar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 12px;
@@ -160,16 +210,15 @@ function onProject(e: Event) {
   color: var(--text);
 }
 
-.gantt-note {
-  font-size: 12px;
-  color: var(--text-muted);
+.gantt-table {
+  margin-bottom: 12px;
 }
 
 .gantt-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 28px;
+  min-height: 30px;
   border-top: 1px solid var(--border-light);
 }
 
@@ -221,16 +270,30 @@ function onProject(e: Event) {
   white-space: nowrap;
 }
 
+/* A bar with its figure inside; a figure that does not fit is cut */
 .gantt-line {
   position: absolute;
   top: 50%;
-  height: 12px;
-  margin-top: -6px;
+  height: 18px;
+  margin-top: -9px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 18px;
+  color: #fff;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.gantt-line.planned {
   border-radius: 9999px;
   background: var(--accent);
 }
 
-.gantt-line.overdue {
+.gantt-line.late {
+  border-radius: 0 9999px 9999px 0;
   background: var(--danger);
 }
 
@@ -245,8 +308,8 @@ function onProject(e: Event) {
 
 .gantt-legend {
   display: flex;
+  flex-wrap: wrap;
   gap: 16px;
-  margin-top: 12px;
   font-size: 12px;
   color: var(--text-dim);
 }
@@ -264,10 +327,42 @@ function onProject(e: Event) {
 }
 
 .gantt-legend-dot {
-  width: 12px;
+  width: 14px;
   height: 8px;
   border-radius: 9999px;
-  background: var(--danger);
+}
+
+.gantt-legend-dot.planned { background: var(--accent); }
+.gantt-legend-dot.late { background: var(--danger); }
+
+.gantt-tip {
+  position: fixed;
+  z-index: var(--z-toast);
+  width: 320px;
+  padding: 10px 12px;
+  background: var(--surface-3);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  pointer-events: none;
+}
+
+.gantt-tip-title {
+  margin-bottom: 4px;
+  font-weight: 600;
+  color: var(--text-bright);
+}
+
+.gantt-tip-late {
+  color: var(--danger);
+}
+
+.gantt-tip-meta {
+  margin-top: 4px;
+  color: var(--text-muted);
 }
 
 /* In a narrow widget the names give way to the timeline */

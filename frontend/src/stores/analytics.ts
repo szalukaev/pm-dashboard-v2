@@ -101,6 +101,8 @@ export interface GanttTask {
   assigned_to_name: string
   start: string
   due: string
+  // Hours planned for the task; null when it has no estimate
+  estimated_hours: number | null
 }
 
 export interface GanttProject {
@@ -112,6 +114,8 @@ export const useAnalyticsStore = defineStore('analytics', () => {
   const gantt = ref<{ tasks: GanttTask[]; projects: GanttProject[]; total: number }>({ tasks: [], projects: [], total: 0 })
   // The project chosen in the filter of the timeline; null — every project
   const ganttProject = ref<number | null>(null)
+  // The first task of the shown page of the timeline
+  const ganttOffset = ref(0)
   const health = ref<Health | null>(null)
   const stats = ref<StatCard[]>([])
   const hours = ref<HoursRow[]>([])
@@ -198,26 +202,41 @@ export const useAnalyticsStore = defineStore('analytics', () => {
 
   async function fetchGantt(): Promise<void> {
     try {
-      const params = ganttProject.value === null ? {} : { project_id: ganttProject.value }
+      const params: Record<string, number> = { offset: ganttOffset.value }
+      if (ganttProject.value !== null) params.project_id = ganttProject.value
       const { data } = await axios.get('/api/analytics/gantt', { params })
       const projects: GanttProject[] = data.projects || []
+      const tasks: GanttTask[] = data.tasks || []
+      const total: number = data.total || 0
       // The chosen project has no tasks with a deadline left: back to all
       if (ganttProject.value !== null && !projects.some(p => p.id === ganttProject.value)) {
         ganttProject.value = null
+        ganttOffset.value = 0
         return fetchGantt()
       }
-      gantt.value = { tasks: data.tasks || [], projects, total: data.total || 0 }
+      // Tasks were closed and the page is past the end now: back to the first
+      if (tasks.length === 0 && total > 0 && ganttOffset.value > 0) {
+        ganttOffset.value = 0
+        return fetchGantt()
+      }
+      gantt.value = { tasks, projects, total }
     } catch {}
   }
 
   function setGanttProject(id: number | null) {
     ganttProject.value = id
+    ganttOffset.value = 0
+    return fetchGantt()
+  }
+
+  function setGanttOffset(offset: number) {
+    ganttOffset.value = offset
     return fetchGantt()
   }
 
   return {
     stats, teamLoad, distribution, deadlines, hours, velocity, health, gantt, ganttProject, loading, error,
     fetchAll, fetchStats, fetchTeamLoad, fetchDistribution, fetchDeadlines, fetchHours, fetchVelocity, fetchHealth,
-    fetchGantt, setGanttProject,
+    fetchGantt, setGanttProject, ganttOffset, setGanttOffset,
   }
 })

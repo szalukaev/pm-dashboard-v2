@@ -71,7 +71,9 @@
           :projects="gantt.projects"
           :total="gantt.total"
           :project="ganttProject"
+          :offset="ganttOffset"
           @update:project="store.setGanttProject($event)"
+          @update:offset="store.setGanttOffset($event)"
           @open-task="openTask"
         />
       </template>
@@ -143,7 +145,7 @@ const { t } = useI18n()
 const store = useAnalyticsStore()
 const auth = useAuthStore()
 const settingsStore = useSettingsStore()
-const { stats, teamLoad, distribution, deadlines, hours, velocity, health, gantt, ganttProject, loading, error } = storeToRefs(store)
+const { stats, teamLoad, distribution, deadlines, hours, velocity, health, gantt, ganttProject, ganttOffset, loading, error } = storeToRefs(store)
 const { fetchAll } = store
 
 // The projects the user switched off in «Distribution»; remembered in the
