@@ -7,6 +7,14 @@
   >
     <div class="invoice-form">
       <table class="items-table">
+        <!-- The widths are set once, so that a title stands over its values -->
+        <colgroup>
+          <col />
+          <col class="col-quantity" />
+          <col class="col-money" />
+          <col class="col-money" />
+          <col class="col-remove" />
+        </colgroup>
         <thead>
           <tr>
             <th>{{ $t('payments.invoice.service_name') }}</th>
@@ -18,12 +26,12 @@
         </thead>
         <tbody>
           <tr v-for="(item, idx) in items" :key="idx">
-            <td><input v-model="item.name" type="text" class="cell-input" /></td>
-            <td class="num"><input v-model.number="item.quantity" type="number" min="0" step="0.01" class="cell-input num-input" /></td>
-            <td class="num"><input v-model.number="item.price" type="number" min="0" step="0.01" class="cell-input num-input" /></td>
-            <td class="num total-cell">{{ formatMoney(item.quantity * item.price) }}</td>
-            <td>
-              <button v-if="items.length > 1" class="remove-btn" @click="removeItem(idx)">
+            <td><input v-model="item.name" type="text" class="cell-input" :maxlength="MAX_NAME" data-testid="invoice-item-name" /></td>
+            <td><input v-model.number="item.quantity" type="number" min="0" step="0.01" class="cell-input num-input" data-testid="invoice-item-quantity" /></td>
+            <td><AppMoneyInput v-model="item.price" class="cell-input num-input" data-testid="invoice-item-price" /></td>
+            <td class="total-cell">{{ formatMoney((item.quantity || 0) * (item.price || 0)) }}</td>
+            <td class="remove-cell">
+              <button v-if="items.length > 1" class="remove-btn" :title="$t('common.delete')" @click="removeItem(idx)">
                 <X :size="14" />
               </button>
             </td>
@@ -55,6 +63,7 @@ import { ref, computed, watch } from 'vue'
 import { Plus, X } from 'lucide-vue-next'
 import AppModal from '../ui/AppModal.vue'
 import AppButton from '../ui/AppButton.vue'
+import AppMoneyInput from '../ui/AppMoneyInput.vue'
 import { formatMoney } from '../../utils/format'
 import { useI18n } from 'vue-i18n'
 
@@ -78,6 +87,9 @@ const props = defineProps<{
 const emit = defineEmits(['close', 'submit'])
 const { t } = useI18n()
 
+// The server takes a name of a line up to this many characters
+const MAX_NAME = 2000
+
 const items = ref<InvoiceItem[]>([{ name: '', quantity: 1, price: 0 }])
 
 watch(() => props.visible, (v) => {
@@ -88,7 +100,7 @@ watch(() => props.visible, (v) => {
   }
 })
 
-const total = computed(() => items.value.reduce((s, i) => s + i.quantity * i.price, 0))
+const total = computed(() => items.value.reduce((s, i) => s + (i.quantity || 0) * (i.price || 0), 0))
 
 function addItem() {
   items.value.push({ name: '', quantity: 1, price: 0 })
@@ -99,7 +111,9 @@ function removeItem(idx: number) {
 }
 
 function submit() {
-  emit('submit', items.value.filter(i => i.name && i.price > 0))
+  emit('submit', items.value
+    .filter(i => i.name.trim() && i.price > 0)
+    .map(i => ({ name: i.name.trim(), quantity: Number(i.quantity) || 0, price: i.price })))
 }
 </script>
 
@@ -117,8 +131,21 @@ function submit() {
 
 .items-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   margin-bottom: 12px;
+}
+
+.col-quantity {
+  width: 130px;
+}
+
+.col-money {
+  width: 190px;
+}
+
+.col-remove {
+  width: 40px;
 }
 
 .items-table th {
@@ -133,6 +160,8 @@ function submit() {
 }
 
 .items-table th.num {
+  /* Over the last digit of the values: the padding and the frame of a field */
+  padding-right: 15px;
   text-align: right;
 }
 
@@ -155,9 +184,21 @@ function submit() {
   border-color: var(--accent);
 }
 
+/* A number fills its column and ends where its title ends */
 .num-input {
   text-align: right;
-  width: 100px;
+  font-variant-numeric: tabular-nums;
+}
+
+.remove-cell {
+  text-align: center;
+}
+
+/* The amount ends under the last digit of the fields to its left */
+.items-table td.total-cell {
+  padding-right: 15px;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .total-cell {

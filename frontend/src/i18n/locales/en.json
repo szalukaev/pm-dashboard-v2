@@ -407,7 +407,14 @@
       "download_failed": "Could not download the invoice",
       "pay_failed": "Could not record the payment",
       "delete_failed": "Could not delete",
-      "copy_failed": "Could not open the invoice for copying"
+      "copy_failed": "Could not open the invoice for copying",
+      "ITEM_NAME_TOO_LONG": "The name of the line is too long: up to 2000 characters are allowed",
+      "ITEM_NAME_REQUIRED": "A line of the invoice has no name",
+      "INVALID_AMOUNT": "The amount is not valid",
+      "CONTRACT_NOT_FOUND": "The contract is not found",
+      "INVOICE_NOT_FOUND": "The invoice is not found",
+      "ORGANIZATION_NOT_FOUND": "The organization is not found",
+      "READ_ONLY_MODE": "The system is in read-only mode"
     }
   },
   "settings": {

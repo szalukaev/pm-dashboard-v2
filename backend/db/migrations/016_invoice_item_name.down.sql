@@ -1,0 +1,1 @@
+ALTER TABLE invoice_items ALTER COLUMN name TYPE VARCHAR(500) USING LEFT(name, 500);

@@ -204,7 +204,7 @@ import AppConfirmDialog from '../components/ui/AppConfirmDialog.vue'
 const store = usePaymentsStore()
 const { organizations, contracts, stats, loading, error, filterType } = storeToRefs(store)
 const { fetchAll } = store
-const { t } = useI18n()
+const { t, te } = useI18n()
 const { toast } = useSwal()
 
 // Whatever fails on this page is told to the user instead of failing quietly
@@ -212,8 +212,10 @@ async function guarded(action: () => Promise<unknown>, failure = 'payments.error
   try {
     await action()
     return true
-  } catch {
-    toast(t(failure), 'error')
+  } catch (e: any) {
+    // A reason the server names is told as it is; otherwise the general one
+    const reason = `payments.errors.${e?.response?.data?.error}`
+    toast(t(te(reason) ? reason : failure), 'error')
     return false
   }
 }

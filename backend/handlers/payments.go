@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"pm-dashboard/invoice"
 	"pm-dashboard/middleware"
@@ -459,6 +460,10 @@ func (h *PaymentsHandler) ListInvoices(w http.ResponseWriter, r *http.Request) {
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"invoices": invoices, "total": total})
 }
 
+// maxInvoiceItemName bounds the name of a line of an invoice: long enough
+// for a reference to a contract with its appendix, short enough to print.
+const maxInvoiceItemName = 2000
+
 func (h *PaymentsHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) {
 	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
@@ -486,7 +491,20 @@ func (h *PaymentsHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 	}
 
 	totalAmount := 0.0
-	for _, item := range body.Items {
+	for i, item := range body.Items {
+		name := strings.TrimSpace(item.Name)
+		switch {
+		case name == "":
+			utils.Error(w, http.StatusBadRequest, "ITEM_NAME_REQUIRED")
+			return
+		case utf8.RuneCountInString(name) > maxInvoiceItemName:
+			utils.Error(w, http.StatusBadRequest, "ITEM_NAME_TOO_LONG")
+			return
+		case item.Quantity < 0 || item.Price < 0:
+			utils.Error(w, http.StatusBadRequest, "INVALID_AMOUNT")
+			return
+		}
+		body.Items[i].Name = name
 		totalAmount += item.Quantity * item.Price
 	}
 	totalAmount = utils.Round2(totalAmount)
@@ -505,6 +523,7 @@ func (h *PaymentsHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 		VALUES ($1,$2,$3,$4,0,'unpaid') RETURNING id`, contractID, totalAmount, contract.VatRate, today).Scan(&invoiceID)
 	if err != nil {
 		tx.Rollback()
+		slog.Error("Could not save the invoice", "contract", contractID, "error", err)
 		utils.Error(w, http.StatusInternalServerError, "CREATE_FAILED")
 		return
 	}
@@ -512,6 +531,7 @@ func (h *PaymentsHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 		if _, err := tx.Exec("INSERT INTO invoice_items (invoice_id, name, quantity, price) VALUES ($1,$2,$3,$4)",
 			invoiceID, item.Name, item.Quantity, item.Price); err != nil {
 			tx.Rollback()
+			slog.Error("Could not save a line of the invoice", "contract", contractID, "error", err)
 			utils.Error(w, http.StatusInternalServerError, "CREATE_FAILED")
 			return
 		}

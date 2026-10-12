@@ -142,10 +142,12 @@ func runFallbackMigrations(db *sql.DB) error {
 	if err := db.QueryRow(`SELECT to_regclass('issue_snapshots') IS NOT NULL`).Scan(&exists); err != nil {
 		return err
 	}
-	if exists {
-		return nil
+	if !exists {
+		if _, err := db.Exec(snapshotsSQL); err != nil {
+			return err
+		}
 	}
-	_, err := db.Exec(snapshotsSQL)
+	_, err := db.Exec(invoiceItemNameSQL)
 	return err
 }
 
@@ -181,6 +183,9 @@ var syncStateSQL string
 
 //go:embed migrations/015_snapshots.up.sql
 var snapshotsSQL string
+
+//go:embed migrations/016_invoice_item_name.up.sql
+var invoiceItemNameSQL string
 
 // fallbackMigrationSQL is kept as a safety net when migration files are not available
 const fallbackMigrationSQL = `
