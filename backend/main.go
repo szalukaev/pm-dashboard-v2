@@ -304,6 +304,7 @@ func main() {
 	api.HandleFunc("/analytics/health", analyticsH.GetHealth).Methods("GET")
 	api.HandleFunc("/analytics/gantt", analyticsH.GetGantt).Methods("GET")
 	api.HandleFunc("/analytics/tasks", analyticsH.GetTasks).Methods("GET")
+	api.HandleFunc("/analytics/thresholds", analyticsH.GetThresholds).Methods("GET")
 
 	// Kanban
 	api.HandleFunc("/kanban/board", kanbanH.GetBoard).Methods("GET")

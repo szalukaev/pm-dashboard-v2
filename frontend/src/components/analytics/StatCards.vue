@@ -5,7 +5,7 @@
       :key="stat.label"
       :label="$t('analytics.stats.' + stat.label)"
       :value="stat.is_pct ? stat.value.toFixed(1) + '%' : Math.round(stat.value)"
-      :variant="(stat.variant as 'danger' | 'success' | 'warning' | 'info' | undefined)"
+      :variant="variantOf(stat)"
       :class="{ clickable: stat.label in METRICS }"
       :title="stat.label in METRICS ? $t('analytics.show_tasks') : undefined"
       data-testid="stat-card"
@@ -18,7 +18,19 @@
 import AppStatCard from '../ui/AppStatCard.vue'
 import type { StatCard } from '../../stores/analytics'
 
-defineProps<{ stats: StatCard[] }>()
+// exceeded: индикаторы выше порога пользователя (overdue, bugs, no_estimate)
+const props = defineProps<{ stats: StatCard[]; exceeded?: string[] }>()
+
+type Variant = 'danger' | 'success' | 'warning' | 'info' | undefined
+
+// Карточка индикатора, превысившего порог, красная
+function variantOf(stat: StatCard): Variant {
+  if (props.exceeded?.includes(stat.label)) return 'danger'
+  // Раньше «Просрочено» было красным всегда. Теперь красный цвет значит
+  // «выше порога», поэтому без превышения карточка обычного цвета
+  if (props.exceeded && stat.label === 'overdue') return undefined
+  return stat.variant as Variant
+}
 
 // open-tasks: a card that counts tasks was clicked; metric names the figure
 // in the list of tasks behind it

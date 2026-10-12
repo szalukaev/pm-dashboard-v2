@@ -21,8 +21,25 @@
         <h1 class="page-title">{{ $t('analytics.title') }}</h1>
       </template>
 
+      <!-- Индикаторы выше порогов, заданных пользователем в настройках -->
+      <template v-if="exceeded.length > 0" #banner>
+        <div class="threshold-banner" data-testid="threshold-banner">
+          <AlertTriangle :size="18" class="threshold-icon" />
+          <div>
+            <div class="threshold-title">{{ $t('analytics.thresholds.title') }}</div>
+            <div v-for="(item, index) in exceeded" :key="index" class="threshold-line">
+              {{ $t('analytics.thresholds.line', {
+                indicator: $t('analytics.stats.' + item.indicator),
+                value: item.value,
+                limit: item.limit,
+              }) }}<template v-if="item.project_name"> — {{ item.project_name }}</template>
+            </div>
+          </div>
+        </div>
+      </template>
+
       <template #stats>
-        <StatCards :stats="stats" @open-tasks="openStatTasks" />
+        <StatCards :stats="stats" :exceeded="exceededIndicators" @open-tasks="openStatTasks" />
       </template>
 
       <template #health>
@@ -104,6 +121,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
+import { AlertTriangle } from 'lucide-vue-next'
 import { useAnalyticsStore } from '../stores/analytics'
 import { useAuthStore } from '../stores/auth'
 import { useSettingsStore } from '../stores/settings'
@@ -146,7 +164,10 @@ const { t } = useI18n()
 const store = useAnalyticsStore()
 const auth = useAuthStore()
 const settingsStore = useSettingsStore()
-const { stats, teamLoad, distribution, deadlines, hours, velocity, health, gantt, ganttProject, ganttOffset, loading, error } = storeToRefs(store)
+const { stats, teamLoad, distribution, deadlines, hours, velocity, health, gantt, ganttProject, ganttOffset, exceeded, loading, error } = storeToRefs(store)
+
+// Индикаторы, превысившие порог хотя бы в одном проекте: их карточки красные
+const exceededIndicators = computed(() => [...new Set(exceeded.value.map(e => e.indicator))])
 const { fetchAll } = store
 
 // The projects the user switched off in «Distribution»; remembered in the
@@ -276,6 +297,35 @@ onMounted(async () => {
 /* The charts in the window follow its width like those in the widget */
 .nested-charts {
   container-type: inline-size;
+}
+
+.threshold-banner {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--danger);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+
+.threshold-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--danger);
+}
+
+.threshold-title {
+  margin-bottom: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-bright);
+}
+
+.threshold-line {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
 }
 
 .page-title-alone {

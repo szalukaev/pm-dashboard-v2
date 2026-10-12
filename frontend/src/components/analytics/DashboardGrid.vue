@@ -20,6 +20,9 @@
       </button>
     </div>
 
+    <!-- Сообщения над виджетами, например о превышении порогов -->
+    <slot name="banner" />
+
     <div v-if="shown.length === 0" class="dash-empty">{{ $t('analytics.dashboard.empty') }}</div>
 
     <div class="dash-grid">

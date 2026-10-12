@@ -51,14 +51,17 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 		AlertRules notify.Rules `json:"alert_rules"`
 		// Регулярная сводка на почту
 		EmailReport ReportSettings `json:"email_report"`
+		// Пороги индикаторов «Аналитики»
+		IndicatorThresholds Thresholds `json:"indicator_thresholds"`
 	}
 	settings.AlertRules = notify.Defaults()
 	settings.EmailReport = defaultReportSettings()
+	settings.IndicatorThresholds = defaultThresholds()
 	settings.Pagination = map[string]int{}
 	settings.TableColumns = json.RawMessage("{}")
 	settings.DashboardLayout = json.RawMessage("{}")
 
-	var selectedProjects, selectedTeam, tabOrder, kanbanStatuses, kanbanUsers, lastFilters, pagination, tableColumns, dashboardLayout, alertRules, emailReport []byte
+	var selectedProjects, selectedTeam, tabOrder, kanbanStatuses, kanbanUsers, lastFilters, pagination, tableColumns, dashboardLayout, alertRules, emailReport, thresholds []byte
 	var theme, language string
 	var notificationsEnabled, overdueAlerts bool
 
@@ -66,12 +69,12 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 		SELECT selected_projects, selected_team, theme, language, tab_order,
 		       kanban_column_order_statuses, kanban_column_order_users,
 		       last_filters, notifications_enabled, overdue_alerts,
-		       kanban_last_mode, kanban_last_project, pagination, table_columns, dashboard_layout, alert_rules, email_report
+		       kanban_last_mode, kanban_last_project, pagination, table_columns, dashboard_layout, alert_rules, email_report, indicator_thresholds
 		FROM user_settings WHERE user_id = $1
 	`, userID).Scan(
 		&selectedProjects, &selectedTeam, &theme, &language,
 		&tabOrder, &kanbanStatuses, &kanbanUsers, &lastFilters, &notificationsEnabled, &overdueAlerts,
-		&settings.KanbanLastMode, &settings.KanbanLastProject, &pagination, &tableColumns, &dashboardLayout, &alertRules, &emailReport,
+		&settings.KanbanLastMode, &settings.KanbanLastProject, &pagination, &tableColumns, &dashboardLayout, &alertRules, &emailReport, &thresholds,
 	)
 
 	if err == sql.ErrNoRows {
@@ -116,6 +119,7 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	settings.AlertRules = notify.Effective(alertRules)
 	settings.EmailReport = parseReportSettings(emailReport)
+	settings.IndicatorThresholds = parseThresholds(thresholds)
 	settings.Theme = theme
 	settings.Language = language
 	settings.NotificationsEnabled = notificationsEnabled
@@ -309,6 +313,20 @@ func (h *SettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request)
 		if _, err := (*h.DB).Exec(`UPDATE user_settings SET email_report = $1::jsonb,
 			email_report_sent_at = CASE WHEN $2 THEN COALESCE(email_report_sent_at, NOW()) ELSE NULL END
 			WHERE user_id = $3`, string(data), report.Enabled, userID); err != nil {
+			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+			return
+		}
+	}
+
+	if v, ok := body["indicator_thresholds"]; ok {
+		raw, _ := json.Marshal(v)
+		limits := defaultThresholds()
+		if json.Unmarshal(raw, &limits) != nil || !limits.valid() {
+			utils.Error(w, http.StatusBadRequest, "INVALID_THRESHOLDS")
+			return
+		}
+		data, _ := json.Marshal(limits)
+		if _, err := (*h.DB).Exec("UPDATE user_settings SET indicator_thresholds = $1::jsonb WHERE user_id = $2", string(data), userID); err != nil {
 			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 			return
 		}

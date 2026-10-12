@@ -162,7 +162,10 @@ func runFallbackMigrations(db *sql.DB) error {
 	if _, err := db.Exec(emailSQL); err != nil {
 		return err
 	}
-	_, err := db.Exec(emailReportSQL)
+	if _, err := db.Exec(emailReportSQL); err != nil {
+		return err
+	}
+	_, err := db.Exec(indicatorThresholdsSQL)
 	return err
 }
 
@@ -216,6 +219,9 @@ var emailSQL string
 
 //go:embed migrations/021_email_report.up.sql
 var emailReportSQL string
+
+//go:embed migrations/022_indicator_thresholds.up.sql
+var indicatorThresholdsSQL string
 
 // fallbackMigrationSQL is kept as a safety net when migration files are not available
 const fallbackMigrationSQL = `

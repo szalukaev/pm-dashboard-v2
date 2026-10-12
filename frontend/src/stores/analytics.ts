@@ -110,7 +110,19 @@ export interface GanttProject {
   name: string
 }
 
+// Превышение порога индикатора: какой индикатор (overdue, bugs, no_estimate),
+// сколько задач и какой порог. project_name пуст, когда порог сравнивался со
+// всеми проектами сразу.
+export interface Exceeded {
+  indicator: string
+  value: number
+  limit: number
+  project_id: number
+  project_name: string
+}
+
 export const useAnalyticsStore = defineStore('analytics', () => {
+  const exceeded = ref<Exceeded[]>([])
   const gantt = ref<{ tasks: GanttTask[]; projects: GanttProject[]; total: number }>({ tasks: [], projects: [], total: 0 })
   // The project chosen in the filter of the timeline; null — every project
   const ganttProject = ref<number | null>(null)
@@ -143,6 +155,7 @@ export const useAnalyticsStore = defineStore('analytics', () => {
         fetchVelocity(),
         fetchHealth(),
         fetchGantt(),
+        fetchThresholds(),
       ])
     } catch {
       if (!silent) error.value = i18n.global.t('common.error')
@@ -193,6 +206,14 @@ export const useAnalyticsStore = defineStore('analytics', () => {
     } catch {}
   }
 
+  // Какие индикаторы сейчас выше порогов пользователя
+  async function fetchThresholds() {
+    try {
+      const { data } = await axios.get('/api/analytics/thresholds')
+      exceeded.value = data.exceeded || []
+    } catch {}
+  }
+
   async function fetchHealth() {
     try {
       const { data } = await axios.get('/api/analytics/health')
@@ -237,6 +258,6 @@ export const useAnalyticsStore = defineStore('analytics', () => {
   return {
     stats, teamLoad, distribution, deadlines, hours, velocity, health, gantt, ganttProject, loading, error,
     fetchAll, fetchStats, fetchTeamLoad, fetchDistribution, fetchDeadlines, fetchHours, fetchVelocity, fetchHealth,
-    fetchGantt, setGanttProject, ganttOffset, setGanttOffset,
+    fetchGantt, setGanttProject, ganttOffset, setGanttOffset, exceeded, fetchThresholds,
   }
 })

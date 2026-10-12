@@ -26,6 +26,17 @@ interface Settings {
   alert_rules: Record<string, AlertRule>
   // Регулярная сводка на почту
   email_report: EmailReport
+  // Пороги индикаторов «Аналитики»
+  indicator_thresholds: IndicatorThresholds
+}
+
+// Пороги: индикатор подсвечивается, когда задач больше порога. per_project —
+// порог сравнивается с каждым проектом, а не со всеми сразу
+export interface IndicatorThresholds {
+  overdue: number
+  bugs: number
+  no_estimate: number
+  per_project: boolean
 }
 
 // Настройка регулярной сводки: email пуст — письмо уходит на адрес из
@@ -71,6 +82,7 @@ const defaultSettings: Settings = {
   table_columns: {},
   dashboard_layout: {},
   alert_rules: {},
+  indicator_thresholds: { overdue: 5, bugs: 10, no_estimate: 3, per_project: false },
   email_report: { enabled: false, email: '', period: 'weekly', time: '09:00', sections: ['stats', 'team_load', 'distribution', 'deadlines'], overdue_list: true },
 }
 

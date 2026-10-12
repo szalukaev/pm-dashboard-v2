@@ -232,6 +232,10 @@
       "no_estimate": "No Estimate",
       "high_priority": "High"
     },
+    "thresholds": {
+      "title": "Indicators above the threshold",
+      "line": "{indicator}: {value} (threshold {limit})"
+    },
     "stats_title": "Statistics",
     "hints": {
       "stats": "Summary figures over the selected projects within your rights.\n• Active Projects — projects with open tasks or tasks in testing.\n• Completion — closed ÷ (open + half of the tasks in testing + closed).\n• Open, In Test — tasks in the statuses of these groups (the groups are set in the status settings).\n• Overdue — open and in-testing tasks whose due date is before today.\n• Bugs — tasks in the statuses marked as Bugs.\n• No Estimate — open tasks without an estimate.\nClick a number to see its tasks.",
@@ -1078,6 +1082,14 @@
       "WORKER_ALREADY_RUNNING": "The mailing is already running",
       "MAIL_SEND_FAILED": "Not every message could be sent — see the “Status” column"
     }
+  },
+  "thresholds": {
+    "title": "Indicator thresholds",
+    "hint": "When an indicator is above its threshold, its card on Analytics turns red and a warning appears above the widgets.",
+    "more_than": "more than",
+    "tasks": "tasks",
+    "all_projects": "Compare with all projects together",
+    "per_project": "Compare with each project separately"
   },
   "email_report": {
     "title": "Email report",
