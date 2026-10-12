@@ -45,8 +45,9 @@ type DeadlineGroup struct {
 type ProjectDist struct {
 	ProjectID   int               `json:"project_id"`
 	ProjectName string            `json:"project_name"`
-	// The topmost parent of the project (the project itself when it has
-	// none): nested projects can be shown as one chart
+	// The topmost parent of the project among the projects of the answer
+	// (the project itself when it has none): nested projects can be shown
+	// as one chart
 	RootID   int    `json:"root_id"`
 	RootName string `json:"root_name"`
 	Assignees   []AssigneeCount   `json:"assignees"`
@@ -227,12 +228,14 @@ func (h *AnalyticsHandler) GetDistribution(w http.ResponseWriter, r *http.Reques
 		}
 		tree.Close()
 	}
+	shown := make(map[int]bool, len(dist))
+	for _, d := range dist {
+		shown[d.ProjectID] = true
+		names[d.ProjectID] = d.ProjectName
+	}
 	for i := range dist {
-		root := projectRoot(dist[i].ProjectID, parents)
+		root := projectRoot(dist[i].ProjectID, parents, shown)
 		dist[i].RootID, dist[i].RootName = root, names[root]
-		if root == dist[i].ProjectID || dist[i].RootName == "" {
-			dist[i].RootID, dist[i].RootName = dist[i].ProjectID, dist[i].ProjectName
-		}
 	}
 
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"distribution": dist})
@@ -308,18 +311,23 @@ func (h *AnalyticsHandler) GetDeadlines(w http.ResponseWriter, r *http.Request) 
 
 // Helpers
 
-// projectRoot returns the topmost parent of a project; parents maps a project
-// to its parent, 0 or a missing entry meaning "no parent". A project whose
-// parent is unknown is its own root. A loop in the data ends the climb.
-func projectRoot(id int, parents map[int]int) int {
+// projectRoot returns the topmost parent of a project among the shown ones,
+// or the project itself when none of its parents is shown. parents maps a
+// project to its parent, 0 or a missing entry meaning "no parent".
+//
+// Only shown projects can be roots: a common umbrella project that has no
+// chart of its own must not swallow every project under it into one chart.
+// A loop in the data ends the climb.
+func projectRoot(id int, parents map[int]int, shown map[int]bool) int {
+	root := id
 	seen := map[int]bool{id: true}
 	for {
-		parent, known := parents[id]
-		if !known || parent == 0 || seen[parent] {
-			return id
+		parent := parents[id]
+		if parent == 0 || seen[parent] {
+			return root
 		}
-		if _, exists := parents[parent]; !exists {
-			return id
+		if shown[parent] {
+			root = parent
 		}
 		seen[parent] = true
 		id = parent

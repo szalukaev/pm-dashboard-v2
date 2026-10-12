@@ -83,24 +83,37 @@ func TestBugPercent(t *testing.T) {
 }
 
 func TestProjectRoot(t *testing.T) {
-	// 1 ← 2 ← 3, 4 stands alone, 5 points to a project that is not known,
-	// 6 and 7 point to each other
-	parents := map[int]int{1: 0, 2: 1, 3: 2, 4: 0, 5: 99, 6: 7, 7: 6}
+	// 1 is an umbrella over everything: 1 ← 2 ← 3, 1 ← 2 ← 4, 1 ← 5 ← 6,
+	// 7 stands alone, 8 points to a project that is not known,
+	// 10 and 11 point to each other
+	parents := map[int]int{1: 0, 2: 1, 3: 2, 4: 2, 5: 1, 6: 5, 7: 0, 8: 99, 10: 11, 11: 10}
+	// The umbrella 1 and the parent 5 have no chart of their own
+	shown := map[int]bool{2: true, 3: true, 4: true, 6: true, 7: true, 8: true, 10: true}
 	cases := map[int]int{
-		1:  1, // a top project is its own root
-		2:  1,
-		3:  1, // through every level
-		4:  4,
-		5:  5,  // an unknown parent cannot be the root
+		2:  2, // its only parent is not shown
+		3:  2, // a nested project joins its shown parent
+		4:  2,
+		6:  6, // neither its parent nor the umbrella is shown
+		7:  7,
+		8:  8,  // an unknown parent cannot be the root
 		42: 42, // an unknown project
 	}
 	for id, want := range cases {
-		if got := projectRoot(id, parents); got != want {
+		if got := projectRoot(id, parents, shown); got != want {
 			t.Errorf("projectRoot(%d) = %d, want %d", id, got, want)
 		}
 	}
-	// A loop must end, wherever it ends
-	if got := projectRoot(6, parents); got != 6 && got != 7 {
-		t.Errorf("a loop: got %d", got)
+
+	// Once the umbrella has a chart, everything under it is its part
+	shown[1] = true
+	for _, id := range []int{2, 3, 6} {
+		if got := projectRoot(id, parents, shown); got != 1 {
+			t.Errorf("under a shown umbrella: projectRoot(%d) = %d, want 1", id, got)
+		}
+	}
+
+	// A loop must end
+	if got := projectRoot(10, parents, shown); got != 10 {
+		t.Errorf("a loop: got %d, want 10", got)
 	}
 }
