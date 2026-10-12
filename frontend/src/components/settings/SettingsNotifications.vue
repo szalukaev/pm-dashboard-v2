@@ -24,12 +24,26 @@
     </div>
 
     <div class="rules" data-testid="alert-rules">
-      <template v-for="group in GROUPS" :key="group.key">
+      <template v-for="group in groups" :key="group.key">
         <div class="rule-group">{{ $t('notifications.groups.' + group.key) }}</div>
         <div v-for="key in group.rules" :key="key" class="rule-row" :data-testid="'alert-rule-' + key">
           <div class="rule-name">
             {{ $t('notifications.rules.' + key + '.name') }}
             <div class="rule-hint">{{ $t('notifications.rules.' + key + '.hint') }}</div>
+            <!-- Правило по проектам: для всех проектов или для выбранных -->
+            <div v-if="group.byProject" class="rule-projects">
+              <button type="button" class="projects-btn" @click="picking = picking === key ? null : key">
+                {{ projectsLabel(key) }}
+              </button>
+              <ul v-if="picking === key" class="projects-list">
+                <li v-for="p in projects" :key="p.id">
+                  <label class="project-option">
+                    <input type="checkbox" :checked="(rule(key).projects || []).includes(p.id)" @change="toggleProject(key, p.id)" />
+                    {{ p.name }}
+                  </label>
+                </li>
+              </ul>
+            </div>
           </div>
           <label v-if="DAYS[key]" class="rule-days">
             {{ $t('notifications.days') }}
@@ -56,22 +70,52 @@ import { ref, computed, onMounted } from 'vue'
 import { useSettingsStore } from '../../stores/settings'
 import type { AlertRule } from '../../stores/settings'
 import { useAuthStore } from '../../stores/auth'
+import { useTasksStore } from '../../stores/tasks'
+import { useI18n } from 'vue-i18n'
 
-// Правила по группам, в порядке показа. Подписи: notifications.rules.<правило>
-const GROUPS: { key: string; rules: string[] }[] = [
+// Правила по группам, в порядке показа. Подписи: notifications.rules.<правило>.
+// byProject: у правил группы выбираются проекты; adminOnly: группа видна
+// только администратору.
+const GROUPS: { key: string; rules: string[]; byProject?: boolean; adminOnly?: boolean }[] = [
   { key: 'tasks', rules: ['task_assigned', 'task_changed', 'task_due_soon', 'task_overdue'] },
+  { key: 'contracts', rules: ['contract_ending', 'contract_expired', 'invoice_unpaid'] },
+  { key: 'sprints', rules: ['sprint_ending', 'sprint_overdue'] },
+  { key: 'projects', rules: ['project_overdue', 'project_high_priority', 'project_task_closed'], byProject: true },
+  { key: 'system', rules: ['sync_failed', 'license_state'], adminOnly: true },
 ]
 
 // Правила с порогом в днях и его пределы — те же, что проверяет сервер
 const DAYS: Record<string, { min: number; max: number }> = {
   task_due_soon: { min: 0, max: 60 },
+  contract_ending: { min: 0, max: 180 },
+  invoice_unpaid: { min: 1, max: 180 },
+  sprint_ending: { min: 0, max: 30 },
+  project_overdue: { min: 1, max: 365 },
 }
 
+const { t } = useI18n()
 const settingsStore = useSettingsStore()
+const tasksStore = useTasksStore()
 const auth = useAuthStore()
 const notificationsEnabled = ref(true)
 
 const linked = computed(() => !!auth.user?.source?.member_id)
+const groups = computed(() => GROUPS.filter(g => !g.adminOnly || auth.isAdmin))
+
+// Проекты для правил по проектам — доступные пользователю
+const projects = computed(() => tasksStore.projects.map(p => ({ id: p.id, name: p.name })))
+// Правило, у которого сейчас раскрыт список проектов
+const picking = ref<string | null>(null)
+
+function projectsLabel(key: string): string {
+  const chosen = rule(key).projects || []
+  return chosen.length === 0 ? t('notifications.all_projects') : t('notifications.projects_chosen', { n: chosen.length })
+}
+
+function toggleProject(key: string, id: number) {
+  const chosen = rule(key).projects || []
+  set(key, { projects: chosen.includes(id) ? chosen.filter(p => p !== id) : [...chosen, id] })
+}
 
 function rule(key: string): AlertRule {
   return settingsStore.settings.alert_rules?.[key] || { bell: false, email: false }
@@ -95,6 +139,7 @@ async function saveToast() {
 }
 
 onMounted(async () => {
+  tasksStore.fetchProjects()
   await settingsStore.ensureLoaded()
   notificationsEnabled.value = settingsStore.settings.notifications_enabled
 })
@@ -194,6 +239,44 @@ onMounted(async () => {
   margin-top: 2px;
   font-size: 12px;
   color: var(--text-muted);
+}
+
+.rule-projects {
+  margin-top: 8px;
+}
+
+.projects-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.projects-btn:hover {
+  border-color: var(--accent);
+}
+
+.projects-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+}
+
+.project-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 4px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
 }
 
 .rule-days,

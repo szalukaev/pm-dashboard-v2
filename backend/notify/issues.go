@@ -107,3 +107,40 @@ func overdueKey(issueID int, today string) string {
 func eventKey(rule string, issueID int, at time.Time) string {
 	return fmt.Sprintf("%s:%d:%d", rule, issueID, at.UnixNano())
 }
+
+// recentDays — сколько дней однократное событие ещё считается свежим. О том,
+// что случилось раньше, не сообщается: иначе включённое правило высыпало бы
+// всю историю разом.
+const recentDays = 7
+
+// Сроки договоров и спринтов: что сообщить по числу дней до срока.
+const (
+	deadlineNone = ""
+	deadlineSoon = "soon" // срок близко
+	deadlineLate = "late" // срок прошёл недавно
+)
+
+// deadlineKind решает, о чём сообщить по сроку, до которого осталось left
+// дней (отрицательное — срок прошёл): «скоро», если осталось не больше
+// soonDays; «прошёл», если прошёл не раньше чем recentDays дней назад.
+func deadlineKind(left, soonDays int) string {
+	switch {
+	case left < 0 && -left <= recentDays:
+		return deadlineLate
+	case left >= 0 && left <= soonDays:
+		return deadlineSoon
+	}
+	return deadlineNone
+}
+
+// reachedThreshold сообщает, что счётчик дней (возраст счёта, дни просрочки)
+// дошёл до порога и это случилось недавно.
+func reachedThreshold(days, threshold int) bool {
+	return days >= threshold && days <= threshold+recentDays
+}
+
+// onceKey — ключ однократного события по сущности и её сроку: если срок
+// перенесут, о новом сроке сообщится заново.
+func onceKey(rule string, id int, date string) string {
+	return fmt.Sprintf("%s:%d:%s", rule, id, date)
+}

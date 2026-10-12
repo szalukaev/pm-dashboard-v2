@@ -210,3 +210,98 @@ func TestRuleEnabled(t *testing.T) {
 		t.Error("правило включено, если доставляется хоть куда-нибудь")
 	}
 }
+
+func TestDeadlineKind(t *testing.T) {
+	cases := []struct {
+		name       string
+		left, soon int
+		want       string
+	}{
+		{"срок через 14 дней при пороге 14", 14, 14, deadlineSoon},
+		{"срок сегодня", 0, 14, deadlineSoon},
+		{"до срока дальше порога", 15, 14, deadlineNone},
+		{"срок прошёл вчера", -1, 14, deadlineLate},
+		{"срок прошёл неделю назад", -7, 14, deadlineLate},
+		{"срок прошёл давно — уже не новость", -8, 14, deadlineNone},
+		{"порог 0: только в день срока", 0, 0, deadlineSoon},
+		{"порог 0: за день ещё рано", 1, 0, deadlineNone},
+	}
+	for _, c := range cases {
+		if got := deadlineKind(c.left, c.soon); got != c.want {
+			t.Errorf("%s: получено %q, ожидалось %q", c.name, got, c.want)
+		}
+	}
+}
+
+func TestReachedThreshold(t *testing.T) {
+	cases := []struct {
+		days, threshold int
+		want            bool
+	}{
+		{13, 14, false}, // порог ещё не достигнут
+		{14, 14, true},  // достигнут сегодня
+		{21, 14, true},  // достигнут неделю назад — ещё свежо
+		{22, 14, false}, // давно: включённое правило не поднимает старое
+	}
+	for _, c := range cases {
+		if got := reachedThreshold(c.days, c.threshold); got != c.want {
+			t.Errorf("reachedThreshold(%d, %d) = %v", c.days, c.threshold, got)
+		}
+	}
+}
+
+func TestOnceKey(t *testing.T) {
+	if onceKey(RuleContractExpired, 5, "2026-10-01") != onceKey(RuleContractExpired, 5, "2026-10-01") {
+		t.Error("однократное событие — один ключ")
+	}
+	// Срок договора продлили: о новом сроке сообщится заново
+	if onceKey(RuleContractExpired, 5, "2026-10-01") == onceKey(RuleContractExpired, 5, "2026-12-01") {
+		t.Error("новый срок — новое уведомление")
+	}
+	if onceKey(RuleContractExpired, 5, "2026-10-01") == onceKey(RuleContractEnding, 5, "2026-10-01") {
+		t.Error("у разных правил разные ключи")
+	}
+}
+
+func TestRuleForProject(t *testing.T) {
+	if !(Rule{}).ForProject(7) {
+		t.Error("без списка проектов правило работает для всех")
+	}
+	chosen := Rule{Projects: []int{1, 2}}
+	if !chosen.ForProject(2) || chosen.ForProject(7) {
+		t.Error("со списком правило работает только для выбранных проектов")
+	}
+}
+
+func TestRuleSpecs(t *testing.T) {
+	// У каждого ключа есть описание, и наоборот
+	if len(Keys()) != len(specs) {
+		t.Fatalf("ключей %d, описаний %d", len(Keys()), len(specs))
+	}
+	for _, key := range Keys() {
+		if _, known := specs[key]; !known {
+			t.Errorf("у правила %s нет описания", key)
+		}
+	}
+	// Правила по проектам пользователь включает сам; о своём сообщается сразу
+	defaults := Defaults()
+	for _, key := range []string{RuleProjectOverdue, RuleProjectHighPriority, RuleProjectTaskClosed} {
+		if defaults[key].Enabled() {
+			t.Errorf("правило %s не должно быть включено по умолчанию", key)
+		}
+	}
+	for _, key := range []string{RuleTaskAssigned, RuleContractEnding, RuleSprintOverdue} {
+		if !defaults[key].Enabled() {
+			t.Errorf("правило %s должно быть включено по умолчанию", key)
+		}
+	}
+	// Стандартные дни лежат в допустимых пределах
+	for key, s := range specs {
+		if s.hasDays && (s.def.Days < s.minDays || s.def.Days > s.maxDays) {
+			t.Errorf("правило %s: стандартные дни %d вне пределов", key, s.def.Days)
+		}
+	}
+	if !AdminOnly(RuleSyncFailed) || !AdminOnly(RuleLicenseState) || AdminOnly(RuleTaskAssigned) {
+		t.Error("системные правила — только администратору")
+	}
+}

@@ -6,35 +6,6 @@ import (
 	"time"
 )
 
-func intPtr(v int) *int { return &v }
-
-func TestSprintVisibleTo(t *testing.T) {
-	team := []int{10, 11}
-	cases := []struct {
-		name   string
-		viewer int
-		member *int
-		owner  int
-		shared bool
-		team   []int
-		want   bool
-	}{
-		{"свой личный", 1, nil, 1, false, nil, true},
-		{"свой общий, сам в команду не входит", 1, intPtr(99), 1, true, team, true},
-		{"чужой личный не виден никому", 2, intPtr(10), 1, false, team, false},
-		{"чужой общий, сотрудник в команде создателя", 2, intPtr(11), 1, true, team, true},
-		{"чужой общий, сотрудник вне команды", 2, intPtr(12), 1, true, team, false},
-		{"чужой общий, пользователь не связан с источником", 2, nil, 1, true, team, false},
-		{"создатель не выбирал команду — видят все связанные", 2, intPtr(12), 1, true, nil, true},
-		{"создатель не выбирал команду, но пользователь не связан", 2, nil, 1, true, nil, false},
-	}
-	for _, c := range cases {
-		if got := sprintVisibleTo(c.viewer, c.member, c.owner, c.shared, c.team); got != c.want {
-			t.Errorf("%s: получено %v, ожидалось %v", c.name, got, c.want)
-		}
-	}
-}
-
 func TestSortSprintTasks(t *testing.T) {
 	// Запрос отдаёт задачи по приоритету; группы статусов идут вперемешку
 	tasks := []SprintTask{

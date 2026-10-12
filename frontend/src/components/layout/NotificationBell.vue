@@ -86,7 +86,21 @@ function openItem(n: AppNotification) {
   if (n.entity_type === 'issue' && n.entity_id) {
     open.value = false
     taskId.value = n.entity_id
+    return
   }
+  // Остальные уведомления ведут на свою вкладку
+  const page = PAGES[n.entity_type]
+  if (page) {
+    open.value = false
+    router.push(page)
+  }
+}
+
+const PAGES: Record<string, string> = {
+  contract: '/payments',
+  invoice: '/payments',
+  sprint: '/sprint',
+  system: '/settings',
 }
 
 function openSettings() {

@@ -77,28 +77,6 @@ type SprintTask struct {
 	statusGroup string
 }
 
-// sprintVisibleTo сообщает, виден ли спринт пользователю. Свой спринт виден
-// всегда. Чужой — только общий и только тому, кто связан с сотрудником
-// источника, входящим в выбранную команду создателя; если создатель команду
-// не выбирал (ownerTeam пуст), его команда — все.
-func sprintVisibleTo(viewerID int, viewerMember *int, ownerID int, shared bool, ownerTeam []int) bool {
-	if ownerID == viewerID {
-		return true
-	}
-	if !shared || viewerMember == nil {
-		return false
-	}
-	if len(ownerTeam) == 0 {
-		return true
-	}
-	for _, id := range ownerTeam {
-		if id == *viewerMember {
-			return true
-		}
-	}
-	return false
-}
-
 // visibleSprints возвращает спринты, видимые пользователю, без задач.
 // sprintID > 0 оставляет один спринт.
 func (h *SprintHandler) visibleSprints(userID, sprintID int) ([]Sprint, error) {
@@ -138,7 +116,8 @@ func (h *SprintHandler) visibleSprints(userID, sprintID int) ([]Sprint, error) {
 			continue
 		}
 		json.Unmarshal(team, &s.ownerTeam)
-		if !sprintVisibleTo(userID, member, s.ownerID, s.IsShared, s.ownerTeam) {
+		// Кому виден спринт, решает access.SprintVisibleTo
+		if !access.SprintVisibleTo(userID, member, s.ownerID, s.IsShared, s.ownerTeam) {
 			continue
 		}
 		s.IsOwn = s.ownerID == userID

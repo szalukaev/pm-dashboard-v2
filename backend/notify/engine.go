@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"sync"
 	"time"
+
+	"pm-dashboard/access"
 )
 
 // EventNotification — событие WebSocket, с которым пользователю уходит новое
@@ -31,6 +33,12 @@ type Notification struct {
 type Engine struct {
 	DB   **sql.DB
 	Send func(userID int, event string, data interface{})
+	// Scopes возвращает права пользователя: по ним правила по проектам
+	// решают, вправе ли он видеть задачу. nil — такие правила молчат.
+	Scopes func(userID int) (*access.Scope, error)
+	// LicenseState возвращает состояние лицензии, о котором надо сообщить
+	// администраторам (grace, read_only), или пустую строку. Может быть nil.
+	LicenseState func() string
 
 	// Проходы не пересекаются: два одновременных сравнения состояний
 	// прислали бы одно изменение дважды.
@@ -134,6 +142,45 @@ func (e *Engine) seen() bool {
 	return any
 }
 
+// pass — один проход по задачам: кто может получить уведомления и что для
+// этого нужно знать.
+type pass struct {
+	people  []recipient
+	members map[int][]recipient
+	// scopes — права получателей на задачи; читаются по мере надобности.
+	scopes map[int]*access.Scope
+	// highPriority — номер высшего приоритета, 0 — неизвестен.
+	highPriority int
+	// except — пользователь, которому не сообщается: он сам внёс изменение.
+	except int
+	now    time.Time
+}
+
+func (e *Engine) newPass(now time.Time, except int) (*pass, error) {
+	people, err := e.recipients()
+	if err != nil {
+		return nil, err
+	}
+	p := &pass{people: people, members: byMember(people), scopes: map[int]*access.Scope{}, except: except, now: now}
+	(*e.DB).QueryRow(`SELECT external_id FROM priorities WHERE data_source = 'redmine'
+		ORDER BY sort_order DESC, external_id DESC LIMIT 1`).Scan(&p.highPriority)
+	return p, nil
+}
+
+// sees сообщает, вправе ли получатель видеть задачу. Без сведений о правах
+// задача считается невидимой.
+func (e *Engine) sees(p *pass, who recipient, issue IssueState) bool {
+	if e.Scopes == nil {
+		return false
+	}
+	scope, known := p.scopes[who.userID]
+	if !known {
+		scope, _ = e.Scopes(who.userID)
+		p.scopes[who.userID] = scope
+	}
+	return scope != nil && scope.SeesIssue(issue.ProjectID, issue.AssignedTo)
+}
+
 // AfterSync вызывается после синхронизации: сравнивает задачи с последним
 // виденным состоянием, проверяет сроки и запоминает новое состояние. Самый
 // первый проход только запоминает: о том, что было до него, не сообщается.
@@ -144,13 +191,11 @@ func (e *Engine) AfterSync(now time.Time) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	people, err := e.recipients()
+	p, err := e.newPass(now, 0)
 	if err != nil {
 		slog.Error("Notifications: failed to read the recipients", "error", err)
 		return
 	}
-	members := byMember(people)
-
 	current, err := e.states("SELECT " + issueColumns)
 	if err != nil {
 		slog.Error("Notifications: failed to read the issues", "error", err)
@@ -166,10 +211,14 @@ func (e *Engine) AfterSync(now time.Time) {
 		}
 		for id, cur := range current {
 			prev, hasPrev := previous[id]
-			created += e.issueChanged(prev, hasPrev, cur, members, 0, now)
+			created += e.issueChanged(p, prev, hasPrev, cur)
 		}
 	}
-	created += e.deadlines(current, members, now)
+	created += e.deadlines(p, current)
+	created += e.contracts(p)
+	created += e.invoices(p)
+	created += e.sprints(p)
+	created += e.license(p)
 
 	if err := e.remember(""); err != nil {
 		slog.Error("Notifications: failed to remember the state of the issues", "error", err)
@@ -204,36 +253,133 @@ func (e *Engine) IssueEdited(issueID, actorID int, now time.Time) {
 	if err != nil {
 		return
 	}
-	people, err := e.recipients()
+	p, err := e.newPass(now, actorID)
 	if err != nil {
 		return
 	}
 	prev, hasPrev := previous[issueID]
-	e.issueChanged(prev, hasPrev, cur, byMember(people), actorID, now)
+	e.issueChanged(p, prev, hasPrev, cur)
 	e.remember("WHERE i.external_id = $1", issueID)
 }
 
+// SyncFailed сообщает администраторам, что синхронизация с источником
+// завершилась с ошибкой, — не чаще раза в день.
+func (e *Engine) SyncFailed(now time.Time) {
+	if e.DB == nil || *e.DB == nil {
+		return
+	}
+	people, err := e.recipients()
+	if err != nil {
+		return
+	}
+	key := RuleSyncFailed + ":" + now.Format("2006-01-02")
+	for _, who := range people {
+		if who.admin {
+			e.create(who, RuleSyncFailed, key, "system", 0, map[string]interface{}{})
+		}
+	}
+}
+
+// issueParams — данные о задаче для текста уведомления.
+func issueParams(cur IssueState) map[string]interface{} {
+	return map[string]interface{}{"issue_id": cur.ID, "subject": cur.Subject, "project": cur.ProjectName}
+}
+
 // issueChanged создаёт уведомления об изменении одной задачи и возвращает их
-// число. except — пользователь, которому не сообщается (он сам внёс изменение).
-func (e *Engine) issueChanged(prev IssueState, hasPrev bool, cur IssueState, members map[int][]recipient, except int, now time.Time) int {
+// число.
+func (e *Engine) issueChanged(p *pass, prev IssueState, hasPrev bool, cur IssueState) int {
 	created := 0
-	base := map[string]interface{}{"issue_id": cur.ID, "subject": cur.Subject, "project": cur.ProjectName}
+	to := func(who recipient, rule string, params map[string]interface{}) {
+		if who.userID != p.except && e.create(who, rule, eventKey(rule, cur.ID, p.now), "issue", cur.ID, params) {
+			created++
+		}
+	}
 
 	member, assigned := assignedTo(prev, hasPrev, cur)
 	if assigned {
-		for _, who := range members[member] {
-			if who.userID != except && e.create(who, RuleTaskAssigned, eventKey(RuleTaskAssigned, cur.ID, now), "issue", cur.ID, base) {
-				created++
-			}
+		for _, who := range p.members[member] {
+			to(who, RuleTaskAssigned, issueParams(cur))
 		}
 	}
 
 	// Тому, кому задачу только что назначили, хватит уведомления о назначении
 	if hasPrev && !assigned && cur.AssignedTo != nil {
 		if list := changes(prev, cur); len(list) > 0 {
-			params := map[string]interface{}{"issue_id": cur.ID, "subject": cur.Subject, "project": cur.ProjectName, "changes": list}
-			for _, who := range members[*cur.AssignedTo] {
-				if who.userID != except && e.create(who, RuleTaskChanged, eventKey(RuleTaskChanged, cur.ID, now), "issue", cur.ID, params) {
+			params := issueParams(cur)
+			params["changes"] = list
+			for _, who := range p.members[*cur.AssignedTo] {
+				to(who, RuleTaskChanged, params)
+			}
+		}
+	}
+
+	// Правила по проектам: кто бы ни был ответственным
+	closed := hasPrev && !prev.Closed() && cur.Closed()
+	becameHigh := p.highPriority != 0 && cur.PriorityID == p.highPriority && !cur.Closed() &&
+		(!hasPrev || prev.PriorityID != p.highPriority)
+	if closed || becameHigh {
+		for _, who := range p.people {
+			if closed && e.projectRule(p, who, RuleProjectTaskClosed, cur) {
+				to(who, RuleProjectTaskClosed, issueParams(cur))
+			}
+			if becameHigh && e.projectRule(p, who, RuleProjectHighPriority, cur) {
+				params := issueParams(cur)
+				params["priority"] = cur.PriorityName
+				to(who, RuleProjectHighPriority, params)
+			}
+		}
+	}
+	return created
+}
+
+// projectRule сообщает, касается ли получателя правило по проектам для этой
+// задачи: правило включено, проект выбран, задачу он вправе видеть.
+func (e *Engine) projectRule(p *pass, who recipient, rule string, issue IssueState) bool {
+	setup := who.rules[rule]
+	return setup.Enabled() && setup.ForProject(issue.ProjectID) && e.sees(p, who, issue)
+}
+
+// deadlines создаёт уведомления о сроках задач: ответственным — срок близко
+// и задача просрочена; по правилу проектов — задача просрочена на заданное
+// число дней. Возвращает число созданных.
+func (e *Engine) deadlines(p *pass, current map[int]IssueState) int {
+	today := p.now.Format("2006-01-02")
+	created := 0
+	for _, cur := range current {
+		if cur.Closed() || cur.Due == "" {
+			continue
+		}
+		left, ok := daysBetween(today, cur.Due)
+		if !ok {
+			continue
+		}
+		params := issueParams(cur)
+		params["due"] = cur.Due
+
+		if cur.AssignedTo != nil {
+			for _, who := range p.members[*cur.AssignedTo] {
+				switch {
+				case left < 0:
+					params["days"] = -left
+					if e.create(who, RuleTaskOverdue, overdueKey(cur.ID, today), "issue", cur.ID, params) {
+						created++
+					}
+				case left <= who.rules[RuleTaskDueSoon].Days:
+					params["days"] = left
+					if e.create(who, RuleTaskDueSoon, dueSoonKey(cur.ID, cur.Due), "issue", cur.ID, params) {
+						created++
+					}
+				}
+			}
+		}
+
+		if left < 0 {
+			for _, who := range p.people {
+				if !reachedThreshold(-left, who.rules[RuleProjectOverdue].Days) || !e.projectRule(p, who, RuleProjectOverdue, cur) {
+					continue
+				}
+				params["days"] = -left
+				if e.create(who, RuleProjectOverdue, onceKey(RuleProjectOverdue, cur.ID, cur.Due), "issue", cur.ID, params) {
 					created++
 				}
 			}
@@ -242,33 +388,158 @@ func (e *Engine) issueChanged(prev IssueState, hasPrev bool, cur IssueState, mem
 	return created
 }
 
-// deadlines создаёт уведомления о сроках задач ответственным: срок близко и
-// задача просрочена. Возвращает число созданных.
-func (e *Engine) deadlines(current map[int]IssueState, members map[int][]recipient, now time.Time) int {
-	today := now.Format("2006-01-02")
+// byUser возвращает получателя по номеру пользователя.
+func (p *pass) byUser(userID int) (recipient, bool) {
+	for _, who := range p.people {
+		if who.userID == userID {
+			return who, true
+		}
+	}
+	return recipient{}, false
+}
+
+// contracts сообщает владельцам договоров, что срок договора близко или
+// истёк.
+func (e *Engine) contracts(p *pass) int {
+	rows, err := (*e.DB).Query(`SELECT id, COALESCE(user_id, 0), name, to_char(end_date, 'YYYY-MM-DD')
+		FROM contracts WHERE end_date IS NOT NULL`)
+	if err != nil {
+		slog.Error("Notifications: failed to read the contracts", "error", err)
+		return 0
+	}
+	defer rows.Close()
+
+	today := p.now.Format("2006-01-02")
 	created := 0
-	for _, cur := range current {
-		if cur.Closed() || cur.AssignedTo == nil || cur.Due == "" {
+	for rows.Next() {
+		var id, userID int
+		var name, end string
+		if rows.Scan(&id, &userID, &name, &end) != nil {
 			continue
 		}
-		left, ok := daysBetween(today, cur.Due)
+		who, known := p.byUser(userID)
+		left, ok := daysBetween(today, end)
+		if !known || !ok {
+			continue
+		}
+		params := map[string]interface{}{"name": name, "due": end}
+		switch deadlineKind(left, who.rules[RuleContractEnding].Days) {
+		case deadlineSoon:
+			params["days"] = left
+			if e.create(who, RuleContractEnding, onceKey(RuleContractEnding, id, end), "contract", id, params) {
+				created++
+			}
+		case deadlineLate:
+			params["days"] = -left
+			if e.create(who, RuleContractExpired, onceKey(RuleContractExpired, id, end), "contract", id, params) {
+				created++
+			}
+		}
+	}
+	return created
+}
+
+// invoices сообщает владельцу договора, что выставленный по нему счёт не
+// оплачен заданное число дней.
+func (e *Engine) invoices(p *pass) int {
+	rows, err := (*e.DB).Query(`SELECT inv.id, COALESCE(c.user_id, 0), c.name, to_char(inv.issued_at, 'YYYY-MM-DD'),
+			COALESCE(inv.amount, 0)::float8
+		FROM invoices inv JOIN contracts c ON c.id = inv.contract_id
+		WHERE COALESCE(inv.status, 'unpaid') <> 'paid'`)
+	if err != nil {
+		slog.Error("Notifications: failed to read the invoices", "error", err)
+		return 0
+	}
+	defer rows.Close()
+
+	today := p.now.Format("2006-01-02")
+	created := 0
+	for rows.Next() {
+		var id, userID int
+		var name, issued string
+		var amount float64
+		if rows.Scan(&id, &userID, &name, &issued, &amount) != nil {
+			continue
+		}
+		who, known := p.byUser(userID)
+		age, ok := daysBetween(issued, today)
+		if !known || !ok || !reachedThreshold(age, who.rules[RuleInvoiceUnpaid].Days) {
+			continue
+		}
+		params := map[string]interface{}{"name": name, "issued": issued, "days": age, "amount": amount}
+		if e.create(who, RuleInvoiceUnpaid, onceKey(RuleInvoiceUnpaid, id, issued), "invoice", id, params) {
+			created++
+		}
+	}
+	return created
+}
+
+// sprints сообщает тем, кому спринт виден, что его срок близко или прошёл.
+func (e *Engine) sprints(p *pass) int {
+	rows, err := (*e.DB).Query(`SELECT s.id, COALESCE(s.user_id, 0), s.name, s.is_shared,
+			to_char(s.due_date, 'YYYY-MM-DD'), os.selected_team
+		FROM sprints s LEFT JOIN user_settings os ON os.user_id = s.user_id
+		WHERE s.status <> 'closed' AND s.due_date IS NOT NULL`)
+	if err != nil {
+		slog.Error("Notifications: failed to read the sprints", "error", err)
+		return 0
+	}
+	defer rows.Close()
+
+	today := p.now.Format("2006-01-02")
+	created := 0
+	for rows.Next() {
+		var id, ownerID int
+		var name, due string
+		var shared bool
+		var team []byte
+		if rows.Scan(&id, &ownerID, &name, &shared, &due, &team) != nil {
+			continue
+		}
+		left, ok := daysBetween(today, due)
 		if !ok {
 			continue
 		}
-		for _, who := range members[*cur.AssignedTo] {
-			params := map[string]interface{}{"issue_id": cur.ID, "subject": cur.Subject, "project": cur.ProjectName, "due": cur.Due}
-			switch {
-			case left < 0:
-				params["days"] = -left
-				if e.create(who, RuleTaskOverdue, overdueKey(cur.ID, today), "issue", cur.ID, params) {
+		var ownerTeam []int
+		json.Unmarshal(team, &ownerTeam)
+
+		for _, who := range p.people {
+			if !access.SprintVisibleTo(who.userID, who.member, ownerID, shared, ownerTeam) {
+				continue
+			}
+			params := map[string]interface{}{"name": name, "due": due}
+			switch deadlineKind(left, who.rules[RuleSprintEnding].Days) {
+			case deadlineSoon:
+				params["days"] = left
+				if e.create(who, RuleSprintEnding, onceKey(RuleSprintEnding, id, due), "sprint", id, params) {
 					created++
 				}
-			case left <= who.rules[RuleTaskDueSoon].Days:
-				params["days"] = left
-				if e.create(who, RuleTaskDueSoon, dueSoonKey(cur.ID, cur.Due), "issue", cur.ID, params) {
+			case deadlineLate:
+				params["days"] = -left
+				if e.create(who, RuleSprintOverdue, onceKey(RuleSprintOverdue, id, due), "sprint", id, params) {
 					created++
 				}
 			}
+		}
+	}
+	return created
+}
+
+// license сообщает администраторам, что лицензия в льготном периоде или в
+// режиме «только чтение», — раз в месяц, пока состояние не изменится.
+func (e *Engine) license(p *pass) int {
+	if e.LicenseState == nil {
+		return 0
+	}
+	state := e.LicenseState()
+	if state == "" {
+		return 0
+	}
+	key := RuleLicenseState + ":" + state + ":" + p.now.Format("2006-01")
+	created := 0
+	for _, who := range p.people {
+		if who.admin && e.create(who, RuleLicenseState, key, "system", 0, map[string]interface{}{"state": state}) {
+			created++
 		}
 	}
 	return created
@@ -279,7 +550,7 @@ func (e *Engine) deadlines(current map[int]IssueState, members map[int][]recipie
 // Возвращает, создано ли уведомление.
 func (e *Engine) create(who recipient, rule, key, entityType string, entityID int, params map[string]interface{}) bool {
 	setup := who.rules[rule]
-	if !setup.Enabled() {
+	if !setup.Enabled() || (AdminOnly(rule) && !who.admin) {
 		return false
 	}
 	data, err := json.Marshal(params)

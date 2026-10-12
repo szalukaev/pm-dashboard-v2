@@ -518,10 +518,72 @@
     "not_linked": "You are not tied to a Redmine employee, so the rules about your tasks will not fire. Enter your personal API key under “Personal”.",
     "days": "Days",
     "to_bell": "To the bell",
+    "all_projects": "All projects",
+    "projects_chosen": "Projects chosen: {n}",
+    "due": "Due: {due}",
+    "issued": "Invoice issued: {date}",
+    "license_states": {
+      "grace": "grace period",
+      "read_only": "read only"
+    },
     "groups": {
-      "tasks": "My tasks"
+      "tasks": "My tasks",
+      "contracts": "My contracts and invoices",
+      "sprints": "Sprints",
+      "projects": "By project — whoever the assignee is",
+      "system": "System (for the administrator)"
     },
     "rules": {
+      "contract_ending": {
+        "name": "A contract ends soon",
+        "hint": "Once, when the given number of days or fewer is left until the end date of your contract",
+        "title": "Days left until the contract ends: {days}"
+      },
+      "contract_expired": {
+        "name": "A contract has expired",
+        "hint": "Once, when the end date of your contract has passed",
+        "title": "The contract has expired"
+      },
+      "invoice_unpaid": {
+        "name": "An invoice is unpaid",
+        "hint": "Once, when an invoice of your contract stays unpaid for the given number of days",
+        "title": "The invoice is unpaid, days: {days}"
+      },
+      "sprint_ending": {
+        "name": "A sprint ends soon",
+        "hint": "Once, when the given number of days or fewer is left until the due date of a sprint you can see",
+        "title": "Days left until the sprint ends: {days}"
+      },
+      "sprint_overdue": {
+        "name": "A sprint is overdue",
+        "hint": "Once, when the due date of an open sprint has passed",
+        "title": "The sprint is overdue"
+      },
+      "project_overdue": {
+        "name": "A task is N days overdue",
+        "hint": "Once, when a task of the project is overdue by the given number of days",
+        "title": "The task is overdue, days: {days}"
+      },
+      "project_high_priority": {
+        "name": "A task with the highest priority",
+        "hint": "When a task with the highest priority appears in the project or the priority of a task is raised to it",
+        "title": "A task with the highest priority"
+      },
+      "project_task_closed": {
+        "name": "A task is closed",
+        "hint": "When a task of the project is moved to a closed status",
+        "title": "A task was closed"
+      },
+      "sync_failed": {
+        "name": "Sync failure",
+        "hint": "The sync with Redmine ended with an error — at most once a day",
+        "title": "The sync with Redmine ended with an error"
+      },
+      "license_state": {
+        "name": "License state",
+        "hint": "The license entered the grace period or the read-only mode",
+        "title": "License: {state}"
+      },
       "task_assigned": {
         "name": "A task is assigned to me",
         "hint": "When you are made the assignee of a task",

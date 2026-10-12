@@ -151,7 +151,23 @@ func main() {
 	workersH := &handlers.WorkersHandler{DB: &pgDB, Source: source, Cleaner: cleaner, Settings: jobSettings, Events: wsHub.BroadcastEvent}
 	// Уведомления: после синхронизации задачи сравниваются с последним
 	// виденным состоянием, а правка задачи в самом дашборде сообщается сразу.
-	notifier := &notify.Engine{DB: &pgDB, Send: wsHub.SendToUser}
+	notifier := &notify.Engine{DB: &pgDB, Send: wsHub.SendToUser, Scopes: (&access.Resolver{DB: &pgDB}).Scope}
+	// Администраторам сообщается о лицензии в льготном периоде и в режиме
+	// «только чтение»
+	notifier.LicenseState = func() string {
+		if state := licenseSvc.Status().State; state == license.Grace || state == license.ReadOnly {
+			return string(state)
+		}
+		return ""
+	}
+	// Сбой синхронизации события до уведомлений не доходит сам: менеджер
+	// сообщает о нём только открытым страницам
+	source.SetNotifier(func(event string, data interface{}) {
+		wsHub.BroadcastEvent(event, data)
+		if status, ok := data.(manager.SyncStatus); ok && event == manager.EventSyncStatus && status.Status == "error" {
+			go notifier.SyncFailed(time.Now())
+		}
+	})
 	handlers.IssueEdited = notifier.IssueEdited
 	notificationsH := &handlers.NotificationsHandler{DB: &pgDB}
 	source.SetAfterSync(func() {

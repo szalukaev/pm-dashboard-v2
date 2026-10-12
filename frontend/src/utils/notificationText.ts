@@ -15,6 +15,8 @@ export function notificationTitle(n: AppNotification, t: Translate): string {
   return t('notifications.rules.' + n.rule + '.title', {
     days: n.params.days ?? 0,
     due: dateText(n.params.due),
+    // Состояние лицензии: льготный период или только чтение
+    state: typeof n.params.state === 'string' ? t('notifications.license_states.' + n.params.state) : '',
   })
 }
 
@@ -33,5 +35,9 @@ export function notificationLines(n: AppNotification, t: Translate): string[] {
     }))
   }
   if (n.params.project) lines.push(String(n.params.project))
+  // Договор, счёт или спринт: название и срок
+  if (typeof n.params.name === 'string' && n.params.name) lines.push(n.params.name)
+  if (!n.params.issue_id && n.params.due) lines.push(t('notifications.due', { due: dateText(n.params.due) }))
+  if (n.params.issued) lines.push(t('notifications.issued', { date: dateText(n.params.issued) }))
   return lines
 }
