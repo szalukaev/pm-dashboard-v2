@@ -9,7 +9,8 @@
     @focus="show"
     @blur="shown = false"
   >
-    <Info :size="15" />
+    <!-- По умолчанию значок «i»; в слот можно положить то, что само объясняется подсказкой -->
+    <slot><Info :size="15" /></slot>
     <!-- Lives in the body so that no widget or window edge cuts it -->
     <Teleport to="body">
       <div v-if="shown" class="info-bubble" :style="{ left: x + 'px', top: y + 'px' }">{{ text }}</div>

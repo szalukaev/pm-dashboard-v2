@@ -14,21 +14,16 @@
       <!-- Готовность числом: закрытая задача — целая доля, в тестировании — половина -->
       <span class="progress-percent" :title="$t('sprint.progress.hint')" data-testid="sprint-progress">{{ percent }}%</span>
     </div>
-    <div class="progress-stats">
-      <span class="stat open">{{ openCount }} {{ $t('sprint.progress.open') }}</span>
-      <span class="stat testing">{{ testingCount }} {{ $t('sprint.progress.testing') }}</span>
-      <span class="stat closed">{{ closedCount }} {{ $t('sprint.progress.closed') }}</span>
-      <span class="stat total">{{ totalCount }} {{ $t('sprint.progress.total') }}</span>
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 
+// Сами числа задач показаны в шапке спринта; здесь они нужны только для
+// ширины частей шкалы
 const props = defineProps<{
   progress: number
-  openCount: number
   testingCount: number
   closedCount: number
   totalCount: number
@@ -97,20 +92,4 @@ const progressColor = computed(() => {
   opacity: 0.5;
 }
 
-.progress-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 6px;
-  font-size: 11px;
-}
-
-.stat {
-  color: var(--text-faint);
-}
-
-.stat.open { color: var(--accent); }
-.stat.testing { color: var(--teal); }
-.stat.closed { color: var(--success); }
-.stat.total { color: var(--text-muted); }
 </style>

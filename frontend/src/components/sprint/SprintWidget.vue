@@ -23,12 +23,14 @@
         {{ $t(sprint.is_shared ? 'sprint.kind.shared' : 'sprint.kind.personal') }}
         <template v-if="sprint.is_shared && !sprint.is_own && sprint.owner_name"> · {{ sprint.owner_name }}</template>
       </span>
-      <!-- Открытых / в тестировании / всего -->
-      <span class="task-count" :title="$t('sprint.counts_hint')" data-testid="sprint-counts">
-        <span class="count-open">{{ sprint.open_count }}</span> /
-        <span class="count-testing">{{ sprint.testing_count }}</span> /
-        {{ sprint.task_count }}
-      </span>
+      <!-- Открытых / в тестировании / всего; при наведении — расшифровка чисел -->
+      <InfoHint
+        class="task-count"
+        :text="$t('sprint.counts_hint', { open: sprint.open_count, testing: sprint.testing_count, closed: sprint.closed_count, total: sprint.task_count })"
+        data-testid="sprint-counts"
+      >
+        <span class="count-open">{{ sprint.open_count }}</span>&nbsp;/&nbsp;<span class="count-testing">{{ sprint.testing_count }}</span>&nbsp;/&nbsp;{{ sprint.task_count }}
+      </InfoHint>
       <span v-if="sprint.start_date || sprint.due_date" class="date-range">
         {{ formatDate(sprint.start_date) }} — {{ formatDate(sprint.due_date) }}
       </span>
@@ -64,7 +66,6 @@
       <!-- Progress bar -->
       <SprintProgressBar
         :progress="sprint.progress"
-        :open-count="sprint.open_count"
         :testing-count="sprint.testing_count"
         :closed-count="sprint.closed_count"
         :total-count="sprint.task_count"
@@ -101,6 +102,7 @@ import { ref } from 'vue'
 import { ChevronDown, Flag, CheckCircle2, Pencil, RefreshCw, RotateCcw, Trash2, Users, Lock } from 'lucide-vue-next'
 import SprintProgressBar from './SprintProgressBar.vue'
 import SprintStateBadge from './SprintStateBadge.vue'
+import InfoHint from '../analytics/InfoHint.vue'
 import KanbanCard from '../kanban/KanbanCard.vue'
 import type { Sprint, SprintTask } from '../../stores/sprint'
 import { SPRINT_DRAG_TYPE } from '../../stores/sprint'
@@ -254,7 +256,8 @@ function formatDate(d: string | null): string {
   color: var(--text-bright);
 }
 
-.task-count {
+.widget-header .task-count {
+  align-items: baseline;
   font-size: 12px;
   color: var(--text-muted);
   white-space: nowrap;

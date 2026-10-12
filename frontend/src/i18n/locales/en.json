@@ -378,12 +378,11 @@
     "closed_section": "Completed",
     "reopen": "Reopen",
     "closed_late_hint": "The sprint was closed after its due date",
-    "counts_hint": "Open / in testing / all tasks",
+    "counts_hint": "Open: {open}
+Testing: {testing}
+Closed: {closed}
+Total: {total}",
     "progress": {
-      "open": "Open",
-      "testing": "Testing",
-      "closed": "Closed",
-      "total": "Total",
       "hint": "Sprint completion: a closed task counts in full, a task in testing counts as half"
     }
   },
