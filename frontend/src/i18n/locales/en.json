@@ -249,6 +249,10 @@
       "no_estimate": "No estimate"
     },
     "health_share": "{count} ({pct}%)",
+    "distribution_filter": {
+      "title": "Projects on the charts",
+      "show_all": "Show all"
+    },
     "gantt": "Gantt: tasks with a deadline",
     "gantt_all_projects": "All projects",
     "gantt_shown": "The nearest {shown} of {total} are shown",

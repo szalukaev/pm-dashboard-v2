@@ -119,7 +119,16 @@ export const useSettingsStore = defineStore('settings', () => {
     } catch {}
   }
 
-  let layoutTimer: ReturnType<typeof setTimeout> | null = null
+  // The filters of a page or a widget, remembered between visits. The filters
+  // saved under the other names stay as they are.
+  async function setLastFilters(name: string, filters: Record<string, any>) {
+    settings.value = { ...settings.value, last_filters: { ...settings.value.last_filters, [name]: filters } }
+    try {
+      await axios.put('/api/settings', { last_filters: { [name]: filters } })
+    } catch {}
+  }
+
+  let layoutTimer:ReturnType<typeof setTimeout> | null = null
 
   // Applied at once, saved after a pause
   function setDashboardLayout(layout: DashboardLayout) {
@@ -135,6 +144,6 @@ export const useSettingsStore = defineStore('settings', () => {
 
   return {
     settings, loading, fetchSettings, ensureLoaded, updateSettings, pageSize, setPageSize,
-    columnOrder, tableColumns, setTableColumns, setDashboardLayout,
+    columnOrder, tableColumns, setTableColumns, setDashboardLayout, setLastFilters,
   }
 })

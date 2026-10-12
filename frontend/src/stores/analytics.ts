@@ -27,6 +27,7 @@ export interface AssigneeCount {
 }
 
 export interface ProjectDist {
+  project_id: number
   project_name: string
   assignees: AssigneeCount[]
 }

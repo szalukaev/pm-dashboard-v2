@@ -198,8 +198,14 @@ func (h *SettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request)
 		}
 	}
 	if v, ok := body["last_filters"]; ok {
+		// {"<page or widget>": its filters}; the sent ones replace their saved
+		// values, the filters of the other pages stay
+		if _, isObject := v.(map[string]interface{}); !isObject {
+			utils.Error(w, http.StatusBadRequest, "INVALID_FILTERS")
+			return
+		}
 		data, _ := json.Marshal(v)
-		if _, err := (*h.DB).Exec("UPDATE user_settings SET last_filters = $1 WHERE user_id = $2", data, userID); err != nil {
+		if _, err := (*h.DB).Exec("UPDATE user_settings SET last_filters = COALESCE(last_filters, '{}'::jsonb) || $1::jsonb WHERE user_id = $2", string(data), userID); err != nil {
 			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 			return
 		}

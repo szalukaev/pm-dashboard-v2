@@ -43,6 +43,7 @@ type DeadlineGroup struct {
 }
 
 type ProjectDist struct {
+	ProjectID   int               `json:"project_id"`
 	ProjectName string            `json:"project_name"`
 	Assignees   []AssigneeCount   `json:"assignees"`
 }
@@ -179,11 +180,11 @@ func (h *AnalyticsHandler) GetDistribution(w http.ResponseWriter, r *http.Reques
 
 	projectFilter, args := projectIssues(r)
 
-	q := `SELECT project_name, COALESCE(assigned_to_name, 'Неназначенные'), COUNT(*)
+	q := `SELECT COALESCE(project_id, 0), project_name, COALESCE(assigned_to_name, 'Неназначенные'), COUNT(*)
 		FROM issues WHERE ` + projectFilter + `
 		AND ` + statusIn("status_id", GroupOpen) + `
-		GROUP BY project_name, assigned_to_name
-		ORDER BY project_name, assigned_to_name`
+		GROUP BY project_id, project_name, assigned_to_name
+		ORDER BY project_name, project_id, assigned_to_name`
 
 	rows, err := (*h.DB).Query(q, args...)
 	if err != nil {
@@ -192,24 +193,20 @@ func (h *AnalyticsHandler) GetDistribution(w http.ResponseWriter, r *http.Reques
 	}
 	defer rows.Close()
 
-	distMap := make(map[string]*ProjectDist)
+	// The rows come sorted by project: a project is its run of rows, and the
+	// projects keep the order of their names
+	dist := []ProjectDist{}
 	for rows.Next() {
+		var projID, count int
 		var projName, assigneeName string
-		var count int
-		if rows.Scan(&projName, &assigneeName, &count) != nil {
+		if rows.Scan(&projID, &projName, &assigneeName, &count) != nil {
 			continue
 		}
-		if _, ok := distMap[projName]; !ok {
-			distMap[projName] = &ProjectDist{ProjectName: projName}
+		if n := len(dist); n == 0 || dist[n-1].ProjectID != projID || dist[n-1].ProjectName != projName {
+			dist = append(dist, ProjectDist{ProjectID: projID, ProjectName: projName})
 		}
-		distMap[projName].Assignees = append(distMap[projName].Assignees, AssigneeCount{
-			Name: assigneeName, Count: count,
-		})
-	}
-
-	dist := make([]ProjectDist, 0, len(distMap))
-	for _, d := range distMap {
-		dist = append(dist, *d)
+		last := &dist[len(dist)-1]
+		last.Assignees = append(last.Assignees, AssigneeCount{Name: assigneeName, Count: count})
 	}
 
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"distribution": dist})

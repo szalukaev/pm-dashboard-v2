@@ -48,8 +48,11 @@
         <TeamLoadTable :team="teamLoad" />
       </template>
 
+      <template #distribution-actions>
+        <DistributionFilter :projects="distributionProjects" :hidden="distributionHidden" @update:hidden="setDistributionHidden" />
+      </template>
       <template #distribution>
-        <ProjectDistribution :distribution="distribution" />
+        <ProjectDistribution :distribution="shownDistribution" />
       </template>
 
       <template #deadlines>
@@ -87,6 +90,7 @@ import DashboardGrid from '../components/analytics/DashboardGrid.vue'
 import BarChart from '../components/analytics/BarChart.vue'
 import HealthGauge from '../components/analytics/HealthGauge.vue'
 import GanttChart from '../components/analytics/GanttChart.vue'
+import DistributionFilter from '../components/analytics/DistributionFilter.vue'
 import StatCards from '../components/analytics/StatCards.vue'
 import TeamLoadTable from '../components/analytics/TeamLoadTable.vue'
 import ProjectDistribution from '../components/analytics/ProjectDistribution.vue'
@@ -116,6 +120,21 @@ const auth = useAuthStore()
 const settingsStore = useSettingsStore()
 const { stats, teamLoad, distribution, deadlines, hours, velocity, health, gantt, ganttProject, loading, error } = storeToRefs(store)
 const { fetchAll } = store
+
+// The projects the user switched off in «Distribution»; remembered in the
+// user's settings under this name
+const DISTRIBUTION_FILTER = 'analytics_distribution'
+
+const distributionHidden = computed<number[]>(() => {
+  const saved = settingsStore.settings.last_filters?.[DISTRIBUTION_FILTER]?.hidden_projects
+  return Array.isArray(saved) ? saved.filter((id: unknown): id is number => typeof id === 'number') : []
+})
+const distributionProjects = computed(() => distribution.value.map(p => ({ id: p.project_id, name: p.project_name })))
+const shownDistribution = computed(() => distribution.value.filter(p => !distributionHidden.value.includes(p.project_id)))
+
+function setDistributionHidden(ids: number[]) {
+  settingsStore.setLastFilters(DISTRIBUTION_FILTER, { hidden_projects: ids })
+}
 
 // An employee without hours adds nothing to a chart of hours
 const hoursRows = computed(() => hours.value.filter(r => r.estimated_hours > 0 || r.spent_hours > 0))

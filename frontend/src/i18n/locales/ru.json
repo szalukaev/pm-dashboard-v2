@@ -249,6 +249,10 @@
       "no_estimate": "Без оценки"
     },
     "health_share": "{count} ({pct}%)",
+    "distribution_filter": {
+      "title": "Проекты на диаграммах",
+      "show_all": "Показать все"
+    },
     "gantt": "Gantt: задачи с дедлайном",
     "gantt_all_projects": "Все проекты",
     "gantt_shown": "Показаны ближайшие {shown} из {total}",
