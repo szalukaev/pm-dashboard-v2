@@ -28,6 +28,7 @@
         :id="w.id"
         :key="w.id"
         :title="$t(titles[w.id])"
+        :hint="hints[w.id] ? $t(hints[w.id]) : undefined"
         :cols="w.cols"
         :collapsed="w.collapsed === true"
         :movable="!narrow"
@@ -83,6 +84,7 @@ const hidden = computed(() => hiddenWidgets(saved.value, props.widgets))
 const shown = computed(() => placed.value.filter(w => props.available.includes(w.id)))
 const addable = computed(() => props.widgets.filter(d => hidden.value.includes(d.id) && props.available.includes(d.id)))
 const titles = computed(() => Object.fromEntries(props.widgets.map(d => [d.id, d.title])) as Record<string, string>)
+const hints = computed(() => Object.fromEntries(props.widgets.map(d => [d.id, d.hint || ''])) as Record<string, string>)
 
 function save(widgets: PlacedWidget[], hiddenIds: string[]) {
   settingsStore.setDashboardLayout({ widgets, hidden_widgets: hiddenIds })

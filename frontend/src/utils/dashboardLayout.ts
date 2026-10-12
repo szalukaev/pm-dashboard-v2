@@ -3,11 +3,13 @@
 // Widths a widget may take, in columns
 export const WIDGET_WIDTHS = [4, 6, 8, 12]
 
-// A widget of the tab: title is a dictionary key, cols is the standard width.
+// A widget of the tab: title is a dictionary key, cols is the standard width,
+// hint is the dictionary key of the text behind the «i» of the widget.
 // The order of the definitions is the standard order of the widgets.
 export interface WidgetDef {
   id: string
   title: string
+  hint?: string
   cols: number
 }
 

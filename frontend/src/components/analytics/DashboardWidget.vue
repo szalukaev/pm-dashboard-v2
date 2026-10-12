@@ -21,6 +21,7 @@
         <Menu :size="16" />
       </span>
       <h3 class="dash-title">{{ title }}</h3>
+      <InfoHint v-if="hint" :text="hint" />
 
       <div class="dash-actions">
         <slot name="actions" />
@@ -77,13 +78,16 @@
 import { ref } from 'vue'
 import { Menu, ChevronDown, ChevronUp, X } from 'lucide-vue-next'
 import { WIDGET_WIDTHS, nearestWidth } from '../../utils/dashboardLayout'
+import InfoHint from './InfoHint.vue'
 
 // movable: the widget can be dragged and resized (not on a narrow screen,
 // where every widget takes the whole width). dropSide: where the dragged
 // widget would land relative to this one.
+// hint: what the widget shows and how it is counted, behind the «i».
 const props = defineProps<{
   id: string
   title: string
+  hint?: string
   cols: number
   collapsed: boolean
   movable: boolean
@@ -180,7 +184,7 @@ function onResizeEnd(e: PointerEvent) {
 }
 
 .dash-title {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   margin: 0;
   font-size: 14px;
@@ -193,6 +197,7 @@ function onResizeEnd(e: PointerEvent) {
 }
 
 .dash-actions {
+  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 6px;

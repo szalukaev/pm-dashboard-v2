@@ -139,7 +139,8 @@ const WIDGETS: WidgetDef[] = [
   { id: 'distribution', title: 'analytics.distribution', cols: 12 },
   { id: 'deadlines', title: 'analytics.deadlines', cols: 12 },
   { id: 'gantt', title: 'analytics.gantt', cols: 12 },
-]
+  // What a widget shows and how it is counted: analytics.hints.<id>
+].map(w => ({ ...w, hint: 'analytics.hints.' + w.id }))
 
 const { t } = useI18n()
 const store = useAnalyticsStore()
