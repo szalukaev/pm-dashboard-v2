@@ -20,7 +20,12 @@
         {{ $t(sprint.is_shared ? 'sprint.kind.shared' : 'sprint.kind.personal') }}
         <template v-if="sprint.is_shared && !sprint.is_own && sprint.owner_name"> · {{ sprint.owner_name }}</template>
       </span>
-      <span class="task-count">{{ sprint.task_count }}</span>
+      <!-- Открытых / в тестировании / всего -->
+      <span class="task-count" :title="$t('sprint.counts_hint')" data-testid="sprint-counts">
+        <span class="count-open">{{ sprint.open_count }}</span> /
+        <span class="count-testing">{{ sprint.testing_count }}</span> /
+        {{ sprint.task_count }}
+      </span>
       <span v-if="sprint.start_date || sprint.due_date" class="date-range">
         {{ formatDate(sprint.start_date) }} — {{ formatDate(sprint.due_date) }}
       </span>
@@ -65,6 +70,7 @@
           :key="task.external_id"
           :card="toKanbanCard(task)"
           compact
+          :class="'group-' + task.status_group"
           @dragstart="onTaskDragStart"
           @open-task="$emit('open-task', $event)"
         />
@@ -221,7 +227,12 @@ function formatDate(d: string | null): string {
 .task-count {
   font-size: 12px;
   color: var(--text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
+
+.count-open { color: var(--accent); }
+.count-testing { color: var(--teal); }
 
 .sprint-kind {
   display: inline-flex;
@@ -284,6 +295,11 @@ function formatDate(d: string | null): string {
   align-items: flex-start;
   gap: 6px;
   min-height: 60px;
+}
+
+/* Сделанное отступает на второй план: закрытые задачи приглушены */
+.tasks-grid :deep(.group-closed) {
+  opacity: 0.55;
 }
 
 .empty-hint {

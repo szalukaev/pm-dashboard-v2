@@ -373,10 +373,13 @@
       "overdue": "Overdue",
       "closed": "Closed"
     },
+    "counts_hint": "Open / in testing / all tasks",
     "progress": {
       "open": "Open",
       "testing": "Testing",
-      "total": "Total"
+      "closed": "Closed",
+      "total": "Total",
+      "hint": "Sprint completion: a closed task counts in full, a task in testing counts as half"
     }
   },
   "payments": {
