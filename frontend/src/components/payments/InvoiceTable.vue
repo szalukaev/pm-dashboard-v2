@@ -71,6 +71,7 @@ import { usePaymentsStore, type Invoice } from '../../stores/payments'
 import { formatMoney, formatDate } from '../../utils/format'
 import { useSwal } from '../../composables/useSwal'
 import { invoiceActionsKey } from './invoiceActions'
+import { copyText } from '../../utils/clipboard'
 
 const props = defineProps<{ contractId: number }>()
 
@@ -119,12 +120,8 @@ async function copyInvoiceInfo(inv: Invoice) {
     remainder: formatMoney(inv.remainder),
     status: statusLabel(inv.status),
   })
-  try {
-    await navigator.clipboard.writeText(text)
-    toast(t('common.copied'), 'success')
-  } catch {
-    toast(t('payments.invoice.copy_error'), 'error')
-  }
+  const copied = await copyText(text)
+  toast(t(copied ? 'common.copied' : 'payments.invoice.copy_error'), copied ? 'success' : 'error')
 }
 
 // An invoice was issued, paid or deleted somewhere on the page

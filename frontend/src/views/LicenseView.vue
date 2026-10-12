@@ -96,6 +96,7 @@
 </template>
 
 <script setup lang="ts">
+import { copyText } from '../utils/clipboard'
 import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 import { useI18n } from 'vue-i18n'
@@ -204,29 +205,8 @@ async function activate() {
   }
 }
 
-// The clipboard API exists only on https and localhost, hence the fallback
 async function copyHwid() {
-  const text = details.value?.hwid || ''
-  let copied = false
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text)
-      copied = true
-    }
-  } catch {}
-  if (!copied) {
-    const field = document.createElement('textarea')
-    field.value = text
-    field.setAttribute('readonly', '')
-    field.style.position = 'fixed'
-    field.style.opacity = '0'
-    document.body.appendChild(field)
-    field.select()
-    try {
-      copied = document.execCommand('copy')
-    } catch {}
-    field.remove()
-  }
+  const copied = await copyText(details.value?.hwid || '')
   toast(t(copied ? 'common.copied' : 'license.copy_failed'), copied ? 'success' : 'error')
 }
 

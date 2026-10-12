@@ -28,7 +28,8 @@ function formatValue(stat: PaymentStat): string {
 <style scoped>
 .payment-stats {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  /* The cards share the whole width; on a narrow screen they wrap evenly */
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
   margin-bottom: 24px;
 }

@@ -238,6 +238,7 @@ import { useSettingsStore } from '../../../stores/settings'
 import { useAuthStore } from '../../../stores/auth'
 import { useSwal } from '../../../composables/useSwal'
 import { formatDate } from '../../../utils/format'
+import { copyText } from '../../../utils/clipboard'
 import {
   clonePermissions, emptyPermissions,
   type Permissions, type Grants, type ProjectItem, type MemberItem,
@@ -541,29 +542,8 @@ async function resetPassword(u: AdminUser) {
   }
 }
 
-// The clipboard API exists only on https and localhost; the dashboard is
-// often opened by plain http inside a network, so there is a fallback.
 async function copyPassword() {
-  let copied = false
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(tempPassword.value)
-      copied = true
-    }
-  } catch {}
-  if (!copied) {
-    const field = document.createElement('textarea')
-    field.value = tempPassword.value
-    field.setAttribute('readonly', '')
-    field.style.position = 'fixed'
-    field.style.opacity = '0'
-    document.body.appendChild(field)
-    field.select()
-    try {
-      copied = document.execCommand('copy')
-    } catch {}
-    field.remove()
-  }
+  const copied = await copyText(tempPassword.value)
   toast(t(copied ? 'common.copied' : 'access.password.copy_failed'), copied ? 'success' : 'error')
 }
 
