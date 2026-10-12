@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import axios from 'axios'
 import i18n from '../i18n'
+import { downloadFile } from '../utils/download'
 
 export interface Organization {
   id: number
@@ -192,27 +193,14 @@ export const usePaymentsStore = defineStore('payments', () => {
     await Promise.all([fetchOrganizations(), fetchContracts(), fetchStats()])
   }
 
-  function saveBlob(blob: Blob, name: string) {
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = name
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
   // The export holds what the list shows: the same filters apply
   async function exportCSV() {
-    const response = await axios.get('/api/contracts/export/csv', { params: contractParams(), responseType: 'blob' })
-    saveBlob(response.data, 'contracts.csv')
+    await downloadFile('/api/contracts/export/csv', 'contracts.csv', contractParams())
   }
 
   // Downloads the .docx of an invoice under the name the server gives it
   async function downloadInvoice(contractId: number, invoiceId: number) {
-    const response = await axios.get(`/api/contracts/${contractId}/invoices/${invoiceId}/download`, { responseType: 'blob' })
-    const header = String(response.headers['content-disposition'] || '')
-    const encoded = /filename\*=UTF-8''([^;]+)/i.exec(header)
-    saveBlob(response.data, encoded ? decodeURIComponent(encoded[1]) : 'invoice.docx')
+    await downloadFile(`/api/contracts/${contractId}/invoices/${invoiceId}/download`, 'invoice.docx')
   }
 
   return {
