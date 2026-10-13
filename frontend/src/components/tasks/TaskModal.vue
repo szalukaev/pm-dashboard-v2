@@ -240,6 +240,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, reactive } from 'vue'
+import { formatDate as formatCalendarDate, formatDateTime } from '../../utils/format'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
@@ -521,17 +522,14 @@ function formatHours(h: number): string {
   return `${hours}:${mins.toString().padStart(2, '0')} ${i18n.t('tasks.units.hours')}`
 }
 
-// Dates follow the interface language
-const dateLocale = computed(() => (i18n.locale.value === 'en' ? 'en-GB' : 'ru-RU'))
-
+// Срок и дата старта — календарные даты: берётся только день, без пояса
 function formatDay(d?: string | null): string {
-  if (!d) return '—'
-  return new Date(d.slice(0, 10) + 'T00:00:00').toLocaleDateString(dateLocale.value)
+  return formatCalendarDate(d ? d.slice(0, 10) : null)
 }
 
+// Время комментария или файла — в поясе пользователя
 function formatDate(d?: string): string {
-  if (!d) return ''
-  return new Date(d).toLocaleString(dateLocale.value, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return formatDateTime(d, { empty: '' })
 }
 
 function formatSize(bytes: number): string {

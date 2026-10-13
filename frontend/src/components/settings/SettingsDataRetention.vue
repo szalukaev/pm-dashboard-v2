@@ -48,6 +48,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
+import { formatDate } from '../../utils/format'
 import axios from 'axios'
 import { useI18n } from 'vue-i18n'
 import { useSwal } from '../../composables/useSwal'
@@ -62,7 +63,7 @@ interface Stats {
   days: number
 }
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const { toast, confirm } = useSwal()
 
 const days = ref(90)
@@ -140,8 +141,7 @@ async function purge() {
 }
 
 function formatDay(value: string | null): string {
-  if (!value) return '—'
-  return new Date(value + 'T00:00:00').toLocaleDateString(locale.value === 'en' ? 'en-GB' : 'ru-RU')
+  return formatDate(value)
 }
 
 // The figures follow the sync (it writes the snapshot of the day) and the

@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import axios from 'axios'
 import type { DashboardLayout } from '../utils/dashboardLayout'
+import { setTimeZone } from '../utils/format'
 
 interface Settings {
   selected_projects: number[]
@@ -28,6 +29,11 @@ interface Settings {
   email_report: EmailReport
   // Пороги индикаторов «Аналитики»
   indicator_thresholds: IndicatorThresholds
+  // Часовой пояс показа времени: свой выбор, пояс от администратора и пояс
+  // сервера, по которому идут расписания. Пусто — не задан
+  timezone: string
+  default_timezone: string
+  server_timezone: string
 }
 
 // Пороги: индикатор подсвечивается, когда задач больше порога. per_project —
@@ -84,6 +90,9 @@ const defaultSettings: Settings = {
   alert_rules: {},
   indicator_thresholds: { overdue: 5, bugs: 10, no_estimate: 3, per_project: false },
   email_report: { enabled: false, email: '', period: 'weekly', time: '09:00', sections: ['stats', 'team_load', 'distribution', 'deadlines'], overdue_list: true },
+  timezone: '',
+  default_timezone: '',
+  server_timezone: '',
 }
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -103,6 +112,7 @@ export const useSettingsStore = defineStore('settings', () => {
     try {
       const { data } = await axios.get('/api/settings')
       settings.value = { ...defaultSettings, ...data, pagination: data.pagination || {}, table_columns: data.table_columns || {}, dashboard_layout: data.dashboard_layout || {}, alert_rules: data.alert_rules || {} }
+      applyTimeZone()
     } catch {
       // Use defaults
     } finally {
@@ -110,10 +120,16 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  // Свой пояс важнее пояса от администратора; без обоих — пояс браузера
+  function applyTimeZone() {
+    setTimeZone(settings.value.timezone || settings.value.default_timezone)
+  }
+
   async function updateSettings(partial: Partial<Settings>) {
     try {
       await axios.put('/api/settings', partial)
       settings.value = { ...settings.value, ...partial }
+      applyTimeZone()
     } catch {}
   }
 

@@ -129,6 +129,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { formatDateTime } from '../../utils/format'
 import { useAuthStore } from '../../stores/auth'
 import { storeToRefs } from 'pinia'
 import { Camera } from 'lucide-vue-next'
@@ -212,15 +213,7 @@ async function removeAvatar() {
 }
 
 function formatLastLogin(val?: string) {
-  if (!val) return '—'
-  try {
-    return new Date(val).toLocaleString('ru-RU', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit',
-    })
-  } catch {
-    return val
-  }
+  return formatDateTime(val)
 }
 
 async function submitPasswordChange() {

@@ -97,6 +97,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { formatDateTime as formatAt } from '../../../utils/format'
 import axios from 'axios'
 import { useI18n } from 'vue-i18n'
 import { FileText, Upload, Download, Eye, CheckCircle2, AlertTriangle } from 'lucide-vue-next'
@@ -123,7 +124,7 @@ interface TemplateInfo {
   report?: { found: string[]; unknown: string[]; warnings: string[] }
 }
 
-const { t, te, locale } = useI18n()
+const { t, te } = useI18n()
 const { toast, confirm } = useSwal()
 
 const info = ref<TemplateInfo | null>(null)
@@ -222,9 +223,7 @@ async function copy(name: string) {
 }
 
 function formatDateTime(value: string): string {
-  return new Date(value).toLocaleString(locale.value === 'en' ? 'en-GB' : 'ru-RU', {
-    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
-  })
+  return formatAt(value)
 }
 
 onMounted(load)

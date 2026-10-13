@@ -43,12 +43,24 @@
         <option value="en">English</option>
       </select>
     </div>
+
+    <!-- Часовой пояс: в нём показывается время на всех экранах -->
+    <div class="setting-block">
+      <h4 class="block-title">{{ $t('settings.interface.timezone') }}</h4>
+      <select v-model="currentZone" @change="changeTimeZone" class="lang-select" data-testid="timezone-select">
+        <option value="">{{ $t('settings.interface.timezone_default', { zone: defaultZone }) }}</option>
+        <option v-for="zone in zones" :key="zone" :value="zone">{{ zone }}</option>
+      </select>
+      <p class="block-hint">{{ $t('settings.interface.timezone_hint', { zone: settings.server_timezone || '—' }) }}</p>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
+import { browserTimeZone, timeZoneList } from '../../utils/format'
 import { Moon, Sun } from 'lucide-vue-next'
 import { useTheme, THEMES, type ThemeName, type ThemeMode } from '../../composables/useTheme'
 import { useSettingsStore } from '../../stores/settings'
@@ -58,6 +70,25 @@ const { locale } = useI18n()
 const settingsStore = useSettingsStore()
 
 const currentLang = ref(locale.value)
+
+const { settings } = storeToRefs(settingsStore)
+const currentZone = ref('')
+// Пояс, действующий без своего выбора: от администратора или пояс браузера
+const defaultZone = computed(() => settings.value.default_timezone || browserTimeZone())
+// Сохранённый пояс остаётся в списке, даже если браузер его не знает
+const zones = computed(() => {
+  const all = timeZoneList()
+  return currentZone.value && !all.includes(currentZone.value) ? [currentZone.value, ...all] : all
+})
+
+onMounted(async () => {
+  await settingsStore.ensureLoaded()
+  currentZone.value = settings.value.timezone || ''
+})
+
+async function changeTimeZone() {
+  await settingsStore.updateSettings({ timezone: currentZone.value })
+}
 
 // Stored on the server as "<theme>-<mode>", e.g. "nord-dark".
 function persist() {
@@ -98,6 +129,13 @@ async function changeLanguage() {
   font-weight: 600;
   color: var(--text-bright);
   margin-bottom: 12px;
+}
+
+.block-hint {
+  max-width: 560px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .mode-switch {

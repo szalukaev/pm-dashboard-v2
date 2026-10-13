@@ -99,6 +99,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { formatDate as formatDay } from '../../utils/format'
 import { ChevronDown, Flag, CheckCircle2, Pencil, RefreshCw, RotateCcw, Trash2, Users, Lock } from 'lucide-vue-next'
 import SprintProgressBar from './SprintProgressBar.vue'
 import SprintStateBadge from './SprintStateBadge.vue'
@@ -183,7 +184,7 @@ function onTaskDragStart(e: DragEvent) {
 
 function formatDate(d: string | null): string {
   if (!d) return ''
-  return new Date(d).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' })
+  return formatDay(d, '2-digit')
 }
 </script>
 

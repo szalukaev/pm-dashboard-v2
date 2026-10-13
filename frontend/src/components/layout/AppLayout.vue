@@ -17,13 +17,14 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted } from 'vue'
+import { formatDateTime } from '../../utils/format'
 import { useI18n } from 'vue-i18n'
 import { AlertTriangle } from 'lucide-vue-next'
 import AppHeader from './AppHeader.vue'
 import { useAuthStore } from '../../stores/auth'
 import { useLicenseStore } from '../../stores/license'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const auth = useAuthStore()
 const license = useLicenseStore()
 
@@ -31,11 +32,7 @@ const showBanner = computed(() => license.state === 'grace' || license.state ===
 
 const bannerText = computed(() => {
   if (license.state === 'read_only') return t('license.banner.read_only')
-  const ends = license.graceEndsAt
-    ? new Date(license.graceEndsAt).toLocaleString(locale.value === 'en' ? 'en-GB' : 'ru-RU', {
-        day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
-      })
-    : ''
+  const ends = formatDateTime(license.graceEndsAt, { empty: '' })
   return t('license.banner.grace', { time: ends })
 })
 

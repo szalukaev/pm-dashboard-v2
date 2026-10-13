@@ -51,6 +51,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { formatDate as formatDay } from '../../utils/format'
 import { storeToRefs } from 'pinia'
 import { AlertCircle } from 'lucide-vue-next'
 import type { KanbanCard } from '../../stores/kanban'
@@ -108,8 +109,7 @@ function onDragEnd() {
 }
 
 function formatDate(d: string): string {
-  const date = new Date(d)
-  return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })
+  return formatDay(d, 'none')
 }
 </script>
 

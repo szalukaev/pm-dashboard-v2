@@ -99,6 +99,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { formatDateTime as formatAt } from '../../../utils/format'
 import axios from 'axios'
 import { useI18n } from 'vue-i18n'
 import { useSwal } from '../../../composables/useSwal'
@@ -121,7 +122,7 @@ interface Worker {
   schedule: Record<string, any>
 }
 
-const { t, te, locale } = useI18n()
+const { t, te } = useI18n()
 const { toast } = useSwal()
 
 const workers = ref<Worker[]>([])
@@ -218,10 +219,7 @@ function errorText(w: Worker): string {
 }
 
 function formatDateTime(value: string | null): string {
-  if (!value) return '—'
-  return new Date(value).toLocaleString(locale.value === 'en' ? 'en-GB' : 'ru-RU', {
-    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit',
-  })
+  return formatAt(value, { seconds: true })
 }
 
 function formatDuration(ms: number | null): string {

@@ -1,7 +1,7 @@
 <template>
   <div class="email-report" data-testid="email-report">
     <h4 class="block-title">{{ $t('email_report.title') }}</h4>
-    <p class="block-hint">{{ $t('email_report.hint') }}</p>
+    <p class="block-hint">{{ $t('email_report.hint', { zone: settingsStore.settings.server_timezone || '—' }) }}</p>
 
     <label class="report-check">
       <input v-model="form.enabled" type="checkbox" data-testid="report-enabled" />

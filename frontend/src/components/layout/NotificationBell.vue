@@ -49,6 +49,7 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { formatDateTime } from '../../utils/format'
 import { storeToRefs } from 'pinia'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -64,7 +65,7 @@ import TaskModal from '../tasks/TaskModal.vue'
 const store = useNotificationsStore()
 const settingsStore = useSettingsStore()
 const { items, unread } = storeToRefs(store)
-const { t: translate, locale } = useI18n()
+const { t: translate } = useI18n()
 // Переводчик в том виде, в каком его ждут функции текста уведомлений
 const t = (key: string, params?: Record<string, unknown>): string => (params ? translate(key, params) : translate(key))
 const router = useRouter()
@@ -116,11 +117,7 @@ function onScroll(e: Event) {
 }
 
 function timeText(iso: string): string {
-  const date = new Date(iso)
-  if (isNaN(date.getTime())) return ''
-  return date.toLocaleString(locale.value === 'en' ? 'en-GB' : 'ru-RU', {
-    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
-  })
+  return formatDateTime(iso, { year: 'none', empty: '' })
 }
 
 // Новое уведомление приходит сразу; всплывающее сообщение показывается, если

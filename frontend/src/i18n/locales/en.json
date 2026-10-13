@@ -641,6 +641,9 @@
       "title": "Interface Settings",
       "theme": "Theme",
       "language": "Language",
+      "timezone": "Time zone",
+      "timezone_default": "Default — {zone}",
+      "timezone_hint": "Times on every screen are shown in this zone. Task due dates and invoice dates do not depend on it. Mailing and background job schedules run by the server time — {zone}.",
       "tab_order": "Tab Order"
     },
     "notifications": {
@@ -760,7 +763,8 @@
       "TEMPLATE_EXISTS": "A template with this name already exists",
       "TEMPLATE_NOT_FOUND": "Template not found",
       "SOURCE_NOT_FOUND": "The source of the rights was not found",
-      "TARGET_NOT_FOUND": "The recipient of the rights was not found"
+      "TARGET_NOT_FOUND": "The recipient of the rights was not found",
+      "INVALID_TIMEZONE": "There is no such time zone — choose one from the list"
     },
     "summary": {
       "all": "all",
@@ -791,6 +795,9 @@
       "no_member": "not linked",
       "no_member_hint": "Users link themselves to Redmine with a personal API key — on the first login or in Personal settings",
       "groups": "Groups",
+      "timezone": "Time zone",
+      "timezone_browser": "as in the browser",
+      "timezone_hint": "The default zone of the user. Empty — times are shown in the zone of their browser. Users can choose a zone of their own in the interface settings.",
       "created": "Created",
       "blocked": "blocked",
       "rights": "Access rights",
@@ -1096,7 +1103,7 @@
   },
   "email_report": {
     "title": "Email report",
-    "hint": "A task report comes to your mailbox on a schedule. It holds the same data as the Analytics tab — over your projects and within your rights. The time is by the clock of the server.",
+    "hint": "A task report comes to your mailbox on a schedule. It holds the same data as the Analytics tab — over your projects and within your rights. The sending time is by the clock of the server ({zone}).",
     "enabled": "Send the report regularly",
     "email": "Email",
     "email_placeholder": "enter an address",

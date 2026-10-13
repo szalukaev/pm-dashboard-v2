@@ -87,6 +87,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { formatDateTime as formatAt } from '../../utils/format'
 import axios from 'axios'
 import { Eye } from 'lucide-vue-next'
 import AppModal from '../ui/AppModal.vue'
@@ -138,10 +139,7 @@ function showDetail(log: AuditEntry) {
 }
 
 function formatDateTime(s: string): string {
-  return new Date(s).toLocaleString('ru-RU', {
-    day: '2-digit', month: '2-digit', year: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
-  })
+  return formatAt(s, { year: '2-digit', seconds: true })
 }
 
 function formatJSON(s: string | null): string {

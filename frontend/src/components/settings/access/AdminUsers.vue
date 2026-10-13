@@ -8,6 +8,11 @@
     </div>
     <p class="adm-hint">{{ $t('access.users.hint') }}</p>
 
+    <!-- Один список поясов на все строки таблицы -->
+    <datalist id="timezone-list">
+      <option v-for="zone in zones" :key="zone" :value="zone" />
+    </datalist>
+
     <div class="adm-table-wrap">
       <table class="adm-table" data-testid="users-table">
         <thead>
@@ -18,6 +23,7 @@
             <th>{{ $t('access.users.template') }}</th>
             <th>{{ $t('access.users.member') }}</th>
             <th>{{ $t('access.users.groups') }}</th>
+            <th :title="$t('access.users.timezone_hint')">{{ $t('access.users.timezone') }}</th>
             <th>{{ $t('access.users.created') }}</th>
             <th></th>
           </tr>
@@ -62,6 +68,18 @@
             <td>
               <span v-for="g in u.groups" :key="g" class="adm-badge group-badge">{{ g }}</span>
               <span v-if="!u.groups.length" class="adm-muted">—</span>
+            </td>
+            <!-- Пояс по умолчанию: пусто — пояс браузера пользователя -->
+            <td>
+              <input
+                class="adm-input timezone-input"
+                list="timezone-list"
+                :value="u.default_timezone"
+                :placeholder="$t('access.users.timezone_browser')"
+                :title="$t('access.users.timezone_hint')"
+                :data-testid="'user-timezone-' + u.id"
+                @change="changeTimeZone(u, ($event.target as HTMLInputElement).value)"
+              />
             </td>
             <td class="adm-muted">{{ formatDate(u.created_at) }}</td>
             <td>
@@ -237,7 +255,7 @@ import AppPagination from '../../ui/AppPagination.vue'
 import { useSettingsStore } from '../../../stores/settings'
 import { useAuthStore } from '../../../stores/auth'
 import { useSwal } from '../../../composables/useSwal'
-import { formatDate } from '../../../utils/format'
+import { formatDate, timeZoneList } from '../../../utils/format'
 import { copyText } from '../../../utils/clipboard'
 import {
   clonePermissions, emptyPermissions,
@@ -256,7 +274,10 @@ interface AdminUser {
   role_template_id: number | null
   custom: boolean
   groups: string[]
+  default_timezone: string
 }
+
+const zones = timeZoneList()
 
 const props = defineProps<{
   projects: ProjectItem[]
@@ -330,6 +351,12 @@ async function update(u: AdminUser, fields: Record<string, unknown>) {
   } finally {
     await load()
   }
+}
+
+// Пояс по умолчанию; свой пояс администратора применяется сразу
+async function changeTimeZone(u: AdminUser, value: string) {
+  await update(u, { default_timezone: value.trim() })
+  await settingsStore.fetchSettings()
 }
 
 async function changeTemplate(u: AdminUser, value: string) {
@@ -552,6 +579,10 @@ defineExpose({ load })
 </script>
 
 <style scoped>
+.timezone-input {
+  min-width: 170px;
+}
+
 .group-badge {
   margin-right: 4px;
 }

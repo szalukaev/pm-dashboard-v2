@@ -73,6 +73,8 @@ type adminUser struct {
 	// Custom: rights are set individually and override the template.
 	Custom bool     `json:"custom"`
 	Groups []string `json:"groups"`
+	// Часовой пояс, заданный администратором; пусто — не задан
+	DefaultTimezone string `json:"default_timezone"`
 }
 
 func (h *AccessHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
@@ -88,7 +90,8 @@ func (h *AccessHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 			u.is_blocked, u.member_id, COALESCE(m.name, ''), u.role_template_id, COALESCE(t.name, ''),
 			EXISTS(SELECT 1 FROM user_permissions p WHERE p.user_id = u.id),
 			COALESCE((SELECT array_agg(g.name ORDER BY g.name) FROM group_members gm
-				JOIN groups g ON g.id = gm.group_id WHERE gm.user_id = u.id), '{}')
+				JOIN groups g ON g.id = gm.group_id WHERE gm.user_id = u.id), '{}'),
+			COALESCE(u.default_timezone, '')
 		FROM users u
 		LEFT JOIN members m ON m.external_id = u.member_id AND m.data_source = 'redmine'
 		LEFT JOIN role_templates t ON t.id = u.role_template_id
@@ -104,7 +107,7 @@ func (h *AccessHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		var u adminUser
 		if err := rows.Scan(&u.ID, &u.Username, &u.DisplayName, &u.Role, &u.CreatedAt, &u.LastLogin,
 			&u.IsBlocked, &u.MemberID, &u.MemberName, &u.RoleTemplateID, &u.TemplateName,
-			&u.Custom, pq.Array(&u.Groups)); err != nil {
+			&u.Custom, pq.Array(&u.Groups), &u.DefaultTimezone); err != nil {
 			utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 			return
 		}
@@ -237,6 +240,14 @@ func (h *AccessHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		set("is_blocked", blocked)
+	}
+	if raw, ok := body["default_timezone"]; ok {
+		var name string
+		if json.Unmarshal(raw, &name) != nil || !validTimezone(name) {
+			utils.Error(w, http.StatusBadRequest, "INVALID_TIMEZONE")
+			return
+		}
+		set("default_timezone", name)
 	}
 	// member_id is not here on purpose: the link to the account in the data
 	// source is set only by the user themselves, with a personal API key.

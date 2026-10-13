@@ -11,6 +11,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { formatDateTime } from '../../utils/format'
 import axios from 'axios'
 import { useI18n } from 'vue-i18n'
 import { useWebSocket } from '../../composables/useWebSocket'
@@ -20,7 +21,7 @@ import { useWebSocket } from '../../composables/useWebSocket'
 // red — the last attempt failed, grey — there was no sync yet.
 type SyncState = 'success' | 'running' | 'error' | 'unknown'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const { on, off } = useWebSocket()
 
 const status = ref<SyncState>('unknown')
@@ -39,10 +40,7 @@ async function load() {
 }
 
 const time = computed(() => {
-  if (!at.value) return ''
-  return new Date(at.value).toLocaleString(locale.value === 'en' ? 'en-GB' : 'ru-RU', {
-    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
-  })
+  return formatDateTime(at.value, { empty: '' })
 })
 
 const statusText = computed(() => t(`sync_status.${status.value}`, { time: time.value }))

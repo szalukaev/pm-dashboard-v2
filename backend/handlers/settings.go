@@ -53,7 +53,17 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 		EmailReport ReportSettings `json:"email_report"`
 		// Пороги индикаторов «Аналитики»
 		IndicatorThresholds Thresholds `json:"indicator_thresholds"`
+		// Часовой пояс для показа времени: свой выбор, пояс от администратора
+		// и пояс сервера, по которому идут расписания. Пусто — не задан.
+		Timezone        string `json:"timezone"`
+		DefaultTimezone string `json:"default_timezone"`
+		ServerTimezone  string `json:"server_timezone"`
 	}
+	settings.ServerTimezone = serverTimezone()
+	// Отдельным запросом: строки настроек у пользователя может ещё не быть
+	(*h.DB).QueryRow(`SELECT COALESCE(us.timezone, ''), COALESCE(u.default_timezone, '')
+		FROM users u LEFT JOIN user_settings us ON us.user_id = u.id WHERE u.id = $1`, userID).
+		Scan(&settings.Timezone, &settings.DefaultTimezone)
 	settings.AlertRules = notify.Defaults()
 	settings.EmailReport = defaultReportSettings()
 	settings.IndicatorThresholds = defaultThresholds()
@@ -199,6 +209,18 @@ func (h *SettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request)
 	}
 	if v, ok := body["language"]; ok {
 		if _, err := (*h.DB).Exec("UPDATE user_settings SET language = $1 WHERE user_id = $2", v, userID); err != nil {
+			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+			return
+		}
+	}
+	if v, ok := body["timezone"]; ok {
+		// Пустая строка возвращает пояс по умолчанию
+		name, isString := v.(string)
+		if !isString || !validTimezone(name) {
+			utils.Error(w, http.StatusBadRequest, "INVALID_TIMEZONE")
+			return
+		}
+		if _, err := (*h.DB).Exec("UPDATE user_settings SET timezone = $1 WHERE user_id = $2", name, userID); err != nil {
 			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 			return
 		}
