@@ -8,8 +8,8 @@ import (
 	"time"
 )
 
-// TestMemorySessionStoreConcurrentAccess exercises Set/Get/Delete from many
-// goroutines at once. Run with -race: the old map-based store crashed here.
+// TestMemorySessionStoreConcurrentAccess вызывает Set/Get/Delete из многих
+// горутин сразу. Запускать с -race: прежнее хранилище на карте здесь падало.
 func TestMemorySessionStoreConcurrentAccess(t *testing.T) {
 	s := newMemorySessionStore()
 	defer s.Close()
@@ -30,7 +30,7 @@ func TestMemorySessionStoreConcurrentAccess(t *testing.T) {
 			if _, err := s.Get(ctx, id); err != nil {
 				t.Errorf("Get(%s): %v", id, err)
 			}
-			// Half of the workers also delete, overlapping with reads/writes.
+			// Половина горутин ещё и удаляет — одновременно с чтением и записью.
 			if n%2 == 0 {
 				if err := s.Delete(ctx, id); err != nil {
 					t.Errorf("Delete(%s): %v", id, err)
@@ -41,13 +41,13 @@ func TestMemorySessionStoreConcurrentAccess(t *testing.T) {
 	wg.Wait()
 }
 
-// TestMemorySessionStoreExpired verifies lazy expiry on Get and the sweeper.
+// TestMemorySessionStoreExpired проверяет истечение при Get и фоновую очистку.
 func TestMemorySessionStoreDeleteUser(t *testing.T) {
 	s := newMemorySessionStore()
 	defer s.Close()
 	ctx := context.Background()
 
-	// User 7 is logged in on two devices, user 8 on one
+	// Пользователь 7 вошёл с двух устройств, пользователь 8 — с одного
 	s.Set(ctx, "phone", 7, time.Minute)
 	s.Set(ctx, "laptop", 7, time.Minute)
 	s.Set(ctx, "other", 8, time.Minute)
@@ -78,7 +78,7 @@ func TestMemorySessionStoreExpired(t *testing.T) {
 		t.Fatal("expected error for expired session")
 	}
 
-	// Sweeper removes entries that are expired and never re-accessed.
+	// Очистка убирает истёкшие записи, к которым больше не обращались.
 	if err := s.Set(ctx, "abandoned", 2, -time.Second); err != nil {
 		t.Fatalf("Set: %v", err)
 	}
@@ -91,8 +91,8 @@ func TestMemorySessionStoreExpired(t *testing.T) {
 	}
 }
 
-// TestMemorySessionStoreCloseStopsCleanup ensures Close is idempotent and
-// stops the background goroutine.
+// TestMemorySessionStoreCloseStopsCleanup проверяет, что Close можно
+// вызывать повторно и что он останавливает фоновую горутину.
 func TestMemorySessionStoreCloseStopsCleanup(t *testing.T) {
 	s := newMemorySessionStore()
 	if err := s.Close(); err != nil {

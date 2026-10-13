@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// Settings of the history, kept in the settings table of the database.
+// Настройки истории; хранятся в таблице settings базы.
 const (
 	keyRetentionDays  = "data_retention_days"
 	keyCleanupEnabled = "cleanup_enabled"
@@ -19,11 +19,11 @@ const (
 	DefaultCleanupTime   = "02:00"
 )
 
-// ErrNoDatabase: the settings cannot be read or saved without the database.
+// ErrNoDatabase: без базы настройки нельзя ни прочитать, ни сохранить.
 var ErrNoDatabase = errors.New("database is not available")
 
-// Settings reads and saves how long the history is kept and when it is
-// cleaned.
+// Settings читает и сохраняет, сколько хранится история и когда она
+// очищается.
 type Settings struct {
 	DB **sql.DB
 }
@@ -52,7 +52,7 @@ func (s *Settings) set(key string, value interface{}) error {
 	return err
 }
 
-// RetentionDays: for how many days the snapshots are kept.
+// RetentionDays: сколько дней хранятся снимки.
 func (s *Settings) RetentionDays() int {
 	days := 0
 	if !s.get(keyRetentionDays, &days) || !ValidRetention(days) {
@@ -61,7 +61,7 @@ func (s *Settings) RetentionDays() int {
 	return days
 }
 
-// ValidRetention reports whether the number of days may be set.
+// ValidRetention сообщает, допустимо ли такое число дней.
 func ValidRetention(days int) bool {
 	return days >= MinRetentionDays && days <= MaxRetentionDays
 }
@@ -73,7 +73,7 @@ func (s *Settings) SetRetentionDays(days int) error {
 	return s.set(keyRetentionDays, days)
 }
 
-// CleanupEnabled: whether old snapshots are deleted by the schedule.
+// CleanupEnabled: удаляются ли старые снимки по расписанию.
 func (s *Settings) CleanupEnabled() bool {
 	enabled := true
 	s.get(keyCleanupEnabled, &enabled)
@@ -84,7 +84,7 @@ func (s *Settings) SetCleanupEnabled(enabled bool) error {
 	return s.set(keyCleanupEnabled, enabled)
 }
 
-// CleanupTime: the time of day ("HH:MM", server time) of the cleanup.
+// CleanupTime: время суток очистки ("HH:MM", время сервера).
 func (s *Settings) CleanupTime() string {
 	value := ""
 	if !s.get(keyCleanupTime, &value) || !ValidTimeOfDay(value) {
@@ -147,7 +147,7 @@ func (s *Settings) SetMailAlertInterval(minutes int) error {
 	return s.set(keyMailAlertInterval, minutes)
 }
 
-// ValidTimeOfDay reports whether the value is a time of day as "HH:MM".
+// ValidTimeOfDay сообщает, является ли значение временем суток вида "HH:MM".
 func ValidTimeOfDay(value string) bool {
 	_, err := time.Parse("15:04", value)
 	return err == nil

@@ -7,19 +7,19 @@ import (
 	"strings"
 )
 
-// DefaultHWIDPath is where the host's hardware identifiers are mounted into
-// the container (read-only). The file is written by scripts/collect-hwid.sh,
-// which docker-compose runs before the backend starts: the application never
-// asks the hardware itself, which would need privileges its container should
-// not have.
+// DefaultHWIDPath — куда в контейнер монтируются аппаратные идентификаторы
+// хоста (только для чтения). Файл пишет scripts/collect-hwid.sh, который
+// docker-compose запускает до старта backend: само приложение железо не
+// опрашивает — для этого понадобились бы привилегии, которых у его
+// контейнера быть не должно.
 const DefaultHWIDPath = "/etc/pmdashboard/hwid-source"
 
-// HWID is the hardware fingerprint of the host: two components, each a
-// SHA-256 of an identifier. A component is "" when the host does not have a
-// usable value for it.
+// HWID — аппаратный отпечаток хоста: два компонента, каждый — SHA-256
+// идентификатора. Компонент равен "", если у хоста нет для него пригодного
+// значения.
 type HWID struct {
-	MachineIDHash   string // of /etc/machine-id
-	BoardSerialHash string // of the baseboard serial number
+	MachineIDHash   string // от /etc/machine-id
+	BoardSerialHash string // от серийного номера материнской платы
 }
 
 const (
@@ -27,9 +27,9 @@ const (
 	hwidMissing   = "-"
 )
 
-// String is the fingerprint as one string — what the activation screen
-// shows and the vendor signs: "<machine id hash>:<board serial hash>",
-// a missing component is "-".
+// String — отпечаток одной строкой: то, что показывает экран активации и
+// подписывает поставщик: "<хэш machine id>:<хэш серийного номера платы>";
+// отсутствующий компонент — "-".
 func (h HWID) String() string {
 	part := func(v string) string {
 		if v == "" {
@@ -40,12 +40,12 @@ func (h HWID) String() string {
 	return part(h.MachineIDHash) + hwidSeparator + part(h.BoardSerialHash)
 }
 
-// Empty reports whether no component is known.
+// Empty сообщает, что не известен ни один компонент.
 func (h HWID) Empty() bool {
 	return h.MachineIDHash == "" && h.BoardSerialHash == ""
 }
 
-// ParseHWID reads the String form back.
+// ParseHWID разбирает строку, которую даёт String.
 func ParseHWID(s string) HWID {
 	parts := strings.SplitN(strings.TrimSpace(s), hwidSeparator, 2)
 	value := func(i int) string {
@@ -57,18 +57,18 @@ func ParseHWID(s string) HWID {
 	return HWID{MachineIDHash: value(0), BoardSerialHash: value(1)}
 }
 
-// Matches reports whether this hardware is the one a license was issued
-// for: at least one of the two components is the same. Reinstalling the OS
-// changes the machine id, replacing the board changes its serial — neither
-// alone makes it another machine.
+// Matches сообщает, то ли это железо, для которого выпущена лицензия:
+// совпадает хотя бы один из двух компонентов. Переустановка ОС меняет
+// machine id, замена платы — её серийный номер; ни то ни другое по
+// отдельности не делает машину другой.
 func (h HWID) Matches(licensed HWID) bool {
 	same := func(a, b string) bool { return a != "" && a == b }
 	return same(h.MachineIDHash, licensed.MachineIDHash) || same(h.BoardSerialHash, licensed.BoardSerialHash)
 }
 
-// ReadHWID reads the identifiers of the host from the file written by
-// scripts/collect-hwid.sh ("machine_id=…" and "board_serial=…" lines) and
-// hashes them.
+// ReadHWID читает идентификаторы хоста из файла, записанного
+// scripts/collect-hwid.sh (строки "machine_id=…" и "board_serial=…"), и
+// хэширует их.
 func ReadHWID(path string) (HWID, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -97,9 +97,9 @@ func parseHWIDSource(content string) HWID {
 	return hwid
 }
 
-// isPlaceholderSerial detects what boards report instead of a real serial
-// number. The collecting script filters these too; the check is repeated
-// here so a stub can never become a license binding shared by many hosts.
+// isPlaceholderSerial распознаёт то, что платы сообщают вместо настоящего
+// серийного номера. Скрипт сбора тоже их отсеивает; проверка повторена
+// здесь, чтобы заглушка не стала привязкой лицензии, общей для многих хостов.
 func isPlaceholderSerial(serial string) bool {
 	s := strings.ToLower(strings.TrimSpace(serial))
 	if s == "" || strings.Trim(s, "0") == "" || strings.Trim(s, "x") == "" {

@@ -12,8 +12,8 @@ import (
 	"time"
 )
 
-// testVendor replaces the vendor keys with a fresh pair for the test and
-// returns a function that issues tokens the way the vendor tool does.
+// testVendor заменяет ключи поставщика новой парой для теста и возвращает
+// функцию, выпускающую токены так же, как утилита поставщика.
 func testVendor(t *testing.T) func(payload map[string]interface{}) string {
 	t.Helper()
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
@@ -54,14 +54,14 @@ func TestVerify(t *testing.T) {
 		t.Errorf("payload = %+v", payload)
 	}
 
-	// One changed character of the payload breaks the signature
+	// Один изменённый символ содержимого ломает подпись
 	tampered := []byte(token)
 	tampered[5] ^= 1
 	if _, err := Verify(string(tampered)); !errors.Is(err, ErrSignature) && !errors.Is(err, ErrMalformed) {
 		t.Errorf("a tampered token: err = %v", err)
 	}
 
-	// A token signed with another key is rejected
+	// Токен, подписанный другим ключом, отклоняется
 	if _, err := verifyWith(token, []string{hex.EncodeToString(make([]byte, 32))}); !errors.Is(err, ErrSignature) {
 		t.Errorf("a foreign key: err = %v, want ErrSignature", err)
 	}
@@ -126,7 +126,7 @@ func TestParseHWIDSource(t *testing.T) {
 		t.Errorf("a component must be a SHA-256 in hex, got %q", hwid.MachineIDHash)
 	}
 
-	// Stubs boards report instead of a serial are not a binding
+	// Заглушки, которые платы сообщают вместо серийного номера, привязкой не являются
 	for _, stub := range []string{"To Be Filled By O.E.M.", "Default string", "None", "0000000000", "Not Specified", ""} {
 		got := parseHWIDSource("machine_id=abc\nboard_serial=" + stub + "\n")
 		if got.BoardSerialHash != "" || got.MachineIDHash == "" {
@@ -141,7 +141,7 @@ func TestParseHWIDSource(t *testing.T) {
 func TestGuard(t *testing.T) {
 	ok := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
 	serve := func(state State, method, path string) int {
-		// No database: the status set here is what the guard sees
+		// Базы нет: Guard видит то состояние, которое задано здесь
 		s := New(nil, "")
 		s.status = Status{State: state, CheckedAt: s.now()}
 		rec := httptest.NewRecorder()

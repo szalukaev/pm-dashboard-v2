@@ -2,12 +2,12 @@ package utils
 
 import "strconv"
 
-// Itoa converts int to string (wrapper around strconv.Itoa for convenience)
+// Itoa переводит int в строку (обёртка над strconv.Itoa для удобства)
 func Itoa(n int) string {
 	return strconv.Itoa(n)
 }
 
-// JoinStrings concatenates strings with separator
+// JoinStrings соединяет строки через разделитель
 func JoinStrings(parts []string, sep string) string {
 	s := ""
 	for i, p := range parts {
@@ -19,7 +19,7 @@ func JoinStrings(parts []string, sep string) string {
 	return s
 }
 
-// Round2 rounds float64 to 2 decimal places
+// Round2 округляет float64 до двух знаков после запятой
 func Round2(v float64) float64 {
 	return float64(int(v*100+0.5)) / 100
 }

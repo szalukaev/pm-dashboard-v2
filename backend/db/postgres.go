@@ -27,7 +27,7 @@ func Connect(dsn string) (*sql.DB, error) {
 }
 
 func RunMigrations(db *sql.DB) error {
-	// Create migrations tracking table
+	// Таблица учёта применённых миграций
 	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
 		version INTEGER PRIMARY KEY,
 		applied_at TIMESTAMPTZ DEFAULT NOW()
@@ -36,10 +36,10 @@ func RunMigrations(db *sql.DB) error {
 		return fmt.Errorf("create schema_migrations: %w", err)
 	}
 
-	// Find migration files
+	// Поиск файлов миграций
 	migrationsDir := "db/migrations"
 	if _, err := os.Stat(migrationsDir); os.IsNotExist(err) {
-		// Try relative to executable
+		// Вторая попытка — рядом с исполняемым файлом
 		execPath, _ := os.Executable()
 		migrationsDir = filepath.Join(filepath.Dir(execPath), "db", "migrations")
 	}
@@ -53,7 +53,7 @@ func RunMigrations(db *sql.DB) error {
 	sort.Strings(files)
 
 	for _, f := range files {
-		// Extract version number from filename (e.g., 001_initial.up.sql -> 1)
+		// Номер версии — из имени файла (например, 001_initial.up.sql -> 1)
 		base := filepath.Base(f)
 		parts := strings.SplitN(base, "_", 2)
 		if len(parts) < 2 {
@@ -65,7 +65,7 @@ func RunMigrations(db *sql.DB) error {
 			continue
 		}
 
-		// Check if already applied
+		// Уже применена?
 		var count int
 		if err := db.QueryRow("SELECT COUNT(*) FROM schema_migrations WHERE version = $1", version).Scan(&count); err != nil {
 			return fmt.Errorf("check migration %d: %w", version, err)
@@ -74,14 +74,14 @@ func RunMigrations(db *sql.DB) error {
 			continue
 		}
 
-		// Read and execute migration
+		// Чтение и выполнение миграции
 		sqlBytes, err := os.ReadFile(f)
 		if err != nil {
 			return fmt.Errorf("read migration %s: %w", f, err)
 		}
 
-		// The migration and its bookkeeping row are applied atomically:
-		// a half-applied migration must not be left behind or re-run.
+		// Миграция и запись о ней применяются одной транзакцией: наполовину
+		// применённая миграция не должна ни остаться, ни выполниться повторно.
 		slog.Info("Applying migration", "version", version, "file", base)
 		tx, err := db.Begin()
 		if err != nil {
@@ -104,7 +104,7 @@ func RunMigrations(db *sql.DB) error {
 	return nil
 }
 
-// runFallbackMigrations runs the inline SQL if no migration files found
+// runFallbackMigrations выполняет встроенный SQL, если файлы миграций не найдены
 func runFallbackMigrations(db *sql.DB) error {
 	if _, err := db.Exec(fallbackMigrationSQL); err != nil {
 		return err
@@ -136,8 +136,8 @@ func runFallbackMigrations(db *sql.DB) error {
 	if _, err := db.Exec(syncStateSQL); err != nil {
 		return err
 	}
-	// The snapshot tables are created by this migration only; it must not
-	// run twice, or a restart would drop the collected history.
+	// Таблицы снимков создаёт только эта миграция; дважды она выполняться
+	// не должна, иначе перезапуск удалил бы накопленную историю.
 	var exists bool
 	if err := db.QueryRow(`SELECT to_regclass('issue_snapshots') IS NOT NULL`).Scan(&exists); err != nil {
 		return err
@@ -169,8 +169,8 @@ func runFallbackMigrations(db *sql.DB) error {
 	return err
 }
 
-// The access control schema is idempotent, so the fallback runs the very
-// migration files instead of keeping a second copy of them.
+// Схема прав доступа идемпотентна, поэтому запасной путь выполняет сами
+// файлы миграций, а не держит их вторую копию.
 //
 //go:embed migrations/006_access_control.up.sql
 var accessControlSQL string
@@ -223,7 +223,7 @@ var emailReportSQL string
 //go:embed migrations/022_indicator_thresholds.up.sql
 var indicatorThresholdsSQL string
 
-// fallbackMigrationSQL is kept as a safety net when migration files are not available
+// fallbackMigrationSQL — страховка на случай, когда файлы миграций недоступны
 const fallbackMigrationSQL = `
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,

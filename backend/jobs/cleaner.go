@@ -11,27 +11,27 @@ import (
 	"pm-dashboard/snapshots"
 )
 
-// CleanupKey names the cleanup among the workers.
+// CleanupKey — имя очистки среди воркеров.
 const CleanupKey = "cleanup"
 
-// EventWorkersChanged tells open pages that the state of a worker changed.
+// EventWorkersChanged сообщает открытым страницам, что состояние воркера изменилось.
 const EventWorkersChanged = "workers-changed"
 
-// retryAfterFailure: a failed cleanup is tried again this much later.
+// retryAfterFailure: через сколько повторяется неудавшаяся очистка.
 const retryAfterFailure = time.Hour
 
-// ErrBusy: a cleanup is already running.
+// ErrBusy: очистка уже идёт.
 var ErrBusy = errors.New("cleanup is already running")
 
-// Cleaner deletes the snapshots that are older than the retention: every
-// day at the set time, and when the administrator asks for it.
+// Cleaner удаляет снимки старше срока хранения: каждый день в заданное
+// время и по запросу администратора.
 type Cleaner struct {
 	DB       **sql.DB
 	Settings *Settings
 	Store    Store
-	// ReadOnly: no scheduled cleanup while it returns true; may be nil.
+	// ReadOnly: пока возвращает true, очистки по расписанию нет; может быть nil.
 	ReadOnly func() bool
-	// Notify reports a change of the state to open pages; may be nil.
+	// Notify сообщает открытым страницам о смене состояния; может быть nil.
 	Notify func(event string, data interface{})
 
 	mu      sync.Mutex
@@ -43,8 +43,9 @@ func NewCleaner(db **sql.DB, settings *Settings, store Store) *Cleaner {
 	return &Cleaner{DB: db, Settings: settings, Store: store, wake: make(chan struct{}, 1)}
 }
 
-// NextRun returns the next moment after now when the clock shows the given
-// time of day. A value that is not a time of day gives the default time.
+// NextRun возвращает ближайший момент после now, когда часы покажут
+// заданное время суток. Значение, не являющееся временем суток, даёт время
+// по умолчанию.
 func NextRun(now time.Time, timeOfDay string) time.Time {
 	t, err := time.Parse("15:04", timeOfDay)
 	if err != nil {
@@ -57,8 +58,8 @@ func NextRun(now time.Time, timeOfDay string) time.Time {
 	return next
 }
 
-// nextAttempt is when the loop wakes up: at the scheduled time, or earlier
-// when a failed run is waiting for its retry.
+// nextAttempt — когда цикл просыпается: по расписанию или раньше, если
+// неудавшийся запуск ждёт повтора.
 func nextAttempt(now time.Time, timeOfDay string, retryAt time.Time) time.Time {
 	next := NextRun(now, timeOfDay)
 	if !retryAt.IsZero() && retryAt.Before(next) {
@@ -67,7 +68,7 @@ func nextAttempt(now time.Time, timeOfDay string, retryAt time.Time) time.Time {
 	return next
 }
 
-// Rescheduled makes the loop re-read the schedule (it was changed).
+// Rescheduled заставляет цикл перечитать расписание (оно изменилось).
 func (c *Cleaner) Rescheduled() {
 	select {
 	case c.wake <- struct{}{}:
@@ -75,7 +76,7 @@ func (c *Cleaner) Rescheduled() {
 	}
 }
 
-// Run is the loop of the scheduled cleanup; it ends with ctx.
+// Run — цикл очистки по расписанию; завершается вместе с ctx.
 func (c *Cleaner) Run(ctx context.Context) {
 	var retryAt time.Time
 	for {
@@ -93,11 +94,11 @@ func (c *Cleaner) Run(ctx context.Context) {
 		retryAt = time.Time{}
 		switch {
 		case c.DB == nil || *c.DB == nil:
-			// Not set up yet
+			// Ещё не настроено
 		case !c.Settings.CleanupEnabled():
-			// Switched off by the administrator
+			// Выключено администратором
 		case c.ReadOnly != nil && c.ReadOnly():
-			// Nothing is changed without a working license
+			// Без действующей лицензии ничего не меняется
 		default:
 			if _, err := c.RunNow(); err != nil && !errors.Is(err, ErrBusy) {
 				retryAt = time.Now().Add(retryAfterFailure)
@@ -107,33 +108,33 @@ func (c *Cleaner) Run(ctx context.Context) {
 	}
 }
 
-// RunNow deletes the snapshots older than the retention and returns how
-// many rows were deleted.
+// RunNow удаляет снимки старше срока хранения и возвращает число удалённых
+// строк.
 func (c *Cleaner) RunNow() (int64, error) {
 	return c.run(func(db *sql.DB) (int64, error) {
 		return snapshots.Cleanup(db, time.Now(), c.Settings.RetentionDays())
 	})
 }
 
-// Purge deletes every snapshot.
+// Purge удаляет все снимки.
 func (c *Cleaner) Purge() (int64, error) {
 	return c.run(snapshots.Purge)
 }
 
-// Running reports whether a cleanup is going on.
+// Running сообщает, идёт ли очистка.
 func (c *Cleaner) Running() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.running
 }
 
-// Status returns the state of the last run.
+// Status возвращает состояние последнего запуска.
 func (c *Cleaner) Status() Status {
 	status, ok := c.Store.Load(CleanupKey)
 	if !ok {
 		status = Status{State: StateIdle}
 	}
-	// A run cut short by a restart left "running" behind
+	// Запуск, оборванный перезапуском, оставил после себя «running»
 	if status.State == StateRunning && !c.Running() {
 		status.State = StateIdle
 	}

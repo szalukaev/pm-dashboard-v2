@@ -9,30 +9,30 @@ import (
 	"time"
 )
 
-// State of the installation with respect to its license.
+// Состояние установки по отношению к её лицензии.
 type State string
 
 const (
-	// NotActivated: no license was ever activated; only the activation
-	// screen works.
+	// NotActivated: лицензия ни разу не активировалась; работает только
+	// экран активации.
 	NotActivated State = "not_activated"
-	// Active: the license is valid for this hardware.
+	// Active: лицензия действительна для этого железа.
 	Active State = "active"
-	// Grace: the last check failed; everything works, the countdown to
-	// read-only is running.
+	// Grace: последняя проверка не прошла; всё работает, идёт отсчёт до
+	// режима «только чтение».
 	Grace State = "grace"
-	// ReadOnly: the grace period is over; data can be read but not changed.
+	// ReadOnly: льготный период истёк; данные можно читать, но не менять.
 	ReadOnly State = "read_only"
 )
 
-// Why a check failed.
+// Почему проверка не прошла.
 const (
-	ReasonSignature       = "signature"        // the stored token does not verify
-	ReasonHWIDMismatch    = "hwid_mismatch"    // the hardware is not the licensed one
-	ReasonHWIDUnavailable = "hwid_unavailable" // the fingerprint of the host cannot be read
+	ReasonSignature       = "signature"        // сохранённый токен не проходит проверку подписи
+	ReasonHWIDMismatch    = "hwid_mismatch"    // железо не то, на которое выдана лицензия
+	ReasonHWIDUnavailable = "hwid_unavailable" // отпечаток хоста прочитать не удалось
 )
 
-// Events written to the license journal (table license_events).
+// События, которые пишутся в журнал лицензии (таблица license_events).
 const (
 	EventActivated        = "activated"
 	EventActivationFailed = "activation_failed"
@@ -42,10 +42,10 @@ const (
 	EventRestored         = "restored"
 )
 
-// CheckInterval is how often the license is re-checked at runtime.
+// CheckInterval — как часто лицензия перепроверяется во время работы.
 const CheckInterval = time.Hour
 
-// Status is the result of a license check.
+// Status — результат проверки лицензии.
 type Status struct {
 	State  State  `json:"state"`
 	Reason string `json:"reason,omitempty"`
@@ -61,14 +61,14 @@ type Status struct {
 	CheckedAt       time.Time  `json:"checked_at"`
 }
 
-// Errors of Activate.
+// Ошибки Activate.
 var (
 	ErrHWIDUnavailable = errors.New("hardware fingerprint of the host is not available")
 	ErrHWIDMismatch    = errors.New("the license was issued for other hardware")
 	ErrNoDatabase      = errors.New("database is not available")
 )
 
-// Service is the single owner of the license state.
+// Service — единственный владелец состояния лицензии.
 type Service struct {
 	db       **sql.DB
 	hwidPath string
@@ -78,8 +78,8 @@ type Service struct {
 	status Status
 }
 
-// New creates the service. The state is unknown (not activated) until the
-// first Check.
+// New создаёт сервис. До первого Check состояние неизвестно (не
+// активирована).
 func New(db **sql.DB, hwidPath string) *Service {
 	return &Service{
 		db:       db,
@@ -89,25 +89,25 @@ func New(db **sql.DB, hwidPath string) *Service {
 	}
 }
 
-// Status returns the result of the last check.
+// Status возвращает результат последней проверки.
 func (s *Service) Status() Status {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.status
 }
 
-// IsReadOnly reports whether changing data is blocked.
+// IsReadOnly сообщает, запрещено ли менять данные.
 func (s *Service) IsReadOnly() bool {
 	return s.Status().State == ReadOnly
 }
 
-// Usable reports whether the product may be used at all (a license was
-// activated at some point).
+// Usable сообщает, можно ли вообще пользоваться продуктом (лицензия
+// когда-либо активировалась).
 func (s *Service) Usable() bool {
 	return s.Status().State != NotActivated
 }
 
-// HWID returns the fingerprint of the host, for the activation screen.
+// HWID возвращает отпечаток хоста для экрана активации.
 func (s *Service) HWID() (HWID, error) {
 	hwid, err := ReadHWID(s.hwidPath)
 	if err != nil {
@@ -119,7 +119,7 @@ func (s *Service) HWID() (HWID, error) {
 	return hwid, nil
 }
 
-// Run checks the license at once and then every CheckInterval until ctx is done.
+// Run проверяет лицензию сразу и затем каждые CheckInterval, пока жив ctx.
 func (s *Service) Run(ctx context.Context) {
 	s.Check()
 	ticker := time.NewTicker(CheckInterval)
@@ -134,7 +134,7 @@ func (s *Service) Run(ctx context.Context) {
 	}
 }
 
-// stored is the license row of the database.
+// stored — строка лицензии из базы.
 type stored struct {
 	token        string
 	activatedAt  *time.Time
@@ -142,18 +142,17 @@ type stored struct {
 	graceStarted *time.Time
 }
 
-// verdict is what a check decides, before anything is written.
+// verdict — решение проверки до того, как что-либо записано.
 type verdict struct {
 	state   State
 	reason  string
 	payload *Payload
-	// graceStarted is when the grace period began, nil when the license is fine.
+	// graceStarted — когда начался льготный период; nil — с лицензией всё в порядке.
 	graceStarted *time.Time
 }
 
-// evaluate decides the state from the stored license, the hardware of the
-// host and the current time. It is the whole logic of a check and has no
-// side effects.
+// evaluate определяет состояние по сохранённой лицензии, железу хоста и
+// текущему времени. Это вся логика проверки; побочных эффектов у неё нет.
 func evaluate(lic *stored, hwid HWID, hwidErr error, now time.Time) verdict {
 	if lic == nil {
 		return verdict{state: NotActivated}
@@ -173,9 +172,9 @@ func evaluate(lic *stored, hwid HWID, hwidErr error, now time.Time) verdict {
 		return verdict{state: Active, payload: payload}
 	}
 
-	// The check failed: the grace period runs from the first failure. Its
-	// length is a parameter of the signed license; a license that cannot be
-	// read gives the default one.
+	// Проверка не прошла: льготный период отсчитывается от первой неудачи.
+	// Его длина — параметр подписанной лицензии; лицензия, которую не
+	// удаётся прочитать, даёт длину по умолчанию.
 	started := now
 	if lic.graceStarted != nil {
 		started = *lic.graceStarted
@@ -203,14 +202,14 @@ func (s *Service) load() (*stored, error) {
 	return &lic, nil
 }
 
-// Check performs the full check — signature and hardware — records the
-// outcome and returns the new status.
+// Check выполняет полную проверку — подпись и железо, — записывает итог и
+// возвращает новое состояние.
 func (s *Service) Check() Status {
 	now := s.now()
 	lic, err := s.load()
 	if err != nil {
-		// Without a database nothing can be decided or recorded; keep the
-		// last known status (not activated right after start).
+		// Без базы нельзя ни решить, ни записать; остаётся последнее
+		// известное состояние (сразу после запуска — не активирована).
 		if !errors.Is(err, ErrNoDatabase) {
 			slog.Warn("License check: cannot read the license", "error", err)
 		}
@@ -262,8 +261,8 @@ func (s *Service) Check() Status {
 	return status
 }
 
-// Activate stores a new license token after checking its signature and that
-// it was issued for this hardware.
+// Activate сохраняет новый токен лицензии, проверив его подпись и то, что
+// он выпущен для этого железа.
 func (s *Service) Activate(token string) (Status, error) {
 	if s.db == nil || *s.db == nil {
 		return s.Status(), ErrNoDatabase
@@ -285,7 +284,7 @@ func (s *Service) Activate(token string) (Status, error) {
 		return fail(ErrHWIDMismatch, ReasonHWIDMismatch)
 	}
 
-	// One active license: the new one replaces the old one.
+	// Действующая лицензия одна: новая заменяет прежнюю.
 	now := s.now()
 	tx, err := (*s.db).Begin()
 	if err != nil {
@@ -306,14 +305,14 @@ func (s *Service) Activate(token string) (Status, error) {
 	return s.Check(), nil
 }
 
-// Event is a row of the license journal.
+// Event — строка журнала лицензии.
 type Event struct {
 	At      time.Time `json:"at"`
 	Event   string    `json:"event"`
 	Details string    `json:"details"`
 }
 
-// Events returns the latest rows of the license journal, newest first.
+// Events возвращает последние строки журнала лицензии, сначала новые.
 func (s *Service) Events(limit int) ([]Event, error) {
 	if s.db == nil || *s.db == nil {
 		return []Event{}, nil
@@ -334,8 +333,8 @@ func (s *Service) Events(limit int) ([]Event, error) {
 	return events, rows.Err()
 }
 
-// logEvent writes to the license journal. It is kept apart from the audit
-// of user actions: support reads it to see what happened to a license.
+// logEvent пишет в журнал лицензии. Он ведётся отдельно от аудита действий
+// пользователей: по нему поддержка видит, что происходило с лицензией.
 func (s *Service) logEvent(event, details string) {
 	if s.db == nil || *s.db == nil {
 		return

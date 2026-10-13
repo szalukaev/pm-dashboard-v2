@@ -11,24 +11,24 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// SessionStore interface for session management
+// SessionStore — хранилище сессий
 type SessionStore interface {
 	Set(ctx context.Context, sessionID string, userID int, expiry time.Duration) error
 	Get(ctx context.Context, sessionID string) (int, error)
 	Delete(ctx context.Context, sessionID string) error
-	// DeleteUser ends every session of the user (on all devices) and
-	// returns how many there were.
+	// DeleteUser завершает все сессии пользователя (на всех устройствах) и
+	// возвращает, сколько их было.
 	DeleteUser(ctx context.Context, userID int) (int, error)
 	Close() error
 }
 
-// RedisSessionStore uses Redis for session storage
+// RedisSessionStore хранит сессии в Redis
 type RedisSessionStore struct {
 	client *redis.Client
 }
 
-// MemorySessionStore is a fallback when Redis is not available.
-// Safe for concurrent use; expired entries are swept by a background goroutine.
+// MemorySessionStore — запасной вариант, когда Redis недоступен. Безопасен
+// при одновременном доступе; истёкшие записи убирает фоновая горутина.
 type MemorySessionStore struct {
 	mu       sync.RWMutex
 	sessions map[string]sessionEntry
@@ -44,7 +44,7 @@ type sessionEntry struct {
 
 const memorySessionCleanupInterval = time.Minute
 
-// newMemorySessionStore creates an in-memory store and starts the cleanup goroutine.
+// newMemorySessionStore создаёт хранилище в памяти и запускает горутину очистки.
 func newMemorySessionStore() *MemorySessionStore {
 	s := &MemorySessionStore{
 		sessions: make(map[string]sessionEntry),
@@ -55,7 +55,7 @@ func newMemorySessionStore() *MemorySessionStore {
 	return s
 }
 
-// cleanupLoop periodically removes expired sessions so abandoned ones don't leak memory.
+// cleanupLoop периодически удаляет истёкшие сессии, чтобы брошенные не занимали память.
 func (s *MemorySessionStore) cleanupLoop() {
 	defer close(s.done)
 	ticker := time.NewTicker(memorySessionCleanupInterval)
@@ -70,7 +70,7 @@ func (s *MemorySessionStore) cleanupLoop() {
 	}
 }
 
-// removeExpired deletes all expired entries under a write lock.
+// removeExpired удаляет все истёкшие записи под блокировкой на запись.
 func (s *MemorySessionStore) removeExpired() {
 	now := time.Now()
 	s.mu.Lock()
@@ -82,7 +82,7 @@ func (s *MemorySessionStore) removeExpired() {
 	s.mu.Unlock()
 }
 
-// NewSessionStore creates a Redis-backed session store, falls back to memory
+// NewSessionStore создаёт хранилище сессий в Redis, а если он недоступен — в памяти
 func NewSessionStore(redisURL string) SessionStore {
 	if redisURL == "" {
 		slog.Warn("No Redis URL configured, using in-memory session store")
@@ -97,7 +97,7 @@ func NewSessionStore(redisURL string) SessionStore {
 
 	client := redis.NewClient(opt)
 
-	// Test connection
+	// Проверка соединения
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -110,7 +110,7 @@ func NewSessionStore(redisURL string) SessionStore {
 	return &RedisSessionStore{client: client}
 }
 
-// ─── Redis implementation ───
+// ─── Реализация на Redis ───
 
 func (s *RedisSessionStore) Set(ctx context.Context, sessionID string, userID int, expiry time.Duration) error {
 	key := "session:" + sessionID
@@ -138,8 +138,8 @@ func (s *RedisSessionStore) Delete(ctx context.Context, sessionID string) error 
 	return s.client.Del(ctx, key).Err()
 }
 
-// DeleteUser walks all sessions: there is no index by user, and the number
-// of sessions of an on-premise installation is small.
+// DeleteUser обходит все сессии: индекса по пользователю нет, а сессий у
+// установки на своём сервере немного.
 func (s *RedisSessionStore) DeleteUser(ctx context.Context, userID int) (int, error) {
 	want := strconv.Itoa(userID)
 	deleted := 0
@@ -160,7 +160,7 @@ func (s *RedisSessionStore) Close() error {
 	return s.client.Close()
 }
 
-// ─── Memory fallback implementation ───
+// ─── Запасная реализация в памяти ───
 
 func (s *MemorySessionStore) Set(ctx context.Context, sessionID string, userID int, expiry time.Duration) error {
 	s.mu.Lock()
@@ -173,7 +173,7 @@ func (s *MemorySessionStore) Set(ctx context.Context, sessionID string, userID i
 }
 
 func (s *MemorySessionStore) Get(ctx context.Context, sessionID string) (int, error) {
-	// Write lock: lazy delete of an expired entry mutates the map.
+	// Блокировка на запись: попутное удаление истёкшей записи меняет карту.
 	s.mu.Lock()
 	entry, ok := s.sessions[sessionID]
 	if !ok {
@@ -209,8 +209,8 @@ func (s *MemorySessionStore) DeleteUser(ctx context.Context, userID int) (int, e
 	return deleted, nil
 }
 
-// Close stops the cleanup goroutine and waits for it to exit.
-// Safe to call multiple times.
+// Close останавливает горутину очистки и ждёт её завершения. Вызывать можно
+// несколько раз.
 func (s *MemorySessionStore) Close() error {
 	s.once.Do(func() {
 		close(s.stop)

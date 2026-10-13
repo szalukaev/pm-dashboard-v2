@@ -1,6 +1,6 @@
-// Package license checks the offline license of the installation: the
-// signature of the license token, its binding to the hardware of the host,
-// and the state that follows — active, grace period or read-only.
+// Package license проверяет офлайн-лицензию установки: подпись токена
+// лицензии, его привязку к железу хоста и вытекающее из этого состояние —
+// активна, льготный период или только чтение.
 package license
 
 import (
@@ -12,21 +12,21 @@ import (
 	"strings"
 )
 
-// vendorPublicKeys are the keys a license may be signed with. They are
-// constants of the binary on purpose: read from a config, a key could be
-// replaced by the administrator of the installation with their own.
-// A list, so that a key can be rotated without voiding issued licenses.
+// vendorPublicKeys — ключи, которыми может быть подписана лицензия. Они
+// намеренно зашиты в бинарник: ключ из конфигурации администратор
+// установки мог бы заменить своим. Это список, чтобы ключ можно было
+// сменить, не аннулируя выпущенные лицензии.
 var vendorPublicKeys = []string{
 	"988abc868c27381c1785ddbc3925486afc662fc434f30dc355b8fb38bd3410f3",
 }
 
-// Payload is the signed content of a license token.
+// Payload — подписанное содержимое токена лицензии.
 type Payload struct {
 	Client string `json:"client"`
-	// HWIDHash is the hardware fingerprint as the vendor tool signs it: the
-	// string shown on the activation screen (see HWID.String).
+	// HWIDHash — аппаратный отпечаток в том виде, в каком его подписывает
+	// утилита поставщика: строка с экрана активации (см. HWID.String).
 	HWIDHash string `json:"hwid_hash"`
-	// HWIDComponents is the same fingerprint given by components.
+	// HWIDComponents — тот же отпечаток по компонентам.
 	HWIDComponents *struct {
 		MachineIDHash   string `json:"machine_id_hash"`
 		BoardSerialHash string `json:"board_serial_hash"`
@@ -37,10 +37,10 @@ type Payload struct {
 	IssuedAt        string   `json:"issued_at"`
 }
 
-// DefaultGraceDays is used when a license does not say otherwise.
+// DefaultGraceDays действует, если в лицензии не указано иное.
 const DefaultGraceDays = 14
 
-// GraceDays returns the length of the grace period the license gives.
+// GraceDays возвращает длину льготного периода, которую даёт лицензия.
 func (p *Payload) GraceDays() int {
 	if p == nil || p.GracePeriodDays <= 0 {
 		return DefaultGraceDays
@@ -48,7 +48,7 @@ func (p *Payload) GraceDays() int {
 	return p.GracePeriodDays
 }
 
-// HWID returns the hardware the license was issued for.
+// HWID возвращает железо, для которого выпущена лицензия.
 func (p *Payload) HWID() HWID {
 	if p.HWIDComponents != nil {
 		return HWID{MachineIDHash: p.HWIDComponents.MachineIDHash, BoardSerialHash: p.HWIDComponents.BoardSerialHash}
@@ -63,9 +63,9 @@ var (
 
 var tokenEncoding = base64.RawURLEncoding
 
-// Verify checks the signature of a token — base64url(payload) "."
-// base64url(signature) — and returns its payload. The signature is checked
-// over the very bytes that were signed; the JSON is never re-encoded.
+// Verify проверяет подпись токена — base64url(содержимое) "."
+// base64url(подпись) — и возвращает его содержимое. Подпись проверяется по
+// тем самым байтам, которые были подписаны; JSON заново не кодируется.
 func Verify(token string) (*Payload, error) {
 	return verifyWith(token, vendorPublicKeys)
 }

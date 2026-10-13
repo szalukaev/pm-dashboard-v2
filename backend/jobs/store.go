@@ -1,6 +1,6 @@
-// Package jobs runs the background work of the dashboard besides the sync
-// with the data source: the daily cleanup of the history. It also keeps the
-// state of the workers for the screen where the administrator sees them.
+// Package jobs выполняет фоновую работу дашборда помимо синхронизации с
+// источником данных: ежедневную очистку истории. Он же хранит состояние
+// воркеров для экрана, на котором их видит администратор.
 package jobs
 
 import (
@@ -13,32 +13,32 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// States of a worker run.
+// Состояния запуска воркера.
 const (
-	StateIdle    = "idle"    // the last run finished
-	StateRunning = "running" // a run is going on
-	StateError   = "error"   // the last run failed
+	StateIdle    = "idle"    // последний запуск завершён
+	StateRunning = "running" // запуск идёт
+	StateError   = "error"   // последний запуск не удался
 )
 
-// Status is what is known about the last run of a worker.
+// Status — что известно о последнем запуске воркера.
 type Status struct {
 	State      string     `json:"state"`
 	LastStart  *time.Time `json:"last_start"`
 	DurationMs int64      `json:"duration_ms"`
-	// Processed: how much the run did, in the units of the worker (rows
-	// deleted by the cleanup).
+	// Processed: сколько сделал запуск, в единицах воркера (строки,
+	// удалённые очисткой).
 	Processed int64  `json:"processed"`
 	Error     string `json:"error"`
 }
 
-// Store keeps the statuses of the workers.
+// Store хранит состояния воркеров.
 type Store interface {
 	Load(key string) (Status, bool)
 	Save(key string, status Status)
 }
 
-// NewStore returns a store in Redis, or in memory when Redis is not
-// configured or does not answer: the statuses then live until a restart.
+// NewStore возвращает хранилище в Redis либо в памяти, если Redis не
+// настроен или не отвечает: тогда состояния живут до перезапуска.
 func NewStore(redisURL string) Store {
 	if redisURL == "" {
 		return newMemoryStore()

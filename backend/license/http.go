@@ -6,17 +6,17 @@ import (
 	"time"
 )
 
-// recheckAfter is how soon an unactivated installation is checked again on
-// a request: the database may have just appeared (setup wizard) or a
-// license may have just been stored.
+// recheckAfter — через сколько неактивированная установка проверяется снова
+// при запросе: база могла только что появиться (мастер настройки), а
+// лицензия — только что сохраниться.
 const recheckAfter = 10 * time.Second
 
-// Guard enforces the license state on the API:
-//   - not activated — nothing works except logging in and the activation screen;
-//   - read-only — data can be read but not changed.
+// Guard применяет состояние лицензии к API:
+//   - не активирована — работают только вход и экран активации;
+//   - только чтение — данные можно читать, но не менять.
 //
-// Requests under /api/license and /api/auth always pass: the activation
-// screen must stay reachable in every state.
+// Запросы к /api/license и /api/auth проходят всегда: экран активации
+// должен быть доступен в любом состоянии.
 func (s *Service) Guard(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path

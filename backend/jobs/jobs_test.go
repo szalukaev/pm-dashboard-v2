@@ -32,17 +32,17 @@ func TestNextAttemptAfterFailure(t *testing.T) {
 	loc := time.FixedZone("MSK", 3*3600)
 	failedAt := time.Date(2026, 10, 9, 2, 0, 5, 0, loc)
 
-	// A failed run is tried again in an hour, not a day later
+	// Неудавшийся запуск повторяется через час, а не через сутки
 	retry := failedAt.Add(retryAfterFailure)
 	if got := nextAttempt(failedAt, "02:00", retry); !got.Equal(retry) {
 		t.Errorf("after a failure: next attempt at %v, want %v", got, retry)
 	}
-	// Without a failure the next run is the scheduled one
+	// Без сбоя следующий запуск — по расписанию
 	want := time.Date(2026, 10, 10, 2, 0, 0, 0, loc)
 	if got := nextAttempt(failedAt, "02:00", time.Time{}); !got.Equal(want) {
 		t.Errorf("without a failure: next attempt at %v, want %v", got, want)
 	}
-	// A retry that would come after the scheduled run does not delay it
+	// Повтор, который пришёлся бы позже запуска по расписанию, его не откладывает
 	late := time.Date(2026, 10, 9, 1, 30, 0, 0, loc)
 	if got := nextAttempt(late, "02:00", late.Add(retryAfterFailure)); !got.Equal(time.Date(2026, 10, 9, 2, 0, 0, 0, loc)) {
 		t.Errorf("a late retry: next attempt at %v, want the scheduled time", got)
@@ -50,7 +50,7 @@ func TestNextAttemptAfterFailure(t *testing.T) {
 }
 
 func TestMemoryStore(t *testing.T) {
-	store := NewStore("") // no Redis: in memory
+	store := NewStore("") // Redis нет: в памяти
 	if _, ok := store.Load(CleanupKey); ok {
 		t.Error("nothing is known about a worker that never ran")
 	}
@@ -67,14 +67,14 @@ func TestCleanerWithoutDatabase(t *testing.T) {
 	if _, err := cleaner.RunNow(); err != ErrNoDatabase {
 		t.Errorf("without a database: err = %v, want ErrNoDatabase", err)
 	}
-	// Nothing ran, so nothing is reported as running or failed
+	// Ничего не запускалось, поэтому нет ни идущих, ни неудавшихся запусков
 	if status := cleaner.Status(); status.State != StateIdle || status.LastStart != nil {
 		t.Errorf("status = %+v", status)
 	}
 }
 
 func TestSettingsDefaultsAndLimits(t *testing.T) {
-	settings := &Settings{} // no database: the defaults
+	settings := &Settings{} // базы нет: значения по умолчанию
 	if settings.RetentionDays() != DefaultRetentionDays || !settings.CleanupEnabled() || settings.CleanupTime() != DefaultCleanupTime {
 		t.Errorf("defaults: %d days, enabled %v, at %s", settings.RetentionDays(), settings.CleanupEnabled(), settings.CleanupTime())
 	}

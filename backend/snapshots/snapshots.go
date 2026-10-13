@@ -1,6 +1,6 @@
-// Package snapshots keeps the history of the data: what the dashboard knew
-// on each day. The current state lives in the issues table and is replaced
-// by every sync; the snapshots are what remains of the days that passed.
+// Package snapshots хранит историю данных: что дашборд знал в каждый из
+// дней. Текущее состояние лежит в таблице issues и заменяется каждой
+// синхронизацией; снимки — то, что остаётся от прошедших дней.
 package snapshots
 
 import (
@@ -9,12 +9,12 @@ import (
 	"time"
 )
 
-// dateLayout is how a day is passed to the database.
+// dateLayout — в каком виде день передаётся в базу.
 const dateLayout = "2006-01-02"
 
-// classified is the issues with the group of their status from the settings
-// (open / testing / closed, see statuses.group_name) and the Bugs mark.
-// A status that is not synced yet counts as open, as everywhere else.
+// classified — задачи с группой их статуса из настроек (open / testing /
+// closed, см. statuses.group_name) и отметкой Bugs. Статус, который ещё не
+// синхронизирован, считается открытым, как и везде.
 const classified = `(
 	SELECT i.*, COALESCE(st.group_name, 'open') AS grp, COALESCE(st.is_bug, false) AS is_bug
 	FROM issues i
@@ -22,19 +22,19 @@ const classified = `(
 	WHERE i.data_source = 'redmine'
 )`
 
-// topPriority is the most important priority by the order from the settings.
+// topPriority — самый важный приоритет по порядку из настроек.
 const topPriority = `(SELECT external_id FROM priorities WHERE data_source = 'redmine'
 	ORDER BY sort_order DESC, external_id DESC LIMIT 1)`
 
-// Counts is how many rows a recording wrote.
+// Counts — сколько строк записал снимок.
 type Counts struct {
-	Members int64 // rows of daily_snapshots for the day
-	Issues  int64 // rows of issue_snapshots added or changed
+	Members int64 // строк daily_snapshots за день
+	Issues  int64 // строк issue_snapshots добавлено или изменено
 }
 
-// Record writes the snapshot of the given day from the current state of the
-// issues. It is called after every sync: the snapshot of today follows the
-// data during the day and stays as the day ended.
+// Record записывает снимок заданного дня по текущему состоянию задач.
+// Вызывается после каждой синхронизации: снимок сегодняшнего дня в течение
+// дня следует за данными и остаётся таким, каким день закончился.
 func Record(db *sql.DB, day time.Time) (Counts, error) {
 	var counts Counts
 	date := day.Format(dateLayout)
@@ -54,9 +54,9 @@ func Record(db *sql.DB, day time.Time) (Counts, error) {
 	return counts, nil
 }
 
-// recordDaily rewrites the totals per member for the day. Hours and the
-// estimate are summed over the issues that are not closed: they describe
-// the work a member has, not everything they ever did.
+// recordDaily переписывает итоги дня по сотрудникам. Часы и оценка
+// суммируются по незакрытым задачам: они описывают работу, которая есть у
+// сотрудника, а не всё, что он когда-либо сделал.
 func recordDaily(db *sql.DB, date string) (int64, error) {
 	tx, err := db.Begin()
 	if err != nil {
@@ -64,8 +64,8 @@ func recordDaily(db *sql.DB, date string) (int64, error) {
 	}
 	defer tx.Rollback()
 
-	// Rewritten as a whole: a member whose last issue was reassigned during
-	// the day must not keep the row written in the morning.
+	// Переписывается целиком: у сотрудника, чью последнюю задачу днём
+	// переназначили, не должна остаться утренняя строка.
 	if _, err := tx.Exec(`DELETE FROM daily_snapshots WHERE date = $1::date`, date); err != nil {
 		return 0, err
 	}
@@ -119,14 +119,13 @@ func recordDaily(db *sql.DB, date string) (int64, error) {
 	return n, nil
 }
 
-// recordIssues writes the issues of the day: every issue that is not
-// closed, and a closed one on the day it was closed — when the source says
-// it was closed on this day, when its previous snapshot shows it open, or
-// when it already is in the snapshot of this day. An issue closed long ago
-// is not copied day after day.
+// recordIssues записывает задачи дня: каждую незакрытую, а закрытую — в
+// день закрытия: когда источник сообщает, что она закрыта в этот день,
+// когда её предыдущий снимок показывает её открытой или когда она уже есть
+// в снимке этого дня. Давно закрытая задача изо дня в день не копируется.
 //
-// A row that would not change is left alone: the sync runs every few
-// minutes and most issues stay as they are.
+// Строка, которая не изменилась бы, не трогается: синхронизация идёт каждые
+// несколько минут, и большинство задач остаются прежними.
 func recordIssues(db *sql.DB, date string, dayStart, dayEnd time.Time) (int64, error) {
 	res, err := db.Exec(`
 		INSERT INTO issue_snapshots AS s (
@@ -182,7 +181,7 @@ func recordIssues(db *sql.DB, date string, dayStart, dayEnd time.Time) (int64, e
 	return n, nil
 }
 
-// Stats is what is stored: for the screen where the history is managed.
+// Stats — что хранится: для экрана управления историей.
 type Stats struct {
 	DailyRows int64   `json:"daily_rows"`
 	IssueRows int64   `json:"issue_rows"`
@@ -191,7 +190,7 @@ type Stats struct {
 	Days      int     `json:"days"`
 }
 
-// GetStats counts the stored snapshots.
+// GetStats считает сохранённые снимки.
 func GetStats(db *sql.DB) (Stats, error) {
 	var s Stats
 	if err := db.QueryRow(`SELECT COUNT(*) FROM daily_snapshots`).Scan(&s.DailyRows); err != nil {
@@ -202,8 +201,8 @@ func GetStats(db *sql.DB) (Stats, error) {
 	return s, err
 }
 
-// Cleanup deletes the snapshots older than keepDays days before today and
-// returns how many rows were deleted. The day keepDays ago itself is kept.
+// Cleanup удаляет снимки старше keepDays дней от сегодняшнего и возвращает
+// число удалённых строк. Сам день keepDays назад остаётся.
 func Cleanup(db *sql.DB, today time.Time, keepDays int) (int64, error) {
 	if keepDays < 1 {
 		return 0, fmt.Errorf("retention of %d days", keepDays)
@@ -211,18 +210,17 @@ func Cleanup(db *sql.DB, today time.Time, keepDays int) (int64, error) {
 	return deleteBefore(db, Cutoff(today, keepDays))
 }
 
-// Cutoff is the first day that is kept with the given retention.
+// Cutoff — первый день, который остаётся при заданном сроке хранения.
 func Cutoff(today time.Time, keepDays int) string {
 	return today.AddDate(0, 0, -keepDays).Format(dateLayout)
 }
 
-// Purge deletes every snapshot.
+// Purge удаляет все снимки.
 func Purge(db *sql.DB) (int64, error) {
 	return deleteBefore(db, "")
 }
 
-// deleteBefore deletes the snapshots of the days before the given one, or
-// all of them for an empty date.
+// deleteBefore удаляет снимки дней до заданного, а при пустой дате — все.
 func deleteBefore(db *sql.DB, before string) (int64, error) {
 	tx, err := db.Begin()
 	if err != nil {

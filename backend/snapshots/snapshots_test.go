@@ -23,7 +23,7 @@ func TestCutoff(t *testing.T) {
 }
 
 func TestCleanupRefusesNoRetention(t *testing.T) {
-	// A retention of zero days would delete today's snapshot as well
+	// Срок хранения в ноль дней удалил бы и сегодняшний снимок
 	if _, err := Cleanup(nil, time.Now(), 0); err == nil {
 		t.Error("a retention of 0 days must be refused before touching the database")
 	}

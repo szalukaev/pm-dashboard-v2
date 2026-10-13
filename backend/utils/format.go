@@ -12,7 +12,7 @@ func FormatMoney(amount float64) string {
 	intPart := parts[0]
 	decPart := parts[1]
 
-	// Add space separators for thousands
+	// Разряды тысяч отделяются пробелом
 	n := len(intPart)
 	if n > 3 {
 		var b strings.Builder
