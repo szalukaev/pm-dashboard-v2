@@ -99,6 +99,7 @@ import { useTasksStore } from '../stores/tasks'
 import { useLiveRefresh } from '../composables/useLiveRefresh'
 import { useAuthStore } from '../stores/auth'
 import { useSettingsStore } from '../stores/settings'
+import { trackedProjects } from '../utils/projects'
 import { useI18n } from 'vue-i18n'
 import { useSwal } from '../composables/useSwal'
 import SprintWidget from '../components/sprint/SprintWidget.vue'
@@ -132,22 +133,7 @@ const deletingSprintId = ref<number | null>(null)
 const selectedTaskId = ref<number | null>(null)
 // Проекты для формы спринта: те, что пользователь выбрал в настройках, вместе
 // с их подпроектами; если ничего не выбрано — все доступные, как и везде
-const projects = computed(() => {
-  const all = tasksStore.projects
-  const selected = settingsStore.settings.selected_projects || []
-  if (selected.length === 0) return all.map(p => ({ id: p.id, name: p.name }))
-
-  const parents = new Map<number, number | null>(all.map(p => [p.id, p.parent_id] as [number, number | null]))
-  const isSelected = (id: number) => {
-    const seen = new Set<number>()
-    for (let current: number | null | undefined = id; current != null && !seen.has(current); current = parents.get(current)) {
-      if (selected.includes(current)) return true
-      seen.add(current)
-    }
-    return false
-  }
-  return all.filter(p => isSelected(p.id)).map(p => ({ id: p.id, name: p.name }))
-})
+const projects = computed(() => trackedProjects(tasksStore.projects, settingsStore.settings.selected_projects || []))
 
 function openTask(id: number) {
   selectedTaskId.value = id

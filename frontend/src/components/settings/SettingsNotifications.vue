@@ -88,6 +88,7 @@ import type { AlertRule } from '../../stores/settings'
 import { useAuthStore } from '../../stores/auth'
 import { useTasksStore } from '../../stores/tasks'
 import { useI18n } from 'vue-i18n'
+import { trackedProjects } from '../../utils/projects'
 import SettingsEmailReport from './SettingsEmailReport.vue'
 import SettingsThresholds from './SettingsThresholds.vue'
 
@@ -121,8 +122,9 @@ const linked = computed(() => !!auth.user?.source?.member_id)
 const hasEmail = computed(() => !!auth.user?.email)
 const groups = computed(() => GROUPS.filter(g => !g.adminOnly || auth.isAdmin))
 
-// Проекты для правил по проектам — доступные пользователю
-const projects = computed(() => tasksStore.projects.map(p => ({ id: p.id, name: p.name })))
+// Проекты для правил по проектам — те, что пользователь отслеживает: выбранные
+// им в разделе «Данные», с подпроектами
+const projects = computed(() => trackedProjects(tasksStore.projects, settingsStore.settings.selected_projects || []))
 // Правило, у которого сейчас раскрыт список проектов
 const picking = ref<string | null>(null)
 

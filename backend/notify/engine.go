@@ -178,7 +178,9 @@ func (e *Engine) sees(p *pass, who recipient, issue IssueState) bool {
 		scope, _ = e.Scopes(who.userID)
 		p.scopes[who.userID] = scope
 	}
-	return scope != nil && scope.SeesIssue(issue.ProjectID, issue.AssignedTo)
+	// Правила по проектам работают в отслеживаемых проектах — тех, что
+	// пользователь выбрал в настройках (с подпроектами), а не во всех доступных
+	return scope != nil && scope.ShowsProject(issue.ProjectID) && scope.SeesIssue(issue.ProjectID, issue.AssignedTo)
 }
 
 // AfterSync вызывается после синхронизации: сравнивает задачи с последним
