@@ -67,7 +67,10 @@ async function handleLogin() {
   error.value = ''
   try {
     await auth.login(username.value, password.value)
-    router.push('/')
+    // Возврат туда, откуда пользователя отправили на вход; только внутренний
+    // адрес — чужой сайт в параметре не откроется
+    const redirect = router.currentRoute.value.query.redirect
+    router.push(typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : '/')
   } catch (e: any) {
     const code = e?.response?.data?.error
     const key = code === 'USER_BLOCKED' ? 'error_blocked'

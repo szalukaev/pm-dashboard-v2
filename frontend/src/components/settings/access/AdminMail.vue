@@ -15,18 +15,22 @@
           <span>{{ $t('mail.host') }}</span>
           <input v-model="form.host" type="text" class="adm-input" placeholder="smtp.example.com" data-testid="smtp-host" />
         </label>
-        <label class="mail-field">
-          <span>{{ $t('mail.port') }}</span>
-          <input v-model="form.port" type="text" inputmode="numeric" class="adm-input" data-testid="smtp-port" />
-        </label>
-        <label class="mail-field">
-          <span>{{ $t('mail.security') }}</span>
-          <select v-model="form.security" class="adm-input" data-testid="smtp-security" @change="onSecurityChange">
-            <option value="starttls">{{ $t('mail.security_starttls') }}</option>
-            <option value="tls">{{ $t('mail.security_tls') }}</option>
-            <option value="none">{{ $t('mail.security_none') }}</option>
-          </select>
-        </label>
+        <!-- Порт и шифрование делят вторую колонку: её левый край совпадает
+             с полями «Пароль» и «Имя отправителя» под ней -->
+        <div class="mail-pair">
+          <label class="mail-field">
+            <span>{{ $t('mail.port') }}</span>
+            <input v-model="form.port" type="text" inputmode="numeric" class="adm-input" data-testid="smtp-port" />
+          </label>
+          <label class="mail-field">
+            <span>{{ $t('mail.security') }}</span>
+            <select v-model="form.security" class="adm-input" data-testid="smtp-security" @change="onSecurityChange">
+              <option value="starttls">{{ $t('mail.security_starttls') }}</option>
+              <option value="tls">{{ $t('mail.security_tls') }}</option>
+              <option value="none">{{ $t('mail.security_none') }}</option>
+            </select>
+          </label>
+        </div>
       </div>
 
       <div class="mail-row">
@@ -58,6 +62,13 @@
           <input v-model="form.from_name" type="text" class="adm-input" placeholder="PM Dashboard" data-testid="smtp-from-name" />
         </label>
       </div>
+
+      <!-- С адресом дашборда номер и название задачи в письме становятся ссылкой -->
+      <label class="mail-field">
+        <span>{{ $t('mail.base_url') }}</span>
+        <input v-model="form.base_url" type="url" class="adm-input" :placeholder="origin" data-testid="smtp-base-url" />
+        <span class="mail-note">{{ $t('mail.base_url_hint') }}</span>
+      </label>
 
       <div class="mail-actions">
         <AppButton variant="primary" :loading="saving" test-id="smtp-save" @click="save">{{ $t('common.save') }}</AppButton>
@@ -105,7 +116,10 @@ const form = reactive({
   username: '',
   from: '',
   from_name: '',
+  base_url: '',
 })
+// Адрес, по которому дашборд открыт сейчас: его обычно и надо указать
+const origin = window.location.origin
 // Новый пароль; пустое поле оставляет сохранённый
 const password = ref('')
 const hasPassword = ref(false)
@@ -134,6 +148,8 @@ async function load() {
     form.username = data.username || ''
     form.from = data.from || ''
     form.from_name = data.from_name || ''
+    // Пока адрес не задан, предлагается тот, по которому дашборд открыт
+    form.base_url = data.base_url || origin
     hasPassword.value = !!data.has_password
   } catch {
     toast(t('mail.load_error'), 'error')
@@ -203,24 +219,44 @@ onMounted(load)
   cursor: pointer;
 }
 
+/* Две равные колонки: поля стоят строго друг под другом */
 .mail-row {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   max-width: 760px;
+}
+
+.mail-pair {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 12px;
 }
 
 .mail-field {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  flex: 1 1 140px;
+  min-width: 0;
   font-size: 12px;
   color: var(--text-muted);
 }
 
-.mail-field.wide {
-  flex: 2 1 260px;
+/* Общий стиль ограничивает поле 200 px; здесь поле занимает всю свою колонку */
+.mail-field .adm-input {
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+}
+
+.mail-note {
+  line-height: 1.4;
+}
+
+@media (max-width: 640px) {
+  .mail-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .mail-actions {

@@ -48,9 +48,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Bell } from 'lucide-vue-next'
 import { useNotificationsStore } from '../../stores/notifications'
@@ -68,6 +68,7 @@ const { t: translate, locale } = useI18n()
 // Переводчик в том виде, в каком его ждут функции текста уведомлений
 const t = (key: string, params?: Record<string, unknown>): string => (params ? translate(key, params) : translate(key))
 const router = useRouter()
+const route = useRoute()
 const { on, off } = useWebSocket()
 const { toast } = useSwal()
 
@@ -136,6 +137,18 @@ function onNotification(n: AppNotification | null) {
 function onDocumentClick(e: MouseEvent) {
   if (open.value && root.value && !root.value.contains(e.target as Node)) open.value = false
 }
+
+// Ссылка из письма: /tasks?task=<номер> открывает карточку задачи. Параметр
+// сразу убирается из адреса, чтобы задача не открывалась заново при обновлении
+// страницы.
+watch(() => route.query.task, value => {
+  const id = Number(typeof value === 'string' ? value : '')
+  if (!Number.isInteger(id) || id <= 0) return
+  taskId.value = id
+  const rest = { ...route.query }
+  delete rest.task
+  router.replace({ path: route.path, query: rest })
+}, { immediate: true })
 
 onMounted(() => {
   settingsStore.ensureLoaded()

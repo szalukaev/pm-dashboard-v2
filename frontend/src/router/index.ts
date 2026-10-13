@@ -100,10 +100,12 @@ router.beforeEach(async (to, _from, next) => {
         }
         next()
       } else {
-        next({ name: 'login' })
+        // После входа пользователь попадёт туда, куда шёл, — например к
+        // задаче по ссылке из письма
+        next({ name: 'login', query: { redirect: to.fullPath } })
       }
     } catch {
-      next({ name: 'login' })
+      next({ name: 'login', query: { redirect: to.fullPath } })
     }
   } else {
     next()
