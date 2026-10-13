@@ -1,19 +1,19 @@
 package handlers
 
-// Limits of a saved dashboard layout: enough for every widget of the tab.
+// Пределы сохранённой раскладки дашборда: хватает на все виджеты вкладки.
 const (
 	maxDashboardWidgets = 50
 	maxWidgetIDLen      = 50
 )
 
-// dashboardWidths are the widths a widget may take in the 12-column grid.
+// dashboardWidths — ширины, которые виджет может занимать в сетке из 12 колонок.
 var dashboardWidths = []int{4, 6, 8, 12}
 
-// validDashboardLayout checks the layout of the Analytics tab sent by the
-// client: {"widgets": [{"id": "...", "cols": 4|6|8|12, "collapsed": bool}],
-// "hidden_widgets": ["..."]}. An empty object resets the layout. The ids
-// themselves are not checked here — the widgets live in the client, which
-// ignores the ids it does not know.
+// validDashboardLayout проверяет раскладку вкладки «Аналитика», присланную
+// клиентом: {"widgets": [{"id": "...", "cols": 4|6|8|12, "collapsed": bool}],
+// "hidden_widgets": ["..."]}. Пустой объект сбрасывает раскладку. Сами
+// идентификаторы здесь не проверяются: виджеты живут в клиенте, и
+// неизвестные идентификаторы он пропускает.
 func validDashboardLayout(v interface{}) bool {
 	layout, ok := v.(map[string]interface{})
 	if !ok {
@@ -65,7 +65,7 @@ func validDashboardLayout(v interface{}) bool {
 			return false
 		}
 		for _, id := range hidden {
-			// A widget is either placed or hidden, never both
+			// Виджет либо размещён, либо скрыт, но не то и другое сразу
 			if !validID(id) {
 				return false
 			}

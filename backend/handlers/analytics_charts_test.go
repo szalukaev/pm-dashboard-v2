@@ -30,8 +30,8 @@ func TestWeekStart(t *testing.T) {
 	}
 }
 
-// The moment a task was closed counts in the server's zone: late Sunday in
-// UTC is already Monday in Yekaterinburg.
+// Момент закрытия задачи считается в поясе сервера: поздний вечер
+// воскресенья по UTC в Екатеринбурге уже понедельник.
 func TestWeekStartFollowsZone(t *testing.T) {
 	closed := time.Date(2026, 10, 11, 20, 0, 0, 0, time.UTC)
 	if got := weekStart(closed).Format("2006-01-02"); got != "2026-10-05" {
@@ -83,20 +83,20 @@ func TestBugPercent(t *testing.T) {
 }
 
 func TestProjectRoot(t *testing.T) {
-	// 1 is an umbrella over everything: 1 ← 2 ← 3, 1 ← 2 ← 4, 1 ← 5 ← 6,
-	// 7 stands alone, 8 points to a project that is not known,
-	// 10 and 11 point to each other
+	// 1 — «зонтик» над всем: 1 ← 2 ← 3, 1 ← 2 ← 4, 1 ← 5 ← 6,
+	// 7 стоит отдельно, 8 ссылается на неизвестный проект,
+	// 10 и 11 ссылаются друг на друга
 	parents := map[int]int{1: 0, 2: 1, 3: 2, 4: 2, 5: 1, 6: 5, 7: 0, 8: 99, 10: 11, 11: 10}
-	// The umbrella 1 and the parent 5 have no chart of their own
+	// У «зонтика» 1 и родителя 5 своих диаграмм нет
 	shown := map[int]bool{2: true, 3: true, 4: true, 6: true, 7: true, 8: true, 10: true}
 	cases := map[int]int{
-		2:  2, // its only parent is not shown
-		3:  2, // a nested project joins its shown parent
+		2:  2, // его единственный родитель не показан
+		3:  2, // вложенный проект входит в показанного родителя
 		4:  2,
-		6:  6, // neither its parent nor the umbrella is shown
+		6:  6, // не показаны ни его родитель, ни «зонтик»
 		7:  7,
-		8:  8,  // an unknown parent cannot be the root
-		42: 42, // an unknown project
+		8:  8,  // неизвестный родитель корнем быть не может
+		42: 42, // неизвестный проект
 	}
 	for id, want := range cases {
 		if got := projectRoot(id, parents, shown); got != want {
@@ -104,7 +104,7 @@ func TestProjectRoot(t *testing.T) {
 		}
 	}
 
-	// Once the umbrella has a chart, everything under it is its part
+	// Как только у «зонтика» появляется диаграмма, всё под ним становится её частью
 	shown[1] = true
 	for _, id := range []int{2, 3, 6} {
 		if got := projectRoot(id, parents, shown); got != 1 {
@@ -112,7 +112,7 @@ func TestProjectRoot(t *testing.T) {
 		}
 	}
 
-	// A loop must end
+	// Цикл должен обрываться
 	if got := projectRoot(10, parents, shown); got != 10 {
 		t.Errorf("a loop: got %d, want 10", got)
 	}

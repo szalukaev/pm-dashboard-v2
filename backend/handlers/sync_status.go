@@ -10,15 +10,15 @@ import (
 	"pm-dashboard/utils"
 )
 
-// SyncStatusHandler serves the state of the background sync to every user
-// (the indicator in the header). The detailed log is admin-only.
+// SyncStatusHandler отдаёт состояние фоновой синхронизации каждому
+// пользователю (индикатор в шапке). Подробный журнал — только администратору.
 type SyncStatusHandler struct {
 	DB     **sql.DB
 	Source *manager.Manager
 }
 
-// GetStatus returns the state of the last sync:
-// running | success | error | unknown (no sync yet).
+// GetStatus возвращает состояние последней синхронизации:
+// running | success | error | unknown (синхронизации ещё не было).
 func (h *SyncStatusHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 	result := map[string]interface{}{"status": "unknown", "at": nil}
 	if *h.DB == nil {
@@ -36,9 +36,9 @@ func (h *SyncStatusHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 		if finishedAt != nil {
 			at = *finishedAt
 		}
-		// The indicator knows three states. A sync that could not read a
-		// part of the projects is a problem to look at; one stopped by the
-		// administrator says nothing about the data.
+		// Индикатор знает три состояния. Синхронизация, не прочитавшая часть
+		// проектов, — проблема, на которую стоит посмотреть; остановленная
+		// администратором о данных ничего не говорит.
 		switch status {
 		case redmine.StatusPartial:
 			status = redmine.StatusError
@@ -48,15 +48,16 @@ func (h *SyncStatusHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 		result["status"] = status
 		result["at"] = at
 	}
-	// The manager knows for sure whether a sync is going on right now.
+	// Менеджер точно знает, идёт ли синхронизация прямо сейчас.
 	if h.Source != nil && h.Source.Running() {
 		result["status"] = "running"
 	}
 	utils.JSON(w, http.StatusOK, result)
 }
 
-// notifyIssuesUpdated tells open pages that a user changed issues, so they
-// refresh without waiting for the next sync. events may be nil.
+// notifyIssuesUpdated сообщает открытым страницам, что пользователь изменил
+// задачи, чтобы они обновились, не дожидаясь синхронизации. events может
+// быть nil.
 func notifyIssuesUpdated(events func(event string, data interface{}), ids ...int) {
 	if events == nil {
 		return

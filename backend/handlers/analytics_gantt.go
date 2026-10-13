@@ -7,17 +7,17 @@ import (
 	"pm-dashboard/utils"
 )
 
-// ganttLimit is how many tasks a page of the timeline shows.
+// ganttLimit — сколько задач показывает одна страница диаграммы.
 const ganttLimit = 25
 
-// GanttTask is a bar of the timeline, from Start to Due (YYYY-MM-DD).
+// GanttTask — полоса диаграммы от Start до Due (YYYY-MM-DD).
 type GanttTask struct {
 	ExternalID     int    `json:"external_id"`
 	Subject        string `json:"subject"`
 	ProjectID      int    `json:"project_id"`
 	ProjectName    string `json:"project_name"`
 	AssignedToName string `json:"assigned_to_name"`
-	// Hours planned for the task; null when it has no estimate
+	// Часы, заложенные на задачу; null — оценки нет
 	EstimatedHours *float64 `json:"estimated_hours"`
 	Start          string   `json:"start"`
 	Due            string   `json:"due"`
@@ -28,10 +28,10 @@ type GanttProject struct {
 	Name string `json:"name"`
 }
 
-// GetGantt returns the tasks that are not closed and have a deadline —
-// overdue and planned alike, by deadline, a page at a time — and the
-// projects they belong to for the filter. ?project_id= leaves the tasks of
-// one project, ?offset= is the first task of the page.
+// GetGantt возвращает незакрытые задачи со сроком — и просроченные, и
+// запланированные, по сроку, постранично — и проекты, к которым они
+// относятся, для фильтра. ?project_id= оставляет задачи одного проекта,
+// ?offset= — первая задача страницы.
 func (h *AnalyticsHandler) GetGantt(w http.ResponseWriter, r *http.Request) {
 	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
@@ -59,7 +59,7 @@ func (h *AnalyticsHandler) GetGantt(w http.ResponseWriter, r *http.Request) {
 	}
 	rows.Close()
 
-	// The filter only narrows what the user may see anyway
+	// Фильтр только сужает то, что пользователь и так вправе видеть
 	taskFilter := base
 	if raw := r.URL.Query().Get("project_id"); raw != "" {
 		id, err := strconv.Atoi(raw)
@@ -82,8 +82,8 @@ func (h *AnalyticsHandler) GetGantt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// A task without a start date starts when it was created; a start after
-	// the deadline is shown as a one-day bar at the deadline.
+	// Задача без даты начала начинается в день создания; начало позже
+	// срока показывается полосой в один день на дате срока.
 	q := `SELECT external_id, COALESCE(subject, ''), COALESCE(project_id, 0), COALESCE(project_name, ''),
 		COALESCE(assigned_to_name, ''),
 		to_char(LEAST(COALESCE(start_date, created_on::date, due_date), due_date), 'YYYY-MM-DD'),

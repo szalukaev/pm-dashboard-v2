@@ -17,8 +17,8 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// WorkersHandler serves the screens where the administrator sees the
-// background workers and manages the history they collect.
+// WorkersHandler обслуживает экраны, на которых администратор видит фоновых
+// воркеров и управляет историей, которую они собирают.
 type WorkersHandler struct {
 	DB      **sql.DB
 	Source  *manager.Manager
@@ -26,23 +26,23 @@ type WorkersHandler struct {
 	// Mailer — рассылка почты; nil, пока не подключена.
 	Mailer   *jobs.Mailer
 	Settings *jobs.Settings
-	// Events reports changes to open pages (WebSocket); may be nil.
+	// Events сообщает об изменениях открытым страницам (WebSocket); может быть nil.
 	Events func(event string, data interface{})
 }
 
-// Keys of the workers.
+// Ключи воркеров.
 const (
 	workerSync    = "sync"
 	workerCleanup = jobs.CleanupKey
 	workerMail    = jobs.MailKey
 )
 
-// What the screen shows as the state of a worker.
+// Что экран показывает как состояние воркера.
 const (
-	workerWorking  = "working"  // on and its last run went well
-	workerStopped  = "stopped"  // switched off
-	workerError    = "error"    // its last run failed
-	workerStarting = "starting" // running right now
+	workerWorking  = "working"  // включён, последний запуск прошёл успешно
+	workerStopped  = "stopped"  // выключен
+	workerError    = "error"    // последний запуск не удался
+	workerStarting = "starting" // работает прямо сейчас
 )
 
 type workerInfo struct {
@@ -53,8 +53,8 @@ type workerInfo struct {
 	LastStart  *time.Time `json:"last_start"`
 	DurationMs *int64     `json:"duration_ms"`
 	Processed  *int64     `json:"processed"`
-	// Error is the text of the failure. ErrorKind "partial" means that Error
-	// holds "<failed>/<total>" projects of a sync that finished.
+	// Error — текст ошибки. ErrorKind "partial" значит, что в Error лежит
+	// "<не прочитано>/<всего>" проектов завершившейся синхронизации.
 	Error     string                 `json:"error"`
 	ErrorKind string                 `json:"error_kind"`
 	Schedule  map[string]interface{} `json:"schedule"`
@@ -79,7 +79,7 @@ func (h *WorkersHandler) notify() {
 	}
 }
 
-// ListWorkers returns the background workers with their state.
+// ListWorkers возвращает фоновых воркеров с их состоянием.
 func (h *WorkersHandler) ListWorkers(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	workers := []workerInfo{h.syncWorker(), h.cleanupWorker()}
@@ -106,7 +106,7 @@ func (h *WorkersHandler) syncWorker() workerInfo {
 
 	failed := false
 	if *h.DB != nil {
-		// The last run that is over; the one going on has nothing to show yet
+		// Последний завершившийся запуск; у идущего показать пока нечего
 		var started time.Time
 		var duration, processed *int64
 		var status, errorText string
@@ -172,8 +172,8 @@ func (h *WorkersHandler) mailWorker() workerInfo {
 	return info
 }
 
-// RunWorker starts a worker now. For the sync, {"full": true} asks for a
-// pass that re-reads every project completely.
+// RunWorker запускает воркера сейчас. Для синхронизации {"full": true}
+// запрашивает проход, перечитывающий каждый проект целиком.
 func (h *WorkersHandler) RunWorker(w http.ResponseWriter, r *http.Request) {
 	switch mux.Vars(r)["key"] {
 	case workerSync:
@@ -225,7 +225,7 @@ func (h *WorkersHandler) RunWorker(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// StopWorker interrupts the run of a worker that is going on.
+// StopWorker прерывает идущий запуск воркера.
 func (h *WorkersHandler) StopWorker(w http.ResponseWriter, r *http.Request) {
 	switch mux.Vars(r)["key"] {
 	case workerSync:
@@ -235,14 +235,14 @@ func (h *WorkersHandler) StopWorker(w http.ResponseWriter, r *http.Request) {
 		}
 		utils.Success(w)
 	case workerCleanup, workerMail:
-		// A cleanup is one short statement: there is nothing to interrupt
+		// Очистка — один короткий запрос: прерывать нечего
 		utils.Error(w, http.StatusConflict, "WORKER_NOT_RUNNING")
 	default:
 		utils.Error(w, http.StatusNotFound, "WORKER_NOT_FOUND")
 	}
 }
 
-// EnableWorker and DisableWorker switch the schedule of a worker on and off.
+// EnableWorker и DisableWorker включают и выключают расписание воркера.
 func (h *WorkersHandler) EnableWorker(w http.ResponseWriter, r *http.Request) {
 	h.setEnabled(w, r, true)
 }
@@ -276,7 +276,7 @@ func (h *WorkersHandler) setEnabled(w http.ResponseWriter, r *http.Request, enab
 	utils.Success(w)
 }
 
-// UpdateSchedule saves when a worker runs.
+// UpdateSchedule сохраняет, когда воркер запускается.
 func (h *WorkersHandler) UpdateSchedule(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		IntervalMinutes *int    `json:"interval_minutes"`
@@ -294,7 +294,7 @@ func (h *WorkersHandler) UpdateSchedule(w http.ResponseWriter, r *http.Request) 
 			utils.Error(w, http.StatusServiceUnavailable, "SYNC_NOT_AVAILABLE")
 			return
 		}
-		// Everything is checked before anything is saved
+		// Сначала проверяется всё, и только потом что-либо сохраняется
 		if body.IntervalMinutes != nil && (*body.IntervalMinutes < manager.MinInterval || *body.IntervalMinutes > manager.MaxInterval) {
 			utils.Error(w, http.StatusBadRequest, "INVALID_INTERVAL")
 			return
@@ -344,10 +344,10 @@ func (h *WorkersHandler) UpdateSchedule(w http.ResponseWriter, r *http.Request) 
 	utils.Success(w)
 }
 
-// ─── History ───
+// ─── История ───
 
-// GetDataRetention returns how long the history is kept and how much of it
-// is stored.
+// GetDataRetention возвращает, сколько хранится история и сколько её
+// накоплено.
 func (h *WorkersHandler) GetDataRetention(w http.ResponseWriter, r *http.Request) {
 	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
@@ -368,7 +368,7 @@ func (h *WorkersHandler) GetDataRetention(w http.ResponseWriter, r *http.Request
 	})
 }
 
-// UpdateDataRetention saves the retention and whether the cleanup is on.
+// UpdateDataRetention сохраняет срок хранения и то, включена ли очистка.
 func (h *WorkersHandler) UpdateDataRetention(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		RetentionDays  *int  `json:"retention_days"`
@@ -399,12 +399,12 @@ func (h *WorkersHandler) UpdateDataRetention(w http.ResponseWriter, r *http.Requ
 	utils.Success(w)
 }
 
-// CleanupSnapshots deletes the snapshots older than the retention now.
+// CleanupSnapshots сейчас удаляет снимки старше срока хранения.
 func (h *WorkersHandler) CleanupSnapshots(w http.ResponseWriter, r *http.Request) {
 	h.cleanup(w, h.Cleaner.RunNow)
 }
 
-// PurgeSnapshots deletes the whole history.
+// PurgeSnapshots удаляет всю историю.
 func (h *WorkersHandler) PurgeSnapshots(w http.ResponseWriter, r *http.Request) {
 	h.cleanup(w, h.Cleaner.Purge)
 }

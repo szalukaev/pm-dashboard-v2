@@ -9,13 +9,13 @@ import (
 	"pm-dashboard/utils"
 )
 
-// analyticsTasksPage is how many tasks a page of the list behind a figure has.
+// analyticsTasksPage — сколько задач на странице списка, стоящего за цифрой.
 const analyticsTasksPage = 25
 
-// analyticsTaskCond returns the condition that selects the tasks counted by a
-// figure of the Analytics tab — the very condition the figure is counted
-// with, so the list always has as many tasks as the figure says. todayParam
-// is the placeholder of today's date. ok is false for an unknown figure.
+// analyticsTaskCond возвращает условие, отбирающее задачи, посчитанные
+// цифрой вкладки «Аналитика», — то самое, по которому цифра считается,
+// поэтому задач в списке всегда столько, сколько говорит цифра. todayParam —
+// номер параметра с сегодняшней датой. ok равен false для неизвестной цифры.
 func analyticsTaskCond(metric, todayParam string) (cond string, ok bool) {
 	switch metric {
 	case "open":
@@ -36,10 +36,10 @@ func analyticsTaskCond(metric, todayParam string) (cond string, ok bool) {
 	return "", false
 }
 
-// GetTasks returns the tasks behind a figure, sorted by project, a page at a
-// time: ?metric= is the figure, ?offset= the first task of the page.
-// Without ?assignee= these are the tasks of a card of the statistics; with
-// it — of a cell of the team load table in the row of that employee.
+// GetTasks возвращает задачи, стоящие за цифрой, по проектам, постранично:
+// ?metric= — цифра, ?offset= — первая задача страницы. Без ?assignee= это
+// задачи карточки статистики; с ним — ячейки таблицы «Нагрузка на команду»
+// в строке этого сотрудника.
 func (h *AnalyticsHandler) GetTasks(w http.ResponseWriter, r *http.Request) {
 	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
@@ -52,7 +52,7 @@ func (h *AnalyticsHandler) GetTasks(w http.ResponseWriter, r *http.Request) {
 		offset = 0
 	}
 
-	// The same tasks the figure was counted over
+	// Те же задачи, по которым считалась цифра
 	var filter string
 	var args []interface{}
 	if _, byEmployee := query["assignee"]; byEmployee {
@@ -83,7 +83,7 @@ func (h *AnalyticsHandler) GetTasks(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusBadRequest, "INVALID_METRIC")
 		return
 	}
-	// The date is a parameter of every query, used by the figure or not
+	// Дата — параметр каждого запроса, нужна она цифре или нет
 	filter += " AND (" + cond + ") AND $" + itoa(len(args)) + "::date IS NOT NULL"
 
 	var total int

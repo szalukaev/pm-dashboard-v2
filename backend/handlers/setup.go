@@ -51,12 +51,13 @@ type adminCreateRequest struct {
 	Language    string `json:"language"`
 }
 
-// dbNamePattern limits database names to characters that are safe both in
-// the DSN path and inside a quoted identifier of CREATE DATABASE.
+// dbNamePattern ограничивает имя базы символами, безопасными и в пути
+// строки подключения, и внутри идентификатора в кавычках у CREATE DATABASE.
 var dbNamePattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,63}$`)
 
-// buildDSNFor assembles a postgres URL; user and password are percent-encoded,
-// so special characters (@ : / ? #) in credentials do not break the DSN.
+// buildDSNFor собирает адрес postgres://…; логин и пароль кодируются
+// процентами, поэтому спецсимволы (@ : / ? #) в них не ломают строку
+// подключения.
 func buildDSNFor(r dbTestRequest, dbName string) string {
 	u := url.URL{
 		Scheme:   "postgres",
@@ -106,7 +107,7 @@ func (h *SetupHandler) TestDatabase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 1. Try connecting to the target DB directly
+	// 1. Попытка подключиться прямо к нужной базе
 	testDB, err := sql.Open("postgres", buildDSN(req))
 	if err == nil {
 		pingErr := testDB.Ping()
@@ -119,7 +120,7 @@ func (h *SetupHandler) TestDatabase(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 2. Target DB may not exist — verify credentials via maintenance DB
+	// 2. Нужной базы может не быть — логин и пароль проверяются через служебную базу
 	maintDB, err := sql.Open("postgres", buildMaintDSN(req))
 	if err != nil {
 		utils.JSON(w, http.StatusOK, map[string]interface{}{"success": false, "error": "Connection failed"})
@@ -132,7 +133,7 @@ func (h *SetupHandler) TestDatabase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Credentials OK, target DB doesn't exist yet
+	// Логин и пароль верны, нужной базы пока нет
 	utils.JSON(w, http.StatusOK, map[string]interface{}{
 		"success": true, "message": "Connection established", "db_exists": false,
 	})
@@ -157,7 +158,7 @@ func (h *SetupHandler) SaveDatabase(w http.ResponseWriter, r *http.Request) {
 
 	dsn := buildDSN(req)
 
-	// Check if target DB is reachable
+	// Доступна ли нужная база
 	dbReachable := false
 	if testDB, err := sql.Open("postgres", dsn); err == nil {
 		if testDB.Ping() == nil {
@@ -166,7 +167,7 @@ func (h *SetupHandler) SaveDatabase(w http.ResponseWriter, r *http.Request) {
 		testDB.Close()
 	}
 
-	// If not reachable, create the database via maintenance connection
+	// Если нет — база создаётся через служебное подключение
 	if !dbReachable {
 		maintDB, err := sql.Open("postgres", buildMaintDSN(req))
 		if err != nil {
@@ -178,7 +179,7 @@ func (h *SetupHandler) SaveDatabase(w http.ResponseWriter, r *http.Request) {
 			utils.Error(w, http.StatusBadRequest, "DB_CONNECTION_FAILED")
 			return
 		}
-		// CREATE DATABASE cannot run inside a transaction
+		// CREATE DATABASE нельзя выполнять внутри транзакции
 		createSQL := fmt.Sprintf(`CREATE DATABASE "%s"`, req.DBName)
 		if _, err := maintDB.Exec(createSQL); err != nil {
 			maintDB.Close()
@@ -188,20 +189,20 @@ func (h *SetupHandler) SaveDatabase(w http.ResponseWriter, r *http.Request) {
 		maintDB.Close()
 	}
 
-	// Connect to the target DB
+	// Подключение к нужной базе
 	conn, err := db.Connect(dsn)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "DB_CONNECT_FAILED")
 		return
 	}
 
-	// Run migrations
+	// Миграции
 	if err := db.RunMigrations(conn); err != nil {
 		utils.Error(w, http.StatusInternalServerError, "MIGRATION_FAILED")
 		return
 	}
 
-	// Save to SQLite
+	// Сохранение в SQLite
 	if err := h.SQLite.Set("db_dsn", dsn); err != nil {
 		utils.Error(w, http.StatusInternalServerError, "CONFIG_SAVE_FAILED")
 		return
@@ -231,12 +232,12 @@ func (h *SetupHandler) TestDataSource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Always set API key
+	// Ключ API задаётся всегда
 	if req.APIKey != "" {
 		httpReq.Header.Set("X-Redmine-API-Key", req.APIKey)
 	}
 
-	// Optionally add Basic Auth
+	// Basic Auth — по необходимости
 	if req.BasicLogin != "" {
 		cred := base64.StdEncoding.EncodeToString([]byte(req.BasicLogin + ":" + req.BasicPasswd))
 		httpReq.Header.Set("Authorization", "Basic "+cred)
@@ -340,8 +341,8 @@ func (h *SetupHandler) CreateAdmin(w http.ResponseWriter, r *http.Request) {
 		h.SQLite.Set("default_language", req.Language)
 	}
 
-	// The wizard is done: start syncing without a restart, so statuses and
-	// projects are there when the administrator opens the settings.
+	// Мастер завершён: синхронизация начинается без перезапуска, чтобы
+	// статусы и проекты уже были, когда администратор откроет настройки.
 	if h.Source != nil {
 		h.Source.Reload()
 		h.Source.TriggerSync()

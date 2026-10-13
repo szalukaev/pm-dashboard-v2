@@ -8,33 +8,33 @@ import (
 	"pm-dashboard/utils"
 )
 
-// Health of the projects is a score from 0 to 100 over the active tasks
-// (open and in testing):
+// Здоровье проектов — оценка от 0 до 100 по активным задачам (открытым и в
+// тестировании):
 //
-//	100 × (1 − (0.5 × overdue share + 0.3 × Bugs share + 0.2 × no-estimate share))
+//	100 × (1 − (0,5 × доля просроченных + 0,3 × доля Bugs + 0,2 × доля без оценки))
 //
-// The weights say how much each problem costs and add up to 1, so the score
-// is 0 only when every active task is overdue, in a Bugs status and has no
-// estimate.
+// Веса показывают, во что обходится каждая проблема, и в сумме дают 1,
+// поэтому оценка равна 0, только когда каждая активная задача просрочена,
+// стоит в статусе Bugs и не имеет оценки.
 const (
 	healthWeightOverdue    = 0.5
 	healthWeightBugs       = 0.3
 	healthWeightNoEstimate = 0.2
 )
 
-// From these scores up the health is good / needs attention; below — bad.
+// Начиная с этих оценок здоровье хорошее / требует внимания; ниже — плохое.
 const (
 	healthGoodFrom    = 80
 	healthWarningFrom = 50
 )
 
-// HealthPart is one of the problems that lower the score.
+// HealthPart — одна из проблем, снижающих оценку.
 type HealthPart struct {
 	Key   string `json:"key"`
 	Count int    `json:"count"`
-	// Share of the active tasks, 0–100 with one decimal
+	// Доля активных задач, 0–100 с одним знаком после запятой
 	Share float64 `json:"share"`
-	// Points taken off the score, with one decimal
+	// Сколько баллов снято с оценки, с одним знаком после запятой
 	Penalty float64 `json:"penalty"`
 }
 
@@ -71,8 +71,8 @@ func (h *AnalyticsHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 	utils.JSON(w, http.StatusOK, healthOf(active, overdue, bugs, noEstimate))
 }
 
-// healthOf scores the active tasks. Without active tasks there is nothing to
-// worry about: the score is 100.
+// healthOf оценивает активные задачи. Без активных задач беспокоиться не о
+// чем: оценка равна 100.
 func healthOf(active, overdue, bugs, noEstimate int) Health {
 	part := func(key string, count int, weight float64) HealthPart {
 		p := HealthPart{Key: key, Count: count}

@@ -10,18 +10,18 @@ import (
 	"pm-dashboard/utils"
 )
 
-// LicenseHandler is the HTTP side of the license: its state for every user
-// (the banner), and the activation screen for administrators. All the logic
-// lives in the license package.
+// LicenseHandler — HTTP-часть лицензии: её состояние для каждого
+// пользователя (плашка) и экран активации для администраторов. Вся логика —
+// в пакете license.
 type LicenseHandler struct {
 	License *license.Service
-	// OnActivated runs after a successful activation (start collecting data).
+	// OnActivated выполняется после успешной активации (начать сбор данных).
 	OnActivated func()
 }
 
-// GetStatus returns the state of the license. It is public — the banner and
-// the "not activated" screen need it before anything else works — and so
-// tells only the state and the end of the grace period.
+// GetStatus возвращает состояние лицензии. Он открыт всем — плашке и экрану
+// «не активирована» он нужен раньше, чем заработает что-либо ещё, — и
+// потому сообщает только состояние и конец льготного периода.
 func (h *LicenseHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 	status := h.License.Status()
 	utils.JSON(w, http.StatusOK, map[string]interface{}{
@@ -30,10 +30,10 @@ func (h *LicenseHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// GetDetails returns everything the activation screen shows: the full
-// status, the hardware fingerprint to send to the vendor and the journal.
+// GetDetails возвращает всё, что показывает экран активации: полное
+// состояние, аппаратный отпечаток для отправки поставщику и журнал.
 func (h *LicenseHandler) GetDetails(w http.ResponseWriter, r *http.Request) {
-	// The screen is opened to see the current state, not an hour-old one
+	// Экран открывают, чтобы увидеть текущее состояние, а не часовой давности
 	status := h.License.Check()
 
 	hwidText, hwidAvailable := "", true
@@ -56,7 +56,7 @@ func (h *LicenseHandler) GetDetails(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// Activate stores a license token.
+// Activate сохраняет токен лицензии.
 func (h *LicenseHandler) Activate(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		LicenseBlob string `json:"license_blob"`

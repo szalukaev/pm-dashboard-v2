@@ -46,9 +46,8 @@ type DeadlineGroup struct {
 type ProjectDist struct {
 	ProjectID   int    `json:"project_id"`
 	ProjectName string `json:"project_name"`
-	// The topmost parent of the project among the projects of the answer
-	// (the project itself when it has none): nested projects can be shown
-	// as one chart
+	// Самый верхний родитель проекта среди проектов ответа (сам проект, если
+	// родителя нет): вложенные проекты можно показать одной диаграммой
 	RootID    int             `json:"root_id"`
 	RootName  string          `json:"root_name"`
 	Assignees []AssigneeCount `json:"assignees"`
@@ -85,14 +84,14 @@ func (h *AnalyticsHandler) stats(scope *access.Scope, now time.Time, period Peri
 	var stats []StatCard
 	today := now.Format("2006-01-02")
 
-	// Active projects: those with open or testing issues
+	// Активные проекты: те, где есть открытые задачи или задачи в тестировании
 	var activeProjects int
 	q := `SELECT COUNT(DISTINCT project_id) FROM issues WHERE ` + projectFilter + `
 		AND ` + statusIn("status_id", GroupOpen, GroupTesting)
 	(*h.DB).QueryRow(q, args...).Scan(&activeProjects)
 	stats = append(stats, StatCard{Label: "active_projects", Value: float64(activeProjects)})
 
-	// Completion: closed / (open + testing*0.5 + closed)
+	// Выполнение: закрытые / (открытые + в тестировании × 0,5 + закрытые)
 	var closed, open, testing int
 	q = `SELECT
 		COUNT(CASE WHEN ` + statusIn("status_id", GroupClosed) + ` THEN 1 END),
@@ -107,13 +106,13 @@ func (h *AnalyticsHandler) stats(scope *access.Scope, now time.Time, period Peri
 	}
 	stats = append(stats, StatCard{Label: "completion", Value: completion, IsPct: true})
 
-	// Open
+	// Открытые
 	stats = append(stats, StatCard{Label: "open", Value: float64(open)})
 
-	// In test
+	// В тестировании
 	stats = append(stats, StatCard{Label: "in_test", Value: float64(testing)})
 
-	// Overdue: open/testing tasks with due_date < today
+	// Просрочено: открытые и тестируемые задачи с due_date раньше сегодняшнего дня
 	var overdue int
 	q = `SELECT COUNT(*) FROM issues WHERE ` + projectFilter + `
 		AND due_date IS NOT NULL AND due_date < $` + itoa(len(args)+1) + `
@@ -129,7 +128,7 @@ func (h *AnalyticsHandler) stats(scope *access.Scope, now time.Time, period Peri
 	(*h.DB).QueryRow(q, args...).Scan(&bugs)
 	stats = append(stats, StatCard{Label: "bugs", Value: float64(bugs)})
 
-	// No estimate
+	// Без оценки
 	var noEstimate int
 	q = `SELECT COUNT(*) FROM issues WHERE ` + projectFilter + `
 		AND (estimated_hours IS NULL OR estimated_hours = 0)
@@ -165,14 +164,14 @@ func (h *AnalyticsHandler) GetTeamLoad(w http.ResponseWriter, r *http.Request) {
 func (h *AnalyticsHandler) teamLoad(scope *access.Scope, now time.Time, period Period) ([]TeamLoadRow, error) {
 	today := now.Format("2006-01-02")
 
-	// The team the user tracks, within rights
+	// Команда, за которой следит пользователь, в пределах прав
 	args := []interface{}{}
 	projectFilter := scope.IssueCond("", &args)
 	// Закрытые считаются только за период
 	projectFilter += period.closedCond(&args)
 	teamFilter := ""
 	if !scope.AllTeam {
-		// A chosen team means a row per member, without "unassigned"
+		// Выбранная команда — это строка на каждого сотрудника, без «неназначенных»
 		teamFilter = " AND assigned_to_id IS NOT NULL"
 	}
 
@@ -242,8 +241,8 @@ func (h *AnalyticsHandler) distribution(scope *access.Scope) ([]ProjectDist, err
 	}
 	defer rows.Close()
 
-	// The rows come sorted by project: a project is its run of rows, and the
-	// projects keep the order of their names
+	// Строки приходят отсортированными по проекту: проект — это его
+	// подряд идущие строки, а проекты идут в порядке названий
 	dist := []ProjectDist{}
 	for rows.Next() {
 		var projID, count int
@@ -258,7 +257,7 @@ func (h *AnalyticsHandler) distribution(scope *access.Scope) ([]ProjectDist, err
 		last.Assignees = append(last.Assignees, AssigneeCount{Name: assigneeName, Count: count})
 	}
 
-	// Where each project stands in the tree of projects
+	// Где каждый проект стоит в дереве проектов
 	parents := map[int]int{}
 	names := map[int]string{}
 	if tree, err := (*h.DB).Query(`SELECT external_id, name, COALESCE(parent_id, 0) FROM projects WHERE data_source = 'redmine'`); err == nil {
@@ -305,7 +304,7 @@ func (h *AnalyticsHandler) deadlines(scope *access.Scope, today time.Time) ([]De
 	args := []interface{}{}
 	projectFilter := scope.ProjectIssueCond("", &args)
 
-	// All tasks that are not closed and have a due date
+	// Все незакрытые задачи со сроком
 	q := `SELECT external_id, project_id, project_name, subject, '',
 		status_name, status_id, priority_name, priority_id,
 		assigned_to_name, assigned_to_id, category_name,
@@ -363,15 +362,15 @@ func (h *AnalyticsHandler) deadlines(scope *access.Scope, today time.Time) ([]De
 	return result, nil
 }
 
-// Helpers
+// Вспомогательное
 
-// projectRoot returns the topmost parent of a project among the shown ones,
-// or the project itself when none of its parents is shown. parents maps a
-// project to its parent, 0 or a missing entry meaning "no parent".
+// projectRoot возвращает самого верхнего родителя проекта среди показанных
+// либо сам проект, если ни один его родитель не показан. parents
+// сопоставляет проекту его родителя; 0 или отсутствие записи — «родителя нет».
 //
-// Only shown projects can be roots: a common umbrella project that has no
-// chart of its own must not swallow every project under it into one chart.
-// A loop in the data ends the climb.
+// Корнем может быть только показанный проект: общий проект-«зонтик», у
+// которого нет своей диаграммы, не должен собрать в одну диаграмму все
+// проекты под ним. Цикл в данных обрывает подъём.
 func projectRoot(id int, parents map[int]int, shown map[int]bool) int {
 	root := id
 	seen := map[int]bool{id: true}
@@ -388,12 +387,12 @@ func projectRoot(id int, parents map[int]int, shown map[int]bool) int {
 	}
 }
 
-// deadlineOrder is the order of the deadline columns on the screen.
+// deadlineOrder — порядок колонок дедлайнов на экране.
 var deadlineOrder = []string{"overdue", "today", "three_days", "week"}
 
-// deadlineBucket returns the deadline column of a due date (YYYY-MM-DD, a
-// longer timestamp is cut), or "" when it is more than a week away:
-// overdue — before today, three_days — the next 3 days, week — days 4 to 7.
+// deadlineBucket возвращает колонку дедлайнов для срока (YYYY-MM-DD, более
+// длинная отметка времени обрезается) или "", если до срока больше недели:
+// overdue — раньше сегодняшнего дня, three_days — ближайшие 3 дня, week — дни с 4-го по 7-й.
 func deadlineBucket(dueDate string, today time.Time) string {
 	if len(dueDate) > 10 {
 		dueDate = dueDate[:10]
@@ -412,8 +411,8 @@ func deadlineBucket(dueDate string, today time.Time) string {
 	return ""
 }
 
-// projectIssues returns the condition and its args selecting the issues of
-// the user's projects within rights — the base of every "by projects" figure.
+// projectIssues возвращает условие и его параметры, отбирающие задачи
+// проектов пользователя в пределах прав, — основу всех цифр «по проектам».
 func projectIssues(r *http.Request) (string, []interface{}) {
 	args := []interface{}{}
 	cond := middleware.GetScope(r).ProjectIssueCond("", &args)

@@ -41,11 +41,11 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 		NotificationsEnabled      bool                   `json:"notifications_enabled"`
 		OverdueAlerts             bool                   `json:"overdue_alerts"`
 		DataSourceURL             string                 `json:"data_source_url"`
-		// Rows per page chosen for each table; a table not listed uses the default
+		// Число строк на странице, выбранное для каждой таблицы; у таблицы, которой нет в списке, — значение по умолчанию
 		Pagination map[string]int `json:"pagination"`
-		// Visible columns and their order chosen for each table
+		// Видимые колонки и их порядок, выбранные для каждой таблицы
 		TableColumns json.RawMessage `json:"table_columns"`
-		// Arrangement of the widgets of the Analytics tab; {} is the standard one
+		// Раскладка виджетов вкладки «Аналитика»; {} — стандартная
 		DashboardLayout json.RawMessage `json:"dashboard_layout"`
 		// Действующие правила уведомлений: сохранённые поверх стандартных
 		AlertRules notify.Rules `json:"alert_rules"`
@@ -88,7 +88,7 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err == sql.ErrNoRows {
-		// Create default settings
+		// Настройки по умолчанию
 		if _, err := (*h.DB).Exec(`INSERT INTO user_settings (user_id) VALUES ($1) ON CONFLICT DO NOTHING`, userID); err != nil {
 			utils.Error(w, http.StatusInternalServerError, "CREATE_FAILED")
 			return
@@ -135,7 +135,7 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 	settings.NotificationsEnabled = notificationsEnabled
 	settings.OverdueAlerts = overdueAlerts
 
-	// Get Redmine URL from SQLite config
+	// Адрес Redmine — из конфигурации в SQLite
 	if h.SQLite != nil {
 		if v, _ := h.SQLite.Get("redmine_url"); v != "" {
 			settings.DataSourceURL = v
@@ -159,7 +159,7 @@ func (h *SettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Upsert settings
+	// Запись настроек (вставка или обновление)
 	_, err := (*h.DB).Exec(`
 		INSERT INTO user_settings (user_id, updated_at) VALUES ($1, NOW())
 		ON CONFLICT (user_id) DO NOTHING
@@ -169,8 +169,8 @@ func (h *SettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// The user narrows what the administrator allows and can never widen it:
-	// anything outside of the rights is dropped from the selection.
+	// Пользователь сужает разрешённое администратором и расширить его не
+	// может: всё, что вне прав, из выбора отбрасывается.
 	scope := middleware.GetScope(r)
 	if v, ok := body["selected_projects"]; ok {
 		requested := intList(v)
@@ -183,8 +183,8 @@ func (h *SettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request)
 			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 			return
 		}
-		// Issues are synced only for selected projects: fetch the new ones
-		// now instead of waiting for the next periodic sync.
+		// Задачи синхронизируются только по выбранным проектам: новые
+		// забираются сейчас, не дожидаясь синхронизации по расписанию.
 		if h.Source != nil {
 			h.Source.TriggerSync()
 		}
@@ -233,8 +233,8 @@ func (h *SettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request)
 		}
 	}
 	if v, ok := body["last_filters"]; ok {
-		// {"<page or widget>": its filters}; the sent ones replace their saved
-		// values, the filters of the other pages stay
+		// {"<страница или виджет>": её фильтры}; присланные заменяют свои
+		// сохранённые значения, фильтры остальных страниц остаются
 		if _, isObject := v.(map[string]interface{}); !isObject {
 			utils.Error(w, http.StatusBadRequest, "INVALID_FILTERS")
 			return
@@ -273,7 +273,7 @@ func (h *SettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request)
 	}
 
 	if v, ok := body["pagination"]; ok {
-		// {"table": rows per page}; the sent tables are merged into the saved ones
+		// {"таблица": строк на странице}; присланные таблицы добавляются к сохранённым
 		sizes, isObject := v.(map[string]interface{})
 		if !isObject {
 			utils.Error(w, http.StatusBadRequest, "INVALID_PAGINATION")
@@ -294,8 +294,8 @@ func (h *SettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request)
 	}
 
 	if v, ok := body["table_columns"]; ok {
-		// {"table": {"visible": [...], "order": [...]}}; the sent tables
-		// replace their saved setups, the others stay
+		// {"таблица": {"visible": [...], "order": [...]}}; присланные таблицы
+		// заменяют свои сохранённые настройки, остальные остаются
 		if !validTableColumns(v) {
 			utils.Error(w, http.StatusBadRequest, "INVALID_TABLE_COLUMNS")
 			return
@@ -355,7 +355,7 @@ func (h *SettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request)
 	}
 
 	if v, ok := body["dashboard_layout"]; ok {
-		// The whole arrangement is sent and replaces the saved one
+		// Раскладка присылается целиком и заменяет сохранённую
 		if !validDashboardLayout(v) {
 			utils.Error(w, http.StatusBadRequest, "INVALID_DASHBOARD_LAYOUT")
 			return
@@ -379,7 +379,7 @@ func (h *SettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request)
 		}
 	}
 	if v, ok := body["kanban_last_project"]; ok {
-		// A number selects the project, null clears the choice
+		// Число выбирает проект, null сбрасывает выбор
 		var project interface{}
 		if id, isNumber := v.(float64); isNumber {
 			project = int(id)

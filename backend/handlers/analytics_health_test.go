@@ -33,7 +33,7 @@ func TestHealthOf(t *testing.T) {
 	}
 }
 
-// The parts explain the score: their penalties add up to what was lost.
+// Слагаемые объясняют оценку: их штрафы в сумме дают потерянные баллы.
 func TestHealthParts(t *testing.T) {
 	got := healthOf(10, 2, 1, 5)
 	want := []HealthPart{

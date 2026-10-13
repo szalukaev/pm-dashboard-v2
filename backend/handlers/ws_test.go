@@ -5,18 +5,19 @@ import (
 	"time"
 )
 
-// TestWSHubSurvivesFullSendBuffer ensures a slow client (full send buffer)
-// does not deadlock the hub: the old code sent to h.unregister from inside
-// run()'s broadcast branch and blocked forever on the first bad client.
+// TestWSHubSurvivesFullSendBuffer проверяет, что медленный клиент (полный
+// буфер отправки) не останавливает хаб: прежний код отправлял в
+// h.unregister из ветки рассылки в run() и навсегда зависал на первом же
+// плохом клиенте.
 func TestWSHubSurvivesFullSendBuffer(t *testing.T) {
 	h := NewWSHub()
 
-	// Client with a buffer of 1 that is already full.
+	// Клиент с буфером на одно сообщение, который уже полон.
 	slow := &wsClient{send: make(chan []byte, 1)}
 	h.register <- slow
-	slow.send <- []byte(`{"event":"fill"}`) // fill the buffer
+	slow.send <- []byte(`{"event":"fill"}`) // буфер заполнен
 
-	// These must both complete without blocking.
+	// Обе отправки должны пройти без блокировки.
 	done := make(chan struct{})
 	go func() {
 		h.BroadcastEvent("first", map[string]string{"k": "v"})
@@ -30,7 +31,7 @@ func TestWSHubSurvivesFullSendBuffer(t *testing.T) {
 		t.Fatal("BroadcastEvent blocked on a client with a full send buffer")
 	}
 
-	// Hub must still accept new clients and deliver messages.
+	// Хаб по-прежнему принимает новых клиентов и доставляет сообщения.
 	healthy := &wsClient{send: make(chan []byte, 4)}
 	h.register <- healthy
 	h.BroadcastEvent("third", nil)
@@ -44,7 +45,7 @@ func TestWSHubSurvivesFullSendBuffer(t *testing.T) {
 		t.Fatal("healthy client did not receive broadcast")
 	}
 
-	// The slow client must have been dropped.
+	// Медленный клиент должен быть отключён.
 	h.mu.Lock()
 	_, stillThere := h.clients[slow]
 	total := len(h.clients)
@@ -57,10 +58,10 @@ func TestWSHubSurvivesFullSendBuffer(t *testing.T) {
 	}
 }
 
-// TestWSClientCloseIdempotent — close() must be safe from multiple paths
-// (dead-list cleanup and unregister).
+// TestWSClientCloseIdempotent — close() должен быть безопасен при вызове с
+// разных сторон (уборка мёртвых клиентов и unregister).
 func TestWSClientCloseIdempotent(t *testing.T) {
 	c := &wsClient{send: make(chan []byte, 1)}
 	c.close()
-	c.close() // must not panic on double-close
+	c.close() // повторное закрытие не должно вызывать панику
 }

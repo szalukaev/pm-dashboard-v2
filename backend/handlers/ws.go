@@ -17,24 +17,25 @@ import (
 const (
 	wsWriteWait  = 10 * time.Second
 	wsPingPeriod = 30 * time.Second
-	// Pong is expected within 10s after a ping; read deadline covers the
-	// full ping interval plus that grace.
+	// Pong ожидается в течение 10 с после ping; срок чтения покрывает весь
+	// интервал между ping и этот запас.
 	wsPongWait   = wsPingPeriod + 10*time.Second
 	wsMaxMsgSize = 64 * 1024
-	// Per-client outbound buffer; when full the client is dropped.
+	// Буфер исходящих сообщений клиента; при переполнении клиент отключается.
 	wsSendBuffer = 64
 )
 
-// checkWSOrigin allows only known frontend origins (CSWSH protection).
-// Same-origin is always allowed (browser on http://176.12.69.5:82 etc.);
-// otherwise localhost dev ports and FRONTEND_ORIGIN from env.
+// checkWSOrigin пропускает только известные адреса фронтенда (защита от
+// CSWSH). Тот же адрес, что у сервера, разрешён всегда (браузер на
+// http://176.12.69.5:82 и т. п.); кроме него — локальные порты разработки
+// и FRONTEND_ORIGIN из окружения.
 func checkWSOrigin(r *http.Request) bool {
 	origin := r.Header.Get("Origin")
-	// Non-browser clients send no Origin header.
+	// Клиенты, не являющиеся браузером, заголовок Origin не присылают.
 	if origin == "" {
 		return true
 	}
-	// Same-origin: Origin host:port matches the request Host.
+	// Тот же адрес: хост и порт в Origin совпадают с Host запроса.
 	if u, err := url.Parse(origin); err == nil && u.Host != "" {
 		if u.Host == r.Host {
 			return true
@@ -54,8 +55,8 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: checkWSOrigin,
 }
 
-// wsClient is one connection with a dedicated outbound buffer.
-// Only writePump writes to the websocket.Conn (gorilla allows a single writer).
+// wsClient — одно соединение со своим буфером исходящих сообщений. В
+// websocket.Conn пишет только writePump (gorilla допускает одного писателя).
 type wsClient struct {
 	// userID — чьё это соединение: по нему уходят личные события.
 	userID    int
@@ -64,7 +65,7 @@ type wsClient struct {
 	closeOnce sync.Once
 }
 
-// close is idempotent: closes the send channel and the connection once.
+// close можно вызывать повторно: канал отправки и соединение закрываются один раз.
 func (c *wsClient) close() {
 	c.closeOnce.Do(func() {
 		close(c.send)
@@ -98,7 +99,7 @@ func NewWSHub() *WSHub {
 	return hub
 }
 
-// removeClient drops the client from the set and closes it. Idempotent.
+// removeClient убирает клиента из набора и закрывает его. Вызывать можно повторно.
 func (h *WSHub) removeClient(client *wsClient) {
 	h.mu.Lock()
 	_, ok := h.clients[client]
@@ -127,9 +128,10 @@ func (h *WSHub) run() {
 			h.removeClient(client)
 
 		case message := <-h.broadcast:
-			// Non-blocking send per client: a slow/dead client must not
-			// stall the hub (the old code sent to h.unregister from here
-			// and deadlocked). Dead clients are removed after the loop.
+			// Отправка каждому клиенту без блокировки: медленный или
+			// мёртвый клиент не должен останавливать хаб (прежний код
+			// отправлял отсюда в h.unregister и зависал). Мёртвые клиенты
+			// убираются после цикла.
 			h.mu.Lock()
 			var dead []*wsClient
 			for client := range h.clients {
@@ -184,7 +186,7 @@ func (h *WSHub) SendToUser(userID int, event string, data interface{}) {
 	}
 }
 
-// writePump is the only writer to the connection.
+// writePump — единственный, кто пишет в соединение.
 func (c *wsClient) writePump() {
 	ticker := time.NewTicker(wsPingPeriod)
 	defer ticker.Stop()
@@ -193,7 +195,7 @@ func (c *wsClient) writePump() {
 		case msg, ok := <-c.send:
 			c.conn.SetWriteDeadline(time.Now().Add(wsWriteWait))
 			if !ok {
-				// Hub closed the channel — client is being removed.
+				// Хаб закрыл канал — клиента убирают.
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
@@ -209,7 +211,7 @@ func (c *wsClient) writePump() {
 	}
 }
 
-// readPump keeps the connection alive, enforces read limits and pong deadlines.
+// readPump поддерживает соединение, следит за пределом чтения и сроками pong.
 func (c *wsClient) readPump(h *WSHub) {
 	defer func() { h.unregister <- c }()
 	c.conn.SetReadLimit(wsMaxMsgSize)

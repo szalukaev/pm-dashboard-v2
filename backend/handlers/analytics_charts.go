@@ -9,11 +9,11 @@ import (
 	"pm-dashboard/utils"
 )
 
-// velocityWeeks is how many weeks the velocity chart shows, the current one
-// included.
+// velocityWeeks — сколько недель показывает график velocity, включая
+// текущую.
 const velocityWeeks = 12
 
-// HoursRow is the hours of one employee over their tasks that are not closed.
+// HoursRow — часы одного сотрудника по его незакрытым задачам.
 type HoursRow struct {
 	Name       string  `json:"name"`
 	Estimated  float64 `json:"estimated_hours"`
@@ -22,15 +22,16 @@ type HoursRow struct {
 	BugPercent float64 `json:"bug_percent"`
 }
 
-// VelocityWeek is the tasks closed during one week, Monday to Sunday.
+// VelocityWeek — задачи, закрытые за одну неделю, с понедельника по воскресенье.
 type VelocityWeek struct {
 	WeekStart string  `json:"week_start"`
 	Closed    int     `json:"closed"`
 	Estimated float64 `json:"estimated_hours"`
 }
 
-// GetHours returns estimated, spent and bug-fixing hours by employee — the
-// same team and tasks as the team load table, closed tasks left out.
+// GetHours возвращает оценку, факт и часы на исправление багов по
+// сотрудникам — та же команда и те же задачи, что в таблице «Нагрузка на
+// команду», без закрытых задач.
 func (h *AnalyticsHandler) GetHours(w http.ResponseWriter, r *http.Request) {
 	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
@@ -42,7 +43,7 @@ func (h *AnalyticsHandler) GetHours(w http.ResponseWriter, r *http.Request) {
 	projectFilter := scope.IssueCond("", &args)
 	teamFilter := ""
 	if !scope.AllTeam {
-		// A chosen team means a row per member, without "unassigned"
+		// Выбранная команда — это строка на каждого сотрудника, без «неназначенных»
 		teamFilter = " AND assigned_to_id IS NOT NULL"
 	}
 
@@ -75,9 +76,9 @@ func (h *AnalyticsHandler) GetHours(w http.ResponseWriter, r *http.Request) {
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"hours": result})
 }
 
-// GetVelocity returns how many tasks were closed in each of the last weeks
-// and their total estimate. The closing date comes from the data source, so
-// the history is there from the first sync.
+// GetVelocity возвращает, сколько задач закрыто в каждую из последних
+// недель, и их суммарную оценку. Дата закрытия приходит из источника
+// данных, поэтому история есть с первой же синхронизации.
 func (h *AnalyticsHandler) GetVelocity(w http.ResponseWriter, r *http.Request) {
 	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
@@ -95,7 +96,7 @@ func (h *AnalyticsHandler) GetVelocity(w http.ResponseWriter, r *http.Request) {
 	weeks := velocityWeeksOf(period, now)
 	projectFilter += period.closedCond(&args)
 
-	// A task reopened after closing is not a closed one
+	// Задача, открытая заново после закрытия, закрытой не считается
 	q := `SELECT closed_on, COALESCE(estimated_hours, 0)
 		FROM issues WHERE ` + projectFilter + `
 		AND closed_on IS NOT NULL AND closed_on >= $` + itoa(len(args)+1) + `
@@ -130,8 +131,8 @@ func (h *AnalyticsHandler) GetVelocity(w http.ResponseWriter, r *http.Request) {
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"weeks": result})
 }
 
-// bugPercent is the share of bug-fixing hours in the spent ones, 0–100 with
-// one decimal; 0 when nothing was spent.
+// bugPercent — доля часов на исправление багов в фактических, 0–100 с
+// одним знаком после запятой; 0, если времени не списано.
 func bugPercent(bugHours, spent float64) float64 {
 	if spent <= 0 || bugHours <= 0 {
 		return 0
@@ -139,17 +140,17 @@ func bugPercent(bugHours, spent float64) float64 {
 	return math.Round(bugHours/spent*1000) / 10
 }
 
-// weekStart returns the midnight of the Monday of the week t belongs to, in
-// the time zone of t.
+// weekStart возвращает полночь понедельника той недели, к которой относится
+// t, в часовом поясе t.
 func weekStart(t time.Time) time.Time {
-	// time.Weekday counts from Sunday; a week here starts on Monday
+	// time.Weekday считает с воскресенья; неделя здесь начинается с понедельника
 	sinceMonday := (int(t.Weekday()) + 6) % 7
 	y, m, d := t.Date()
 	return time.Date(y, m, d-sinceMonday, 0, 0, 0, 0, t.Location())
 }
 
-// lastWeeks returns the starts of the last n weeks ending with the week of
-// now, oldest first.
+// lastWeeks возвращает начала последних n недель, заканчивая неделей now,
+// сначала самые давние.
 func lastWeeks(now time.Time, n int) []time.Time {
 	current := weekStart(now)
 	weeks := make([]time.Time, n)
