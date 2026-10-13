@@ -697,7 +697,6 @@
       "timezone": "Time zone",
       "timezone_default": "Default — {zone}",
       "timezone_hint": "Times on every screen are shown in this zone. Task due dates and invoice dates do not depend on it. Mailing and background job schedules run by the server time — {zone}.",
-      "tab_order": "Tab Order",
       "mode_dark": "Dark",
       "mode_light": "Light",
       "themes": {
@@ -709,8 +708,7 @@
     },
     "notifications": {
       "title": "Notifications",
-      "toast": "Toast Notifications",
-      "overdue_alerts": "Overdue Task Alerts"
+      "toast": "Toast Notifications"
     },
     "sync": {
       "title": "Synchronization",
@@ -906,16 +904,8 @@
       "covered_by_parent": "Covered by the ticked parent project",
       "show_unassigned": "Show tasks without an assignee",
       "show_unassigned_hint": "Without this tick tasks that have no assignee are not shown to the user",
-      "projects": "Projects",
       "all_projects": "All projects",
-      "team": "Members",
       "all_team": "All members",
-      "tabs": "Tabs",
-      "all_tabs": "All tabs",
-      "widgets": "Analytics widgets",
-      "all_widgets": "All widgets",
-      "sprints": "Sprints",
-      "all_sprint_actions": "All actions",
       "search_project": "Search a project…",
       "search_member": "Search a member…",
       "selected": "Selected: {n}",
