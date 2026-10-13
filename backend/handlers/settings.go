@@ -39,7 +39,6 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 		KanbanLastProject         *int                   `json:"kanban_last_project"`
 		LastFilters               map[string]interface{} `json:"last_filters"`
 		NotificationsEnabled      bool                   `json:"notifications_enabled"`
-		OverdueAlerts             bool                   `json:"overdue_alerts"`
 		DataSourceURL             string                 `json:"data_source_url"`
 		// Число строк на странице, выбранное для каждой таблицы; у таблицы, которой нет в списке, — значение по умолчанию
 		Pagination map[string]int `json:"pagination"`
@@ -73,17 +72,17 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 
 	var selectedProjects, selectedTeam, tabOrder, kanbanStatuses, kanbanUsers, lastFilters, pagination, tableColumns, dashboardLayout, alertRules, emailReport, thresholds []byte
 	var theme, language string
-	var notificationsEnabled, overdueAlerts bool
+	var notificationsEnabled bool
 
 	err := (*h.DB).QueryRow(`
 		SELECT selected_projects, selected_team, theme, language, tab_order,
 		       kanban_column_order_statuses, kanban_column_order_users,
-		       last_filters, notifications_enabled, overdue_alerts,
+		       last_filters, notifications_enabled,
 		       kanban_last_mode, kanban_last_project, pagination, table_columns, dashboard_layout, alert_rules, email_report, indicator_thresholds
 		FROM user_settings WHERE user_id = $1
 	`, userID).Scan(
 		&selectedProjects, &selectedTeam, &theme, &language,
-		&tabOrder, &kanbanStatuses, &kanbanUsers, &lastFilters, &notificationsEnabled, &overdueAlerts,
+		&tabOrder, &kanbanStatuses, &kanbanUsers, &lastFilters, &notificationsEnabled,
 		&settings.KanbanLastMode, &settings.KanbanLastProject, &pagination, &tableColumns, &dashboardLayout, &alertRules, &emailReport, &thresholds,
 	)
 
@@ -97,7 +96,6 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 		settings.Language = "ru"
 		settings.KanbanLastMode = "users"
 		settings.NotificationsEnabled = true
-		settings.OverdueAlerts = false
 		if h.SQLite != nil {
 			if v, _ := h.SQLite.Get("redmine_url"); v != "" {
 				settings.DataSourceURL = v
@@ -133,7 +131,6 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 	settings.Theme = theme
 	settings.Language = language
 	settings.NotificationsEnabled = notificationsEnabled
-	settings.OverdueAlerts = overdueAlerts
 
 	// Адрес Redmine — из конфигурации в SQLite
 	if h.SQLite != nil {
@@ -247,12 +244,6 @@ func (h *SettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request)
 	}
 	if v, ok := body["notifications_enabled"]; ok {
 		if _, err := (*h.DB).Exec("UPDATE user_settings SET notifications_enabled = $1 WHERE user_id = $2", v, userID); err != nil {
-			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
-			return
-		}
-	}
-	if v, ok := body["overdue_alerts"]; ok {
-		if _, err := (*h.DB).Exec("UPDATE user_settings SET overdue_alerts = $1 WHERE user_id = $2", v, userID); err != nil {
 			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 			return
 		}
