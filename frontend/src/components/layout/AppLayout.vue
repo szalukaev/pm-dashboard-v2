@@ -106,6 +106,15 @@ onUnmounted(() => {
 }
 
 @media (max-width: 768px) {
+  /* Шапка на узком экране в две строки — высоту задаёт её содержимое */
+  .app-layout {
+    grid-template-rows: auto 1fr;
+  }
+
+  .app-layout.with-banner {
+    grid-template-rows: auto auto 1fr;
+  }
+
   .app-content {
     padding: 16px;
   }

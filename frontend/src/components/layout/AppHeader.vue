@@ -265,18 +265,69 @@ function handleLogout() {
   color: var(--text-bright);
 }
 
-@media (max-width: 768px) {
-  .tab-label {
-    display: none;
-  }
-
+/* На планшетной ширине название уступает место вкладкам — иначе последняя
+   вкладка обрезается */
+@media (max-width: 1100px) {
   .logo-text {
     display: none;
   }
 
   .app-header {
+    gap: 16px;
+  }
+}
+
+/* На узком экране вкладки идут отдельной строкой под логотипом и кнопками:
+   в одной строке с ними вкладкам остаётся около 20 px */
+@media (max-width: 768px) {
+  .app-header {
+    flex-wrap: wrap;
     padding: 0 12px;
-    gap: 12px;
+    column-gap: 12px;
+    row-gap: 0;
+  }
+
+  .header-logo,
+  .header-actions {
+    height: 52px;
+  }
+
+  .header-actions {
+    margin-left: auto;
+  }
+
+  .header-tabs {
+    order: 3;
+    flex: 0 0 100%;
+    padding-bottom: 8px;
+  }
+
+  .tab {
+    flex: 1 0 auto;
+    justify-content: center;
+  }
+
+  /* Перетаскивание вкладок на сенсорном экране не работает */
+  .tab-grip {
+    display: none;
+  }
+}
+
+/* На телефоне подпись стоит под значком, все вкладки помещаются без прокрутки */
+@media (max-width: 640px) {
+  .tab {
+    flex: 1 1 0;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 2px;
+    font-size: 10px;
+  }
+
+  .tab-label {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 </style>
