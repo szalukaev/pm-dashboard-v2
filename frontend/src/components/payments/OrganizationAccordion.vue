@@ -41,7 +41,7 @@
       </div>
     </div>
 
-    <!-- Contracts without organization -->
+    <!-- Договоры без организации -->
     <div v-if="noOrgContracts.length > 0" class="org-group">
       <div class="org-header" @click="toggle(0)">
         <ChevronDown :size="16" class="chevron" :class="{ collapsed: !isOpen(0) }" />
@@ -95,7 +95,7 @@ function orgContracts(orgId: number) {
 
 const noOrgContracts = computed(() => props.contracts.filter(c => !c.organization_id))
 
-// A figure of the organization: the sum over its contracts
+// Цифра организации: сумма по её договорам
 function orgSum(orgId: number, field: 'total_amount' | 'invoiced_amount' | 'debt_amount') {
   return orgContracts(orgId).reduce((sum, c) => sum + (c[field] || 0), 0)
 }

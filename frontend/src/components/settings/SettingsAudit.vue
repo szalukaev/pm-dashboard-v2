@@ -3,7 +3,7 @@
     <h3 class="section-title">{{ $t('audit.title') }}</h3>
     <p class="section-hint">{{ $t('audit.hint') }}</p>
 
-    <!-- Filters -->
+    <!-- Фильтры -->
     <div class="audit-filters">
       <select v-model="filterAction" @change="loadLogs" class="filter-select">
         <option value="">{{ $t('audit.all_actions') }}</option>
@@ -57,7 +57,7 @@
       {{ $t('audit.empty') }}
     </div>
 
-    <!-- Detail Modal -->
+    <!-- Окно с подробностями -->
     <AppModal
       :model-value="showDetailModal"
       :title="$t('audit.details_title')"

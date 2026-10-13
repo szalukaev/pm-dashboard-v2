@@ -41,7 +41,7 @@
       <div v-if="!groups.length" class="adm-empty">{{ $t('access.groups.empty') }}</div>
     </div>
 
-    <!-- New group -->
+    <!-- Новая группа -->
     <AppModal v-model="createOpen" :title="$t('access.groups.new_title')" width="440px" :busy="saving">
       <form class="adm-form" @submit.prevent="createGroup">
         <div class="adm-field">
@@ -59,7 +59,7 @@
       </template>
     </AppModal>
 
-    <!-- Edit group: members and rights -->
+    <!-- Правка группы: участники и права -->
     <AppModal v-model="editOpen" :title="$t('access.groups.edit_title', { name: edit.name })" width="900px" :busy="saving">
       <div class="adm-tabs">
         <button type="button" class="adm-tab" :class="{ active: editTab === 'members' }" @click="editTab = 'members'">{{ $t('access.groups.tab_members') }}</button>
@@ -104,7 +104,7 @@
       </template>
     </AppModal>
 
-    <!-- Copy rights of a group -->
+    <!-- Копирование прав группы -->
     <AppModal v-model="cloneOpen" :title="$t('access.clone.group_title', { name: cloneSource?.name || '' })" width="440px" :busy="saving">
       <div class="adm-form">
         <div class="adm-field">
@@ -193,7 +193,7 @@ function errorText(e: any): string {
   return te(key) ? t(key) : t('access.save_error')
 }
 
-// ── New group ──
+// ── Новая группа ──
 const createOpen = ref(false)
 const draft = reactive({ name: '', description: '' })
 
@@ -210,7 +210,7 @@ async function createGroup() {
     await axios.post('/api/admin/groups', draft)
     createOpen.value = false
     await load()
-    // A new group is empty: open it to add members and rights right away
+    // Новая группа пуста: она сразу открывается, чтобы добавить участников и права
     const created = groups.value.find(g => g.name === draft.name.trim())
     if (created) openEdit(created)
   } catch (e) {
@@ -220,7 +220,7 @@ async function createGroup() {
   }
 }
 
-// ── Edit ──
+// ── Правка ──
 const editOpen = ref(false)
 const editTab = ref<'members' | 'rights' | 'general'>('members')
 const userQuery = ref('')
@@ -282,7 +282,7 @@ async function deleteGroup(g: Group) {
   await load()
 }
 
-// ── Copy rights ──
+// ── Копирование прав ──
 const cloneOpen = ref(false)
 const cloneSource = ref<Group | null>(null)
 const clone = reactive({

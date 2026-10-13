@@ -45,7 +45,7 @@ import type { Contract } from '../../stores/payments'
 defineProps<{ contract: Contract }>()
 defineEmits(['edit', 'delete', 'issue-invoice'])
 
-// The invoices of the contract are shown when it is opened
+// Счета договора показываются, когда его раскрывают
 const expanded = ref(false)
 </script>
 

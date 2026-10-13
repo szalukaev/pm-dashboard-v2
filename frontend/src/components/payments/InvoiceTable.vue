@@ -74,7 +74,7 @@ import { invoiceActionsKey } from './invoiceActions'
 const props = defineProps<{ contractId: number }>()
 
 const { t, te } = useI18n()
-// Paying, downloading and deleting belong to the page
+// Оплату, скачивание и удаление выполняет страница
 const actions = inject(invoiceActionsKey)
 
 const store = usePaymentsStore()
@@ -108,10 +108,10 @@ function statusLabel(status: string): string {
   return te(key) ? t(key) : status
 }
 
-// An invoice was issued, paid or deleted somewhere on the page
+// Где-то на странице счёт выставили, оплатили или удалили
 watch(() => store.invoicesVersion, async () => {
   await load()
-  // The last invoice of the last page was deleted: show the page before it
+  // Удалён последний счёт последней страницы: показывается предыдущая
   if (invoices.value.length === 0 && total.value > 0) {
     offset.value = Math.floor((total.value - 1) / pageSize.value) * pageSize.value
     await load()

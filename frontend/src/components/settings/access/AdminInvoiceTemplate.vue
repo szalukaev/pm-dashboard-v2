@@ -5,7 +5,7 @@
     </div>
     <p class="adm-hint">{{ $t('invoice_template.hint') }}</p>
 
-    <!-- Which template is in force -->
+    <!-- Какой шаблон действует -->
     <div class="current" data-testid="invoice-template-current">
       <FileText :size="18" class="current-icon" />
       <div class="current-text">
@@ -37,7 +37,7 @@
       </AppButton>
     </div>
 
-    <!-- What a check of the template finds -->
+    <!-- Что нашла проверка шаблона -->
     <div v-if="info?.report" class="report" data-testid="invoice-template-report">
       <div v-if="problems.length === 0" class="report-line ok">
         <CheckCircle2 :size="14" /> {{ $t('invoice_template.report_ok', { count: info.report.found.length }) }}
@@ -49,7 +49,7 @@
       </template>
     </div>
 
-    <!-- The lines of an invoice -->
+    <!-- Позиции счёта -->
     <h4 class="adm-title block-title">{{ $t('invoice_template.items_title') }}</h4>
     <div class="ways">
       <div class="way">
@@ -62,7 +62,7 @@
       </div>
     </div>
 
-    <!-- Every variable -->
+    <!-- Все переменные -->
     <h4 class="adm-title block-title">{{ $t('invoice_template.variables_title') }}</h4>
     <p class="adm-hint">{{ $t('invoice_template.variables_hint') }}</p>
     <div class="adm-table-wrap">
@@ -131,7 +131,7 @@ const info = ref<TemplateInfo | null>(null)
 const uploading = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 
-// A variable as it is written in a template
+// Переменная в том виде, в каком она пишется в шаблоне
 function braces(name: string): string {
   return '{{' + name + '}}'
 }
@@ -152,10 +152,10 @@ const groups = computed(() =>
     .filter(g => g.variables.length > 0)
 )
 
-// The variables the template in force uses
+// Переменные, которые использует действующий шаблон
 const used = computed(() => new Set(info.value?.report?.found || []))
 
-// What is wrong with the template, in words
+// Что не так с шаблоном, словами
 const problems = computed(() => {
   const report = info.value?.report
   if (!report) return []
@@ -178,7 +178,7 @@ function errorText(e: any, fallback: string): string {
 async function onFile(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
-  // The same file may be chosen again after it was corrected
+  // Тот же файл можно выбрать снова после исправления
   input.value = ''
   if (!file) return
 
@@ -368,7 +368,7 @@ onMounted(load)
   color: var(--text-bright);
 }
 
-/* The template in force uses this variable */
+/* Действующий шаблон использует эту переменную */
 .variable.used {
   border-color: color-mix(in srgb, var(--success) 50%, transparent);
 }

@@ -12,7 +12,7 @@
     <!-- По умолчанию значок «i», с help — «?» (у настроек); в слот можно положить
          то, что само объясняется подсказкой -->
     <slot><HelpCircle v-if="help" :size="15" /><Info v-else :size="15" /></slot>
-    <!-- Lives in the body so that no widget or window edge cuts it -->
+    <!-- Лежит в body, чтобы её не обрезал ни виджет, ни край окна -->
     <Teleport to="body">
       <div v-if="shown" class="info-bubble" :style="{ left: x + 'px', top: y + 'px' }">{{ text }}</div>
     </Teleport>
@@ -23,7 +23,7 @@
 import { ref } from 'vue'
 import { Info, HelpCircle } from 'lucide-vue-next'
 
-// text: what the bubble says; line breaks are kept
+// text: текст подсказки; переносы строк сохраняются
 // help: значок «?» вместо «i»
 defineProps<{ text: string; help?: boolean }>()
 
@@ -35,7 +35,7 @@ const shown = ref(false)
 const x = ref(0)
 const y = ref(0)
 
-// Under the icon, moved left when it would not fit in the window
+// Под значком; сдвигается влево, если не помещается в окно
 function show() {
   if (!icon.value) return
   const rect = icon.value.getBoundingClientRect()

@@ -186,8 +186,8 @@ import {
   type Permissions, type ProjectItem, type MemberItem,
 } from '../../../utils/access'
 
-// One editor for the rights of a user, a group and a role template. The
-// parent owns the object (v-model) and decides when to save it.
+// Один редактор для прав пользователя, группы и шаблона роли. Объектом
+// владеет родитель (v-model), он же решает, когда его сохранять.
 const model = defineModel<Permissions>({ required: true })
 
 const props = defineProps<{
@@ -292,9 +292,9 @@ const visibleMembers = computed(() => {
   return q ? props.members.filter(m => m.name.toLowerCase().includes(q)) : props.members
 })
 
-// A right to a project is a right to its whole branch, including the
-// subprojects created later. Only the ticked project itself is stored; its
-// subprojects are covered by it.
+// Право на проект — это право на всю его ветку, включая подпроекты,
+// созданные позже. Хранится только сам отмеченный проект; его подпроекты
+// покрыты им.
 const covered = computed(() => coveredByParents(props.projects, model.value.project_ids))
 
 function projectChecked(id: number): boolean {
@@ -305,7 +305,7 @@ function toggleProject(id: number, checked: boolean) {
   const current = new Set(model.value.project_ids)
   if (checked) {
     current.add(id)
-    // Ticks of its subprojects are now redundant
+    // Галочки его подпроектов теперь лишние
     for (const child of withDescendants(props.projects, id)) {
       if (child !== id) current.delete(child)
     }

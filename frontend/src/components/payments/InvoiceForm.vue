@@ -7,7 +7,7 @@
   >
     <div class="invoice-form">
       <table class="items-table">
-        <!-- The widths are set once, so that a title stands over its values -->
+        <!-- Ширины задаются один раз, чтобы заголовок стоял над своими значениями -->
         <colgroup>
           <col />
           <col class="col-quantity" />
@@ -77,17 +77,17 @@ const props = defineProps<{
   visible: boolean
   contractName: string
   contractAmount: number
-  // Lines to start from: those of the invoice being copied. Without them
-  // the form starts with one line of the contract.
+  // Позиции, с которых начинать: позиции копируемого счёта. Без них форма
+  // начинается с одной позиции договора.
   initialItems?: InvoiceItem[]
-  // The number of the invoice being copied, for the title
+  // Номер копируемого счёта — для заголовка
   sourceNumber?: string
 }>()
 
 const emit = defineEmits(['close', 'submit'])
 const { t } = useI18n()
 
-// The server takes a name of a line up to this many characters
+// Сервер принимает название позиции не длиннее стольких символов
 const MAX_NAME = 2000
 
 const items = ref<InvoiceItem[]>([{ name: '', quantity: 1, price: 0 }])
@@ -118,7 +118,7 @@ function submit() {
 </script>
 
 <style scoped>
-/* A roomy form: an invoice of a dozen lines is seen without scrolling */
+/* Просторная форма: счёт из десятка позиций виден без прокрутки */
 .invoice-form {
   display: flex;
   flex-direction: column;
@@ -160,7 +160,7 @@ function submit() {
 }
 
 .items-table th.num {
-  /* Over the last digit of the values: the padding and the frame of a field */
+  /* Над последней цифрой значений: отступ и рамка поля */
   padding-right: 15px;
   text-align: right;
 }
@@ -184,7 +184,7 @@ function submit() {
   border-color: var(--accent);
 }
 
-/* A number fills its column and ends where its title ends */
+/* Число занимает свою колонку и заканчивается там же, где её заголовок */
 .num-input {
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -194,7 +194,7 @@ function submit() {
   text-align: center;
 }
 
-/* The amount ends under the last digit of the fields to its left */
+/* Сумма заканчивается под последней цифрой полей слева от неё */
 .items-table td.total-cell {
   padding-right: 15px;
   text-align: right;

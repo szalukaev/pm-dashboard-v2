@@ -16,9 +16,9 @@ import axios from 'axios'
 import { useI18n } from 'vue-i18n'
 import { useWebSocket } from '../../composables/useWebSocket'
 
-// State of the background sync with the data source:
-// green — the last sync succeeded, yellow — a sync is running,
-// red — the last attempt failed, grey — there was no sync yet.
+// Состояние фоновой синхронизации с источником данных:
+// зелёный — последняя синхронизация успешна, жёлтый — синхронизация идёт,
+// красный — последняя попытка не удалась, серый — синхронизации ещё не было.
 type SyncState = 'success' | 'running' | 'error' | 'unknown'
 
 const { t } = useI18n()
@@ -45,7 +45,7 @@ const time = computed(() => {
 
 const statusText = computed(() => t(`sync_status.${status.value}`, { time: time.value }))
 
-// Events keep the indicator live; the poll covers a lost connection.
+// Индикатор обновляют события; опрос страхует на случай потери соединения.
 let poll: ReturnType<typeof setInterval> | null = null
 
 onMounted(() => {

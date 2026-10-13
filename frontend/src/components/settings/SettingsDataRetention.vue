@@ -148,8 +148,8 @@ function formatDay(value: string | null): string {
   return formatDate(value)
 }
 
-// The figures follow the sync (it writes the snapshot of the day) and the
-// cleanup, whoever started them
+// Цифры следуют за синхронизацией (она пишет снимок дня) и очисткой, кто бы
+// их ни запустил
 const { on, off } = useWebSocket()
 
 onMounted(() => {

@@ -1,5 +1,5 @@
 <template>
-  <!-- A list shorter than the smallest page needs neither pages nor a page size -->
+  <!-- Списку короче самой маленькой страницы не нужны ни страницы, ни выбор их размера -->
   <div v-if="total > sizes[0]" class="app-pagination" data-testid="pagination">
     <span class="range">{{ $t('common.pagination.range', { from, to, total }) }}</span>
 

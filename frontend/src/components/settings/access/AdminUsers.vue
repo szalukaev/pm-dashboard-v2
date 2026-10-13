@@ -60,7 +60,7 @@
                 <option v-for="t in templates" :key="t.id" :value="t.id">{{ t.name }}</option>
               </select>
             </td>
-            <!-- Set by the user themselves with a personal API key -->
+            <!-- Задаёт сам пользователь личным ключом API -->
             <td>
               <span v-if="u.member_id">{{ u.member_name || '#' + u.member_id }}</span>
               <span v-else class="adm-muted" :title="$t('access.users.no_member_hint')">{{ $t('access.users.no_member') }}</span>
@@ -130,7 +130,7 @@
       @update:limit="setPageSize"
     />
 
-    <!-- New user -->
+    <!-- Новый пользователь -->
     <AppModal v-model="createOpen" :title="$t('access.users.new_title')" width="440px" :busy="saving">
       <form class="adm-form" @submit.prevent="createUser">
         <div class="adm-field">
@@ -169,10 +169,10 @@
       </template>
     </AppModal>
 
-    <!-- Rights of a user -->
+    <!-- Права пользователя -->
     <AppModal v-model="rightsOpen" :title="$t('access.rights.title', { name: rightsUser?.username || '' })" width="900px" :busy="saving">
       <div v-if="grants" class="rights">
-        <!-- Where the rights come from -->
+        <!-- Откуда берутся права -->
         <div class="rights-sources">
           <div class="rights-source">
             <span class="adm-label">{{ $t('access.rights.own_source') }}</span>
@@ -190,7 +190,7 @@
           </div>
         </div>
 
-        <!-- Individual rights -->
+        <!-- Личные права -->
         <template v-if="editing">
           <p class="adm-hint">{{ $t('access.rights.individual_hint') }}</p>
           <PermissionsEditor v-model="editing" :projects="projects" :members="members" />
@@ -211,7 +211,7 @@
       </template>
     </AppModal>
 
-    <!-- Copy rights -->
+    <!-- Копирование прав -->
     <AppModal v-model="cloneOpen" :title="$t('access.clone.title', { name: cloneSource?.username || '' })" width="440px" :busy="saving">
       <div class="adm-form">
         <div class="adm-field">
@@ -242,7 +242,7 @@
       </template>
     </AppModal>
 
-    <!-- Temporary password, shown once -->
+    <!-- Временный пароль, показывается один раз -->
     <AppModal v-model="passwordOpen" :title="$t('access.password.title')" width="440px">
       <p class="adm-hint">{{ $t('access.password.hint', { name: passwordUser }) }}</p>
       <div class="password-box" data-testid="temp-password">{{ tempPassword }}</div>
@@ -298,14 +298,14 @@ const props = defineProps<{
   members: MemberItem[]
 }>()
 
-// Value of the template select for individually set rights
+// Значение списка шаблонов для прав, заданных лично
 const CUSTOM = 'custom'
 
 const { t, te } = useI18n()
 const { toast, confirm } = useSwal()
 const auth = useAuthStore()
 
-// The table shows one page of users
+// Таблица показывает одну страницу пользователей
 const PAGE_TABLE = 'admin_users_table'
 const settingsStore = useSettingsStore()
 const pageSize = computed(() => settingsStore.pageSize(PAGE_TABLE))
@@ -327,7 +327,7 @@ async function load() {
       axios.get('/api/admin/role-templates'),
       axios.get('/api/admin/groups'),
     ])
-    // The last user of the last page was deleted: show the page before it
+    // Удалён последний пользователь последней страницы: показывается предыдущая
     if ((u.data.users || []).length === 0 && u.data.total > 0) {
       offset.value = Math.floor((u.data.total - 1) / pageSize.value) * pageSize.value
       u = await usersPage()
@@ -360,7 +360,7 @@ function errorText(e: any, fallback: string): string {
   return code && te(key) ? t(key) : t(fallback)
 }
 
-// One changed field of a user; the table shows what the server saved.
+// Одно изменённое поле пользователя; таблица показывает то, что сохранил сервер.
 async function update(u: AdminUser, fields: Record<string, unknown>) {
   try {
     await axios.put(`/api/admin/users/${u.id}`, fields)
@@ -392,7 +392,7 @@ async function changeTimeZone(u: AdminUser, value: string) {
 
 async function changeTemplate(u: AdminUser, value: string) {
   if (value === CUSTOM) return
-  // A template replaces individually set rights: ask before dropping them
+  // Шаблон заменяет права, заданные лично: перед их сбросом задаётся вопрос
   if (u.custom) {
     const result = await confirm(t('access.users.template_replaces_title'), t('access.users.template_replaces_text'))
     if (!result.isConfirmed) {
@@ -414,7 +414,7 @@ async function deleteUser(u: AdminUser) {
   await load()
 }
 
-// ── New user ──
+// ── Новый пользователь ──
 const createOpen = ref(false)
 const draft = reactive({
   username: '',
@@ -447,11 +447,11 @@ async function createUser() {
   }
 }
 
-// ── Rights ──
+// ── Права ──
 const rightsOpen = ref(false)
 const rightsUser = ref<AdminUser | null>(null)
 const grants = ref<Grants | null>(null)
-// The individual rights being edited; null while they are inherited
+// Личные права, которые правятся; null — пока права наследуются
 const editing = ref<Permissions | null>(null)
 
 function summary(p: Permissions): string {
@@ -482,11 +482,11 @@ async function openRights(u: AdminUser) {
   }
 }
 
-// Individual rights start from the user's own inherited set
+// Личные права начинаются с набора, который пользователь наследует
 function startEditing() {
   if (!grants.value) return
   const base = grants.value.template?.permissions
-  // Without a template the default applies: own tasks only
+  // Без шаблона действует набор по умолчанию: только свои задачи
   editing.value = base ? clonePermissions(base) : { ...emptyPermissions(), own_tasks_only: true }
 }
 
@@ -517,7 +517,7 @@ async function clearRights() {
   }
 }
 
-// "Create a template from the current rights": the saved rights of the user
+// «Создать шаблон из текущих прав»: сохранённые права пользователя
 async function saveAsTemplate() {
   if (!rightsUser.value) return
   const result = await useSwal().fire({
@@ -531,7 +531,7 @@ async function saveAsTemplate() {
   const name = String(result.value || '').trim()
   if (!result.isConfirmed || !name) return
   try {
-    // Save what is on the screen first, so the template gets exactly it
+    // Сначала сохраняется то, что на экране, чтобы шаблон получил именно это
     if (editing.value) await axios.put(`/api/admin/users/${rightsUser.value.id}/permissions`, editing.value)
     await axios.post('/api/admin/role-templates', { name, from_user_id: rightsUser.value.id })
     toast(t('access.templates.created_toast'), 'success')
@@ -541,7 +541,7 @@ async function saveAsTemplate() {
   }
 }
 
-// ── Copy rights ──
+// ── Копирование прав ──
 const cloneOpen = ref(false)
 const cloneSource = ref<AdminUser | null>(null)
 const clone = reactive({
@@ -551,7 +551,7 @@ const clone = reactive({
   include_widgets: true,
 })
 
-// Rights may be copied to any user, not only to those on the current page
+// Права можно копировать любому пользователю, а не только тем, кто на текущей странице
 const allUsers = ref<AdminUser[]>([])
 const cloneTargets = computed(() => allUsers.value.filter(u => u.id !== cloneSource.value?.id && u.role !== 'admin'))
 
@@ -582,7 +582,7 @@ async function applyClone() {
   }
 }
 
-// ── Password reset ──
+// ── Сброс пароля ──
 const passwordOpen = ref(false)
 const passwordUser = ref('')
 const tempPassword = ref('')

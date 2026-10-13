@@ -59,7 +59,7 @@
       </table>
     </div>
 
-    <!-- Schedule of a worker -->
+    <!-- Расписание воркера -->
     <AppModal v-model="scheduleOpen" :title="scheduleTitle" width="420px" :busy="savingSchedule">
       <form class="schedule-form" @submit.prevent="saveSchedule">
         <template v-if="scheduleKey === 'sync'">
@@ -117,7 +117,7 @@ interface Worker {
   duration_ms: number | null
   processed: number | null
   error: string
-  // "partial": error holds "<failed>/<total>" projects of a finished sync
+  // "partial": в error лежит "<не прочитано>/<всего>" проектов завершившейся синхронизации
   error_kind: string
   schedule: Record<string, any>
 }
@@ -134,7 +134,7 @@ async function load() {
     const { data } = await axios.get('/api/admin/workers')
     workers.value = data.workers || []
     timezone.value = data.timezone || ''
-    // The clock of the server, not of this computer: schedules follow it
+    // Часы сервера, а не этого компьютера: расписания идут по ним
     serverTime.value = String(data.server_time || '').slice(11, 16)
   } catch {
     toast(t('workers.load_error'), 'error')
@@ -157,7 +157,7 @@ async function act(w: Worker, action: 'run' | 'stop' | 'enable' | 'disable', bod
   }
 }
 
-// ─── Schedule ───
+// ─── Расписание ───
 
 const scheduleOpen = ref(false)
 const savingSchedule = ref(false)
@@ -195,7 +195,7 @@ async function saveSchedule() {
   }
 }
 
-// ─── Texts ───
+// ─── Тексты ───
 
 function scheduleText(w: Worker): string {
   if (w.key === 'sync') {
@@ -237,7 +237,7 @@ function formatDuration(ms: number | null): string {
     : t('workers.duration_sec', { sec: seconds })
 }
 
-// The table follows the workers without a reload
+// Таблица следует за воркерами без перезагрузки
 const { on, off } = useWebSocket()
 
 onMounted(() => {

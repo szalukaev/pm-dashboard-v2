@@ -14,12 +14,12 @@
       >
         {{ $t('access.tabs.' + tab) }}
       </button>
-      <!-- The license has a screen of its own: it must work when nothing else does -->
+      <!-- У лицензии свой экран: он должен работать, когда не работает больше ничего -->
       <router-link to="/license" class="adm-tab" data-testid="admin-tab-license">{{ $t('license.title') }}</router-link>
     </div>
 
-    <!-- Access control. Each screen loads its own data when it is opened,
-         so a change made on one is seen on another. -->
+    <!-- Права доступа. Каждый экран загружает свои данные при открытии,
+         поэтому изменение, сделанное на одном, видно на другом. -->
     <AdminUsers v-if="activeTab === 'users'" :projects="projects" :members="members" />
     <AdminGroups v-else-if="activeTab === 'groups'" :projects="projects" :members="members" />
     <AdminTemplates v-else-if="activeTab === 'templates'" :projects="projects" :members="members" />
@@ -28,7 +28,7 @@
     <AdminMail v-else-if="activeTab === 'mail'" />
     <AdminDebugLogs v-else-if="activeTab === 'debug'" />
 
-    <!-- Settings of the data shared by all users -->
+    <!-- Настройки данных, общие для всех пользователей -->
     <template v-else>
       <div class="adm-section">
         <SettingsStatusGroups />
@@ -115,7 +115,7 @@ watch(() => props.tab, name => { activeTab.value = tabOr(name, activeTab.value) 
 const { t } = useI18n()
 const { toast } = useSwal()
 
-// Everything rights can be given to: an administrator gets the full lists
+// Всё, на что можно выдать права: администратор получает полные списки
 const projects = ref<ProjectItem[]>([])
 const members = ref<MemberItem[]>([])
 const priorities = ref<Priority[]>([])

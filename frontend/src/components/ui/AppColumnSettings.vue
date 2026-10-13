@@ -49,8 +49,8 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { SlidersHorizontal, GripVertical } from 'lucide-vue-next'
 import { useSettingsStore } from '../../stores/settings'
 
-// table: the name the setup is saved under; columns: every column of the
-// table in the standard order, label is a dictionary key.
+// table: имя, под которым сохраняется настройка; columns: все колонки
+// таблицы в стандартном порядке, label — ключ словаря.
 const props = defineProps<{
   table: string
   columns: { key: string; label: string }[]
@@ -65,7 +65,7 @@ const order = computed(() => settingsStore.columnOrder(props.table, allKeys.valu
 const visible = computed(() => new Set(settingsStore.tableColumns(props.table, allKeys.value)))
 const ordered = computed(() => order.value.map(key => props.columns.find(c => c.key === key)!))
 
-// Every change is applied and saved at once
+// Каждое изменение сразу применяется и сохраняется
 function save(nextOrder: string[], nextVisible: Set<string>) {
   settingsStore.setTableColumns(props.table, nextOrder.filter(k => nextVisible.has(k)), nextOrder)
 }
@@ -73,7 +73,7 @@ function save(nextOrder: string[], nextVisible: Set<string>) {
 function toggle(key: string) {
   const next = new Set(visible.value)
   if (next.has(key)) {
-    // A table without columns is of no use: the last one stays
+    // Таблица без колонок бесполезна: последняя остаётся
     if (next.size === 1) return
     next.delete(key)
   } else {

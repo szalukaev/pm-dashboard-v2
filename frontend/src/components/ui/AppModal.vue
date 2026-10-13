@@ -38,8 +38,8 @@ import { ref } from 'vue'
 import { X, Maximize2, Minimize2 } from 'lucide-vue-next'
 import AppSavingOverlay from './AppSavingOverlay.vue'
 
-// expandable: the window can be switched to the full screen and back; the
-// choice is kept while the page is open.
+// expandable: окно можно развернуть на весь экран и вернуть обратно; выбор
+// сохраняется, пока открыта страница.
 // busy: идёт сохранение — содержимое закрыто заслонкой, окно не закрывается.
 const props = defineProps<{
   modelValue: boolean

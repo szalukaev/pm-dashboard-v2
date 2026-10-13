@@ -90,11 +90,11 @@ const { t, te } = useI18n()
 const { toast } = useSwal()
 
 const logs = ref<SyncLog[]>([])
-// How many issues there are in all; an entry of the log counts what one sync brought
+// Сколько задач всего; запись журнала считает то, что принесла одна синхронизация
 const totalIssues = ref(0)
 const syncing = ref(false)
 
-// Interval between periodic syncs, minutes
+// Интервал между синхронизациями по расписанию, в минутах
 const interval = ref(5)
 const intervalInput = ref('5')
 const intervalLimits = ref({ min: 1, max: 1440 })
@@ -144,8 +144,8 @@ async function loadLogs() {
   } catch {}
 }
 
-// A sync that finished but could not read some projects keeps their number
-// as "<failed>/<total>"
+// Синхронизация, которая завершилась, но не прочитала часть проектов,
+// хранит их число в виде "<не прочитано>/<всего>"
 function errorText(log: SyncLog): string {
   if (log.status === 'partial' && log.error_text) {
     const [failed, total] = log.error_text.split('/')
@@ -159,7 +159,7 @@ async function runSync() {
   try {
     await axios.post('/api/admin/sync/run')
     toast(t('settings.sync.started'), 'success')
-    // The sync runs in the background: show the new entry, then its outcome
+    // Синхронизация идёт в фоне: показывается новая запись, затем её итог
     loadLogs()
     setTimeout(loadLogs, 5000)
   } catch (e: any) {
@@ -188,7 +188,7 @@ function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max) + '…' : s
 }
 
-// The log follows the sync: a new entry on start, its outcome on finish
+// Журнал следует за синхронизацией: новая запись при запуске, её итог при завершении
 const { on, off } = useWebSocket()
 
 onMounted(() => {

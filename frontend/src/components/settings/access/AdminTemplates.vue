@@ -44,7 +44,7 @@
       </table>
     </div>
 
-    <!-- Create / edit a template -->
+    <!-- Создание и правка шаблона -->
     <AppModal v-model="editOpen" :title="edit.id ? $t('access.templates.edit_title', { name: edit.name }) : $t('access.templates.new_title')" width="900px" :busy="saving">
       <div class="adm-form">
         <div class="name-row">

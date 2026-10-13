@@ -2,7 +2,7 @@
   <div class="settings-personal">
     <h3 class="section-title">{{ $t('settings.personal.title') }}</h3>
     <div class="personal-layout">
-      <!-- Avatar -->
+      <!-- Аватар -->
       <div class="avatar-block">
         <div class="avatar-circle" @click="triggerFileInput">
           <img v-if="user?.avatar" :src="user.avatar" class="avatar-img" />
@@ -16,7 +16,7 @@
         <AppButton v-if="user?.avatar" variant="ghost" size="sm" @click="removeAvatar">{{ $t('settings.personal.avatar_remove') }}</AppButton>
       </div>
 
-      <!-- Info -->
+      <!-- Сведения -->
       <div class="form-group">
         <div class="info-row">
           <span class="info-label">{{ $t('settings.personal.display_name') }}</span>
@@ -87,14 +87,14 @@
       </AppButton>
     </div>
 
-    <!-- The user's account in the data source -->
+    <!-- Учётная запись пользователя в источнике данных -->
     <div v-if="user?.source?.type" class="source-block">
       <h4 class="source-title">{{ $t('source_token.title') }} <AppHint help :text="$t('hints.source_token')" /></h4>
       <p class="source-hint">{{ $t('source_token.hint') }}</p>
       <SourceTokenForm allow-unlink />
     </div>
 
-    <!-- Change password modal -->
+    <!-- Окно смены пароля -->
     <AppModal v-model="showChangePassword" :title="$t('auth.password_change.title')" width="400px" :busy="changingPassword">
       <form @submit.prevent="submitPasswordChange" class="pw-form">
         <div class="form-field">

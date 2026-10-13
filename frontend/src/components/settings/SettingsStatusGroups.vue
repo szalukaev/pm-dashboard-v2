@@ -3,7 +3,7 @@
     <h4 class="section-title">{{ $t('settings.statuses.title') }} <AppHint help :text="$t('hints.statuses')" /></h4>
     <p class="block-hint">{{ $t('settings.statuses.hint') }}</p>
 
-    <!-- Unassigned statuses as tiles -->
+    <!-- Статусы без группы — плитками -->
     <div class="tiles-area">
       <h4 class="block-title">{{ $t('settings.statuses.all') }}</h4>
       <div class="tiles-grid">
@@ -19,7 +19,7 @@
       </div>
     </div>
 
-    <!-- Three columns -->
+    <!-- Три колонки -->
     <div class="columns-row">
       <div
         v-for="col in columns"
@@ -99,7 +99,7 @@ function bugTitle(s: Status): string {
   return t(s.is_bug ? 'settings.statuses.bug_unmark' : 'settings.statuses.bug_mark')
 }
 
-// Bugs is a mark on top of the group: the status stays in its column.
+// Bugs — отметка поверх группы: статус остаётся в своей колонке.
 async function toggleBug(status: Status) {
   if (!isAdmin.value) return
   status.is_bug = !status.is_bug

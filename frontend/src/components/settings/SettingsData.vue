@@ -2,7 +2,7 @@
   <div class="settings-data">
     <h3 class="section-title">{{ $t('settings.data.title') }}</h3>
 
-    <!-- Projects: selected ones as chips, the full tree in a dialog -->
+    <!-- Проекты: выбранные — метками, полное дерево — в окне -->
     <div class="setting-block">
       <h4 class="block-title">{{ $t('settings.data.projects') }}</h4>
       <p class="block-hint">{{ $t('settings.data.projects_hint') }}</p>
@@ -17,7 +17,7 @@
       </AppButton>
     </div>
 
-    <!-- Team -->
+    <!-- Команда -->
     <div class="setting-block">
       <h4 class="block-title">{{ $t('settings.data.team') }} <AppHint help :text="$t('hints.team')" /></h4>
       <p class="block-hint">{{ $t('settings.data.team_hint') }}</p>
@@ -30,7 +30,7 @@
       </AppButton>
     </div>
 
-    <!-- Projects dialog -->
+    <!-- Окно выбора проектов -->
     <AppModal v-model="projectsOpen" :title="$t('settings.data.pick_projects')" width="700px" :busy="saving">
       <div class="picker-toolbar">
         <input v-model="projectQuery" class="picker-search" :placeholder="$t('access.editor.search_project')" />
@@ -62,7 +62,7 @@
       </template>
     </AppModal>
 
-    <!-- Team dialog -->
+    <!-- Окно выбора команды -->
     <AppModal v-model="teamOpen" :title="$t('settings.data.pick_team')" width="560px" :busy="saving">
       <div class="picker-toolbar">
         <input v-model="teamQuery" class="picker-search" :placeholder="$t('access.editor.search_member')" />
@@ -124,7 +124,7 @@ async function loadData() {
   } catch {}
 }
 
-// Build flat tree with depth for display
+// Дерево плоским списком с глубиной — для показа
 const projectTree = computed(() => {
   const byId = new Map<number, any>()
   const children = new Map<number, number[]>()
@@ -146,7 +146,7 @@ const projectTree = computed(() => {
     }
   }
   walk(0, 0)
-  // Also include orphan projects (parent_id points to non-existent project)
+  // Сюда же — проекты без родителя (parent_id указывает на несуществующий проект)
   const placed = new Set(result.map(r => r.id))
   for (const p of projects.value) {
     if (!placed.has(p.id)) {
@@ -156,7 +156,7 @@ const projectTree = computed(() => {
   return result
 })
 
-// Get all descendant IDs of a project
+// Идентификаторы всех потомков проекта
 function getDescendants(id: number): number[] {
   const children = new Map<number, number[]>()
   for (const p of projects.value) {
@@ -175,7 +175,7 @@ function getDescendants(id: number): number[] {
   return result
 }
 
-// Selected values shown as chips, in tree / alphabetical order
+// Выбранные значения показываются метками: в порядке дерева или по алфавиту
 const selectedProjectItems = computed(() =>
   projectTree.value.filter(p => selectedProjects.value.includes(p.id))
 )
@@ -215,7 +215,7 @@ function openTeam() {
   teamOpen.value = true
 }
 
-// Selecting a parent project selects all its subprojects as well.
+// Выбор родительского проекта выбирает и все его подпроекты.
 function toggleProject(id: number, checked: boolean) {
   const descendants = getDescendants(id)
   if (checked) {

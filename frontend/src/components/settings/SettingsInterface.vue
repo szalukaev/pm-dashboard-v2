@@ -2,7 +2,7 @@
   <div class="settings-interface">
     <h3 class="section-title">{{ $t('settings.interface.title') }}</h3>
 
-    <!-- Theme -->
+    <!-- Тема -->
     <div class="setting-block">
       <h4 class="block-title">{{ $t('settings.interface.theme') }}</h4>
       <div class="mode-switch">
@@ -35,7 +35,7 @@
       </div>
     </div>
 
-    <!-- Language -->
+    <!-- Язык -->
     <div class="setting-block">
       <h4 class="block-title">{{ $t('settings.interface.language') }}</h4>
       <select v-model="currentLang" @change="changeLanguage" class="lang-select">
@@ -92,7 +92,7 @@ async function changeTimeZone() {
   await settingsStore.updateSettings({ timezone: currentZone.value })
 }
 
-// Stored on the server as "<theme>-<mode>", e.g. "nord-dark".
+// На сервере хранится в виде "<тема>-<режим>", например "nord-dark".
 function persist() {
   return settingsStore.updateSettings({ theme: `${currentTheme.value}-${currentMode.value}` } as any)
 }

@@ -1,6 +1,6 @@
 <template>
-  <!-- The personal API key form of the Redmine connector. Another connector
-       identifies a person its own way and gets its own form. -->
+  <!-- Форма личного ключа API для коннектора Redmine. Другой коннектор
+       определяет человека по-своему и получает свою форму. -->
   <form v-if="source?.type === 'redmine'" class="token-form" @submit.prevent="save">
     <p v-if="source.linked" class="token-status linked" data-testid="source-linked">
       <CheckCircle2 :size="16" />
