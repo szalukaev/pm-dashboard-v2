@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import axios from 'axios'
 import type { DashboardLayout } from '../utils/dashboardLayout'
 import { setTimeZone } from '../utils/format'
+import i18n from '../i18n'
 
 interface Settings {
   selected_projects: number[]
@@ -113,6 +114,7 @@ export const useSettingsStore = defineStore('settings', () => {
       const { data } = await axios.get('/api/settings')
       settings.value = { ...defaultSettings, ...data, pagination: data.pagination || {}, table_columns: data.table_columns || {}, dashboard_layout: data.dashboard_layout || {}, alert_rules: data.alert_rules || {} }
       applyTimeZone()
+      applyLanguage()
     } catch {
       // Use defaults
     } finally {
@@ -123,6 +125,16 @@ export const useSettingsStore = defineStore('settings', () => {
   // Свой пояс важнее пояса от администратора; без обоих — пояс браузера
   function applyTimeZone() {
     setTimeZone(settings.value.timezone || settings.value.default_timezone)
+  }
+
+  // Язык выбран пользователем и хранится на сервере, поэтому действует в
+  // любом браузере, а не только там, где его выбирали
+  function applyLanguage() {
+    const lang = settings.value.language
+    const locale = i18n.global.locale
+    if (locale.value === lang || !i18n.global.availableLocales.includes(lang as any)) return
+    locale.value = lang as any
+    localStorage.setItem('pm-dashboard-lang', lang)
   }
 
   async function updateSettings(partial: Partial<Settings>) {

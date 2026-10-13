@@ -83,6 +83,8 @@ const zones = computed(() => {
 
 onMounted(async () => {
   await settingsStore.ensureLoaded()
+  // Загрузка настроек могла сменить язык на сохранённый
+  currentLang.value = locale.value
   currentZone.value = settings.value.timezone || ''
 })
 
