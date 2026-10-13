@@ -1257,6 +1257,17 @@
       "TEMPLATE_SAVE_FAILED": "Could not save the template on the server"
     }
   },
+  "hints": {
+    "statuses": "Every Redmine status belongs to one of the groups. For example, New and In Progress are Open, Testing is In testing, Closed and Rejected are Closed.\n\nThe group decides which filter of the Tasks tab a task falls into and how it is counted in Analytics and in the sprint progress. Closed tasks are never overdue, tasks in testing do not get into the sprint backlog.\n\nThe setting is shared by all users and applies at once.",
+    "sync": "Data comes from Redmine in two ways. Once per interval only the changes are fetched — it takes seconds. Once a day every project is read in full: this picks up tasks deleted in Redmine and hours logged for past dates.\n\nThe time of the full pass and a manual start are on the Workers tab of Administration. Only projects chosen by at least one user are synced.",
+    "team": "The chosen members are your team. Team load is built over them, the list of assignees in a task is made of them, and they see your shared sprints.\n\nThe choice only narrows what the administrator allowed: a member beyond your rights cannot be added.",
+    "alert_rules": "Every rule has two ways of delivery: the bell in the header and email. Emails do not go one by one: everything collected is sent as one message once per interval set by the administrator.\n\nYour own edits in the dashboard do not notify you. Project rules work only in the projects chosen in the data settings. Events older than a week are not raised.",
+    "thresholds": "A threshold is the number of tasks above which an indicator is alarming: its card on Analytics turns red and a warning appears above the widgets.\n\nWithout the per-project checkbox the threshold is compared with the total over all your projects. With it — with the number of tasks of each project.",
+    "source_token": "Where to get the key: in Redmine open My account, find API access key on the right and press Show.\n\nThe key is stored encrypted. With it your task edits and comments go to Redmine under your own name instead of the service account.",
+    "retention": "Once a day after a sync the system saves a snapshot: totals per member and the state of the tasks. The trend charts are built from the snapshots.\n\nA cleanup deletes only the snapshots older than the retention period. Tasks, time entries, invoices and settings are not touched. Delete all snapshots removes the whole history — the charts start anew.",
+    "mail": "Get the settings from your mail administrator. SSL/TLS encrypts the connection from the start, usually port 465. STARTTLS turns encryption on after connecting, usually port 587. No encryption is acceptable only inside your own network.\n\nThe dashboard address is needed for links: with it the number and the name of a task in an email open its card.",
+    "users": "Rights add up in this order. An administrator can do everything. Others get rights from a role template; an individual setup (the shield icon) replaces the template. Then groups narrow the result: only the projects and members allowed by at least one group of the user remain.\n\nUsers link themselves to a Redmine member with a personal API key. The time zone is the default one until the user chooses their own."
+  },
   "connections": {
     "title": "Connections",
     "hint": "Connection settings of the database and the source system. Available to the administrator only. Only tested settings can be saved.",

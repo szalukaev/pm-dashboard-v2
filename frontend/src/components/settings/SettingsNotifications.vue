@@ -15,7 +15,7 @@
     </div>
 
     <!-- Правила: о чём сообщать и куда -->
-    <h4 class="block-title">{{ $t('notifications.rules_title') }}</h4>
+    <h4 class="block-title">{{ $t('notifications.rules_title') }} <AppHint help :text="$t('hints.alert_rules')" /></h4>
     <p class="block-hint">{{ $t('notifications.rules_hint') }}</p>
 
     <!-- Личные правила работают для того, кто связан с сотрудником Redmine -->
@@ -83,6 +83,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import AppHint from '../ui/AppHint.vue'
 import { useSettingsStore } from '../../stores/settings'
 import type { AlertRule } from '../../stores/settings'
 import { useAuthStore } from '../../stores/auth'

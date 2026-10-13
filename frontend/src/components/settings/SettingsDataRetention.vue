@@ -1,6 +1,6 @@
 <template>
   <div class="retention" data-testid="data-retention">
-    <h4 class="adm-title">{{ $t('settings.retention.title') }}</h4>
+    <h4 class="adm-title">{{ $t('settings.retention.title') }} <AppHint help :text="$t('hints.retention')" /></h4>
     <p class="adm-hint">{{ $t('settings.retention.hint') }}</p>
 
     <p class="stored" data-testid="retention-stats">
@@ -57,6 +57,7 @@ import { useSwal } from '../../composables/useSwal'
 import { useWebSocket } from '../../composables/useWebSocket'
 import AppButton from '../ui/AppButton.vue'
 import AppSavingOverlay from '../ui/AppSavingOverlay.vue'
+import AppHint from '../ui/AppHint.vue'
 
 interface Stats {
   daily_rows: number

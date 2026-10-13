@@ -1,6 +1,6 @@
 <template>
   <div class="status-groups">
-    <h4 class="section-title">{{ $t('settings.statuses.title') }}</h4>
+    <h4 class="section-title">{{ $t('settings.statuses.title') }} <AppHint help :text="$t('hints.statuses')" /></h4>
     <p class="block-hint">{{ $t('settings.statuses.hint') }}</p>
 
     <!-- Unassigned statuses as tiles -->
@@ -62,6 +62,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import AppHint from '../ui/AppHint.vue'
 import { useAuthStore } from '../../stores/auth'
 import { storeToRefs } from 'pinia'
 import axios from 'axios'

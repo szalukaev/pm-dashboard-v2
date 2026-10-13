@@ -1,6 +1,6 @@
 <template>
   <div class="thresholds" data-testid="thresholds">
-    <h4 class="block-title">{{ $t('thresholds.title') }}</h4>
+    <h4 class="block-title">{{ $t('thresholds.title') }} <AppHint help :text="$t('hints.thresholds')" /></h4>
     <p class="block-hint">{{ $t('thresholds.hint') }}</p>
 
     <div class="threshold-rows">
@@ -35,6 +35,7 @@
 
 <script setup lang="ts">
 import { reactive, onMounted } from 'vue'
+import AppHint from '../ui/AppHint.vue'
 import { useSettingsStore } from '../../stores/settings'
 import type { IndicatorThresholds } from '../../stores/settings'
 

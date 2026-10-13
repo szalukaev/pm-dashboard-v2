@@ -19,7 +19,7 @@
 
     <!-- Team -->
     <div class="setting-block">
-      <h4 class="block-title">{{ $t('settings.data.team') }}</h4>
+      <h4 class="block-title">{{ $t('settings.data.team') }} <AppHint help :text="$t('hints.team')" /></h4>
       <p class="block-hint">Сотрудники, задачи которых показываются в дашборде.</p>
       <div class="chips">
         <span v-for="m in selectedTeamItems" :key="m.id" class="chip">{{ m.name }}</span>
@@ -96,6 +96,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import AppHint from '../ui/AppHint.vue'
 import axios from 'axios'
 import { useSettingsStore } from '../../stores/settings'
 import { Pencil } from 'lucide-vue-next'

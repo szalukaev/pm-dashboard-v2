@@ -1,7 +1,7 @@
 <template>
   <div class="adm-section">
     <div class="adm-header">
-      <h4 class="adm-title">{{ $t('access.users.title') }}</h4>
+      <h4 class="adm-title">{{ $t('access.users.title') }} <AppHint help :text="$t('hints.users')" /></h4>
       <AppButton variant="primary" test-id="add-user-btn" @click="openCreate">
         <Plus :size="14" /> {{ $t('access.users.add') }}
       </AppButton>
@@ -245,6 +245,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
+import AppHint from '../../ui/AppHint.vue'
 import axios from 'axios'
 import { useI18n } from 'vue-i18n'
 import { Plus, ShieldCheck, Copy, KeyRound, Lock, Unlock, Trash2 } from 'lucide-vue-next'

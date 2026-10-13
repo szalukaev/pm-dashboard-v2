@@ -9,8 +9,9 @@
     @focus="show"
     @blur="shown = false"
   >
-    <!-- По умолчанию значок «i»; в слот можно положить то, что само объясняется подсказкой -->
-    <slot><Info :size="15" /></slot>
+    <!-- По умолчанию значок «i», с help — «?» (у настроек); в слот можно положить
+         то, что само объясняется подсказкой -->
+    <slot><HelpCircle v-if="help" :size="15" /><Info v-else :size="15" /></slot>
     <!-- Lives in the body so that no widget or window edge cuts it -->
     <Teleport to="body">
       <div v-if="shown" class="info-bubble" :style="{ left: x + 'px', top: y + 'px' }">{{ text }}</div>
@@ -20,10 +21,11 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Info } from 'lucide-vue-next'
+import { Info, HelpCircle } from 'lucide-vue-next'
 
 // text: what the bubble says; line breaks are kept
-defineProps<{ text: string }>()
+// help: значок «?» вместо «i»
+defineProps<{ text: string; help?: boolean }>()
 
 const BUBBLE_WIDTH = 360
 const EDGE = 8
@@ -48,6 +50,7 @@ function show() {
 .info-hint {
   display: inline-flex;
   flex-shrink: 0;
+  vertical-align: middle;
   color: var(--text-faint);
   cursor: help;
   outline: none;

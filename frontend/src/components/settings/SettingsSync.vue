@@ -1,6 +1,6 @@
 <template>
   <div class="settings-sync">
-    <h3 class="section-title">{{ $t('settings.sync.title') }}</h3>
+    <h3 class="section-title">{{ $t('settings.sync.title') }} <AppHint help :text="$t('hints.sync')" /></h3>
     <p class="section-hint">{{ $t('settings.sync.hint') }}</p>
 
     <div class="sync-actions">
@@ -71,6 +71,7 @@ import { useSwal } from '../../composables/useSwal'
 import { useWebSocket } from '../../composables/useWebSocket'
 import AppButton from '../ui/AppButton.vue'
 import AppSavingOverlay from '../ui/AppSavingOverlay.vue'
+import AppHint from '../ui/AppHint.vue'
 import SettingsDataRetention from './SettingsDataRetention.vue'
 
 interface SyncLog {

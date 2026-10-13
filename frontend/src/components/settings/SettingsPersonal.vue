@@ -89,7 +89,7 @@
 
     <!-- The user's account in the data source -->
     <div v-if="user?.source?.type" class="source-block">
-      <h4 class="source-title">{{ $t('source_token.title') }}</h4>
+      <h4 class="source-title">{{ $t('source_token.title') }} <AppHint help :text="$t('hints.source_token')" /></h4>
       <p class="source-hint">{{ $t('source_token.hint') }}</p>
       <SourceTokenForm allow-unlink />
     </div>
@@ -130,6 +130,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { formatDateTime } from '../../utils/format'
+import AppHint from '../ui/AppHint.vue'
 import { useAuthStore } from '../../stores/auth'
 import { storeToRefs } from 'pinia'
 import { Camera } from 'lucide-vue-next'

@@ -78,7 +78,7 @@
 import { ref } from 'vue'
 import { Menu, ChevronDown, ChevronUp, X } from 'lucide-vue-next'
 import { WIDGET_WIDTHS, nearestWidth } from '../../utils/dashboardLayout'
-import InfoHint from './InfoHint.vue'
+import InfoHint from '../ui/AppHint.vue'
 
 // movable: the widget can be dragged and resized (not on a narrow screen,
 // where every widget takes the whole width). dropSide: where the dragged

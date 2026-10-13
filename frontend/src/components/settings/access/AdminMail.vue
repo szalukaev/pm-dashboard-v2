@@ -1,6 +1,6 @@
 <template>
   <div class="adm-section">
-    <h4 class="adm-title">{{ $t('mail.title') }}</h4>
+    <h4 class="adm-title">{{ $t('mail.title') }} <AppHint help :text="$t('hints.mail')" /></h4>
     <p class="adm-hint">{{ $t('mail.hint') }}</p>
 
     <!-- Кнопки внутри формы сами её отправляют: сохранение идёт только по их клику -->
@@ -105,6 +105,7 @@ import { useSwal } from '../../../composables/useSwal'
 import { useAuthStore } from '../../../stores/auth'
 import AppButton from '../../ui/AppButton.vue'
 import AppSavingOverlay from '../../ui/AppSavingOverlay.vue'
+import AppHint from '../../ui/AppHint.vue'
 
 const { t, te } = useI18n()
 const { toast } = useSwal()
