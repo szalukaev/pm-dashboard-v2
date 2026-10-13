@@ -120,3 +120,24 @@ func TestMailerNeedsDatabase(t *testing.T) {
 		t.Errorf("состояние после прерванного запуска: %s", got)
 	}
 }
+
+func TestMailAlertInterval(t *testing.T) {
+	// Без базы и без сохранённого значения — раз в час
+	if got := (&Settings{}).MailAlertInterval(); got != 60 {
+		t.Errorf("интервал по умолчанию: %d", got)
+	}
+	for _, minutes := range []int{5, 60, 1440} {
+		if !ValidMailAlertInterval(minutes) {
+			t.Errorf("интервал %d должен приниматься", minutes)
+		}
+	}
+	// Чаще, чем рассылка проверяет почту, письма уходить не могут
+	for _, minutes := range []int{0, 4, -5, 1441} {
+		if ValidMailAlertInterval(minutes) {
+			t.Errorf("интервал %d не должен приниматься", minutes)
+		}
+	}
+	if err := (&Settings{}).SetMailAlertInterval(3); err == nil {
+		t.Error("негодный интервал не сохраняется")
+	}
+}

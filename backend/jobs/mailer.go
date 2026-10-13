@@ -19,8 +19,6 @@ const MailKey = "mail"
 const (
 	// mailTick — как часто рассылка проверяет, не пора ли что-то отправить.
 	mailTick = 5 * time.Minute
-	// alertMailInterval — письмо об уведомлениях уходит пользователю не чаще.
-	alertMailInterval = time.Hour
 	// alertMailWindow — уведомления старше в письмо не попадают: если почту
 	// настроили позже, накопившееся за недели разом не уйдёт.
 	alertMailWindow = 24 * time.Hour
@@ -147,11 +145,11 @@ func (m *Mailer) RunNow(force bool) (int64, error) {
 }
 
 // alerts отправляет пользователям письма с их неотправленными уведомлениями:
-// одно письмо на пользователя, не чаще раза в час. Возвращает число писем и
-// первую ошибку отправки.
+// одно письмо на пользователя, не чаще интервала, заданного администратором в
+// расписании рассылки. Возвращает число писем и первую ошибку отправки.
 func (m *Mailer) alerts(cfg mail.Config, now time.Time, force bool) (int, error) {
 	since := now.Add(-alertMailWindow)
-	quiet := now.Add(-alertMailInterval)
+	quiet := now.Add(-time.Duration(m.Settings.MailAlertInterval()) * time.Minute)
 	if force {
 		// Никакое письмо не моложе этого момента: час ждать не нужно
 		quiet = now.Add(time.Hour)
@@ -189,7 +187,7 @@ func (m *Mailer) alerts(cfg mail.Config, now time.Time, force bool) (int, error)
 		if err != nil || len(list) == 0 {
 			continue
 		}
-		subject, body := notify.Digest(list, t.lang)
+		subject, body := notify.Digest(list, t.lang, cfg.TaskURL)
 		if err := send(cfg, t.email, subject, body); err != nil {
 			slog.Warn("Could not send the notifications by mail", "user", t.userID, "error", err)
 			if firstErr == nil {

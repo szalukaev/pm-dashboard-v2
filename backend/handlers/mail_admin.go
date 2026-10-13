@@ -51,6 +51,7 @@ func (h *MailHandler) UpdateSMTP(w http.ResponseWriter, r *http.Request) {
 	cfg.Username = strings.TrimSpace(cfg.Username)
 	cfg.From = strings.TrimSpace(cfg.From)
 	cfg.FromName = strings.TrimSpace(cfg.FromName)
+	cfg.BaseURL = strings.TrimSpace(cfg.BaseURL)
 	cfg.PasswordEnc = ""
 	// Выключенную отправку можно сохранить и недозаполненной
 	if code := cfg.Validate(); code != "" && (cfg.Enabled || cfg.Host != "") {

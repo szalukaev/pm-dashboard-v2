@@ -13,6 +13,7 @@ import (
 	"net"
 	netmail "net/mail"
 	"net/smtp"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -48,6 +49,10 @@ type Config struct {
 	// From — адрес отправителя; FromName — подпись рядом с ним.
 	From     string `json:"from"`
 	FromName string `json:"from_name"`
+	// BaseURL — адрес, по которому пользователи открывают дашборд
+	// (http://host:port). С ним номер и название задачи в письме становятся
+	// ссылкой на её карточку; без него остаются текстом.
+	BaseURL string `json:"base_url"`
 	// Password хранится в базе зашифрованным (PasswordEnc) и наружу не
 	// отдаётся.
 	Password    string `json:"-"`
@@ -138,8 +143,29 @@ func (c Config) Validate() string {
 		return "INVALID_SMTP_FROM"
 	case strings.ContainsAny(c.FromName, "\r\n") || len(c.FromName) > 200:
 		return "INVALID_SMTP_FROM"
+	case c.BaseURL != "" && !validBaseURL(c.BaseURL):
+		return "INVALID_BASE_URL"
 	}
 	return ""
+}
+
+// validBaseURL сообщает, что строка — адрес сайта: http или https, с именем
+// сервера, без параметров и пробелов.
+func validBaseURL(address string) bool {
+	if len(address) > 255 || strings.ContainsAny(address, " \r\n\"'<>") {
+		return false
+	}
+	u, err := url.Parse(address)
+	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != "" && u.RawQuery == "" && u.Fragment == ""
+}
+
+// TaskURL возвращает ссылку на карточку задачи в дашборде или пустую строку,
+// если адрес дашборда не задан.
+func (c Config) TaskURL(issueID int) string {
+	if c.BaseURL == "" || !validBaseURL(c.BaseURL) || issueID <= 0 {
+		return ""
+	}
+	return strings.TrimRight(c.BaseURL, "/") + "/tasks?task=" + strconv.Itoa(issueID)
 }
 
 // Ready сообщает, можно ли отправлять письма с такими настройками.

@@ -117,3 +117,51 @@ func TestSendNeedsConfig(t *testing.T) {
 		t.Errorf("негодный адрес получателя: %v", err)
 	}
 }
+
+func TestTaskURL(t *testing.T) {
+	cfg := Config{BaseURL: "http://176.12.69.5:82"}
+	if got := cfg.TaskURL(31974); got != "http://176.12.69.5:82/tasks?task=31974" {
+		t.Errorf("ссылка на задачу: %q", got)
+	}
+	// Косая черта в конце адреса не удваивается
+	if got := (Config{BaseURL: "https://pm.example.com/"}).TaskURL(7); got != "https://pm.example.com/tasks?task=7" {
+		t.Errorf("адрес с косой чертой: %q", got)
+	}
+	// Без адреса дашборда ссылки нет — задача в письме останется текстом
+	if got := (Config{}).TaskURL(7); got != "" {
+		t.Errorf("без адреса: %q", got)
+	}
+	if got := cfg.TaskURL(0); got != "" {
+		t.Errorf("без номера задачи: %q", got)
+	}
+}
+
+func TestBaseURLValidation(t *testing.T) {
+	good := Config{Host: "smtp.example.com", Port: 587, Security: SecurityStartTLS, From: "pm@example.com"}
+	for _, address := range []string{"", "http://176.12.69.5:82", "https://pm.example.com", "https://example.com/pm/"} {
+		cfg := good
+		cfg.BaseURL = address
+		if code := cfg.Validate(); code != "" {
+			t.Errorf("адрес %q должен приниматься: %s", address, code)
+		}
+	}
+	bad := []string{
+		"pm.example.com",                  // без http
+		"ftp://pm.example.com",            // не сайт
+		"javascript:alert(1)",             // не должно стать ссылкой в письме
+		"http://",                         // без сервера
+		"http://pm.example.com/?x=1",      // с параметрами
+		"http://pm.example.com/\"onclick", // кавычка сломала бы разметку письма
+		"http://pm example.com",
+	}
+	for _, address := range bad {
+		cfg := good
+		cfg.BaseURL = address
+		if code := cfg.Validate(); code != "INVALID_BASE_URL" {
+			t.Errorf("адрес %q не должен приниматься: %q", address, code)
+		}
+		if got := cfg.TaskURL(5); got != "" {
+			t.Errorf("по негодному адресу %q ссылка не строится: %q", address, got)
+		}
+	}
+}

@@ -1,6 +1,7 @@
 package notify
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -350,8 +351,20 @@ func TestMailTexts(t *testing.T) {
 		}
 	}
 
-	subject, body := Digest([]Notification{changed, overdue}, "ru")
-	if subject != "PM Dashboard: новых уведомлений — 2" {
+	// Без адреса дашборда задача в письме — текст, ссылок нет
+	if _, plain := Digest([]Notification{changed}, "ru", nil); strings.Contains(plain, "<a ") {
+		t.Error("без адреса дашборда ссылок в письме быть не должно")
+	}
+	link := func(id int) string { return fmt.Sprintf("http://pm.example.com/tasks?task=%d", id) }
+	subject, body := Digest([]Notification{changed, overdue, contract}, "ru", link)
+	// Номер и название задачи ведут на её карточку; у договора ссылки нет
+	if !strings.Contains(body, `<a href="http://pm.example.com/tasks?task=101"`) || !strings.Contains(body, `task=5"`) {
+		t.Error("номер и название задачи должны быть ссылкой на карточку")
+	}
+	if strings.Count(body, "<a ") != 2 {
+		t.Errorf("ссылок должно быть две — по одной на задачу, найдено %d", strings.Count(body, "<a "))
+	}
+	if subject != "PM Dashboard: новых уведомлений — 3" {
 		t.Errorf("тема: %q", subject)
 	}
 	// Текст из задач не должен стать разметкой письма

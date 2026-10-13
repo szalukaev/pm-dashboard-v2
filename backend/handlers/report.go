@@ -214,7 +214,7 @@ func (h *ReportHandler) sendTo(cfg mail.Config, userID int, to, lang string, set
 	if err != nil {
 		return err
 	}
-	subject, body, err := h.build(scope, settings, lang, now)
+	subject, body, err := h.build(scope, settings, lang, now, cfg.TaskURL)
 	if err != nil {
 		return err
 	}
@@ -250,7 +250,7 @@ func (h *ReportHandler) SendTest(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusBadRequest, "SMTP_NOT_CONFIGURED")
 		return
 	}
-	subject, body, err := h.build(middleware.GetScope(r), settings, lang, time.Now())
+	subject, body, err := h.build(middleware.GetScope(r), settings, lang, time.Now(), cfg.TaskURL)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
@@ -318,7 +318,9 @@ func reportDate(date string) string {
 
 // build собирает письмо со сводкой: тему и текст в HTML. Данные считаются
 // теми же расчётами, что показывает вкладка «Аналитика», в правах пользователя.
-func (h *ReportHandler) build(scope *access.Scope, settings ReportSettings, lang string, now time.Time) (subject, body string, err error) {
+// taskURL даёт ссылку на карточку задачи в дашборде; с пустой ссылкой задача
+// остаётся текстом.
+func (h *ReportHandler) build(scope *access.Scope, settings ReportSettings, lang string, now time.Time, taskURL func(issueID int) string) (subject, body string, err error) {
 	if lang != "en" {
 		lang = "ru"
 	}
@@ -462,7 +464,12 @@ func (h *ReportHandler) build(scope *access.Scope, settings ReportSettings, lang
 					due = due[:10]
 				}
 				b.WriteString(`<tr>`)
-				cell(fmt.Sprintf("#%d %s", task.ExternalID, esc(task.Subject)), "")
+				// Номер и название задачи — ссылка на её карточку в дашборде
+				name := fmt.Sprintf("#%d %s", task.ExternalID, esc(task.Subject))
+				if link := taskURL(task.ExternalID); link != "" {
+					name = `<a href="` + esc(link) + `" style="color:#0969da;text-decoration:none">` + name + `</a>`
+				}
+				cell(name, "")
 				cell(esc(task.ProjectName), "color:#57606a;")
 				cell(esc(task.AssignedToName), "color:#57606a;")
 				cell(reportDate(due), reportNumber)

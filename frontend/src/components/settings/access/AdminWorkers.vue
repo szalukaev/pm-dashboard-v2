@@ -49,8 +49,7 @@
                 <AppButton variant="ghost" :test-id="'worker-toggle-' + w.key" @click="act(w, w.enabled ? 'disable' : 'enable')">
                   {{ $t(w.enabled ? 'workers.disable' : 'workers.enable') }}
                 </AppButton>
-                <!-- У рассылки нет своего расписания: время задают сами письма -->
-                <AppButton v-if="w.key !== 'mail'" variant="ghost" :test-id="'worker-schedule-' + w.key" @click="openSchedule(w)">
+                <AppButton variant="ghost" :test-id="'worker-schedule-' + w.key" @click="openSchedule(w)">
                   {{ $t('workers.schedule') }}
                 </AppButton>
               </div>
@@ -73,6 +72,14 @@
             <input v-model="schedule.fullTime" type="time" class="adm-input" data-testid="schedule-full-time" />
           </label>
           <p class="adm-hint">{{ $t('workers.full_sync_hint') }}</p>
+        </template>
+        <!-- Рассылка: как часто пользователю уходит письмо с уведомлениями -->
+        <template v-else-if="scheduleKey === 'mail'">
+          <label class="schedule-field">
+            <span>{{ $t('workers.mail_interval') }}</span>
+            <input v-model="schedule.mailInterval" type="text" inputmode="numeric" class="adm-input" data-testid="schedule-mail-interval" />
+          </label>
+          <p class="adm-hint">{{ $t('workers.mail_hint') }}</p>
         </template>
         <template v-else>
           <label class="schedule-field">
@@ -153,7 +160,7 @@ async function act(w: Worker, action: 'run' | 'stop' | 'enable' | 'disable', bod
 
 const scheduleOpen = ref(false)
 const scheduleKey = ref<Worker['key']>('sync')
-const schedule = reactive({ interval: '5', fullTime: '03:00', time: '02:00' })
+const schedule = reactive({ interval: '5', fullTime: '03:00', time: '02:00', mailInterval: '60' })
 const scheduleTitle = computed(() => t('workers.schedule_title', { name: t('workers.names.' + scheduleKey.value) }))
 
 function openSchedule(w: Worker) {
@@ -161,13 +168,16 @@ function openSchedule(w: Worker) {
   schedule.interval = String(w.schedule.interval_minutes ?? 5)
   schedule.fullTime = w.schedule.full_sync_time || '03:00'
   schedule.time = w.schedule.time || '02:00'
+  schedule.mailInterval = String(w.schedule.interval_minutes ?? 60)
   scheduleOpen.value = true
 }
 
 async function saveSchedule() {
   const body = scheduleKey.value === 'sync'
     ? { interval_minutes: Number(schedule.interval), full_sync_time: schedule.fullTime }
-    : { time: schedule.time }
+    : scheduleKey.value === 'mail'
+      ? { interval_minutes: Number(schedule.mailInterval) }
+      : { time: schedule.time }
   try {
     await axios.put(`/api/admin/workers/${scheduleKey.value}/schedule`, body)
     scheduleOpen.value = false
@@ -187,7 +197,9 @@ function scheduleText(w: Worker): string {
   }
   if (w.key === 'mail') {
     // Без настроенной почты рассылке отправлять нечем
-    return t(w.schedule.configured ? 'workers.schedule_mail' : 'workers.schedule_mail_off')
+    return w.schedule.configured
+      ? t('workers.schedule_mail', { minutes: w.schedule.interval_minutes })
+      : t('workers.schedule_mail_off')
   }
   return t('workers.schedule_cleanup', { time: w.schedule.time, days: w.schedule.retention_days })
 }

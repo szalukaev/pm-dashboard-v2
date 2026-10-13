@@ -115,6 +115,38 @@ func (s *Settings) SetMailEnabled(enabled bool) error {
 	return s.set(keyMailEnabled, enabled)
 }
 
+// Как часто пользователю уходит письмо с уведомлениями, в минутах.
+const (
+	keyMailAlertInterval = "mail_alert_interval_minutes"
+
+	DefaultMailAlertInterval = 60
+	// Рассылка проверяет почту раз в 5 минут — чаще письма уходить не могут
+	MinMailAlertInterval = 5
+	MaxMailAlertInterval = 1440
+)
+
+// ValidMailAlertInterval сообщает, можно ли задать такой интервал.
+func ValidMailAlertInterval(minutes int) bool {
+	return minutes >= MinMailAlertInterval && minutes <= MaxMailAlertInterval
+}
+
+// MailAlertInterval: письмо с уведомлениями уходит пользователю не чаще чем
+// раз в столько минут.
+func (s *Settings) MailAlertInterval() int {
+	minutes := 0
+	if !s.get(keyMailAlertInterval, &minutes) || !ValidMailAlertInterval(minutes) {
+		return DefaultMailAlertInterval
+	}
+	return minutes
+}
+
+func (s *Settings) SetMailAlertInterval(minutes int) error {
+	if !ValidMailAlertInterval(minutes) {
+		return errors.New("mail interval out of range")
+	}
+	return s.set(keyMailAlertInterval, minutes)
+}
+
 // ValidTimeOfDay reports whether the value is a time of day as "HH:MM".
 func ValidTimeOfDay(value string) bool {
 	_, err := time.Parse("15:04", value)

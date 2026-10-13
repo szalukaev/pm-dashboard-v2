@@ -149,8 +149,17 @@ func Lines(n Notification, lang string) []string {
 	return lines
 }
 
-// Digest собирает письмо с уведомлениями: тему и текст в HTML.
-func Digest(list []Notification, lang string) (subject, body string) {
+// issueID возвращает номер задачи, о которой уведомление, или 0.
+func issueID(n Notification) int {
+	var p params
+	json.Unmarshal(n.Params, &p)
+	return p.IssueID
+}
+
+// Digest собирает письмо с уведомлениями: тему и текст в HTML. taskURL даёт
+// ссылку на карточку задачи в дашборде; если она пуста или taskURL — nil,
+// номер и название задачи остаются текстом.
+func Digest(list []Notification, lang string, taskURL func(issueID int) string) (subject, body string) {
 	lang = language(lang)
 	w := words[lang]
 	subject = fmt.Sprintf(w["subject"], len(list))
@@ -161,8 +170,18 @@ func Digest(list []Notification, lang string) (subject, body string) {
 	for _, n := range list {
 		b.WriteString(`<div style="margin:0 0 12px;padding:12px 14px;border:1px solid #d8dee4;border-radius:8px">`)
 		b.WriteString(`<div style="font-weight:bold">` + html.EscapeString(Title(n, lang)) + `</div>`)
-		for _, line := range Lines(n, lang) {
-			b.WriteString(`<div style="margin-top:4px;color:#57606a">` + html.EscapeString(line) + `</div>`)
+		link := ""
+		if id := issueID(n); id != 0 && taskURL != nil {
+			link = taskURL(id)
+		}
+		for i, line := range Lines(n, lang) {
+			text := html.EscapeString(line)
+			// Первая строка уведомления о задаче — её номер и название:
+			// клик открывает карточку задачи в дашборде
+			if i == 0 && link != "" {
+				text = `<a href="` + html.EscapeString(link) + `" style="color:#0969da;text-decoration:none">` + text + `</a>`
+			}
+			b.WriteString(`<div style="margin-top:4px;color:#57606a">` + text + `</div>`)
 		}
 		b.WriteString(`<div style="margin-top:6px;font-size:12px;color:#8c959f">` + n.CreatedAt.Format("02.01.2006 15:04") + `</div>`)
 		b.WriteString(`</div>`)

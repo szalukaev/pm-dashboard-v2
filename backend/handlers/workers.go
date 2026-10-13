@@ -158,7 +158,12 @@ func (h *WorkersHandler) mailWorker() workerInfo {
 		Running:   h.Mailer.Running(),
 		LastStart: status.LastStart,
 		Error:     status.Error,
-		Schedule:  map[string]interface{}{"configured": cfg.Ready()},
+		Schedule: map[string]interface{}{
+			"configured":       cfg.Ready(),
+			"interval_minutes": h.Settings.MailAlertInterval(),
+			"interval_min":     jobs.MinMailAlertInterval,
+			"interval_max":     jobs.MaxMailAlertInterval,
+		},
 	}
 	if status.LastStart != nil {
 		info.DurationMs, info.Processed = &status.DurationMs, &status.Processed
@@ -320,6 +325,17 @@ func (h *WorkersHandler) UpdateSchedule(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		h.Cleaner.Rescheduled()
+	case workerMail:
+		// Расписание рассылки — как часто пользователю уходит письмо с
+		// уведомлениями; сводки идут по времени, заданному пользователями
+		if body.IntervalMinutes == nil || !jobs.ValidMailAlertInterval(*body.IntervalMinutes) {
+			utils.Error(w, http.StatusBadRequest, "INVALID_INTERVAL")
+			return
+		}
+		if err := h.Settings.SetMailAlertInterval(*body.IntervalMinutes); err != nil {
+			utils.Error(w, http.StatusInternalServerError, "CONFIG_SAVE_FAILED")
+			return
+		}
 	default:
 		utils.Error(w, http.StatusNotFound, "WORKER_NOT_FOUND")
 		return
