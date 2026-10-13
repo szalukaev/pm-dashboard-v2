@@ -19,8 +19,8 @@ type GanttTask struct {
 	AssignedToName string `json:"assigned_to_name"`
 	// Hours planned for the task; null when it has no estimate
 	EstimatedHours *float64 `json:"estimated_hours"`
-	Start          string `json:"start"`
-	Due            string `json:"due"`
+	Start          string   `json:"start"`
+	Due            string   `json:"due"`
 }
 
 type GanttProject struct {

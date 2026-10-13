@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"strconv"
-	"strings"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -45,9 +45,9 @@ func (c *Client) requestContext() context.Context {
 
 type projectResp struct {
 	Projects []struct {
-		ID       int    `json:"id"`
-		Name     string `json:"name"`
-		Parent   *struct{ ID int } `json:"parent"`
+		ID     int               `json:"id"`
+		Name   string            `json:"name"`
+		Parent *struct{ ID int } `json:"parent"`
 	} `json:"projects"`
 	TotalCount int `json:"total_count"`
 }
@@ -76,12 +76,12 @@ type issueResp struct {
 		Category *struct {
 			Name string `json:"name"`
 		} `json:"category"`
-		StartDate    *string  `json:"start_date"`
-		DueDate      *string  `json:"due_date"`
-		DoneRatio    int      `json:"done_ratio"`
+		StartDate      *string  `json:"start_date"`
+		DueDate        *string  `json:"due_date"`
+		DoneRatio      int      `json:"done_ratio"`
 		EstimatedHours *float64 `json:"estimated_hours"`
-		SpentHours   float64  `json:"spent_hours"`
-		Tracker      struct {
+		SpentHours     float64  `json:"spent_hours"`
+		Tracker        struct {
 			Name string `json:"name"`
 		} `json:"tracker"`
 		Author struct {
@@ -227,17 +227,17 @@ func (c *Client) GetTimeEntries(projectID int, from string) ([]TimeEntry, error)
 
 type statusResp struct {
 	Statuses []struct {
-		ID      int    `json:"id"`
-		Name    string `json:"name"`
-		IsClosed bool  `json:"is_closed"`
+		ID       int    `json:"id"`
+		Name     string `json:"name"`
+		IsClosed bool   `json:"is_closed"`
 	} `json:"issue_statuses"`
 }
 
 type memberResp struct {
 	Memberships []struct {
 		User struct {
-			ID   int    `json:"id"`
-			Name string `json:"name"`
+			ID    int    `json:"id"`
+			Name  string `json:"name"`
 			Login string `json:"login"`
 		} `json:"user"`
 	} `json:"memberships"`
@@ -556,8 +556,8 @@ type Comment struct {
 type commentsResp struct {
 	Issue struct {
 		Journals []struct {
-			ID        int    `json:"id"`
-			User      struct {
+			ID   int `json:"id"`
+			User struct {
 				Name string `json:"name"`
 			} `json:"user"`
 			Notes     string `json:"notes"`
@@ -693,9 +693,9 @@ func (c *Client) GetIssueState(id int) (*IssueState, error) {
 
 type priorityResp struct {
 	Priorities []struct {
-		ID       int    `json:"id"`
-		Name     string `json:"name"`
-		IsDefault bool  `json:"is_default"`
+		ID        int    `json:"id"`
+		Name      string `json:"name"`
+		IsDefault bool   `json:"is_default"`
 	} `json:"issue_priorities"`
 	TotalCount int `json:"total_count"`
 }

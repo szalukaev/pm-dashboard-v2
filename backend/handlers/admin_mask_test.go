@@ -1,9 +1,9 @@
 package handlers
 
 import (
+	"database/sql"
 	"net/http"
 	"net/http/httptest"
-	"database/sql"
 	"testing"
 )
 

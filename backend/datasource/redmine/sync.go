@@ -2,10 +2,10 @@ package redmine
 
 import (
 	"context"
-	"strings"
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 

@@ -74,10 +74,10 @@ type Manager struct {
 
 func New(store ConfigStore, db **sql.DB, readOnly func() bool) *Manager {
 	m := &Manager{
-		store:     store,
-		db:        db,
-		readOnly:  readOnly,
-		wake:      make(chan struct{}, 1),
+		store:    store,
+		db:       db,
+		readOnly: readOnly,
+		wake:     make(chan struct{}, 1),
 	}
 	m.newSyncer = func(c *redmine.Client) syncer {
 		s := redmine.NewSyncer(c)

@@ -16,10 +16,10 @@ type AnalyticsHandler struct {
 }
 
 type StatCard struct {
-	Label string  `json:"label"`
-	Value float64 `json:"value"`
-	IsPct bool    `json:"is_pct"`
-	Variant string `json:"variant,omitempty"`
+	Label   string  `json:"label"`
+	Value   float64 `json:"value"`
+	IsPct   bool    `json:"is_pct"`
+	Variant string  `json:"variant,omitempty"`
 }
 
 type TeamLoadRow struct {
@@ -44,14 +44,14 @@ type DeadlineGroup struct {
 }
 
 type ProjectDist struct {
-	ProjectID   int               `json:"project_id"`
-	ProjectName string            `json:"project_name"`
+	ProjectID   int    `json:"project_id"`
+	ProjectName string `json:"project_name"`
 	// The topmost parent of the project among the projects of the answer
 	// (the project itself when it has none): nested projects can be shown
 	// as one chart
-	RootID   int    `json:"root_id"`
-	RootName string `json:"root_name"`
-	Assignees   []AssigneeCount   `json:"assignees"`
+	RootID    int             `json:"root_id"`
+	RootName  string          `json:"root_name"`
+	Assignees []AssigneeCount `json:"assignees"`
 }
 
 type AssigneeCount struct {

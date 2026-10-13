@@ -44,11 +44,11 @@ func (h *PaymentsHandler) ListOrganizations(w http.ResponseWriter, r *http.Reque
 	defer rows.Close()
 
 	type Org struct {
-		ID          int     `json:"id"`
-		Name        string  `json:"name"`
-		Address     *string `json:"address"`
-		INN         *string `json:"inn"`
-		ContactName *string `json:"contact_name"`
+		ID           int     `json:"id"`
+		Name         string  `json:"name"`
+		Address      *string `json:"address"`
+		INN          *string `json:"inn"`
+		ContactName  *string `json:"contact_name"`
 		ContactPhone *string `json:"contact_phone"`
 	}
 	var orgs []Org
@@ -308,17 +308,29 @@ func (h *PaymentsHandler) CreateContract(w http.ResponseWriter, r *http.Request)
 			utils.Error(w, http.StatusNotFound, "ORGANIZATION_NOT_FOUND")
 			return
 		}
-		if body.CompanyName == nil && orgName.Valid { body.CompanyName = &orgName.String }
-		if body.CompanyAddress == nil && orgAddr.Valid { body.CompanyAddress = &orgAddr.String }
-		if body.ContactName == nil && orgContact.Valid { body.ContactName = &orgContact.String }
-		if body.ContactPhone == nil && orgPhone.Valid { body.ContactPhone = &orgPhone.String }
+		if body.CompanyName == nil && orgName.Valid {
+			body.CompanyName = &orgName.String
+		}
+		if body.CompanyAddress == nil && orgAddr.Valid {
+			body.CompanyAddress = &orgAddr.String
+		}
+		if body.ContactName == nil && orgContact.Valid {
+			body.ContactName = &orgContact.String
+		}
+		if body.ContactPhone == nil && orgPhone.Valid {
+			body.ContactPhone = &orgPhone.String
+		}
 	}
 	// A date left blank in the form is "not set", not an empty string
 	body.StartDate, body.EndDate = emptyToNil(body.StartDate), emptyToNil(body.EndDate)
 	vatRate := "none"
-	if body.VatRate != nil { vatRate = *body.VatRate }
+	if body.VatRate != nil {
+		vatRate = *body.VatRate
+	}
 	amount := 0.0
-	if body.Amount != nil { amount = *body.Amount }
+	if body.Amount != nil {
+		amount = *body.Amount
+	}
 
 	var id int
 	err := (*h.DB).QueryRow(`INSERT INTO contracts (user_id, organization_id, contract_type, name, company_name,
@@ -359,7 +371,10 @@ func (h *PaymentsHandler) UpdateContract(w http.ResponseWriter, r *http.Request)
 		"company_address": true, "amount": true, "vat_rate": true, "contact_name": true,
 		"contact_phone": true, "start_date": true, "end_date": true,
 	}, 1)
-	if len(sets) == 0 { utils.Error(w, http.StatusBadRequest, "NO_FIELDS"); return }
+	if len(sets) == 0 {
+		utils.Error(w, http.StatusBadRequest, "NO_FIELDS")
+		return
+	}
 	args = append(args, contractID, userID)
 	res, err := (*h.DB).Exec("UPDATE contracts SET "+utils.JoinStrings(sets, ",")+" WHERE id=$"+utils.Itoa(idx)+" AND user_id=$"+utils.Itoa(idx+1), args...)
 	if err != nil {
@@ -424,19 +439,20 @@ func (h *PaymentsHandler) ListInvoices(w http.ResponseWriter, r *http.Request) {
 		FROM invoices i JOIN contracts c ON i.contract_id = c.id
 		WHERE i.contract_id=$1 AND c.user_id=$2 ORDER BY i.issued_at DESC, i.id DESC`+pageClause(limit, offset), contractID, userID)
 	if err != nil {
-		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED"); return
+		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
+		return
 	}
 	defer rows.Close()
 
 	type Invoice struct {
-		ID        int     `json:"id"`
-		Amount    float64 `json:"amount"`
-		VatRate   string  `json:"vat_rate"`
-		IssuedAt  string  `json:"issued_at"`
+		ID         int     `json:"id"`
+		Amount     float64 `json:"amount"`
+		VatRate    string  `json:"vat_rate"`
+		IssuedAt   string  `json:"issued_at"`
 		PaidAmount float64 `json:"paid_amount"`
-		Status    string  `json:"status"`
-		Total     float64 `json:"total"`
-		Remainder float64 `json:"remainder"`
+		Status     string  `json:"status"`
+		Total      float64 `json:"total"`
+		Remainder  float64 `json:"remainder"`
 		// Number: the date of issue as YYYYMM-DD
 		Number string `json:"number"`
 		// PaidAt: the date of the last payment, nil when nothing is paid
@@ -456,7 +472,9 @@ func (h *PaymentsHandler) ListInvoices(w http.ResponseWriter, r *http.Request) {
 		inv.Number = invoiceNumber(inv.IssuedAt)
 		invoices = append(invoices, inv)
 	}
-	if invoices == nil { invoices = []Invoice{} }
+	if invoices == nil {
+		invoices = []Invoice{}
+	}
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"invoices": invoices, "total": total})
 }
 
@@ -477,17 +495,32 @@ func (h *PaymentsHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var contract struct{ Amount float64; VatRate string; Name string }
+	var contract struct {
+		Amount  float64
+		VatRate string
+		Name    string
+	}
 	err = (*h.DB).QueryRow("SELECT amount, vat_rate, name FROM contracts WHERE id=$1 AND user_id=$2", contractID, userID).Scan(&contract.Amount, &contract.VatRate, &contract.Name)
-	if err != nil { utils.Error(w, http.StatusNotFound, "CONTRACT_NOT_FOUND"); return }
+	if err != nil {
+		utils.Error(w, http.StatusNotFound, "CONTRACT_NOT_FOUND")
+		return
+	}
 
 	var body struct {
-		Items []struct{ Name string; Quantity float64; Price float64 } `json:"items"`
+		Items []struct {
+			Name     string
+			Quantity float64
+			Price    float64
+		} `json:"items"`
 	}
 	json.NewDecoder(r.Body).Decode(&body)
 
 	if len(body.Items) == 0 {
-		body.Items = []struct{ Name string; Quantity float64; Price float64 }{{Name: contract.Name, Quantity: 1, Price: contract.Amount}}
+		body.Items = []struct {
+			Name     string
+			Quantity float64
+			Price    float64
+		}{{Name: contract.Name, Quantity: 1, Price: contract.Amount}}
 	}
 
 	totalAmount := 0.0
@@ -607,10 +640,12 @@ func (h *PaymentsHandler) DeleteInvoice(w http.ResponseWriter, r *http.Request) 
 	res, err := (*h.DB).Exec(`DELETE FROM invoices WHERE id=$1 AND contract_id IN
 		(SELECT id FROM contracts WHERE user_id=$2)`, invoiceID, userID)
 	if err != nil {
-		utils.Error(w, http.StatusInternalServerError, "DELETE_FAILED"); return
+		utils.Error(w, http.StatusInternalServerError, "DELETE_FAILED")
+		return
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		utils.Error(w, http.StatusNotFound, "INVOICE_NOT_FOUND"); return
+		utils.Error(w, http.StatusNotFound, "INVOICE_NOT_FOUND")
+		return
 	}
 	utils.Success(w)
 }
@@ -629,16 +664,26 @@ func (h *PaymentsHandler) PayInvoice(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Ownership: pay only an invoice of the caller's own contract.
-	var inv struct{ Amount float64; VatRate string; PaidAmount float64 }
+	var inv struct {
+		Amount     float64
+		VatRate    string
+		PaidAmount float64
+	}
 	err = (*h.DB).QueryRow(`SELECT i.amount, i.vat_rate, i.paid_amount
 		FROM invoices i JOIN contracts c ON i.contract_id = c.id
 		WHERE i.id=$1 AND c.user_id=$2`, invoiceID, userID).Scan(&inv.Amount, &inv.VatRate, &inv.PaidAmount)
-	if err != nil { utils.Error(w, http.StatusNotFound, "INVOICE_NOT_FOUND"); return }
+	if err != nil {
+		utils.Error(w, http.StatusNotFound, "INVOICE_NOT_FOUND")
+		return
+	}
 
 	totalObligation := utils.Round2(inv.Amount * vatMultiplier(inv.VatRate))
 	remainder := totalObligation - inv.PaidAmount
 
-	var body struct{ Amount *float64 `json:"amount"`; PaidAt *string `json:"paid_at"` }
+	var body struct {
+		Amount *float64 `json:"amount"`
+		PaidAt *string  `json:"paid_at"`
+	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
 		return
@@ -653,12 +698,18 @@ func (h *PaymentsHandler) PayInvoice(w http.ResponseWriter, r *http.Request) {
 	}
 
 	payDate := time.Now().Format("2006-01-02")
-	if body.PaidAt != nil { payDate = *body.PaidAt }
+	if body.PaidAt != nil {
+		payDate = *body.PaidAt
+	}
 
 	newPaid := utils.Round2(inv.PaidAmount + payAmount)
-	if newPaid > totalObligation { newPaid = totalObligation }
+	if newPaid > totalObligation {
+		newPaid = totalObligation
+	}
 	status := "partial"
-	if newPaid >= totalObligation { status = "paid" }
+	if newPaid >= totalObligation {
+		status = "paid"
+	}
 
 	// Atomic update of invoice + payment row (avoids lost updates on
 	// concurrent payments and inconsistent state if one statement fails).

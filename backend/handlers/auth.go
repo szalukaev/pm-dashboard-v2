@@ -60,9 +60,9 @@ const (
 )
 
 var (
-	loginAttempts  = make(map[string]*loginAttempt)
+	loginAttempts   = make(map[string]*loginAttempt)
 	loginIPAttempts = make(map[string]*loginAttempt)
-	loginMu        sync.Mutex
+	loginMu         sync.Mutex
 )
 
 // attemptLocked reports whether the entry is currently locked or its window expired.

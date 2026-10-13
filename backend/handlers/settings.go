@@ -28,19 +28,19 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.GetUserID(r)
 
 	var settings struct {
-		SelectedProjects          []int    `json:"selected_projects"`
-		SelectedTeam              []int    `json:"selected_team"`
-		Theme                     string   `json:"theme"`
-		Language                  string   `json:"language"`
-		TabOrder                  []string `json:"tab_order"`
-		KanbanColumnOrderStatuses []string `json:"kanban_column_order_statuses"`
-		KanbanColumnOrderUsers    []string `json:"kanban_column_order_users"`
-		KanbanLastMode            string   `json:"kanban_last_mode"`
-		KanbanLastProject         *int     `json:"kanban_last_project"`
-		LastFilters              map[string]interface{} `json:"last_filters"`
-		NotificationsEnabled      bool     `json:"notifications_enabled"`
-		OverdueAlerts             bool     `json:"overdue_alerts"`
-		DataSourceURL             string   `json:"data_source_url"`
+		SelectedProjects          []int                  `json:"selected_projects"`
+		SelectedTeam              []int                  `json:"selected_team"`
+		Theme                     string                 `json:"theme"`
+		Language                  string                 `json:"language"`
+		TabOrder                  []string               `json:"tab_order"`
+		KanbanColumnOrderStatuses []string               `json:"kanban_column_order_statuses"`
+		KanbanColumnOrderUsers    []string               `json:"kanban_column_order_users"`
+		KanbanLastMode            string                 `json:"kanban_last_mode"`
+		KanbanLastProject         *int                   `json:"kanban_last_project"`
+		LastFilters               map[string]interface{} `json:"last_filters"`
+		NotificationsEnabled      bool                   `json:"notifications_enabled"`
+		OverdueAlerts             bool                   `json:"overdue_alerts"`
+		DataSourceURL             string                 `json:"data_source_url"`
 		// Rows per page chosen for each table; a table not listed uses the default
 		Pagination map[string]int `json:"pagination"`
 		// Visible columns and their order chosen for each table

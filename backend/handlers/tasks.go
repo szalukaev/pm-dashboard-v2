@@ -1,10 +1,10 @@
 package handlers
 
 import (
-	"log/slog"
 	"database/sql"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"mime"
 	"net/http"
 	"sort"
@@ -139,19 +139,19 @@ func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 	orderBy := "external_id DESC"
 	if sortBy != "" {
 		validSorts := map[string]string{
-			"subject":        "LOWER(subject)",
-			"external_id":    "external_id",
-			"project_name":   "LOWER(project_name)",
-			"priority_name":  priorityRank("priority_id"),
-			"assigned_to":    "NULLIF(assigned_to_name, '')",
-			"estimate":       "estimated_hours",
-			"fact":           "spent_hours",
-			"status_name":    "LOWER(status_name)",
-			"bug_fix_hours":  "bug_fix_hours",
-			"bug_fix_pct":    "COALESCE(bug_fix_hours, 0) / NULLIF(spent_hours, 0)",
-			"start_date":     "start_date",
-			"due_date":       "due_date",
-			"category_name":  "NULLIF(category_name, '')",
+			"subject":       "LOWER(subject)",
+			"external_id":   "external_id",
+			"project_name":  "LOWER(project_name)",
+			"priority_name": priorityRank("priority_id"),
+			"assigned_to":   "NULLIF(assigned_to_name, '')",
+			"estimate":      "estimated_hours",
+			"fact":          "spent_hours",
+			"status_name":   "LOWER(status_name)",
+			"bug_fix_hours": "bug_fix_hours",
+			"bug_fix_pct":   "COALESCE(bug_fix_hours, 0) / NULLIF(spent_hours, 0)",
+			"start_date":    "start_date",
+			"due_date":      "due_date",
+			"category_name": "NULLIF(category_name, '')",
 		}
 		if col, ok := validSorts[sortBy]; ok {
 			dir := "ASC"
@@ -854,9 +854,9 @@ func (h *TaskHandler) GetPriorities(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	type PriorityInfo struct {
-		ID       int    `json:"id"`
-		Name     string `json:"name"`
-		SortOrder int   `json:"sort_order"`
+		ID        int    `json:"id"`
+		Name      string `json:"name"`
+		SortOrder int    `json:"sort_order"`
 		// Цвет, заданный администратором в «Порядке приоритетов»
 		Color string `json:"color"`
 	}

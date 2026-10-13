@@ -13,8 +13,8 @@ import (
 
 	"pm-dashboard/access"
 	"pm-dashboard/config"
-	"pm-dashboard/db"
 	"pm-dashboard/datasource/manager"
+	"pm-dashboard/db"
 	"pm-dashboard/handlers"
 	"pm-dashboard/jobs"
 	"pm-dashboard/license"

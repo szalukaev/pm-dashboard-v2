@@ -60,17 +60,17 @@ func decodePermissions(r *http.Request) (access.Permissions, bool) {
 // ─── Users ───
 
 type adminUser struct {
-	ID             int      `json:"id"`
-	Username       string   `json:"username"`
-	DisplayName    string   `json:"display_name"`
-	Role           string   `json:"role"`
-	CreatedAt      string   `json:"created_at"`
-	LastLogin      *string  `json:"last_login"`
-	IsBlocked      bool     `json:"is_blocked"`
-	MemberID       *int     `json:"member_id"`
-	MemberName     string   `json:"member_name"`
-	RoleTemplateID *int     `json:"role_template_id"`
-	TemplateName   string   `json:"template_name"`
+	ID             int     `json:"id"`
+	Username       string  `json:"username"`
+	DisplayName    string  `json:"display_name"`
+	Role           string  `json:"role"`
+	CreatedAt      string  `json:"created_at"`
+	LastLogin      *string `json:"last_login"`
+	IsBlocked      bool    `json:"is_blocked"`
+	MemberID       *int    `json:"member_id"`
+	MemberName     string  `json:"member_name"`
+	RoleTemplateID *int    `json:"role_template_id"`
+	TemplateName   string  `json:"template_name"`
 	// Custom: rights are set individually and override the template.
 	Custom bool     `json:"custom"`
 	Groups []string `json:"groups"`

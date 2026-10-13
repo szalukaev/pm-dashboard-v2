@@ -29,19 +29,19 @@ type KanbanHandler struct {
 }
 
 type KanbanCard struct {
-	ExternalID     int     `json:"external_id"`
-	Subject        string  `json:"subject"`
-	ProjectName    string  `json:"project_name"`
-	StatusName     string  `json:"status_name"`
-	StatusID       int     `json:"status_id"`
-	PriorityName   string  `json:"priority_name"`
-	PriorityID     int     `json:"priority_id"`
-	AssignedToName string  `json:"assigned_to_name"`
-	AssignedToID   *int    `json:"assigned_to_id"`
-	CategoryName   string  `json:"category_name"`
-	DueDate        *string `json:"due_date"`
+	ExternalID     int      `json:"external_id"`
+	Subject        string   `json:"subject"`
+	ProjectName    string   `json:"project_name"`
+	StatusName     string   `json:"status_name"`
+	StatusID       int      `json:"status_id"`
+	PriorityName   string   `json:"priority_name"`
+	PriorityID     int      `json:"priority_id"`
+	AssignedToName string   `json:"assigned_to_name"`
+	AssignedToID   *int     `json:"assigned_to_id"`
+	CategoryName   string   `json:"category_name"`
+	DueDate        *string  `json:"due_date"`
 	EstimatedHours *float64 `json:"estimated_hours"`
-	IsOverdue      bool    `json:"is_overdue"`
+	IsOverdue      bool     `json:"is_overdue"`
 }
 
 type KanbanColumn struct {
@@ -285,9 +285,9 @@ func (h *KanbanHandler) MoveCard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		IssueID    int    `json:"issue_id"`
-		TargetID   string `json:"target_id"` // status_id or user name
-		Mode       string `json:"mode"`       // "users" or "statuses"
+		IssueID  int    `json:"issue_id"`
+		TargetID string `json:"target_id"` // status_id or user name
+		Mode     string `json:"mode"`      // "users" or "statuses"
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
@@ -432,8 +432,8 @@ func (h *KanbanHandler) SaveColumnOrder(w http.ResponseWriter, r *http.Request) 
 	userID := middleware.GetUserID(r)
 
 	var body struct {
-		Mode   string   `json:"mode"`
-		Order  []string `json:"order"`
+		Mode  string   `json:"mode"`
+		Order []string `json:"order"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")

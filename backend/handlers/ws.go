@@ -235,7 +235,7 @@ func (h *WSHub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	client := &wsClient{
 		userID: middleware.GetUserID(r),
 		conn:   conn,
-		send: make(chan []byte, wsSendBuffer),
+		send:   make(chan []byte, wsSendBuffer),
 	}
 	h.register <- client
 
