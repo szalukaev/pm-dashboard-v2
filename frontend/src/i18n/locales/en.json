@@ -1268,6 +1268,43 @@
     "mail": "Get the settings from your mail administrator. SSL/TLS encrypts the connection from the start, usually port 465. STARTTLS turns encryption on after connecting, usually port 587. No encryption is acceptable only inside your own network.\n\nThe dashboard address is needed for links: with it the number and the name of a task in an email open its card.",
     "users": "Rights add up in this order. An administrator can do everything. Others get rights from a role template; an individual setup (the shield icon) replaces the template. Then groups narrow the result: only the projects and members allowed by at least one group of the user remain.\n\nUsers link themselves to a Redmine member with a personal API key. The time zone is the default one until the user chooses their own."
   },
+  "checklist": {
+    "title": "System setup",
+    "complete": "The system is fully set up",
+    "progress": "{done} of {total} done",
+    "items": {
+      "source": {
+        "name": "Connection to Redmine",
+        "done": "Checked: the last sync succeeded",
+        "todo": "The last sync failed or has not run yet — check the connection"
+      },
+      "statuses": {
+        "name": "Status sync",
+        "done": "Statuses are loaded — check their groups",
+        "todo": "Statuses have not been loaded from Redmine yet"
+      },
+      "projects": {
+        "name": "Project loading",
+        "done": "Projects are synced",
+        "todo": "Projects have not been loaded from Redmine yet"
+      },
+      "users": {
+        "name": "Creating users",
+        "done": "Users are created",
+        "todo": "There are no users but you — add your colleagues"
+      },
+      "rights": {
+        "name": "Rights setup",
+        "done": "Rights are assigned",
+        "todo": "Recommended: assign rights to at least one user"
+      },
+      "schedule": {
+        "name": "Schedule setup",
+        "done": "The sync schedule is set",
+        "todo": "Recommended: the default schedule is in effect now"
+      }
+    }
+  },
   "connections": {
     "title": "Connections",
     "hint": "Connection settings of the database and the source system. Available to the administrator only. Only tested settings can be saved.",

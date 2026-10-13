@@ -408,6 +408,7 @@ func main() {
 	admin.HandleFunc("/sync-settings", adminH.GetSyncSettings).Methods("GET")
 	admin.HandleFunc("/sync-settings", adminH.UpdateSyncSettings).Methods("PUT")
 	admin.HandleFunc("/audit-log", adminH.GetAuditLog).Methods("GET")
+	admin.HandleFunc("/setup-checklist", adminH.GetSetupChecklist).Methods("GET")
 	// The template of invoices
 	admin.HandleFunc("/invoice-template", invoiceTemplateH.Get).Methods("GET")
 	admin.HandleFunc("/invoice-template", invoiceTemplateH.Upload).Methods("POST")

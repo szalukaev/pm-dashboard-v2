@@ -2,6 +2,8 @@
   <div class="settings-view">
     <h1 class="page-title">{{ $t('settings.title') }}</h1>
 
+    <SetupChecklist v-if="isAdmin" ref="checklist" @open="openStep" />
+
     <div class="settings-layout">
       <!-- Left menu -->
       <nav class="settings-menu">
@@ -27,14 +29,14 @@
         <SettingsConnections v-if="isAdmin && activeTab === 'connections'" />
         <SettingsSync v-if="isAdmin && activeTab === 'sync'" />
         <SettingsAudit v-if="isAdmin && activeTab === 'audit'" />
-        <SettingsAdmin v-if="isAdmin && activeTab === 'admin'" />
+        <SettingsAdmin v-if="isAdmin && activeTab === 'admin'" :tab="adminTab" />
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { User, Database, Palette, Bell, Shield, Link, RefreshCw, ScrollText } from 'lucide-vue-next'
 import { useAuthStore } from '../stores/auth'
 import SettingsPersonal from '../components/settings/SettingsPersonal.vue'
@@ -45,8 +47,23 @@ import SettingsConnections from '../components/settings/SettingsConnections.vue'
 import SettingsSync from '../components/settings/SettingsSync.vue'
 import SettingsAudit from '../components/settings/SettingsAudit.vue'
 import SettingsAdmin from '../components/settings/SettingsAdmin.vue'
+import SetupChecklist from '../components/settings/SetupChecklist.vue'
 
 const activeTab = ref('personal')
+// Вкладка внутри «Администрирования», на которую ведёт пункт чек-листа
+const adminTab = ref('')
+const checklist = ref<{ reload: () => void } | null>(null)
+
+async function openStep(target: { tab: string; sub?: string }) {
+  // Сначала сброс: повторный клик по тому же пункту тоже должен сработать
+  adminTab.value = ''
+  await nextTick()
+  adminTab.value = target.sub || ''
+  activeTab.value = target.tab
+}
+
+// Шаги выполняются на других вкладках: при переходе чек-лист перечитывается
+watch(activeTab, () => checklist.value?.reload())
 
 const tabs = [
   { key: 'personal', icon: User, label: 'settings.tabs.personal' },

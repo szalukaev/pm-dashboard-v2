@@ -77,7 +77,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import axios from 'axios'
 import { useI18n } from 'vue-i18n'
 import SettingsStatusGroups from './SettingsStatusGroups.vue'
@@ -98,7 +98,17 @@ interface Priority {
 }
 
 const tabs = ['users', 'groups', 'templates', 'data', 'workers', 'invoice', 'mail'] as const
-const activeTab = ref<(typeof tabs)[number]>('users')
+type AdminTab = (typeof tabs)[number]
+
+// tab: вкладка, которую нужно открыть (переход с чек-листа первого запуска)
+const props = defineProps<{ tab?: string }>()
+
+function tabOr(name: string | undefined, fallback: AdminTab): AdminTab {
+  return (tabs as readonly string[]).includes(name || '') ? (name as AdminTab) : fallback
+}
+
+const activeTab = ref<AdminTab>(tabOr(props.tab, 'users'))
+watch(() => props.tab, name => { activeTab.value = tabOr(name, activeTab.value) })
 
 const { t } = useI18n()
 const { toast } = useSwal()
