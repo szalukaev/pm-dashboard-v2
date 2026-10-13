@@ -1,9 +1,9 @@
--- History of the data: what the dashboard showed on each day.
+-- История данных: что дашборд показывал в каждый из дней.
 --
--- The two snapshot tables of the first schema were never written to; they
--- are replaced by the layout below.
+-- В две таблицы снимков из первой схемы ничего не писалось; их заменяет
+-- структура ниже.
 
--- What the source knows about an issue beyond its current state.
+-- Что источник знает о задаче помимо её текущего состояния.
 ALTER TABLE issues ADD COLUMN IF NOT EXISTS created_on TIMESTAMPTZ;
 ALTER TABLE issues ADD COLUMN IF NOT EXISTS updated_on TIMESTAMPTZ;
 ALTER TABLE issues ADD COLUMN IF NOT EXISTS closed_on TIMESTAMPTZ;
@@ -12,8 +12,8 @@ ALTER TABLE issues ADD COLUMN IF NOT EXISTS fixed_version_name VARCHAR(255);
 DROP TABLE IF EXISTS daily_snapshots;
 DROP TABLE IF EXISTS issue_snapshots;
 
--- One row per member and day: the totals of the issues assigned to them.
--- redmine_id 0 stands for the issues without an assignee.
+-- Строка на сотрудника и день: итоги по назначенным ему задачам.
+-- redmine_id 0 означает задачи без исполнителя.
 CREATE TABLE daily_snapshots (
     id BIGSERIAL PRIMARY KEY,
     date DATE NOT NULL,
@@ -31,16 +31,15 @@ CREATE TABLE daily_snapshots (
     total_actual_hours REAL NOT NULL DEFAULT 0,
     total_bug_hours REAL NOT NULL DEFAULT 0,
     bug_percent REAL NOT NULL DEFAULT 0,
-    -- Issues per status and per priority: {"New": 4, "In Progress": 2}.
-    -- Statuses are configured in the source, so they are not columns.
+    -- Задачи по статусам и по приоритетам: {"New": 4, "In Progress": 2}.
+    -- Статусы настраиваются в источнике, поэтому столбцами они не сделаны.
     status_counts JSONB NOT NULL DEFAULT '{}',
     priority_counts JSONB NOT NULL DEFAULT '{}',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (date, redmine_id)
 );
 
--- One row per issue and day: the issues that were not closed, and the ones
--- closed on that day.
+-- Строка на задачу и день: незакрытые задачи и те, что закрыты в этот день.
 CREATE TABLE issue_snapshots (
     id BIGSERIAL PRIMARY KEY,
     date DATE NOT NULL,

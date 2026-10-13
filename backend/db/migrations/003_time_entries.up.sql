@@ -1,5 +1,6 @@
--- Time entries from the data source. Fact and bug fix hours of an issue are
--- sums over this table, so a sync only needs to fetch recent entries.
+-- Трудозатраты из источника данных. Фактические часы и часы на исправление
+-- багов задачи — суммы по этой таблице, поэтому синхронизации достаточно
+-- забирать свежие записи.
 CREATE TABLE IF NOT EXISTS time_entries (
     external_id INTEGER NOT NULL,
     issue_id INTEGER NOT NULL,

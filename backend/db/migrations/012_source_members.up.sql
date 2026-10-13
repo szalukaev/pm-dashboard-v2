@@ -1,6 +1,6 @@
--- "Rights as in the data source" also cover the team: the members the
--- source shows to the user (read with the user's personal API key) are the
--- most the user may see. NULL = not read yet.
+-- «Права как в источнике данных» распространяются и на команду: сотрудники,
+-- которых источник показывает пользователю (читаются его личным ключом API),
+-- — предел того, что он может видеть. NULL — ещё не прочитаны.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS source_members JSONB;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS source_members_at TIMESTAMPTZ;
 

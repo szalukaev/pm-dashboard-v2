@@ -1,7 +1,7 @@
--- 001: Initial schema
--- PM Dashboard V3 — All core tables
+-- 001: начальная схема
+-- PM Dashboard V3 — все основные таблицы
 
--- Users
+-- Пользователи
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(100) UNIQUE NOT NULL,
@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Sessions
+-- Сессии
 CREATE TABLE IF NOT EXISTS sessions (
     id VARCHAR(64) PRIMARY KEY,
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     expires_at TIMESTAMPTZ NOT NULL
 );
 
--- User settings
+-- Настройки пользователя
 CREATE TABLE IF NOT EXISTS user_settings (
     user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     selected_projects JSONB DEFAULT '[]',
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS user_settings (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Cached projects from data source
+-- Проекты из источника данных (локальная копия)
 CREATE TABLE IF NOT EXISTS projects (
     id SERIAL PRIMARY KEY,
     external_id INTEGER NOT NULL,
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS projects (
     UNIQUE(external_id, data_source)
 );
 
--- Cached users/members from data source
+-- Сотрудники из источника данных (локальная копия)
 CREATE TABLE IF NOT EXISTS members (
     id SERIAL PRIMARY KEY,
     external_id INTEGER NOT NULL,
@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS members (
     UNIQUE(external_id, data_source)
 );
 
--- Cached issues from data source
+-- Задачи из источника данных (локальная копия)
 CREATE TABLE IF NOT EXISTS issues (
     id SERIAL PRIMARY KEY,
     external_id INTEGER NOT NULL,
@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS issues (
     UNIQUE(external_id, data_source)
 );
 
--- Statuses mapping
+-- Статусы и их группы
 CREATE TABLE IF NOT EXISTS statuses (
     id SERIAL PRIMARY KEY,
     external_id INTEGER NOT NULL,
@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS statuses (
     UNIQUE(external_id, data_source)
 );
 
--- Priorities mapping
+-- Приоритеты и их порядок
 CREATE TABLE IF NOT EXISTS priorities (
     id SERIAL PRIMARY KEY,
     external_id INTEGER NOT NULL,
@@ -112,7 +112,7 @@ CREATE TABLE IF NOT EXISTS priorities (
     UNIQUE(external_id, data_source)
 );
 
--- Organizations
+-- Организации
 CREATE TABLE IF NOT EXISTS organizations (
     id SERIAL PRIMARY KEY,
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -124,7 +124,7 @@ CREATE TABLE IF NOT EXISTS organizations (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Contracts
+-- Договоры
 CREATE TABLE IF NOT EXISTS contracts (
     id SERIAL PRIMARY KEY,
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -142,7 +142,7 @@ CREATE TABLE IF NOT EXISTS contracts (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Invoices
+-- Счета
 CREATE TABLE IF NOT EXISTS invoices (
     id SERIAL PRIMARY KEY,
     contract_id INTEGER REFERENCES contracts(id) ON DELETE CASCADE,
@@ -154,7 +154,7 @@ CREATE TABLE IF NOT EXISTS invoices (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Invoice items
+-- Позиции счетов
 CREATE TABLE IF NOT EXISTS invoice_items (
     id SERIAL PRIMARY KEY,
     invoice_id INTEGER REFERENCES invoices(id) ON DELETE CASCADE,
@@ -163,7 +163,7 @@ CREATE TABLE IF NOT EXISTS invoice_items (
     price NUMERIC(15,2) DEFAULT 0
 );
 
--- Contract payments
+-- Оплаты по договорам
 CREATE TABLE IF NOT EXISTS contract_payments (
     id SERIAL PRIMARY KEY,
     invoice_id INTEGER REFERENCES invoices(id) ON DELETE CASCADE,
@@ -172,7 +172,7 @@ CREATE TABLE IF NOT EXISTS contract_payments (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Sprints
+-- Спринты
 CREATE TABLE IF NOT EXISTS sprints (
     id SERIAL PRIMARY KEY,
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -187,7 +187,7 @@ CREATE TABLE IF NOT EXISTS sprints (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Sprint-Issue mapping
+-- Задачи спринтов
 CREATE TABLE IF NOT EXISTS sprint_issues (
     sprint_id INTEGER REFERENCES sprints(id) ON DELETE CASCADE,
     issue_external_id INTEGER NOT NULL,
@@ -195,14 +195,14 @@ CREATE TABLE IF NOT EXISTS sprint_issues (
     PRIMARY KEY (sprint_id, issue_external_id)
 );
 
--- Admin settings
+-- Настройки администратора
 CREATE TABLE IF NOT EXISTS admin_settings (
     key VARCHAR(100) PRIMARY KEY,
     value JSONB NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Collection log
+-- Журнал синхронизации
 CREATE TABLE IF NOT EXISTS collection_log (
     id SERIAL PRIMARY KEY,
     started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -214,7 +214,7 @@ CREATE TABLE IF NOT EXISTS collection_log (
     data_source VARCHAR(50) DEFAULT 'redmine'
 );
 
--- Daily snapshots
+-- Ежедневные снимки
 CREATE TABLE IF NOT EXISTS daily_snapshots (
     id SERIAL PRIMARY KEY,
     snapshot_date DATE NOT NULL,
@@ -230,7 +230,7 @@ CREATE TABLE IF NOT EXISTS daily_snapshots (
     UNIQUE(snapshot_date, project_id, data_source)
 );
 
--- Issue snapshots
+-- Снимки задач
 CREATE TABLE IF NOT EXISTS issue_snapshots (
     id SERIAL PRIMARY KEY,
     issue_external_id INTEGER NOT NULL,
@@ -245,14 +245,14 @@ CREATE TABLE IF NOT EXISTS issue_snapshots (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Global runtime settings
+-- Общие настройки работы системы
 CREATE TABLE IF NOT EXISTS settings (
     key VARCHAR(100) PRIMARY KEY,
     value JSONB NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Audit log
+-- Журнал аудита
 CREATE TABLE IF NOT EXISTS audit_log (
     id BIGSERIAL PRIMARY KEY,
     occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -267,7 +267,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
     user_agent TEXT
 );
 
--- Licenses
+-- Лицензии
 CREATE TABLE IF NOT EXISTS licenses (
     id BIGSERIAL PRIMARY KEY,
     license_blob TEXT NOT NULL,
@@ -277,14 +277,14 @@ CREATE TABLE IF NOT EXISTS licenses (
     grace_started_at TIMESTAMPTZ
 );
 
--- User layouts
+-- Раскладки пользователя
 CREATE TABLE IF NOT EXISTS user_layouts (
     user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     layout JSONB NOT NULL DEFAULT '{}',
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Issue weights
+-- Веса задач
 CREATE TABLE IF NOT EXISTS issue_weights (
     id SERIAL PRIMARY KEY,
     priority_external_id INTEGER NOT NULL,
@@ -293,7 +293,7 @@ CREATE TABLE IF NOT EXISTS issue_weights (
     UNIQUE(priority_external_id, data_source)
 );
 
--- Indexes for performance
+-- Индексы для скорости запросов
 CREATE INDEX IF NOT EXISTS idx_issues_project_id ON issues(project_id);
 CREATE INDEX IF NOT EXISTS idx_issues_status_name ON issues(status_name);
 CREATE INDEX IF NOT EXISTS idx_issues_due_date ON issues(due_date);

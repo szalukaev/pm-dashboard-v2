@@ -1,4 +1,4 @@
--- 001: Drop all tables (reverse order due to FK constraints)
+-- 001: удаление всех таблиц (в обратном порядке из-за внешних ключей)
 DROP TABLE IF EXISTS issue_weights CASCADE;
 DROP TABLE IF EXISTS user_layouts CASCADE;
 DROP TABLE IF EXISTS licenses CASCADE;

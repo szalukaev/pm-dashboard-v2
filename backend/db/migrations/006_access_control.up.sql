@@ -1,12 +1,12 @@
--- Access control: what data a user may see is set by the administrator —
--- individually, through a role template or through groups.
+-- Права доступа: какие данные видит пользователь, задаёт администратор —
+-- лично, через шаблон роли или через группы.
 --
--- A permission set is stored the same way in three tables:
---   project_ids / team_ids   lists of allowed projects and members (ids of the data source)
---   all_projects / all_team  every project / member, the lists are ignored
---   own_tasks_only           plus the issues assigned to the user (users.member_id)
---   read_only                data may be viewed but not changed
---   visible_tabs / widgets   NULL = everything, otherwise the allowed keys
+-- Набор прав хранится одинаково в трёх таблицах:
+--   project_ids / team_ids   списки разрешённых проектов и сотрудников (идентификаторы источника данных)
+--   all_projects / all_team  все проекты / сотрудники, списки не учитываются
+--   own_tasks_only           плюс задачи, назначенные самому пользователю (users.member_id)
+--   read_only                данные можно смотреть, но не менять
+--   visible_tabs / widgets   NULL — всё, иначе разрешённые ключи
 
 CREATE TABLE IF NOT EXISTS role_templates (
     id SERIAL PRIMARY KEY,
@@ -25,8 +25,8 @@ CREATE TABLE IF NOT EXISTS role_templates (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- A row here means the rights of the user are set individually and override
--- the role template.
+-- Строка здесь значит, что права пользователя заданы лично и перекрывают
+-- шаблон роли.
 CREATE TABLE IF NOT EXISTS user_permissions (
     user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     project_ids JSONB NOT NULL DEFAULT '[]',
@@ -67,16 +67,17 @@ CREATE TABLE IF NOT EXISTS group_permissions (
 );
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN NOT NULL DEFAULT false;
--- The member of the data source this user is ("own tasks" are assigned to it).
--- It is found by the personal API key the user enters. The key is stored
--- encrypted (see backend/secrets) to change data on behalf of the user; its
--- last characters are kept apart to show which key is in use.
+-- Сотрудник источника данных, которым является этот пользователь («свои
+-- задачи» назначены ему). Определяется по личному ключу API, который вводит
+-- пользователь. Ключ хранится зашифрованным (см. backend/secrets), чтобы
+-- менять данные от имени пользователя; его последние символы хранятся
+-- отдельно — по ним видно, какой ключ используется.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS member_id INTEGER;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS source_token_enc TEXT NOT NULL DEFAULT '';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS source_token_hint VARCHAR(16) NOT NULL DEFAULT '';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS role_template_id INTEGER REFERENCES role_templates(id) ON DELETE SET NULL;
 
--- Preset role templates.
+-- Готовые шаблоны ролей.
 INSERT INTO role_templates (name, description, is_system, grants_admin, all_projects, all_team, own_tasks_only, read_only) VALUES
     ('Только свои задачи', 'Доступ только к задачам, где пользователь указан исполнителем', true, false, false, false, true, false),
     ('Наблюдатель', 'Все проекты и сотрудники, только чтение', true, false, true, true, false, true),
@@ -84,8 +85,8 @@ INSERT INTO role_templates (name, description, is_system, grants_admin, all_proj
     ('Администратор', 'Полный доступ ко всем данным и настройкам', true, true, true, true, false, false)
 ON CONFLICT (name) DO NOTHING;
 
--- Users that existed before access control saw everything: keep it that way
--- until the administrator narrows their rights.
+-- Пользователи, существовавшие до появления прав доступа, видели всё: так
+-- и остаётся, пока администратор не сузит их права.
 INSERT INTO user_permissions (user_id, all_projects, all_team)
 SELECT id, true, true FROM users WHERE role <> 'admin'
 ON CONFLICT (user_id) DO NOTHING;

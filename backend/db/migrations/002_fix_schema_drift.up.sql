@@ -1,7 +1,8 @@
--- 002: Fix schema drift between file migrations and fallbackMigrationSQL.
--- These columns existed only in the embedded fallback, so a clean deploy
--- via file migrations broke login (users.display_name/avatar/last_login)
--- and settings/sync. Also adds audit_log.status_code for the audit middleware.
+-- 002: выравнивание схемы между файлами миграций и fallbackMigrationSQL.
+-- Эти столбцы были только во встроенном запасном SQL, поэтому чистая
+-- установка через файлы миграций ломала вход (users.display_name/avatar/
+-- last_login), настройки и синхронизацию. Заодно добавляется
+-- audit_log.status_code для журнала аудита.
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name VARCHAR(255) DEFAULT '';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT DEFAULT '';

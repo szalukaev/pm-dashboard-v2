@@ -1,5 +1,5 @@
--- The journal of license events (activation, failed checks, grace period,
--- read-only), kept apart from the audit of user actions.
+-- Журнал событий лицензии (активация, неудачные проверки, льготный период,
+-- только чтение); ведётся отдельно от аудита действий пользователей.
 CREATE TABLE IF NOT EXISTS license_events (
     id BIGSERIAL PRIMARY KEY,
     event VARCHAR(50) NOT NULL,

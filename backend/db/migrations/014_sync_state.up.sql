@@ -1,7 +1,7 @@
--- When each project was last read from the data source: any successful
--- load and the last complete one. Kept in the database so that a restart
--- does not make the next sync read everything again, and per project so
--- that a failure of one project does not make the others be re-read.
+-- Когда каждый проект в последний раз читался из источника данных: любая
+-- успешная загрузка и последняя полная. Хранится в базе, чтобы после
+-- перезапуска синхронизация не читала всё заново, и по каждому проекту,
+-- чтобы сбой одного проекта не заставлял перечитывать остальные.
 CREATE TABLE IF NOT EXISTS sync_state (
     project_id INTEGER NOT NULL,
     data_source VARCHAR(50) NOT NULL DEFAULT 'redmine',

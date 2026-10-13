@@ -1,4 +1,4 @@
--- 002 down: drop columns added to fix schema drift.
+-- 002, откат: удаление столбцов, добавленных для выравнивания схемы.
 ALTER TABLE audit_log DROP COLUMN IF EXISTS status_code;
 
 ALTER TABLE priorities DROP COLUMN IF EXISTS synced_at;

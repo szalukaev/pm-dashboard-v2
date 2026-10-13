@@ -1,12 +1,12 @@
--- "Rights as in the data source": a permission set may say that the user
--- gets the projects they are a member of in the source (Redmine). The list
--- is read with the personal API key of the user and refreshed by the sync.
+-- «Права как в источнике данных»: набор прав может указывать, что
+-- пользователь получает проекты, в которых он состоит в источнике (Redmine).
+-- Список читается личным ключом API пользователя и обновляется синхронизацией.
 
 ALTER TABLE role_templates ADD COLUMN IF NOT EXISTS from_source BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE user_permissions ADD COLUMN IF NOT EXISTS from_source BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE group_permissions ADD COLUMN IF NOT EXISTS from_source BOOLEAN NOT NULL DEFAULT false;
 
--- The projects of the user in the source and when they were last read.
+-- Проекты пользователя в источнике и время их последнего чтения.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS source_projects JSONB NOT NULL DEFAULT '[]';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS source_projects_at TIMESTAMPTZ;
 
