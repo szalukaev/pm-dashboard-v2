@@ -53,6 +53,9 @@ onUnmounted(() => {
 <style scoped>
 .app-layout {
   display: grid;
+  /* Колонка не шире окна: иначе на узком экране шапка растягивает макет по
+     своему содержимому и кнопки справа уезжают за край */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: 56px 1fr;
   height: 100vh;
   overflow: hidden;
