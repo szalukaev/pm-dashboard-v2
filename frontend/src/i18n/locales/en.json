@@ -109,6 +109,7 @@
     "table": {
       "name": "Name",
       "number": "Number",
+      "project": "Project",
       "priority": "Priority",
       "assignee": "Assignee",
       "responsible": "Assignee",

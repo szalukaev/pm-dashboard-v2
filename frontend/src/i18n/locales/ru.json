@@ -109,6 +109,7 @@
     "table": {
       "name": "Наименование",
       "number": "Номер",
+      "project": "Проект",
       "priority": "Приоритет",
       "assignee": "Исполнитель",
       "responsible": "Ответственный",

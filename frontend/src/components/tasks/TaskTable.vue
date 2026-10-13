@@ -31,6 +31,8 @@
               </a>
             </td>
 
+            <td v-else-if="col.key === 'project_name'" class="project">{{ task.project_name }}</td>
+
             <td v-else-if="col.key === 'subject'" class="subject" @click="$emit('open-task', task.external_id)">{{ task.subject }}</td>
 
             <td v-else-if="col.key === 'priority_name'" class="center">
@@ -213,8 +215,11 @@ function withCurrent(list: string[], current?: string | null): string[] {
 }
 
 // The columns the user chose to see, in their order
+// В группировке по проектам колонка «Проект» лишняя: проект назван в заголовке группы
 const shownColumns = computed(() =>
-  settingsStore.tableColumns(TASKS_TABLE, TASK_COLUMNS.map(c => c.key)).map(key => TASK_COLUMNS.find(c => c.key === key)!)
+  settingsStore.tableColumns(TASKS_TABLE, TASK_COLUMNS.map(c => c.key))
+    .filter(key => key !== 'project_name' || filters.value.group_by !== 'project')
+    .map(key => TASK_COLUMNS.find(c => c.key === key)!)
 )
 
 function toggleSort(key: string) {
@@ -356,6 +361,13 @@ tr.overdue td:first-child {
 
 .bug {
   color: var(--danger);
+}
+
+.project {
+  max-width: 200px;
+  color: var(--text-muted);
+  white-space: normal;
+  word-break: break-word;
 }
 
 .subject {

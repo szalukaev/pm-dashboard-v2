@@ -4,6 +4,8 @@ export const TASKS_TABLE = 'tasks_table'
 
 export const TASK_COLUMNS = [
   { key: 'external_id', label: 'tasks.table.number', sortable: true },
+  // Проект: в группировке по проектам не показывается — он стоит в заголовке группы
+  { key: 'project_name', label: 'tasks.table.project', sortable: true },
   { key: 'subject', label: 'tasks.table.name', sortable: true },
   { key: 'priority_name', label: 'tasks.table.priority', sortable: true },
   { key: 'assigned_to', label: 'tasks.table.responsible', sortable: true },

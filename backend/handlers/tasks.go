@@ -141,6 +141,7 @@ func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 		validSorts := map[string]string{
 			"subject":        "LOWER(subject)",
 			"external_id":    "external_id",
+			"project_name":   "LOWER(project_name)",
 			"priority_name":  priorityRank("priority_id"),
 			"assigned_to":    "NULLIF(assigned_to_name, '')",
 			"estimate":       "estimated_hours",

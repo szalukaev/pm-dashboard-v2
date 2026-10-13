@@ -132,11 +132,18 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   // Every column of a table in the order the user chose. all is the standard
-  // order; a column added to the table later goes to the end.
+  // order. Колонка, добавленная в таблицу позже, встаёт после своей соседки
+  // слева из стандартного порядка, а не в конец.
   function columnOrder(table: string, all: string[]): string[] {
     const saved = settings.value.table_columns?.[table]
     if (!saved || !Array.isArray(saved.order)) return all
-    return [...saved.order.filter(k => all.includes(k)), ...all.filter(k => !saved.order.includes(k))]
+    const order = saved.order.filter(k => all.includes(k))
+    all.forEach((key, i) => {
+      if (order.includes(key)) return
+      const left = i > 0 ? order.indexOf(all[i - 1]) : -1
+      order.splice(left + 1, 0, key)
+    })
+    return order
   }
 
   // The columns of a table the user sees, in their order. A column added to
