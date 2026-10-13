@@ -117,7 +117,9 @@ func (h *AdminHandler) SaveDBConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	current, _ := h.SQLite.Get(dbDSNKey)
 	dsn := buildDSN(req)
-	if dsn == current {
+	// Сравниваются и сами параметры: та же база, записанная в SQLite строкой
+	// другого вида, перезапуска не требует
+	if dsn == current || parseDSN(current) == req {
 		utils.JSON(w, http.StatusOK, map[string]interface{}{"success": true, "restart": false})
 		return
 	}
