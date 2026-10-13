@@ -26,6 +26,7 @@
     <AdminWorkers v-else-if="activeTab === 'workers'" />
     <AdminInvoiceTemplate v-else-if="activeTab === 'invoice'" />
     <AdminMail v-else-if="activeTab === 'mail'" />
+    <AdminDebugLogs v-else-if="activeTab === 'debug'" />
 
     <!-- Settings of the data shared by all users -->
     <template v-else>
@@ -86,6 +87,7 @@ import AdminGroups from './access/AdminGroups.vue'
 import AdminWorkers from './access/AdminWorkers.vue'
 import AdminInvoiceTemplate from './access/AdminInvoiceTemplate.vue'
 import AdminMail from './access/AdminMail.vue'
+import AdminDebugLogs from './access/AdminDebugLogs.vue'
 import AdminTemplates from './access/AdminTemplates.vue'
 import { useSwal } from '../../composables/useSwal'
 import type { ProjectItem, MemberItem } from '../../utils/access'
@@ -97,7 +99,7 @@ interface Priority {
   color: string
 }
 
-const tabs = ['users', 'groups', 'templates', 'data', 'workers', 'invoice', 'mail'] as const
+const tabs = ['users', 'groups', 'templates', 'data', 'workers', 'invoice', 'mail', 'debug'] as const
 type AdminTab = (typeof tabs)[number]
 
 // tab: вкладка, которую нужно открыть (переход с чек-листа первого запуска)

@@ -737,7 +737,8 @@
       "data": "Statuses and priorities",
       "workers": "Workers",
       "invoice": "Invoice template",
-      "mail": "Mail"
+      "mail": "Mail",
+      "debug": "Debug logs"
     },
     "widgets": {
       "stats": "Project statistics",
@@ -801,6 +802,10 @@
       "groups": "Groups",
       "timezone": "Time zone",
       "timezone_browser": "as in the browser",
+      "debug_off": "Turn debug logging on for 24 hours",
+      "debug_on": "Debug logging is on until {time} — press to turn it off",
+      "debug_enabled": "Debug logging for {name} is on for 24 hours",
+      "debug_disabled": "Debug logging for {name} is off",
       "timezone_hint": "The default zone of the user. Empty — times are shown in the zone of their browser. Users can choose a zone of their own in the interface settings.",
       "created": "Created",
       "blocked": "blocked",
@@ -1267,6 +1272,41 @@
     "retention": "Once a day after a sync the system saves a snapshot: totals per member and the state of the tasks. The trend charts are built from the snapshots.\n\nA cleanup deletes only the snapshots older than the retention period. Tasks, time entries, invoices and settings are not touched. Delete all snapshots removes the whole history — the charts start anew.",
     "mail": "Get the settings from your mail administrator. SSL/TLS encrypts the connection from the start, usually port 465. STARTTLS turns encryption on after connecting, usually port 587. No encryption is acceptable only inside your own network.\n\nThe dashboard address is needed for links: with it the number and the name of a task in an email open its card.",
     "users": "Rights add up in this order. An administrator can do everything. Others get rights from a role template; an individual setup (the shield icon) replaces the template. Then groups narrow the result: only the projects and members allowed by at least one group of the user remain.\n\nUsers link themselves to a Redmine member with a personal API key. The time zone is the default one until the user chooses their own."
+  },
+  "debug_logs": {
+    "title": "Debug logs",
+    "hint": "Requests of the users with debug logging turned on (the bug icon in the users table). Records are kept for 7 days. Press a row to see the request and response bodies.",
+    "help": "The mode is turned on for one user for 24 hours and turns off by itself. While it is on, every request of the user is recorded: the address, the request body, the server response, the code and the duration.\n\nPasswords, keys and tokens in the records are replaced with asterisks. Files, bodies over 64 KB and anything that is not JSON are not saved — a note with the size is kept instead.\n\nRecording runs in the background and does not slow the user down.",
+    "user": "User",
+    "all_users": "All users",
+    "on": "on",
+    "from": "From",
+    "to": "To",
+    "method": "Action",
+    "all_methods": "All actions",
+    "methods": {
+      "GET": "GET — read",
+      "POST": "POST — create",
+      "PUT": "PUT — change",
+      "DELETE": "DELETE — delete"
+    },
+    "path": "Address contains",
+    "query": "Parameters",
+    "col_time": "Time",
+    "col_path": "Address",
+    "col_status": "Code",
+    "col_duration": "Time, ms",
+    "request_body": "Request body",
+    "response_body": "Server response",
+    "no_body": "(empty)",
+    "empty": "No records. Turn debug logging on for a user in the users table.",
+    "load_error": "Could not load the log",
+    "clear": "Clear logs",
+    "clear_need_user": "Choose a user first",
+    "clear_title": "Delete the debug logs of {name}?",
+    "clear_text": "All of their records will be deleted. This cannot be undone.",
+    "cleared": "Records deleted: {count}",
+    "clear_error": "Could not clear the log"
   },
   "checklist": {
     "title": "System setup",

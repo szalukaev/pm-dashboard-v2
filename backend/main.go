@@ -263,6 +263,12 @@ func main() {
 	api := r.PathPrefix("/api").Subrouter()
 	api.Use(middleware.RequireAuth(sessionStore, &pgDB))
 
+	// Отладочное логирование: запросы пользователей, которым его включил
+	// администратор, пишутся в журнал. После авторизации — пользователь уже известен.
+	debugLog := middleware.NewDebugLog(&pgDB)
+	api.Use(debugLog.Log)
+	debugH := &handlers.DebugHandler{DB: &pgDB, Log: debugLog}
+
 	// Wire audit middleware — logs all mutating requests
 	if auditMW != nil {
 		api.Use(auditMW.Log)
@@ -409,6 +415,10 @@ func main() {
 	admin.HandleFunc("/sync-settings", adminH.UpdateSyncSettings).Methods("PUT")
 	admin.HandleFunc("/audit-log", adminH.GetAuditLog).Methods("GET")
 	admin.HandleFunc("/setup-checklist", adminH.GetSetupChecklist).Methods("GET")
+	admin.HandleFunc("/users/{id}/debug", debugH.SetUserDebug).Methods("PUT")
+	admin.HandleFunc("/debug-logs", debugH.List).Methods("GET")
+	admin.HandleFunc("/debug-logs", debugH.Clear).Methods("DELETE")
+	admin.HandleFunc("/debug-logs/{id}", debugH.Get).Methods("GET")
 	// The template of invoices
 	admin.HandleFunc("/invoice-template", invoiceTemplateH.Get).Methods("GET")
 	admin.HandleFunc("/invoice-template", invoiceTemplateH.Upload).Methods("POST")

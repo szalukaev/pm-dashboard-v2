@@ -161,12 +161,27 @@ var auditSecretKeys = map[string]bool{
 
 const auditSecretMask = "***"
 
+// isSecretKey сообщает, хранит ли поле с таким именем секрет: имя из списка
+// либо любое, где есть password, token или secret (smtp_password, source_token).
+func isSecretKey(name string) bool {
+	name = strings.ToLower(name)
+	if auditSecretKeys[name] {
+		return true
+	}
+	for _, part := range []string{"password", "passwd", "token", "secret"} {
+		if strings.Contains(name, part) {
+			return true
+		}
+	}
+	return false
+}
+
 // maskSecrets replaces secret values in a decoded JSON body (recursively).
 func maskSecrets(v interface{}) interface{} {
 	switch val := v.(type) {
 	case map[string]interface{}:
 		for k, inner := range val {
-			if auditSecretKeys[strings.ToLower(k)] {
+			if isSecretKey(k) {
 				val[k] = auditSecretMask
 				continue
 			}

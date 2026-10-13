@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"pm-dashboard/access"
 	"pm-dashboard/datasource/manager"
@@ -75,6 +76,8 @@ type adminUser struct {
 	Groups []string `json:"groups"`
 	// Часовой пояс, заданный администратором; пусто — не задан
 	DefaultTimezone string `json:"default_timezone"`
+	// До какого момента включено отладочное логирование; nil — выключено
+	DebugUntil *time.Time `json:"debug_until"`
 }
 
 func (h *AccessHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
@@ -91,7 +94,8 @@ func (h *AccessHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 			EXISTS(SELECT 1 FROM user_permissions p WHERE p.user_id = u.id),
 			COALESCE((SELECT array_agg(g.name ORDER BY g.name) FROM group_members gm
 				JOIN groups g ON g.id = gm.group_id WHERE gm.user_id = u.id), '{}'),
-			COALESCE(u.default_timezone, '')
+			COALESCE(u.default_timezone, ''),
+			CASE WHEN u.debug_until > NOW() THEN u.debug_until END
 		FROM users u
 		LEFT JOIN members m ON m.external_id = u.member_id AND m.data_source = 'redmine'
 		LEFT JOIN role_templates t ON t.id = u.role_template_id
@@ -107,7 +111,7 @@ func (h *AccessHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		var u adminUser
 		if err := rows.Scan(&u.ID, &u.Username, &u.DisplayName, &u.Role, &u.CreatedAt, &u.LastLogin,
 			&u.IsBlocked, &u.MemberID, &u.MemberName, &u.RoleTemplateID, &u.TemplateName,
-			&u.Custom, pq.Array(&u.Groups), &u.DefaultTimezone); err != nil {
+			&u.Custom, pq.Array(&u.Groups), &u.DefaultTimezone, &u.DebugUntil); err != nil {
 			utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 			return
 		}

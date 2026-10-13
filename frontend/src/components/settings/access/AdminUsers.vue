@@ -93,6 +93,16 @@
                 <button class="adm-icon-btn" :title="$t('access.users.reset_password')" @click="resetPassword(u)">
                   <KeyRound :size="15" />
                 </button>
+                <!-- Отладочное логирование: включается на сутки, журнал — на вкладке «Логи отладки» -->
+                <button
+                  class="adm-icon-btn"
+                  :class="{ 'debug-on': u.debug_until }"
+                  :title="u.debug_until ? $t('access.users.debug_on', { time: formatDateTime(u.debug_until) }) : $t('access.users.debug_off')"
+                  :data-testid="'user-debug-' + u.id"
+                  @click="toggleDebug(u)"
+                >
+                  <Bug :size="15" />
+                </button>
                 <button
                   class="adm-icon-btn"
                   :title="$t(u.is_blocked ? 'access.users.unblock' : 'access.users.block')"
@@ -248,7 +258,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import AppHint from '../../ui/AppHint.vue'
 import axios from 'axios'
 import { useI18n } from 'vue-i18n'
-import { Plus, ShieldCheck, Copy, KeyRound, Lock, Unlock, Trash2 } from 'lucide-vue-next'
+import { Plus, ShieldCheck, Copy, KeyRound, Lock, Unlock, Trash2, Bug } from 'lucide-vue-next'
 import AppButton from '../../ui/AppButton.vue'
 import AppModal from '../../ui/AppModal.vue'
 import PermissionsEditor from './PermissionsEditor.vue'
@@ -256,7 +266,7 @@ import AppPagination from '../../ui/AppPagination.vue'
 import { useSettingsStore } from '../../../stores/settings'
 import { useAuthStore } from '../../../stores/auth'
 import { useSwal } from '../../../composables/useSwal'
-import { formatDate, timeZoneList } from '../../../utils/format'
+import { formatDate, formatDateTime, timeZoneList } from '../../../utils/format'
 import { copyText } from '../../../utils/clipboard'
 import {
   clonePermissions, emptyPermissions,
@@ -276,6 +286,8 @@ interface AdminUser {
   custom: boolean
   groups: string[]
   default_timezone: string
+  // До какого момента включено отладочное логирование; null — выключено
+  debug_until: string | null
 }
 
 const zones = timeZoneList()
@@ -347,6 +359,19 @@ function errorText(e: any, fallback: string): string {
 async function update(u: AdminUser, fields: Record<string, unknown>) {
   try {
     await axios.put(`/api/admin/users/${u.id}`, fields)
+  } catch (e) {
+    toast(errorText(e, 'access.save_error'), 'error')
+  } finally {
+    await load()
+  }
+}
+
+// Отладочное логирование включается на сутки и выключается само
+async function toggleDebug(u: AdminUser) {
+  const enable = !u.debug_until
+  try {
+    await axios.put(`/api/admin/users/${u.id}/debug`, { enabled: enable })
+    toast(t(enable ? 'access.users.debug_enabled' : 'access.users.debug_disabled', { name: u.username }), 'success')
   } catch (e) {
     toast(errorText(e, 'access.save_error'), 'error')
   } finally {
@@ -582,6 +607,12 @@ defineExpose({ load })
 <style scoped>
 .timezone-input {
   min-width: 170px;
+}
+
+/* Режим отладки включён: значок заметен в строке */
+.adm-icon-btn.debug-on {
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
 }
 
 .group-badge {

@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS debug_logs;
+ALTER TABLE users DROP COLUMN IF EXISTS debug_until;
