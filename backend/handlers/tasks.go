@@ -22,9 +22,9 @@ import (
 type TaskHandler struct {
 	DB     **sql.DB
 	Source *manager.Manager
-	// Events reports changes to open pages (WebSocket); may be nil.
+	// Events сообщает об изменениях открытым страницам (WebSocket); может быть nil.
 	Events func(event string, data interface{})
-	// Keys gives the personal API keys to write under the user's name.
+	// Keys даёт личные ключи API, чтобы писать от имени пользователя.
 	Keys *UserKeys
 }
 

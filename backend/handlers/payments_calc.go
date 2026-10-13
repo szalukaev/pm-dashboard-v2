@@ -6,11 +6,11 @@ import (
 	"pm-dashboard/utils"
 )
 
-// The arithmetic of the Payments tab, in one place: the list of contracts,
-// the statistics and the CSV export must agree with each other.
+// Арифметика вкладки «Оплаты» в одном месте: список договоров, статистика
+// и выгрузка в CSV должны сходиться друг с другом.
 
-// vatMultiplier turns an amount without VAT into the amount to pay.
-// Two modes exist: "none" and "5" (5 %).
+// vatMultiplier переводит сумму без НДС в сумму к оплате. Режимов два:
+// "none" и "5" (5 %).
 func vatMultiplier(rate string) float64 {
 	if rate == "5" {
 		return 1.05
@@ -18,25 +18,25 @@ func vatMultiplier(rate string) float64 {
 	return 1
 }
 
-// contractMoney is what the state of a contract is computed from.
+// contractMoney — то, из чего считается состояние договора.
 type contractMoney struct {
 	Type    string  // "service" | "onetime"
-	Amount  float64 // the amount of the contract, without VAT
+	Amount  float64 // сумма договора без НДС
 	VatRate string
-	// Invoiced: the sum of its invoices, with VAT of each invoice.
+	// Invoiced: сумма его счетов, с НДС каждого счёта.
 	Invoiced float64
-	// Paid: everything paid on its invoices.
+	// Paid: всё, что оплачено по его счетам.
 	Paid    float64
 	EndDate *string // YYYY-MM-DD…
 }
 
-// Total is the amount of the contract with VAT.
+// Total — сумма договора с НДС.
 func (m contractMoney) Total() float64 {
 	return utils.Round2(m.Amount * vatMultiplier(m.VatRate))
 }
 
-// Debt is what is invoiced and not paid yet. What has not been invoiced is
-// not a debt.
+// Debt — выставленное и ещё не оплаченное. То, на что счёт не выставлен,
+// долгом не считается.
 func (m contractMoney) Debt() float64 {
 	debt := utils.Round2(m.Invoiced - m.Paid)
 	if debt < 0 {
@@ -45,7 +45,7 @@ func (m contractMoney) Debt() float64 {
 	return debt
 }
 
-// FullyPaid: the whole amount of the contract is paid.
+// FullyPaid: оплачена вся сумма договора.
 func (m contractMoney) FullyPaid() bool {
 	return m.Paid > 0 && m.Paid >= m.Total()
 }
@@ -58,10 +58,10 @@ func (m contractMoney) endsBefore(day string, inclusive bool) bool {
 	return end < day || (inclusive && end == day)
 }
 
-// Closed: nothing more is expected of the contract. A one-time contract is
-// closed when it is fully paid; a service contract — when its term has come
-// and nothing is owed. A service contract whose term is in the future, or
-// that has no term, is never closed.
+// Closed: по договору больше ничего не ожидается. Разовый договор закрыт,
+// когда полностью оплачен; договор сопровождения — когда его срок наступил
+// и долга нет. Договор сопровождения со сроком в будущем или без срока
+// закрытым не бывает.
 func (m contractMoney) Closed(today string) bool {
 	if m.Type == "onetime" {
 		return m.FullyPaid()
@@ -69,20 +69,19 @@ func (m contractMoney) Closed(today string) bool {
 	return m.endsBefore(today, true) && m.Debt() <= 0
 }
 
-// Overdue: the term has passed and the contract is neither fully paid nor
-// closed.
+// Overdue: срок прошёл, а договор не оплачен полностью и не закрыт.
 func (m contractMoney) Overdue(today string) bool {
 	return m.endsBefore(today, false) && !m.FullyPaid() && !m.Closed(today)
 }
 
-// Statuses of a contract in the export.
+// Статусы договора в выгрузке.
 const (
 	contractStatusPaid    = "Оплачен"
 	contractStatusOverdue = "Просрочен"
 	contractStatusActive  = "Активен"
 )
 
-// ExportStatus is the status of the contract in the CSV export.
+// ExportStatus — статус договора в выгрузке CSV.
 func (m contractMoney) ExportStatus(today string) string {
 	switch {
 	case m.FullyPaid():
@@ -94,15 +93,15 @@ func (m contractMoney) ExportStatus(today string) string {
 	}
 }
 
-// paymentTotals are the figures of the cards above the list: always over
-// every contract of the user, whatever the filters show.
+// paymentTotals — цифры карточек над списком: всегда по всем договорам
+// пользователя, что бы ни показывали фильтры.
 type paymentTotals struct {
 	Contracts    int
-	TotalAmount  float64 // with VAT
-	Invoiced     float64 // with VAT
+	TotalAmount  float64 // с НДС
+	Invoiced     float64 // с НДС
 	Debt         float64
 	Paid         float64
-	ClosedAmount float64 // the amounts of the contracts that are fully paid or closed
+	ClosedAmount float64 // суммы договоров, оплаченных полностью или закрытых
 }
 
 func sumContracts(contracts []contractMoney, today string) paymentTotals {
@@ -122,16 +121,16 @@ func sumContracts(contracts []contractMoney, today string) paymentTotals {
 	return t
 }
 
-// appliedPayment is how much of an entered payment is taken: never more
-// than what is left to pay on the invoice. ok is false for an amount that
-// cannot be a payment, or when nothing is left to pay.
+// appliedPayment — сколько из введённой оплаты принимается: не больше
+// остатка по счёту. ok равен false для суммы, которая не может быть
+// оплатой, или когда платить уже нечего.
 func appliedPayment(entered *float64, remainder float64) (applied float64, clamped, ok bool) {
 	remainder = utils.Round2(remainder)
 	if remainder <= 0 {
 		return 0, false, false
 	}
 	if entered == nil {
-		// No amount given: the whole remainder is paid
+		// Сумма не указана: оплачивается весь остаток
 		return remainder, false, true
 	}
 	amount := utils.Round2(*entered)
@@ -144,8 +143,8 @@ func appliedPayment(entered *float64, remainder float64) (applied float64, clamp
 	return amount, false, true
 }
 
-// invoiceNumber is the number of an invoice: the date it was issued on as
-// YYYYMM-DD. It is not a counter.
+// invoiceNumber — номер счёта: дата выставления в виде YYYYMM-DD. Это не
+// счётчик.
 func invoiceNumber(issuedAt string) string {
 	t, err := time.Parse("2006-01-02", firstN(issuedAt, 10))
 	if err != nil {

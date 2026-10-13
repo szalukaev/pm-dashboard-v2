@@ -5,8 +5,8 @@ import "testing"
 func strPtr(s string) *string { return &s }
 
 func TestContractMoneyFromTheSpec(t *testing.T) {
-	// The example of the specification: a contract for 100 000 with 5 % VAT,
-	// 52 500 invoiced, 31 500 paid
+	// Пример из ТЗ: договор на 100 000 с НДС 5 %, выставлено 52 500,
+	// оплачено 31 500
 	c := contractMoney{Type: "service", Amount: 100000, VatRate: "5", Invoiced: 52500, Paid: 31500, EndDate: strPtr("2025-12-31")}
 	if c.Total() != 105000 {
 		t.Errorf("total = %v, want 105000", c.Total())
@@ -145,8 +145,8 @@ func TestContractsCSV(t *testing.T) {
 			t.Errorf("column %d = %q, want %q", i, rows[0][i], name)
 		}
 	}
-	// Amounts with VAT and a decimal comma; the organization the contract
-	// belongs to; an expired contract with a debt is overdue
+	// Суммы с НДС и десятичной запятой; организация, которой принадлежит
+	// договор; истёкший договор с долгом — просрочен
 	want := []string{"Сопровождение", "Сопровождение", "ООО Рога и Копыта", "", "105000,00", "НДС 5%", "52500,00", "21000,00",
 		"", "", "", "2026-09-30", "Просрочен"}
 	for i, value := range want {
@@ -154,8 +154,8 @@ func TestContractsCSV(t *testing.T) {
 			t.Errorf("first contract, column %q = %q, want %q", wantHeader[i], rows[1][i], value)
 		}
 	}
-	// Without an organization the name kept in the contract is used; a
-	// fully paid contract is "paid"
+	// Без организации берётся название, сохранённое в договоре; полностью
+	// оплаченный договор — «paid»
 	if rows[2][2] != "ООО Ромашка" || rows[2][5] != "Без НДС" || rows[2][12] != "Оплачен" {
 		t.Errorf("second contract = %v", rows[2])
 	}

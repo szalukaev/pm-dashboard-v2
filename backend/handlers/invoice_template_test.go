@@ -12,7 +12,7 @@ import (
 	"testing"
 )
 
-// testDocx builds a minimal Word document with the given text and files.
+// testDocx собирает минимальный документ Word с заданным текстом и файлами.
 func testDocx(t *testing.T, text string, extra ...string) []byte {
 	t.Helper()
 	var buf bytes.Buffer
@@ -47,7 +47,7 @@ func uploadRequest(t *testing.T, name string, content []byte) *http.Request {
 
 func newTemplateHandler(t *testing.T) *InvoiceTemplateHandler {
 	t.Helper()
-	var db *sql.DB // no database in tests: who uploaded is simply not kept
+	var db *sql.DB // базы в тестах нет: кто загрузил, просто не сохраняется
 	templates := &InvoiceTemplates{DB: &db, Dir: t.TempDir(), BuiltIn: "../invoice/invoice_template.docx"}
 	return &InvoiceTemplateHandler{DB: &db, Templates: templates}
 }
@@ -64,7 +64,7 @@ func errorCode(t *testing.T, w *httptest.ResponseRecorder) string {
 func TestInvoiceTemplateUploadAndReset(t *testing.T) {
 	h := newTemplateHandler(t)
 
-	// At first the built-in template is in force
+	// Сначала действует встроенный шаблон
 	builtIn, custom, err := h.Templates.Current()
 	if err != nil || custom || len(builtIn) == 0 {
 		t.Fatalf("built-in template: custom = %v, %d bytes, err = %v", custom, len(builtIn), err)
@@ -76,7 +76,7 @@ func TestInvoiceTemplateUploadAndReset(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("upload: %d %s", w.Code, w.Body.String())
 	}
-	// A typo does not stop the upload; it is reported
+	// Опечатка загрузку не останавливает; о ней сообщается
 	var answer struct {
 		Report struct {
 			Found   []string `json:"found"`
@@ -93,7 +93,7 @@ func TestInvoiceTemplateUploadAndReset(t *testing.T) {
 		t.Error("the uploaded template is not the one in force")
 	}
 
-	// The preview is made from the uploaded template
+	// Предпросмотр собирается по загруженному шаблону
 	w = httptest.NewRecorder()
 	h.Preview(w, httptest.NewRequest("GET", "/api/admin/invoice-template/preview", nil))
 	if w.Code != http.StatusOK || !strings.Contains(w.Header().Get("Content-Disposition"), "filename*=UTF-8''") {
@@ -104,13 +104,13 @@ func TestInvoiceTemplateUploadAndReset(t *testing.T) {
 		t.Fatalf("the preview is not a document: %v", err)
 	}
 
-	// Back to the built-in one
+	// Возврат к встроенному
 	w = httptest.NewRecorder()
 	h.Reset(w, httptest.NewRequest("DELETE", "/api/admin/invoice-template", nil))
 	if current, custom, _ = h.Templates.Current(); custom || !bytes.Equal(current, builtIn) {
 		t.Error("after a reset the built-in template must be in force")
 	}
-	// Resetting what is not there is not an error
+	// Сброс того, чего нет, — не ошибка
 	w = httptest.NewRecorder()
 	h.Reset(w, httptest.NewRequest("DELETE", "/api/admin/invoice-template", nil))
 	if w.Code != http.StatusOK {
@@ -137,13 +137,13 @@ func TestInvoiceTemplateUploadRefused(t *testing.T) {
 		if w.Code != http.StatusBadRequest || errorCode(t, w) != c.want {
 			t.Errorf("%s: %d %s, want 400 %s", c.name, w.Code, w.Body.String(), c.want)
 		}
-		// A refused file never replaces the template in force
+		// Непринятый файл не заменяет действующий шаблон
 		if _, custom, _ := h.Templates.Current(); custom {
 			t.Errorf("%s: the refused file became the template", c.name)
 		}
 	}
 
-	// No file at all
+	// Файла нет вовсе
 	h := newTemplateHandler(t)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/admin/invoice-template", strings.NewReader("{}"))
@@ -176,7 +176,7 @@ func TestInvoiceTemplateInfo(t *testing.T) {
 	if info.Custom || len(info.Variables) < 20 {
 		t.Errorf("custom = %v, %d variables", info.Custom, len(info.Variables))
 	}
-	// The built-in template is a good one
+	// Встроенный шаблон исправен
 	if len(info.Report.Unknown) != 0 || len(info.Report.Warnings) != 0 {
 		t.Errorf("built-in template: %+v", info.Report)
 	}

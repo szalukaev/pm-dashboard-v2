@@ -18,29 +18,30 @@ import (
 	"pm-dashboard/utils"
 )
 
-// A dashboard user is tied to their account in the data source by a
-// personal API key: the key identifies its owner there. Only the user can
-// set or remove the link, and only their own — there is no admin route.
+// Пользователь дашборда привязывается к своей учётной записи в источнике
+// данных личным ключом API: ключ определяет там своего владельца. Задать
+// или снять привязку может только сам пользователь и только свою —
+// маршрута для администратора нет.
 //
-// This is how the Redmine connector identifies a person; another connector
-// may do it differently, so the client is told the kind of the source and
-// shows the matching form.
+// Так человека определяет коннектор Redmine; другой коннектор может делать
+// это иначе, поэтому клиенту сообщается вид источника, и он показывает
+// подходящую форму.
 //
-// The key is checked in the source (who does it belong to?) and stored
-// encrypted, so that changes the user makes go to the source under their
-// own name. It is never sent back to the client: only its last characters
-// are shown, to recognise which key is in use.
+// Ключ проверяется в источнике (чей он?) и хранится зашифрованным, чтобы
+// изменения пользователя уходили в источник от его имени. Клиенту ключ
+// обратно не отдаётся: показываются только последние символы — по ним
+// видно, какой ключ используется.
 
-// UserKeys reads the personal API keys of users.
+// UserKeys читает личные ключи API пользователей.
 type UserKeys struct {
 	DB     **sql.DB
 	Source *manager.Manager
 	Box    *secrets.Box
 }
 
-// ClientFor returns the client of the data source to change data with on
-// behalf of the user: with their personal key when they have one, otherwise
-// the system client. nil when the source is not configured.
+// ClientFor возвращает клиента источника данных для изменения данных от
+// имени пользователя: с личным ключом, если он есть, иначе системного.
+// nil — источник не настроен.
 func (k *UserKeys) ClientFor(userID int) *redmine.Client {
 	if k == nil || k.Source == nil {
 		return nil
@@ -51,8 +52,8 @@ func (k *UserKeys) ClientFor(userID int) *redmine.Client {
 	return k.Source.Client()
 }
 
-// personalClient returns a client acting with the user's own key, nil when
-// the user has not given one (or the source is not configured).
+// personalClient возвращает клиента, действующего с ключом самого
+// пользователя; nil — ключ не введён (или источник не настроен).
 func (k *UserKeys) personalClient(userID int) *redmine.Client {
 	if k == nil || k.Source == nil || k.Box == nil || *k.DB == nil || k.Source.Client() == nil {
 		return nil
@@ -69,8 +70,8 @@ func (k *UserKeys) personalClient(userID int) *redmine.Client {
 	return k.Source.ClientWithKey(token)
 }
 
-// RefreshProjects re-reads the projects the user is a member of in the data
-// source ("rights as in Redmine", see access.Permissions.FromSource).
+// RefreshProjects перечитывает проекты, в которых пользователь состоит в
+// источнике данных («права как в Redmine», см. access.Permissions.FromSource).
 func (k *UserKeys) RefreshProjects(userID int) {
 	client := k.personalClient(userID)
 	if client == nil {
@@ -80,11 +81,11 @@ func (k *UserKeys) RefreshProjects(userID int) {
 	projects, err := client.GetCurrentProjects()
 	switch {
 	case errors.Is(err, redmine.ErrUnauthorized):
-		// The key was revoked in the source: the rights it gave go with it.
+		// Ключ отозван в источнике: вместе с ним уходят и права, которые он давал.
 		slog.Warn("Personal API key is no longer accepted by the data source", "user", userID)
 		projects = []int{}
 	case err != nil:
-		// The source is unavailable: keep what was read last time.
+		// Источник недоступен: остаётся то, что прочитано в прошлый раз.
 		slog.Warn("Could not read the user's projects from the data source", "user", userID, "error", err)
 		return
 	}
@@ -93,9 +94,9 @@ func (k *UserKeys) RefreshProjects(userID int) {
 		slog.Warn("Could not save the user's projects from the data source", "user", userID, "error", err)
 		return
 	}
-	// The members are read project by project, which takes minutes for a
-	// user of many projects: in the background, one user at a time, so that
-	// the sync this runs before does not wait.
+	// Сотрудники читаются по каждому проекту, и у пользователя со многими
+	// проектами это занимает минуты: в фоне, по одному пользователю, чтобы
+	// синхронизация, перед которой это запускается, не ждала.
 	go func() {
 		membersRefresh.Lock()
 		defer membersRefresh.Unlock()
@@ -103,17 +104,17 @@ func (k *UserKeys) RefreshProjects(userID int) {
 	}()
 }
 
-// membersRefresh lets one refreshMembers run at a time.
+// membersRefresh не даёт работать нескольким refreshMembers одновременно.
 var membersRefresh sync.Mutex
 
-// sourceMembersMaxAge is how long the members read from the source are
-// trusted. They are read project by project, which is too heavy to repeat
-// before every sync.
+// sourceMembersMaxAge — сколько времени можно доверять сотрудникам,
+// прочитанным из источника. Они читаются по каждому проекту, и повторять
+// это перед каждой синхронизацией слишком тяжело.
 const sourceMembersMaxAge = time.Hour
 
-// refreshMembers re-reads whom the data source shows to the user: the
-// members of the user's projects, asked with the user's own key. With
-// "rights as in the source" nobody else is visible to the user here.
+// refreshMembers перечитывает, кого источник данных показывает
+// пользователю: участников его проектов, запрошенных его же ключом. При
+// «правах как в источнике» никто другой пользователю здесь не виден.
 func (k *UserKeys) refreshMembers(userID int, client *redmine.Client, projects []int) {
 	var fresh bool
 	(*k.DB).QueryRow(`SELECT source_members IS NOT NULL AND source_members_at > NOW() - $1 * INTERVAL '1 second'
@@ -124,7 +125,7 @@ func (k *UserKeys) refreshMembers(userID int, client *redmine.Client, projects [
 
 	members := []int{}
 	seen := map[int]bool{}
-	// The user always sees themselves
+	// Себя пользователь видит всегда
 	var own *int
 	(*k.DB).QueryRow("SELECT member_id FROM users WHERE id = $1", userID).Scan(&own)
 	if own != nil {
@@ -137,8 +138,8 @@ func (k *UserKeys) refreshMembers(userID int, client *redmine.Client, projects [
 		case errors.Is(err, redmine.ErrUnauthorized):
 			return
 		case err != nil:
-			// The source does not show the members of this project to the
-			// user: it adds nobody.
+			// Участников этого проекта источник пользователю не показывает:
+			// проект никого не добавляет.
 			slog.Debug("The user's key cannot read the members of a project", "user", userID, "project", projectID, "error", err)
 			continue
 		}
@@ -180,9 +181,10 @@ func (k *UserKeys) fillEmail(userID int, client *redmine.Client) {
 	}
 }
 
-// RefreshAllProjects does RefreshProjects for every active user who gave a
-// key. It runs before each sync, so a change of membership in the source
-// reaches the dashboard within one sync interval.
+// RefreshAllProjects выполняет RefreshProjects для каждого активного
+// пользователя с ключом. Запускается перед каждой синхронизацией, поэтому
+// смена участия в источнике доходит до дашборда за один интервал
+// синхронизации.
 func (k *UserKeys) RefreshAllProjects() {
 	if k == nil || *k.DB == nil {
 		return
@@ -204,7 +206,7 @@ func (k *UserKeys) RefreshAllProjects() {
 	}
 }
 
-// sourceInfo describes the link for /auth/me and the login answer.
+// sourceInfo описывает привязку для /auth/me и ответа на вход.
 func (h *AuthHandler) sourceInfo(userID int) map[string]interface{} {
 	info := map[string]interface{}{
 		"type":        "",
@@ -232,12 +234,12 @@ func (h *AuthHandler) sourceInfo(userID int) map[string]interface{} {
 		info["member_name"] = memberName
 		info["token_hint"] = hint
 	}
-	// Only the Redmine connector asks for a personal key.
+	// Личный ключ запрашивает только коннектор Redmine.
 	info["needs_token"] = info["type"] == "redmine" && memberID == nil
 	return info
 }
 
-// tokenHint keeps the last characters of a key, enough to recognise it.
+// tokenHint оставляет последние символы ключа — их хватает, чтобы его узнать.
 func tokenHint(token string) string {
 	const keep = 4
 	if len(token) <= keep {
@@ -246,8 +248,8 @@ func tokenHint(token string) string {
 	return token[len(token)-keep:]
 }
 
-// SetSourceToken ties the current user to the owner of the given personal
-// API key of the data source.
+// SetSourceToken привязывает текущего пользователя к владельцу заданного
+// личного ключа API источника данных.
 func (h *AuthHandler) SetSourceToken(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.GetUserID(r)
 
@@ -279,7 +281,7 @@ func (h *AuthHandler) SetSourceToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// One account of the source — one dashboard user.
+	// Одна учётная запись источника — один пользователь дашборда.
 	var taken bool
 	(*h.DB).QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE member_id = $1 AND id <> $2)", member.ExternalID, userID).Scan(&taken)
 	if taken {
@@ -302,14 +304,14 @@ func (h *AuthHandler) SetSourceToken(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 		return
 	}
-	// The member may not be synced yet (not in a tracked project): keep the
-	// name the source has just given.
+	// Сотрудник может быть ещё не синхронизирован (его нет в отслеживаемых
+	// проектах): берётся имя, которое только что дал источник.
 	(*h.DB).Exec(`INSERT INTO members (external_id, name, login, data_source, synced_at)
 		VALUES ($1, $2, $3, 'redmine', NOW())
 		ON CONFLICT (external_id, data_source) DO NOTHING`, member.ExternalID, member.Name, member.Login)
 
-	// The projects of the user in the source, for "rights as in Redmine";
-	// the sync then fetches the issues of the projects that became visible.
+	// Проекты пользователя в источнике — для «прав как в Redmine»; затем
+	// синхронизация забирает задачи проектов, ставших видимыми.
 	if h.Keys != nil {
 		// Новая связка — адрес почты спрашивается у источника заново
 		emailTried.Delete(userID)
@@ -322,7 +324,7 @@ func (h *AuthHandler) SetSourceToken(w http.ResponseWriter, r *http.Request) {
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"success": true, "source": h.sourceInfo(userID)})
 }
 
-// ClearSourceToken removes the link of the current user.
+// ClearSourceToken снимает привязку текущего пользователя.
 func (h *AuthHandler) ClearSourceToken(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.GetUserID(r)
 	if _, err := (*h.DB).Exec(`UPDATE users SET member_id = NULL, source_token_enc = '', source_token_hint = '',

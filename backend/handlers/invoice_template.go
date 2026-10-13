@@ -19,28 +19,27 @@ import (
 	"pm-dashboard/utils"
 )
 
-// docxContentType is the media type of a Word document.
+// docxContentType — тип содержимого документа Word.
 const docxContentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
-// InvoiceTemplates keeps the template the invoices are made from: the one
-// the administrator uploaded, or the built-in one. There is one template
-// for the whole installation.
+// InvoiceTemplates хранит шаблон, по которому формируются счета:
+// загруженный администратором или встроенный. Шаблон один на всю установку.
 type InvoiceTemplates struct {
 	DB **sql.DB
-	// Dir is where the uploaded template is kept (the data directory: it
-	// survives a rebuild of the container).
+	// Dir — где лежит загруженный шаблон (каталог данных: он переживает
+	// пересборку контейнера).
 	Dir string
-	// BuiltIn is the path of the template that ships with the application.
+	// BuiltIn — путь к шаблону из поставки.
 	BuiltIn string
 }
 
 const (
 	customTemplateFile = "invoice_template.docx"
-	// templateSettingsKey: what is known about the uploaded template.
+	// templateSettingsKey: что известно о загруженном шаблоне.
 	templateSettingsKey = "invoice_template"
 )
 
-// templateInfo is kept in the settings next to the uploaded file.
+// templateInfo хранится в настройках рядом с загруженным файлом.
 type templateInfo struct {
 	FileName   string    `json:"file_name"`
 	UploadedAt time.Time `json:"uploaded_at"`
@@ -52,9 +51,9 @@ func (t *InvoiceTemplates) customPath() string {
 	return filepath.Join(t.Dir, customTemplateFile)
 }
 
-// Current returns the template in force and whether it is an uploaded one.
-// An uploaded template that cannot be read falls back to the built-in one:
-// invoices must not stop because of it.
+// Current возвращает действующий шаблон и то, загруженный ли он. Если
+// загруженный шаблон не читается, берётся встроенный: счета из-за этого
+// останавливаться не должны.
 func (t *InvoiceTemplates) Current() (template []byte, custom bool, err error) {
 	if content, readErr := os.ReadFile(t.customPath()); readErr == nil {
 		return content, true, nil
@@ -80,8 +79,8 @@ func (t *InvoiceTemplates) info() *templateInfo {
 	return &info
 }
 
-// Save replaces the uploaded template. The file is written next to its
-// place and moved over it, so that a failure half-way leaves the old one.
+// Save заменяет загруженный шаблон. Файл пишется рядом со своим местом и
+// затем переносится на него: при сбое посередине остаётся прежний.
 func (t *InvoiceTemplates) Save(content []byte, info templateInfo) error {
 	if err := os.MkdirAll(t.Dir, 0755); err != nil {
 		return err
@@ -111,7 +110,7 @@ func (t *InvoiceTemplates) Save(content []byte, info templateInfo) error {
 	return nil
 }
 
-// Reset removes the uploaded template: the built-in one is in force again.
+// Reset удаляет загруженный шаблон: снова действует встроенный.
 func (t *InvoiceTemplates) Reset() error {
 	if err := os.Remove(t.customPath()); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
@@ -122,15 +121,15 @@ func (t *InvoiceTemplates) Reset() error {
 	return nil
 }
 
-// InvoiceTemplateHandler serves the screen where the administrator manages
-// the template of invoices.
+// InvoiceTemplateHandler обслуживает экран, на котором администратор
+// управляет шаблоном счёта.
 type InvoiceTemplateHandler struct {
 	DB        **sql.DB
 	Templates *InvoiceTemplates
 }
 
-// Get returns which template is in force, what a check of it finds and
-// every variable a template may use.
+// Get возвращает, какой шаблон действует, что нашла его проверка и все
+// переменные, которые может использовать шаблон.
 func (h *InvoiceTemplateHandler) Get(w http.ResponseWriter, r *http.Request) {
 	template, custom, err := h.Templates.Current()
 	if err != nil {
@@ -154,7 +153,7 @@ func (h *InvoiceTemplateHandler) Get(w http.ResponseWriter, r *http.Request) {
 	utils.JSON(w, http.StatusOK, result)
 }
 
-// templateError answers with the reason a file cannot be a template.
+// templateError отвечает причиной, по которой файл не может быть шаблоном.
 func templateError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, invoice.ErrMacros):
@@ -166,10 +165,10 @@ func templateError(w http.ResponseWriter, err error) {
 	}
 }
 
-// Upload replaces the template with the uploaded file. A file that cannot
-// be a template is refused and the template in force stays.
+// Upload заменяет шаблон загруженным файлом. Файл, который не может быть
+// шаблоном, не принимается, и действующий шаблон остаётся.
 func (h *InvoiceTemplateHandler) Upload(w http.ResponseWriter, r *http.Request) {
-	// A little above the limit of the file: the form adds its own framing
+	// Чуть больше предела самого файла: форма добавляет свою обвязку
 	r.Body = http.MaxBytesReader(w, r.Body, invoice.MaxTemplateSize+(1<<20))
 	file, header, err := r.FormFile("file")
 	if err != nil {
@@ -197,7 +196,7 @@ func (h *InvoiceTemplateHandler) Upload(w http.ResponseWriter, r *http.Request) 
 		templateError(w, err)
 		return
 	}
-	// The template must also survive being filled, not only being read
+	// Шаблон должен выдержать и заполнение, а не только чтение
 	if _, err := invoice.Render(content, invoice.Sample()); err != nil {
 		templateError(w, err)
 		return
@@ -216,7 +215,7 @@ func (h *InvoiceTemplateHandler) Upload(w http.ResponseWriter, r *http.Request) 
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"success": true, "report": report})
 }
 
-// Reset returns to the built-in template.
+// Reset возвращает встроенный шаблон.
 func (h *InvoiceTemplateHandler) Reset(w http.ResponseWriter, r *http.Request) {
 	if err := h.Templates.Reset(); err != nil {
 		utils.Error(w, http.StatusInternalServerError, "TEMPLATE_SAVE_FAILED")
@@ -225,8 +224,8 @@ func (h *InvoiceTemplateHandler) Reset(w http.ResponseWriter, r *http.Request) {
 	utils.Success(w)
 }
 
-// File gives the template in force: to look at it, or to take the built-in
-// one as a start for one's own.
+// File отдаёт действующий шаблон: чтобы посмотреть его или взять встроенный
+// за основу своего.
 func (h *InvoiceTemplateHandler) File(w http.ResponseWriter, r *http.Request) {
 	template, custom, err := h.Templates.Current()
 	if err != nil {
@@ -243,8 +242,8 @@ func (h *InvoiceTemplateHandler) File(w http.ResponseWriter, r *http.Request) {
 	serveDocx(w, name, template)
 }
 
-// Preview gives an invoice made from the template in force and invented
-// data: what a real invoice will look like.
+// Preview отдаёт счёт, собранный по действующему шаблону на вымышленных
+// данных: так будет выглядеть настоящий счёт.
 func (h *InvoiceTemplateHandler) Preview(w http.ResponseWriter, r *http.Request) {
 	template, _, err := h.Templates.Current()
 	if err != nil {
@@ -259,9 +258,9 @@ func (h *InvoiceTemplateHandler) Preview(w http.ResponseWriter, r *http.Request)
 	serveDocx(w, "Пробный счёт.docx", document)
 }
 
-// serveDocx sends a Word document for download. The name may be in
-// Russian: filename* carries it encoded, filename is the fallback for what
-// cannot read that.
+// serveDocx отдаёт документ Word на скачивание. Имя может быть русским:
+// filename* несёт его в закодированном виде, filename — запасной вариант
+// для тех, кто filename* не понимает.
 func serveDocx(w http.ResponseWriter, name string, content []byte) {
 	w.Header().Set("Content-Type", docxContentType)
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"document.docx\"; filename*=UTF-8''%s", url.PathEscape(name)))

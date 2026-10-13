@@ -22,11 +22,11 @@ import (
 
 type PaymentsHandler struct {
 	DB **sql.DB
-	// Templates gives the template the invoices are made from.
+	// Templates даёт шаблон, по которому формируются счета.
 	Templates *InvoiceTemplates
 }
 
-// ─── Organization ───
+// ─── Организации ───
 
 func (h *PaymentsHandler) ListOrganizations(w http.ResponseWriter, r *http.Request) {
 	if *h.DB == nil {
@@ -140,7 +140,7 @@ func (h *PaymentsHandler) DeleteOrganization(w http.ResponseWriter, r *http.Requ
 		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
 		return
 	}
-	// Unlink contracts instead of deleting
+	// Договоры не удаляются, а отвязываются от организации
 	if _, err := (*h.DB).Exec("UPDATE contracts SET organization_id = NULL WHERE organization_id = $1 AND user_id = $2", orgID, userID); err != nil {
 		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 		return
@@ -157,9 +157,9 @@ func (h *PaymentsHandler) DeleteOrganization(w http.ResponseWriter, r *http.Requ
 	utils.Success(w)
 }
 
-// ─── Contract ───
+// ─── Договоры ───
 
-// paymentContract is a contract with what is computed for it.
+// paymentContract — договор вместе с тем, что для него посчитано.
 type paymentContract struct {
 	ID             int     `json:"id"`
 	OrganizationID *int    `json:"organization_id"`
@@ -174,12 +174,12 @@ type paymentContract struct {
 	StartDate      *string `json:"start_date"`
 	EndDate        *string `json:"end_date"`
 	OrgName        string  `json:"org_name"`
-	// TotalAmount: the amount of the contract with VAT.
+	// TotalAmount: сумма договора с НДС.
 	TotalAmount float64 `json:"total_amount"`
-	// InvoicedAmount: the sum of the invoices, with VAT.
+	// InvoicedAmount: сумма счетов с НДС.
 	InvoicedAmount float64 `json:"invoiced_amount"`
 	TotalPaid      float64 `json:"total_paid"`
-	// DebtAmount: invoiced and not paid yet.
+	// DebtAmount: выставлено и ещё не оплачено.
 	DebtAmount  float64 `json:"debt_amount"`
 	IsClosed    bool    `json:"is_closed"`
 	IsOverdue   bool    `json:"is_overdue"`
@@ -188,10 +188,10 @@ type paymentContract struct {
 	money contractMoney
 }
 
-// contractFilter is what the list of contracts is narrowed by.
+// contractFilter — чем сужается список договоров.
 type contractFilter struct {
-	Type       string // "service" | "onetime" | "" for both
-	Search     string // in the name of the contract or of the organization
+	Type       string // "service" | "onetime" | "" — оба вида
+	Search     string // по названию договора или организации
 	ShowClosed bool
 }
 
@@ -204,8 +204,8 @@ func contractFilterOf(r *http.Request) contractFilter {
 	}
 }
 
-// loadContracts returns the contracts of the user with their computed
-// state. A nil filter gives every contract.
+// loadContracts возвращает договоры пользователя с их посчитанным
+// состоянием. Фильтр nil даёт все договоры.
 func (h *PaymentsHandler) loadContracts(userID int, filter *contractFilter) ([]paymentContract, error) {
 	where := []string{"c.user_id = $1"}
 	args := []interface{}{userID}
@@ -299,12 +299,12 @@ func (h *PaymentsHandler) CreateContract(w http.ResponseWriter, r *http.Request)
 		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
 		return
 	}
-	// Inherit from org if provided (only the caller's own organization)
+	// Данные берутся из организации, если она указана (только своя)
 	if body.OrganizationID != nil {
 		var orgName, orgAddr, orgContact, orgPhone sql.NullString
 		err := (*h.DB).QueryRow("SELECT name, address, contact_name, contact_phone FROM organizations WHERE id=$1 AND user_id=$2", *body.OrganizationID, userID).Scan(&orgName, &orgAddr, &orgContact, &orgPhone)
 		if err != nil {
-			// Foreign or missing organization — refuse rather than cross-link.
+			// Чужая или несуществующая организация — отказ, а не привязка к чужому.
 			utils.Error(w, http.StatusNotFound, "ORGANIZATION_NOT_FOUND")
 			return
 		}
@@ -321,7 +321,7 @@ func (h *PaymentsHandler) CreateContract(w http.ResponseWriter, r *http.Request)
 			body.ContactPhone = &orgPhone.String
 		}
 	}
-	// A date left blank in the form is "not set", not an empty string
+	// Дата, не заполненная в форме, — «не задана», а не пустая строка
 	body.StartDate, body.EndDate = emptyToNil(body.StartDate), emptyToNil(body.EndDate)
 	vatRate := "none"
 	if body.VatRate != nil {
@@ -360,7 +360,7 @@ func (h *PaymentsHandler) UpdateContract(w http.ResponseWriter, r *http.Request)
 	}
 	var body map[string]interface{}
 	json.NewDecoder(r.Body).Decode(&body)
-	// A date left blank in the form is "not set", not an empty string
+	// Дата, не заполненная в форме, — «не задана», а не пустая строка
 	for _, field := range []string{"start_date", "end_date"} {
 		if text, isText := body[field].(string); isText && strings.TrimSpace(text) == "" {
 			body[field] = nil
@@ -412,7 +412,7 @@ func (h *PaymentsHandler) DeleteContract(w http.ResponseWriter, r *http.Request)
 	utils.Success(w)
 }
 
-// ─── Invoice ───
+// ─── Счета ───
 
 func (h *PaymentsHandler) ListInvoices(w http.ResponseWriter, r *http.Request) {
 	if *h.DB == nil {
@@ -426,7 +426,7 @@ func (h *PaymentsHandler) ListInvoices(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
 		return
 	}
-	// Ownership: invoices are visible only via a contract belonging to the caller.
+	// Принадлежность: счета видны только через договор самого пользователя.
 	limit, offset := pageOf(r)
 	total := 0
 	if err := (*h.DB).QueryRow(`SELECT COUNT(*) FROM invoices i JOIN contracts c ON i.contract_id = c.id
@@ -453,9 +453,9 @@ func (h *PaymentsHandler) ListInvoices(w http.ResponseWriter, r *http.Request) {
 		Status     string  `json:"status"`
 		Total      float64 `json:"total"`
 		Remainder  float64 `json:"remainder"`
-		// Number: the date of issue as YYYYMM-DD
+		// Number: дата выставления в виде YYYYMM-DD
 		Number string `json:"number"`
-		// PaidAt: the date of the last payment, nil when nothing is paid
+		// PaidAt: дата последней оплаты; nil — ничего не оплачено
 		PaidAt *string `json:"paid_at"`
 	}
 	var invoices []Invoice
@@ -478,8 +478,8 @@ func (h *PaymentsHandler) ListInvoices(w http.ResponseWriter, r *http.Request) {
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"invoices": invoices, "total": total})
 }
 
-// maxInvoiceItemName bounds the name of a line of an invoice: long enough
-// for a reference to a contract with its appendix, short enough to print.
+// maxInvoiceItemName ограничивает название позиции счёта: хватает на ссылку
+// на договор с приложением, и при этом название помещается при печати.
 const maxInvoiceItemName = 2000
 
 func (h *PaymentsHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) {
@@ -544,8 +544,8 @@ func (h *PaymentsHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 
 	today := time.Now().Format("2006-01-02")
 
-	// Invoice header + items must be written atomically — otherwise a partial
-	// failure leaves an invoice without its line items.
+	// Счёт и его позиции записываются одной транзакцией — иначе при сбое
+	// посередине остался бы счёт без позиций.
 	tx, err := (*h.DB).Begin()
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "CREATE_FAILED")
@@ -577,8 +577,8 @@ func (h *PaymentsHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"id": invoiceID, "success": true})
 }
 
-// GetInvoiceItems returns the lines of an invoice: a new invoice may be
-// issued from them.
+// GetInvoiceItems возвращает позиции счёта: по ним можно выставить новый
+// счёт.
 func (h *PaymentsHandler) GetInvoiceItems(w http.ResponseWriter, r *http.Request) {
 	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
@@ -589,7 +589,7 @@ func (h *PaymentsHandler) GetInvoiceItems(w http.ResponseWriter, r *http.Request
 		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
 		return
 	}
-	// Ownership: only an invoice of the caller's own contract
+	// Принадлежность: только счёт по договору самого пользователя
 	var amount float64
 	var contractName string
 	err = (*h.DB).QueryRow(`SELECT i.amount, c.name FROM invoices i JOIN contracts c ON i.contract_id = c.id
@@ -617,7 +617,7 @@ func (h *PaymentsHandler) GetInvoiceItems(w http.ResponseWriter, r *http.Request
 			items = append(items, it)
 		}
 	}
-	// An old invoice may have no lines stored: it was one line of the contract
+	// У старого счёта позиции могут быть не сохранены: он был одной строкой договора
 	if len(items) == 0 {
 		items = append(items, item{Name: contractName, Quantity: 1, Price: amount})
 	}
@@ -636,7 +636,7 @@ func (h *PaymentsHandler) DeleteInvoice(w http.ResponseWriter, r *http.Request) 
 		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
 		return
 	}
-	// Ownership: delete only an invoice of the caller's own contract.
+	// Принадлежность: удалить можно только счёт по своему договору.
 	res, err := (*h.DB).Exec(`DELETE FROM invoices WHERE id=$1 AND contract_id IN
 		(SELECT id FROM contracts WHERE user_id=$2)`, invoiceID, userID)
 	if err != nil {
@@ -663,7 +663,7 @@ func (h *PaymentsHandler) PayInvoice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Ownership: pay only an invoice of the caller's own contract.
+	// Принадлежность: оплатить можно только счёт по своему договору.
 	var inv struct {
 		Amount     float64
 		VatRate    string
@@ -689,8 +689,8 @@ func (h *PaymentsHandler) PayInvoice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// More than is left to pay is cut to the remainder; the answer says so,
-	// and the page tells the user how much was taken.
+	// Сумма больше остатка урезается до остатка; ответ об этом сообщает, и
+	// страница говорит пользователю, сколько принято.
 	payAmount, clamped, ok := appliedPayment(body.Amount, remainder)
 	if !ok {
 		utils.Error(w, http.StatusBadRequest, "INVALID_AMOUNT")
@@ -711,8 +711,9 @@ func (h *PaymentsHandler) PayInvoice(w http.ResponseWriter, r *http.Request) {
 		status = "paid"
 	}
 
-	// Atomic update of invoice + payment row (avoids lost updates on
-	// concurrent payments and inconsistent state if one statement fails).
+	// Счёт и строка оплаты меняются одной транзакцией: при одновременных
+	// оплатах ничего не теряется, а при сбое одного запроса состояние не
+	// расходится.
 	tx, err := (*h.DB).Begin()
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "TX_FAILED")
@@ -752,7 +753,7 @@ func (h *PaymentsHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// The invoice with its contract and organization (only the caller's own)
+	// Счёт с его договором и организацией (только свои)
 	var issuedAt string
 	var amount float64
 	data := invoice.Data{}
@@ -771,8 +772,8 @@ func (h *PaymentsHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request
 		utils.Error(w, http.StatusNotFound, "INVOICE_NOT_FOUND")
 		return
 	}
-	// The number and the date of the document are those of the day the
-	// invoice was issued on: downloading it again gives the same document
+	// Номер и дата документа берутся от дня выставления счёта: повторное
+	// скачивание даёт тот же документ
 	data.IssuedAt, err = time.ParseInLocation("2006-01-02", firstN(issuedAt, 10), time.Local)
 	if err != nil {
 		data.IssuedAt = time.Now()
@@ -808,10 +809,10 @@ func (h *PaymentsHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request
 	serveDocx(w, data.FileName(), document)
 }
 
-// ─── Statistics ───
+// ─── Статистика ───
 
-// GetStats returns the figures of the cards above the list. They always
-// cover every contract of the user, whatever the filters show.
+// GetStats возвращает цифры карточек над списком. Они всегда считаются по
+// всем договорам пользователя, что бы ни показывали фильтры.
 func (h *PaymentsHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
@@ -836,16 +837,16 @@ func (h *PaymentsHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 		{"label": "paid", "value": totals.Paid},
 		{"label": "closed_amount", "value": totals.ClosedAmount},
 	}
-	// The debt card is red only when there is a debt
+	// Карточка задолженности красная, только когда долг есть
 	if totals.Debt > 0 {
 		stats[3]["variant"] = "danger"
 	}
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"stats": stats})
 }
 
-// ─── CSV Export ───
+// ─── Экспорт в CSV ───
 
-// ExportCSV writes the contracts the list shows — the same filters apply.
+// ExportCSV выгружает договоры, показанные в списке, — с теми же фильтрами.
 func (h *PaymentsHandler) ExportCSV(w http.ResponseWriter, r *http.Request) {
 	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
@@ -863,7 +864,7 @@ func (h *PaymentsHandler) ExportCSV(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", "attachment; filename=contracts.csv")
-	// BOM for Excel
+	// BOM — для Excel
 	w.Write([]byte{0xEF, 0xBB, 0xBF})
 
 	writer := csv.NewWriter(w)
@@ -874,8 +875,8 @@ func (h *PaymentsHandler) ExportCSV(w http.ResponseWriter, r *http.Request) {
 	writer.Flush()
 }
 
-// contractsCSV builds the rows of the export, the header first. Amounts
-// are with VAT and use a decimal comma, as spreadsheets expect it here.
+// contractsCSV собирает строки выгрузки, первой — шапку. Суммы — с НДС и с
+// десятичной запятой, как их ждут здешние электронные таблицы.
 func contractsCSV(contracts []paymentContract, today string) [][]string {
 	text := func(s *string) string {
 		if s == nil {
@@ -909,7 +910,7 @@ func contractsCSV(contracts []paymentContract, today string) [][]string {
 	return rows
 }
 
-// ─── Helpers ───
+// ─── Вспомогательное ───
 
 func buildUpdateSets(body map[string]interface{}, allowed map[string]bool, startIdx int) ([]string, []interface{}, int) {
 	sets := []string{}
