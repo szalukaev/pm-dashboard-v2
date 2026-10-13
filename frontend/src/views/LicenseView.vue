@@ -2,7 +2,7 @@
   <div class="license-view">
     <h1 class="page-title">{{ $t('license.title') }}</h1>
 
-    <!-- Everybody sees the state -->
+    <!-- Состояние видят все -->
     <div class="license-card state-card" :class="license.state" data-testid="license-state">
       <component :is="stateIcon" :size="22" class="state-icon" />
       <div>
@@ -11,12 +11,12 @@
       </div>
     </div>
 
-    <!-- The rest is for administrators -->
+    <!-- Остальное — для администраторов -->
     <p v-if="!auth.isAdmin" class="license-note">{{ $t('license.ask_admin') }}</p>
 
     <template v-else>
       <div v-if="details" class="license-grid">
-        <!-- What is licensed -->
+        <!-- На что выдана лицензия -->
         <div v-if="details.status.client" class="license-card">
           <h4 class="card-title">{{ $t('license.info') }}</h4>
           <dl class="facts">
@@ -33,7 +33,7 @@
           </dl>
         </div>
 
-        <!-- Hardware fingerprint to send to the vendor -->
+        <!-- Аппаратный отпечаток для отправки поставщику -->
         <div class="license-card">
           <h4 class="card-title">{{ $t('license.hwid') }}</h4>
           <template v-if="details.hwid_available">
@@ -45,7 +45,7 @@
         </div>
       </div>
 
-      <!-- Load a license -->
+      <!-- Загрузка лицензии -->
       <div class="license-card">
         <h4 class="card-title">{{ $t(license.notActivated ? 'license.activate_title' : 'license.replace_title') }}</h4>
         <p class="card-hint">{{ $t('license.token_hint') }}</p>
@@ -69,7 +69,7 @@
         <p v-if="message" class="token-message" :class="messageKind" data-testid="license-message">{{ message }}</p>
       </div>
 
-      <!-- Journal -->
+      <!-- Журнал -->
       <div v-if="details?.events.length" class="license-card">
         <h4 class="card-title">{{ $t('license.events') }}</h4>
         <div class="adm-table-wrap">
@@ -145,7 +145,7 @@ function formatDateTime(value?: string | null): string {
   return formatAt(value)
 }
 
-// A dictionary entry when there is one, otherwise the raw value
+// Подпись из словаря, если она есть, иначе значение как есть
 function label(key: string, raw: string): string {
   return te(key) ? t(key) : raw
 }
@@ -196,7 +196,7 @@ async function activate() {
     const key = `license.errors.${e?.response?.data?.error}`
     messageKind.value = 'error'
     message.value = te(key) ? t(key) : t('license.errors.generic')
-    // A failed attempt is written to the journal
+    // Неудачная попытка записывается в журнал
     load()
   } finally {
     activating.value = false

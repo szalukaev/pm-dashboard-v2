@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════
-   PM Dashboard V3 — Global Styles (UI_GUIDE §3, §4)
-   Font: Inter, self-hosted. No external CDN.
+   PM Dashboard V3 — общие стили (UI_GUIDE §3, §4)
+   Шрифт: Inter, лежит у нас. Внешних CDN нет.
    ═══════════════════════════════════════════════════════ */
 
 @font-face {
@@ -35,7 +35,7 @@
   font-display: swap;
 }
 
-/* ── Reset ── */
+/* ── Сброс стилей браузера ── */
 *,
 *::before,
 *::after {
@@ -69,7 +69,7 @@ a:hover {
   color: var(--accent-hover);
 }
 
-/* Focus ring (UI_GUIDE §4 — :focus-visible, not :focus) */
+/* Кольцо фокуса (UI_GUIDE §4 — :focus-visible, а не :focus) */
 :focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
@@ -91,7 +91,7 @@ button {
   cursor: pointer;
 }
 
-/* Scrollbar */
+/* Полоса прокрутки */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -110,7 +110,7 @@ button {
   background: var(--text-faint);
 }
 
-/* ── Quasar overrides (UI_GUIDE compliance) ── */
+/* ── Переопределения Quasar (по UI_GUIDE) ── */
 
 :deep(.q-field) .q-field__control {
   background: var(--surface-2);
@@ -170,7 +170,7 @@ button {
   background: var(--bg-hover);
 }
 
-/* ── Print (UI_GUIDE §7) ── */
+/* ── Печать (UI_GUIDE §7) ── */
 @media print {
   .app-header,
   .header-actions,
@@ -189,7 +189,7 @@ button {
   }
 }
 
-/* ── Responsive (UI_GUIDE §7) ── */
+/* ── Узкие экраны (UI_GUIDE §7) ── */
 @media (max-width: 900px) {
   .charts-grid {
     grid-template-columns: 1fr;
@@ -208,7 +208,7 @@ button {
   }
 }
 
-/* ── SweetAlert2 overrides (UI_GUIDE compliance) ── */
+/* ── Переопределения SweetAlert2 (по UI_GUIDE) ── */
 /* override: сторонний компонент, свои классы недоступны */
 .swal-popup {
   background: var(--surface-1) !important;
@@ -262,9 +262,9 @@ button {
   background: var(--accent) !important;
 }
 
-/* An issue that has just changed (sync or another user) flashes briefly;
-   the class is set by composables/useFlash.ts. In a table the cells flash,
-   because rows have no background of their own. */
+/* Только что изменившаяся задача (синхронизация или другой пользователь)
+   ненадолго подсвечивается; класс ставит composables/useFlash.ts. В таблице
+   подсвечиваются ячейки, потому что у строк своего фона нет. */
 @keyframes flash-update {
   0%, 40% {
     background-color: var(--accent-bg);

@@ -11,21 +11,21 @@
       @change-project="setProject"
     />
 
-    <!-- Loading -->
+    <!-- Загрузка -->
     <div v-if="loading" class="kanban-loading">
       <AppSpinner :size="32" />
     </div>
 
-    <!-- Error -->
+    <!-- Ошибка -->
     <AppEmptyState v-else-if="error" state="error" @retry="fetchBoard()" />
 
-    <!-- Empty -->
+    <!-- Пусто -->
     <div v-else-if="mode === 'statuses' && !projectId" class="kanban-placeholder">
       <AppEmptyState state="empty" />
       <p class="placeholder-hint">{{ $t('kanban.select_project') }}</p>
     </div>
 
-    <!-- Board -->
+    <!-- Доска -->
     <div
       v-else
       class="kanban-board"
@@ -41,7 +41,7 @@
       />
     </div>
 
-    <!-- Task modal -->
+    <!-- Карточка задачи -->
     <TaskModal :task-id="selectedTaskId" @close="selectedTaskId = null" />
   </div>
 </template>
@@ -95,7 +95,7 @@ function handleColumnDrop(e: Event) {
   }
 }
 
-// Changes from a sync or from other users appear without a reload
+// Изменения от синхронизации и других пользователей появляются без перезагрузки
 useLiveRefresh(() => fetchBoard({ silent: true }))
 
 onMounted(async () => {

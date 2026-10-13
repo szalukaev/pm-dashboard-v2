@@ -1,6 +1,6 @@
 <template>
   <div class="analytics-view">
-    <!-- Loading -->
+    <!-- Загрузка -->
     <template v-if="loading || !ready">
       <h1 class="page-title page-title-alone">{{ $t('analytics.title') }}</h1>
       <div class="skeleton-stats">
@@ -8,14 +8,14 @@
       </div>
     </template>
 
-    <!-- Error -->
+    <!-- Ошибка -->
     <template v-else-if="error">
       <h1 class="page-title page-title-alone">{{ $t('analytics.title') }}</h1>
       <AppEmptyState state="error" @retry="fetchAll()" />
     </template>
 
-    <!-- Content: the user arranges the widgets; the ones hidden from the
-         user by the administrator are not shown -->
+    <!-- Содержимое: виджеты расставляет пользователь; скрытые от него
+         администратором не показываются -->
     <DashboardGrid v-else :widgets="WIDGETS" :available="available">
       <template #title>
         <div class="title-row">
@@ -99,8 +99,8 @@
       </template>
     </DashboardGrid>
 
-    <!-- Task modal (shared with Tasks) -->
-    <!-- The projects a chart of nested projects is made of -->
+    <!-- Карточка задачи (общая с вкладкой «Задачи») -->
+    <!-- Проекты, из которых состоит диаграмма вложенных проектов -->
     <AppModal
       :model-value="openedChart !== null"
       :title="openedChart ? openedChart.project_name : ''"
@@ -113,7 +113,7 @@
       </div>
     </AppModal>
 
-    <!-- The tasks behind a clicked figure; a task opens over the list -->
+    <!-- Задачи, стоящие за цифрой, по которой кликнули; задача открывается поверх списка -->
     <AnalyticsTasksModal :query="taskList" @close="taskList = null" @open-task="openTask" />
 
     <TaskModal :task-id="selectedTaskId" @close="selectedTaskId = null" />
@@ -149,8 +149,8 @@ import AppModal from '../components/ui/AppModal.vue'
 import PeriodFilter from '../components/analytics/PeriodFilter.vue'
 import { PERIOD_MODES, DEFAULT_PERIOD, assigneeLabel, type AnalyticsPeriod, type TaskListQuery, type DistChart, type ProjectDist } from '../stores/analytics'
 
-// The widgets of the tab in the standard order with their standard widths.
-// The ids are the keys of the widgets in the access rights.
+// Виджеты вкладки в стандартном порядке со стандартными ширинами.
+// Идентификаторы — ключи виджетов в правах доступа.
 const WIDGETS: WidgetDef[] = [
   { id: 'stats', title: 'analytics.stats_title', cols: 12 },
   { id: 'health', title: 'analytics.health', cols: 4 },
@@ -161,7 +161,7 @@ const WIDGETS: WidgetDef[] = [
   { id: 'distribution', title: 'analytics.distribution', cols: 12 },
   { id: 'deadlines', title: 'analytics.deadlines', cols: 12 },
   { id: 'gantt', title: 'analytics.gantt', cols: 12 },
-  // What a widget shows and how it is counted: analytics.hints.<id>
+  // Что показывает виджет и как это считается: analytics.hints.<id>
 ].map(w => ({ ...w, hint: 'analytics.hints.' + w.id }))
 
 const { t } = useI18n()
@@ -190,8 +190,8 @@ function changePeriod(next: AnalyticsPeriod) {
 const exceededIndicators = computed(() => [...new Set(exceeded.value.map(e => e.indicator))])
 const { fetchAll } = store
 
-// The projects the user switched off in «Distribution»; remembered in the
-// user's settings under this name
+// Проекты, которые пользователь отключил в «Распределении»; запоминаются в
+// настройках пользователя под этим именем
 const DISTRIBUTION_FILTER = 'analytics_distribution'
 
 const distributionHidden = computed<number[]>(() => {
@@ -199,7 +199,7 @@ const distributionHidden = computed<number[]>(() => {
   return Array.isArray(saved) ? saved.filter((id: unknown): id is number => typeof id === 'number') : []
 })
 const distributionProjects = computed(() => distribution.value.map(p => ({ id: p.project_id, name: p.project_name })))
-// A parent project and its nested ones are one chart, unless switched off
+// Родительский проект и его вложенные — одна диаграмма, если не отключено
 const distributionGrouped = computed<boolean>(() => settingsStore.settings.last_filters?.[DISTRIBUTION_FILTER]?.group_nested !== false)
 
 const shownDistribution = computed<DistChart[]>(() => {
@@ -225,7 +225,7 @@ const shownDistribution = computed<DistChart[]>(() => {
     .sort((a, b) => a.project_name.localeCompare(b.project_name))
 })
 
-// The chart of nested projects opened to see each of its projects
+// Диаграмма вложенных проектов, открытая, чтобы увидеть каждый её проект
 const openedChart = ref<DistChart | null>(null)
 
 function saveDistribution(change: { hidden_projects?: number[]; group_nested?: boolean }) {
@@ -236,12 +236,13 @@ function saveDistribution(change: { hidden_projects?: number[]; group_nested?: b
   })
 }
 
-// An employee without hours adds nothing to a chart of hours
+// Сотрудник без часов ничего не добавляет на график часов
 const hoursRows = computed(() => hours.value.filter(r => r.estimated_hours > 0 || r.spent_hours > 0))
 const bugRows = computed(() => hours.value.filter(r => r.bug_hours > 0))
 
-// What the charts draw. Kept as computed values so that a chart is redrawn
-// when its data changes and not on every repaint of the page.
+// Что рисуют графики. Это вычисляемые значения, чтобы график
+// перерисовывался при изменении своих данных, а не при каждой перерисовке
+// страницы.
 const velocityChart = computed(() => ({
   labels: velocity.value.map(w => weekLabel(w.week_start)),
   datasets: [{ label: t('analytics.charts.closed'), data: velocity.value.map(w => w.closed), color: '--accent' }],
@@ -270,7 +271,7 @@ function velocityHint(index: number): string {
   return week ? t('analytics.charts.estimate_sum', { hours: roundHours(week.estimated_hours) }) : ''
 }
 
-// The Monday a week starts on, YYYY-MM-DD, as DD.MM
+// Понедельник, с которого начинается неделя (YYYY-MM-DD), в виде DD.MM
 function weekLabel(weekStart: string): string {
   const [, month, day] = weekStart.split('-')
   return day + '.' + month
@@ -278,7 +279,7 @@ function weekLabel(weekStart: string): string {
 
 const available = computed(() => WIDGETS.map(w => w.id).filter(id => auth.widgetVisible(id)))
 
-// The saved arrangement is known: the widgets do not jump after appearing
+// Сохранённая раскладка уже известна: виджеты не прыгают после появления
 const ready = ref(false)
 const selectedTaskId = ref<number | null>(null)
 
@@ -296,7 +297,7 @@ function openTask(id: number) {
   selectedTaskId.value = id
 }
 
-// Changes from a sync or from other users appear without a reload
+// Изменения от синхронизации и других пользователей появляются без перезагрузки
 useLiveRefresh(() => fetchAll({ silent: true }))
 
 onMounted(async () => {
@@ -325,7 +326,7 @@ onMounted(async () => {
   letter-spacing: -0.4px;
 }
 
-/* The charts in the window follow its width like those in the widget */
+/* Диаграммы в окне следуют за его шириной так же, как в виджете */
 .nested-charts {
   container-type: inline-size;
 }

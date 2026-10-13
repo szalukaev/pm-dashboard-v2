@@ -1,4 +1,4 @@
-/* SweetAlert2 — force above modal */
+/* SweetAlert2 — всегда поверх модального окна */
 .swal2-popup.toast-beautiful {
   z-index: 999999 !important;
 }
@@ -6,7 +6,7 @@
   z-index: 999999 !important;
 }
 
-/* SweetAlert2 toast — above modal */
+/* Всплывающее сообщение SweetAlert2 — поверх модального окна */
 .toast-beautiful {
   z-index: 999999 !important;
   border-radius: 12px !important;
@@ -15,24 +15,24 @@
 }
 
 /* ═══════════════════════════════════════════════════════
-   PM Dashboard V3 — Design Tokens (UI_GUIDE §2)
-   Theme version: 2026-09-22-v2
-   All colors, surfaces, borders via CSS custom properties.
-   Hardcoded hex in components = violation.
+   PM Dashboard V3 — токены оформления (UI_GUIDE §2)
+   Версия тем: 2026-09-22-v2
+   Все цвета, поверхности и рамки — через CSS-переменные.
+   Цвет, зашитый в компонент hex-значением, — нарушение.
    ═══════════════════════════════════════════════════════ */
 /* ═══════════════════════════════════════════════════════
-   PM Dashboard — Design Tokens
-   Themes (Nord, Amber, Forest, Dusk) come from the previous
-   version of the project; each has a dark and a light mode:
+   PM Dashboard — токены оформления
+   Темы (Nord, Amber, Forest, Dusk) пришли из прежней версии
+   проекта; у каждой есть тёмный и светлый режим:
    <html data-theme="nord" data-mode="dark">.
-   The base below holds tokens the themes do not define.
+   В основе ниже — токены, которые темы не задают.
    ═══════════════════════════════════════════════════════ */
 
 :root {
-  /* Native controls (dropdown lists, date pickers) follow the mode */
+  /* Элементы управления браузера (выпадающие списки, выбор даты) следуют за режимом */
   color-scheme: dark;
 
-  /* Surfaces */
+  /* Поверхности */
   --bg: #010102;
   --bg-card: #0f1011;
   --bg-card-alt: #141516;
@@ -42,14 +42,14 @@
   --surface-3: #18191a;
   --surface-4: #191a1b;
 
-  /* Borders */
+  /* Рамки */
   --border: #23252a;
   --border-light: #1e2025;
   --border-accent: #5e6ad244;
   --hairline: #23252a;
   --hairline-strong: #34343a;
 
-  /* Text */
+  /* Текст */
   --text: #d0d6e0;
   --text-bright: #f7f8f8;
   --text-dim: #d0d6e0;
@@ -57,18 +57,18 @@
   --text-faint: #62666d;
   --text-faintest: #555;
 
-  /* Accent */
+  /* Акцент */
   --accent: #5e6ad2;
   --accent-hover: #828fff;
   --accent-bg: #5e6ad218;
 
-  /* Semantic statuses */
+  /* Смысловые цвета состояний */
   --success: #27a644;
   --danger: #e74c3c;
   --warning: #f0a500;
   --critical: #ff4757;
 
-  /* Categorical (charts, tags — NOT statuses) */
+  /* Цвета категорий (графики, метки — НЕ состояния) */
   --purple: #a855f7;
   --orange: #f97316;
   --cyan: #06b6d4;
@@ -80,17 +80,17 @@
   --shadow: 0 20px 60px rgba(0, 0, 0, .5);
   --tag-bg: #191a1b;
 
-  /* Priority colors (from Redmine) */
+  /* Цвета приоритетов (из Redmine) */
   --priority-low: #888888;
   --priority-normal: #4488ff;
   --priority-high: #ffaa00;
   --priority-urgent: #ff8800;
   --priority-immediate: #ff4444;
 
-  /* Focus ring */
+  /* Кольцо фокуса */
   --focus-ring: 0 0 0 2px var(--accent-bg), 0 0 0 1px var(--accent);
 
-  /* z-index scale (UI_GUIDE §7) */
+  /* Шкала z-index (UI_GUIDE §7) */
   --z-base: 1;
   --z-sticky-header: 5;
   --z-dropdown: 100;
@@ -99,7 +99,7 @@
   --z-login: 99999;
 }
 
-/* Light mode base: categorical colors tuned for a light background */
+/* Основа светлого режима: цвета категорий подобраны под светлый фон */
 [data-mode="light"] {
   color-scheme: light;
   --bg: #ffffff;
@@ -139,7 +139,7 @@
   --tag-bg: #e4e5e7;
 }
 
-/* ── Themes ── */
+/* ── Темы ── */
 
 [data-theme="nord"][data-mode="dark"] {
   --bg: #1a1d23;

@@ -4,7 +4,7 @@
       <div class="step-indicator">{{ $t('setup.step_of', { current: step, total: 3 }) }}</div>
       <h2 class="setup-title">{{ stepTitle }}</h2>
 
-      <!-- Step 1: Database -->
+      <!-- Шаг 1: база данных -->
       <form v-if="step === 1" @submit.prevent="testDb" class="setup-form">
         <div class="form-row">
           <div class="form-field flex-1">
@@ -43,7 +43,7 @@
         </div>
       </form>
 
-      <!-- Step 2: Data Source -->
+      <!-- Шаг 2: источник данных -->
       <form v-if="step === 2" @submit.prevent="testDs" class="setup-form">
         <div class="form-field">
           <label>{{ $t('setup.datasource_type') }}</label>
@@ -89,7 +89,7 @@
         </div>
       </form>
 
-      <!-- Step 3: Create Admin -->
+      <!-- Шаг 3: создание администратора -->
       <form v-if="step === 3" @submit.prevent="createAdmin" class="setup-form">
         <div class="form-field">
           <label>{{ $t('setup.display_name') }}</label>
@@ -146,7 +146,7 @@ import i18n from '../i18n'
 const router = useRouter()
 const step = ref(1)
 
-// Step 1: DB
+// Шаг 1: база данных
 const dbHost = ref('host.docker.internal')
 const dbPort = ref('5432')
 const dbUser = ref('pm_user')
@@ -205,7 +205,7 @@ async function saveDb() {
   } catch {}
 }
 
-// Step 2: Data Source
+// Шаг 2: источник данных
 const dsType = ref('redmine')
 const dsUrl = ref('')
 const dsApiKey = ref('')
@@ -264,7 +264,7 @@ async function saveDs() {
   } catch {}
 }
 
-// Step 3: Admin
+// Шаг 3: администратор
 const adminName = ref('')
 const adminUser = ref('')
 const adminPass = ref('')

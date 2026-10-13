@@ -4,7 +4,7 @@
 
     <TaskFilters />
 
-    <!-- Loading state -->
+    <!-- Загрузка -->
     <template v-if="loading">
       <div class="skeleton-list">
         <div v-for="i in 5" :key="i" class="skeleton-row">
@@ -17,10 +17,10 @@
       </div>
     </template>
 
-    <!-- Error state -->
+    <!-- Ошибка -->
     <AppEmptyState v-else-if="error" state="error" @retry="fetchTasks()" />
 
-    <!-- Empty state: no rows because of active filters -->
+    <!-- Пусто: строк нет из-за действующих фильтров -->
     <div v-else-if="total === 0 && !loading && hasActiveFilters()" class="filtered-empty" data-testid="filtered-empty">
       <p class="filtered-empty-title">{{ $t('tasks.empty.filtered_title') }}</p>
       <p class="filtered-empty-hint">{{ $t('tasks.empty.filtered_hint') }}</p>
@@ -29,10 +29,10 @@
       </button>
     </div>
 
-    <!-- Empty state -->
+    <!-- Пусто -->
     <AppEmptyState v-else-if="total === 0 && !loading" state="empty" />
 
-    <!-- Grouped view -->
+    <!-- Вид с группировкой -->
     <TaskAccordion
       v-else-if="useGrouping && groups.length > 0"
       :groups="groups"
@@ -41,7 +41,7 @@
       @sort-change="handleSortChange"
     />
 
-    <!-- Flat table view -->
+    <!-- Плоская таблица -->
     <template v-else-if="tasks.length > 0">
       <TaskTable
         :tasks="tasks"
@@ -58,7 +58,7 @@
       />
     </template>
 
-    <!-- Task detail modal -->
+    <!-- Карточка задачи -->
     <TaskModal
       :task-id="selectedTaskId"
       @close="selectedTaskId = null"
@@ -91,7 +91,7 @@ function openTask(id: number) {
 function handleSortChange(sort: { sortBy: string; sortDir: string }) {
   store.setFilter('sort_by', sort.sortBy)
   store.setFilter('sort_dir', sort.sortDir)
-  // Quietly: the table stays in place and only its rows change
+  // Тихо: таблица остаётся на месте, меняются только её строки
   store.fetchTasks({ silent: true })
 }
 
@@ -99,7 +99,7 @@ async function handleInlineEdit(payload: { taskId: number; field: string; value:
   await store.updateTask(payload.taskId, { [payload.field]: payload.value })
 }
 
-// Changes from a sync or from other users appear without a reload
+// Изменения от синхронизации и других пользователей появляются без перезагрузки
 useLiveRefresh(() => store.fetchTasks({ silent: true }))
 
 onMounted(async () => {
@@ -107,7 +107,7 @@ onMounted(async () => {
   await Promise.all([
     store.fetchTasks(),
     store.fetchProjects(),
-    // Categories depend on the restored project filter
+    // Категории зависят от восстановленного фильтра проекта
     store.fetchCategories(store.filters.project_id || undefined),
     store.fetchStatuses(),
     store.fetchPriorities(),

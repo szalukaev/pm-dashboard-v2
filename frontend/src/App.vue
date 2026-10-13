@@ -2,7 +2,7 @@
   <div id="app">
     <router-view />
 
-    <!-- Force password change modal -->
+    <!-- Окно обязательной смены пароля -->
     <AppModal
       :model-value="showForceChange"
       :title="$t('auth.password_change.title')"
@@ -31,8 +31,9 @@
       </template>
     </AppModal>
 
-    <!-- First login: who the user is in the data source. Asked after the
-         password is set; may be put off, then it is asked on the next login. -->
+    <!-- Первый вход: кто этот пользователь в источнике данных. Вопрос задаётся
+         после установки пароля; его можно отложить — тогда он повторится при
+         следующем входе. -->
     <AppModal
       :model-value="showTokenPrompt"
       :title="$t('source_token.prompt_title')"
@@ -71,8 +72,8 @@ const showForceChange = computed(() => {
   return user.value?.force_password_change === true
 })
 
-// The key is asked once per login: "Later" hides the question until the
-// next one (the choice lives as long as the browser tab).
+// Ключ запрашивается один раз за вход: «Позже» скрывает вопрос до
+// следующего входа (выбор живёт, пока открыта вкладка браузера).
 const TOKEN_POSTPONED = 'pm-dashboard-token-postponed'
 const tokenPostponed = ref(sessionStorage.getItem(TOKEN_POSTPONED) || '')
 

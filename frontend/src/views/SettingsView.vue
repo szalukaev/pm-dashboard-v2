@@ -7,7 +7,7 @@
     </div>
 
     <div class="settings-layout">
-      <!-- Left menu -->
+      <!-- Меню слева -->
       <nav class="settings-menu">
         <button
           v-for="tab in visibleTabs"
@@ -22,7 +22,7 @@
         </button>
       </nav>
 
-      <!-- Right content -->
+      <!-- Содержимое справа -->
       <div class="settings-content">
         <SettingsPersonal v-if="activeTab === 'personal'" />
         <SettingsData v-if="activeTab === 'data'" />

@@ -12,7 +12,7 @@
       </div>
     </div>
 
-    <!-- Filters -->
+    <!-- Фильтры -->
     <div class="filter-row">
       <div class="filter-group">
         <button
@@ -38,13 +38,13 @@
       />
     </div>
 
-    <!-- Loading -->
+    <!-- Загрузка -->
     <div v-if="loading" class="loading"><AppSpinner :size="32" /></div>
 
-    <!-- Error -->
+    <!-- Ошибка -->
     <AppEmptyState v-else-if="error" state="error" @retry="fetchAll" />
 
-    <!-- Content -->
+    <!-- Содержимое -->
     <template v-else>
       <PaymentStats :stats="stats" />
       <OrganizationAccordion
@@ -59,7 +59,7 @@
       />
     </template>
 
-    <!-- Organization -->
+    <!-- Организация -->
     <AppModal :model-value="showOrgForm" :title="$t('payments.org_form.title')" width="480px" @update:model-value="showOrgForm = $event">
       <form class="modal-form" @submit.prevent="submitOrg">
         <div class="form-field">
@@ -89,7 +89,7 @@
       </template>
     </AppModal>
 
-    <!-- Contract -->
+    <!-- Договор -->
     <AppModal :model-value="showContractForm" :title="$t('payments.contract_form.title')" width="520px" @update:model-value="showContractForm = $event">
       <form class="modal-form" @submit.prevent="submitContract">
         <div class="form-field">
@@ -135,7 +135,7 @@
           </div>
         </div>
         <div class="form-row">
-          <!-- A one-time contract has no start date -->
+          <!-- У разового договора нет даты начала -->
           <div class="form-field" v-if="contractForm.contract_type === 'service'">
             <label>{{ $t('payments.contract_form.start_date') }}</label>
             <input v-model="contractForm.start_date" type="date" />
@@ -152,7 +152,7 @@
       </template>
     </AppModal>
 
-    <!-- Invoice Form -->
+    <!-- Форма счёта -->
     <InvoiceForm
       :visible="showInvoiceForm"
       :contract-name="invoiceContractName"
@@ -163,7 +163,7 @@
       @submit="handleCreateInvoice"
     />
 
-    <!-- Pay Form -->
+    <!-- Форма оплаты -->
     <PayForm
       :visible="showPayForm"
       :default-amount="payDefaultAmount"
@@ -171,7 +171,7 @@
       @submit="handlePay"
     />
 
-    <!-- Delete Confirm -->
+    <!-- Подтверждение удаления -->
     <AppConfirmDialog
       :model-value="showDeleteConfirm"
       :title="deleteTitle"
@@ -207,13 +207,13 @@ const { fetchAll } = store
 const { t, te } = useI18n()
 const { toast } = useSwal()
 
-// Whatever fails on this page is told to the user instead of failing quietly
+// О любом сбое на этой странице пользователю сообщается — молча ничего не падает
 async function guarded(action: () => Promise<unknown>, failure = 'payments.errors.action_failed'): Promise<boolean> {
   try {
     await action()
     return true
   } catch (e: any) {
-    // A reason the server names is told as it is; otherwise the general one
+    // Причина, названная сервером, показывается как есть; иначе — общая
     const reason = `payments.errors.${e?.response?.data?.error}`
     toast(t(te(reason) ? reason : failure), 'error')
     return false
@@ -224,7 +224,7 @@ function exportCSV() {
   guarded(() => store.exportCSV(), 'payments.errors.export_failed')
 }
 
-// Filters
+// Фильтры
 const filterOptions = [
   { value: '', label: 'payments.filters.all' },
   { value: 'service', label: 'payments.filters.service' },
@@ -248,7 +248,7 @@ function doSearch() {
   store.fetchContracts()
 }
 
-// Organization form
+// Форма организации
 const showOrgForm = ref(false)
 const editingOrg = ref<Organization | null>(null)
 const orgForm = reactive({ name: '', address: '', inn: '', contact_name: '', contact_phone: '' })
@@ -273,7 +273,7 @@ function deleteOrg(id: number) {
   askDelete(t('payments.delete.org_title'), t('payments.delete.org_text'), () => store.deleteOrganization(id))
 }
 
-// Contract form
+// Форма договора
 const showContractForm = ref(false)
 const editingContract = ref<Contract | null>(null)
 const emptyContract = {
@@ -286,10 +286,10 @@ const contractForm = reactive({ ...emptyContract })
 const contractOrgName = computed(() =>
   organizations.value.find(o => o.id === contractForm.organization_id)?.name || t('payments.without_org')
 )
-// The name and the contact person are required
+// Название и контактное лицо обязательны
 const canSaveContract = computed(() => contractForm.name.trim() !== '' && contractForm.contact_name.trim() !== '')
 
-// A new contract takes the address and the contact of its organization
+// Новый договор берёт адрес и контакт своей организации
 function startAddContract(orgId: number) {
   const org = organizations.value.find(o => o.id === orgId)
   editingContract.value = null
@@ -318,7 +318,7 @@ function editContract(contract: Contract) {
 
 async function submitContract() {
   if (!canSaveContract.value) return
-  // A date left blank is "not set"; a one-time contract has no start date
+  // Незаполненная дата — «не задана»; у разового договора нет даты начала
   const fields = {
     ...contractForm,
     name: contractForm.name.trim(),
@@ -335,13 +335,13 @@ function deleteContract(id: number) {
   askDelete(t('payments.delete.contract_title'), t('payments.delete.contract_text'), () => store.deleteContract(id))
 }
 
-// Issuing an invoice
+// Выставление счёта
 const showInvoiceForm = ref(false)
 const invoiceContractId = ref(0)
 const invoiceContractName = ref('')
 const invoiceContractAmount = ref(0)
 
-// The lines the form starts from when an invoice is copied, and its number
+// Позиции, с которых форма начинает при копировании счёта, и его номер
 const invoiceInitialItems = ref<InvoiceLine[]>([])
 const invoiceSourceNumber = ref('')
 
@@ -359,8 +359,8 @@ function issueInvoice(contractId: number) {
   openInvoiceForm(contractId)
 }
 
-// A new invoice like an existing one: the form opens with its lines, and
-// nothing is saved until the user confirms
+// Новый счёт по образцу существующего: форма открывается с его позициями,
+// и ничего не сохраняется, пока пользователь не подтвердит
 async function copyInvoice(contractId: number, invoice: Invoice) {
   await guarded(async () => {
     const lines = await store.fetchInvoiceItems(contractId, invoice.id)
@@ -368,7 +368,7 @@ async function copyInvoice(contractId: number, invoice: Invoice) {
   }, 'payments.errors.copy_failed')
 }
 
-// The invoice is saved, and its document is downloaded at once
+// Счёт сохраняется, и его документ сразу скачивается
 async function handleCreateInvoice(items: any[]) {
   const contractId = invoiceContractId.value
   let invoiceId = 0
@@ -381,7 +381,7 @@ async function handleCreateInvoice(items: any[]) {
   if (invoiceId) await guarded(() => store.downloadInvoice(contractId, invoiceId), 'payments.errors.download_failed')
 }
 
-// Paying an invoice
+// Оплата счёта
 const showPayForm = ref(false)
 const payContractId = ref(0)
 const payInvoiceId = ref(0)
@@ -391,7 +391,7 @@ async function handlePay(data: { amount: number; paid_at: string }) {
   await guarded(async () => {
     const result = await store.payInvoice(payContractId.value, payInvoiceId.value, data.amount, data.paid_at)
     showPayForm.value = false
-    // More than was left to pay: the user is told how much was taken
+    // Введено больше остатка: пользователю сообщается, сколько принято
     if (result?.clamped) {
       toast(t('payments.invoice.clamped', { applied: formatMoney(result.applied), entered: formatMoney(data.amount) }), 'info')
     } else {
@@ -400,8 +400,8 @@ async function handlePay(data: { amount: number; paid_at: string }) {
   }, 'payments.errors.pay_failed')
 }
 
-// The table of invoices sits deep inside the accordions; what it does with
-// an invoice is done here
+// Таблица счетов лежит глубоко внутри раскрывающихся блоков; её действия со
+// счётом выполняются здесь
 provide(invoiceActionsKey, {
   pay(contractId: number, invoice: Invoice) {
     payContractId.value = contractId
@@ -423,7 +423,7 @@ provide(invoiceActionsKey, {
   },
 })
 
-// Delete confirmation
+// Подтверждение удаления
 const showDeleteConfirm = ref(false)
 const deleteTitle = ref('')
 const deleteMessage = ref('')

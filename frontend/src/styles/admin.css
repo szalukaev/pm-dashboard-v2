@@ -1,5 +1,5 @@
-/* Shared look of the administration screens (Настройки → Администрирование):
-   tables, inline controls, forms in dialogs and pick lists. */
+/* Общее оформление экранов администрирования (Настройки → Администрирование):
+   таблицы, элементы управления в строках, формы в окнах и списки выбора. */
 
 .adm-section {
   margin-bottom: 32px;
@@ -150,7 +150,7 @@
   color: var(--danger);
 }
 
-/* Forms in dialogs */
+/* Формы в окнах */
 .adm-form {
   display: flex;
   flex-direction: column;
@@ -207,7 +207,7 @@
   cursor: default;
 }
 
-/* Tabs inside a screen or a dialog */
+/* Вкладки внутри экрана или окна */
 .adm-tabs {
   display: flex;
   /* Вкладок больше, чем помещается в строку на ноутбуке и телефоне */
@@ -236,7 +236,7 @@
   border-bottom-color: var(--accent);
 }
 
-/* Pick lists */
+/* Списки выбора */
 .adm-pick-toolbar {
   display: flex;
   align-items: center;

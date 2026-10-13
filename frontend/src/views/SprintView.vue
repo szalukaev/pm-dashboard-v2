@@ -7,17 +7,17 @@
       </AppButton>
     </div>
 
-    <!-- Loading -->
+    <!-- Загрузка -->
     <div v-if="loading" class="sprint-loading">
       <AppSpinner :size="32" />
     </div>
 
-    <!-- Error -->
+    <!-- Ошибка -->
     <AppEmptyState v-else-if="error" state="error" @retry="fetchAll()" />
 
-    <!-- Content -->
+    <!-- Содержимое -->
     <div v-else class="sprint-content">
-      <!-- Sprints -->
+      <!-- Спринты -->
       <div class="sprints-list">
         <!-- Незакрытые: просроченные сверху, затем по дате окончания -->
         <SprintWidget
@@ -60,7 +60,7 @@
         </div>
       </div>
 
-      <!-- Backlog -->
+      <!-- Бэклог -->
       <SprintBacklog
         :backlog="backlog"
         @open-task="openTask"
@@ -68,7 +68,7 @@
       />
     </div>
 
-    <!-- Sprint Form Modal -->
+    <!-- Окно формы спринта -->
     <SprintForm
       :visible="showForm"
       :sprint="editingSprint"
@@ -77,7 +77,7 @@
       @submit="handleFormSubmit"
     />
 
-    <!-- Delete Confirm -->
+    <!-- Подтверждение удаления -->
     <AppConfirmDialog
       :model-value="showDeleteConfirm"
       :title="$t('sprint.delete_title')"
@@ -85,7 +85,7 @@
       @confirm="handleDelete"
     />
 
-    <!-- Task Modal -->
+    <!-- Карточка задачи -->
     <TaskModal :task-id="selectedTaskId" @close="selectedTaskId = null" />
   </div>
 </template>
@@ -149,8 +149,8 @@ function closeForm() {
   editingSprint.value = null
 }
 
-// The buttons of actions the user has no right to are hidden; if the server
-// still refuses (the rights changed meanwhile), say so instead of failing silently.
+// Кнопки действий, на которые у пользователя нет права, скрыты; если сервер
+// всё же отказал (права тем временем изменились), об этом сообщается.
 async function guarded(action: () => Promise<unknown>) {
   try {
     await action()
@@ -213,7 +213,7 @@ async function handleRefresh(id: number) {
   await guarded(() => refreshSprint(id))
 }
 
-// Changes from a sync or from other users appear without a reload
+// Изменения от синхронизации и других пользователей появляются без перезагрузки
 useLiveRefresh(() => fetchAll({ silent: true }))
 
 onMounted(async () => {
