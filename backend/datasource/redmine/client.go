@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-// pageRetryDelay is the pause before retrying a failed page (grows per attempt).
+// pageRetryDelay — пауза перед повтором неудавшейся страницы (растёт с каждой попыткой).
 var pageRetryDelay = time.Second
 
 type Client struct {
@@ -24,12 +24,12 @@ type Client struct {
 	BasicPass  string
 	HTTPClient *http.Client
 
-	// ctx, when set, bounds the list requests of this client: a sync that
-	// is stopped drops what it is waiting for.
+	// ctx, если задан, ограничивает запросы списков этого клиента:
+	// остановленная синхронизация бросает то, чего ждёт.
 	ctx context.Context
 }
 
-// withContext returns a copy of the client whose requests end with ctx.
+// withContext возвращает копию клиента, запросы которой обрываются вместе с ctx.
 func (c *Client) withContext(ctx context.Context) *Client {
 	bound := *c
 	bound.ctx = ctx
@@ -106,8 +106,8 @@ type customFieldValue struct {
 // developerEstimateFieldID is the Redmine custom field "Оценка разработчика".
 const developerEstimateFieldID = 18
 
-// issueEstimate prefers the developer estimate when it is set and positive,
-// otherwise falls back to the standard estimated_hours.
+// issueEstimate берёт оценку разработчика, если она задана и больше нуля,
+// иначе — стандартное поле estimated_hours.
 func issueEstimate(estimated *float64, fields []customFieldValue) *float64 {
 	if v := developerEstimate(fields); v != nil {
 		return v
@@ -115,7 +115,7 @@ func issueEstimate(estimated *float64, fields []customFieldValue) *float64 {
 	return estimated
 }
 
-// developerEstimate returns the developer estimate when it is set and positive.
+// developerEstimate возвращает оценку разработчика, если она задана и больше нуля.
 func developerEstimate(fields []customFieldValue) *float64 {
 	for _, f := range fields {
 		if f.ID != developerEstimateFieldID {
@@ -134,9 +134,9 @@ func developerEstimate(fields []customFieldValue) *float64 {
 	return nil
 }
 
-// EstimateFields returns the Redmine fields that store an issue's estimate:
-// the developer estimate when it is already set, otherwise the standard
-// estimated_hours. A nil hours value clears the estimate.
+// EstimateFields возвращает поля Redmine, в которых хранится оценка задачи:
+// оценку разработчика, если она уже задана, иначе стандартное
+// estimated_hours. Значение hours, равное nil, очищает оценку.
 func (c *Client) EstimateFields(issueID int, hours *float64) (map[string]interface{}, error) {
 	data, err := c.doRequest(fmt.Sprintf("/issues/%d.json", issueID))
 	if err != nil {
@@ -182,7 +182,7 @@ type timeEntryResp struct {
 	TotalCount int `json:"total_count"`
 }
 
-// TimeEntry is a single spent-time record linked to an issue.
+// TimeEntry — одна запись трудозатрат, привязанная к задаче.
 type TimeEntry struct {
 	ID           int
 	IssueID      int
@@ -191,9 +191,9 @@ type TimeEntry struct {
 	Hours        float64
 }
 
-// GetTimeEntries returns the time entries of a project that are linked to
-// issues, spent on or after `from` (YYYY-MM-DD; empty = all). Subprojects
-// are excluded: they are requested on their own.
+// GetTimeEntries возвращает трудозатраты проекта, привязанные к задачам, за
+// дни начиная с `from` (YYYY-MM-DD; пусто — все). Подпроекты не входят: они
+// запрашиваются отдельно.
 func (c *Client) GetTimeEntries(projectID int, from string) ([]TimeEntry, error) {
 	path := fmt.Sprintf("/time_entries.json?project_id=%d&subproject_id=!*", projectID)
 	if from != "" {
@@ -285,15 +285,15 @@ func (c *Client) doRequest(path string) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
-// ErrForbidden: the owner of the API key has no right to what was asked.
-// Unlike a failure it will not go away by itself, so it is not retried.
+// ErrForbidden: у владельца ключа API нет права на запрошенное. В отличие
+// от сбоя это само не пройдёт, поэтому запрос не повторяется.
 var ErrForbidden = errors.New("redmine denies access")
 
-// ErrUnauthorized: Redmine did not accept the API key.
+// ErrUnauthorized: Redmine не принял ключ API.
 var ErrUnauthorized = errors.New("redmine api key is not valid")
 
-// GetCurrentProjects returns the ids of the projects the owner of the API
-// key of this client is a member of — what they have rights to in Redmine.
+// GetCurrentProjects возвращает проекты, в которых состоит владелец ключа
+// API этого клиента, — то, на что у него есть права в Redmine.
 func (c *Client) GetCurrentProjects() ([]int, error) {
 	data, err := c.doRequest("/users/current.json?include=memberships")
 	if err != nil {
@@ -320,9 +320,9 @@ func (c *Client) GetCurrentProjects() ([]int, error) {
 	return projects, nil
 }
 
-// GetCurrentUser returns the Redmine user the API key of this client belongs
-// to. A personal key identifies its owner, which is how a dashboard user is
-// tied to their Redmine account.
+// GetCurrentUser возвращает пользователя Redmine, которому принадлежит ключ
+// API этого клиента. Личный ключ определяет своего владельца — так
+// пользователь дашборда привязывается к своей учётной записи Redmine.
 func (c *Client) GetCurrentUser() (*Member, error) {
 	data, err := c.doRequest("/users/current.json")
 	if err != nil {
@@ -369,20 +369,21 @@ func (c *Client) GetCurrentUserMail() (string, error) {
 
 const (
 	pageSize = 100
-	// Pages of one list requested at once.
+	// Сколько страниц одного списка запрашивается одновременно.
 	pageWorkers  = 2
 	pageAttempts = 3
-	// maxParallelLists bounds the list requests in flight over all lists and
-	// projects: Redmine answers 500 when hit with many of them at once.
+	// maxParallelLists ограничивает число одновременных запросов списков по
+	// всем спискам и проектам: на много запросов сразу Redmine отвечает 500.
 	maxParallelLists = 4
 )
 
-// listSlots enforces maxParallelLists.
+// listSlots обеспечивает ограничение maxParallelLists.
 var listSlots = make(chan struct{}, maxParallelLists)
 
-// getPages loads every page of a paginated list. The first page gives
-// total_count, the rest are requested concurrently and returned in order.
-// A failed page is retried a few times before the whole list fails.
+// getPages загружает все страницы постраничного списка. Первая страница
+// даёт total_count, остальные запрашиваются параллельно и возвращаются по
+// порядку. Неудавшаяся страница повторяется несколько раз, и только потом
+// ошибкой считается весь список.
 func (c *Client) getPages(path string) ([][]byte, error) {
 	page := func(offset int) ([]byte, error) {
 		var data []byte
@@ -394,8 +395,8 @@ func (c *Client) getPages(path string) ([][]byte, error) {
 			if err == nil {
 				return data, nil
 			}
-			// A refusal is an answer, not a failure: asking again changes
-			// nothing. Neither does it when the sync was stopped.
+			// Отказ — это ответ, а не сбой: повтор ничего не изменит. Как
+			// и в случае, когда синхронизацию остановили.
 			if errors.Is(err, ErrForbidden) || errors.Is(err, ErrUnauthorized) || c.requestContext().Err() != nil {
 				return nil, err
 			}
@@ -486,9 +487,9 @@ func (c *Client) GetProjects() ([]Project, error) {
 	return all, nil
 }
 
-// GetIssues returns the issues of a project without its subprojects (they
-// are requested on their own); projectID 0 means all projects. A non-nil
-// updatedSince limits the result to issues changed since that moment.
+// GetIssues возвращает задачи проекта без подпроектов (они запрашиваются
+// отдельно); projectID 0 — все проекты. Заданный updatedSince оставляет
+// только задачи, изменённые с этого момента.
 func (c *Client) GetIssues(projectID int, updatedSince *time.Time) ([]Issue, error) {
 	path := "/issues.json?status_id=*"
 	if projectID > 0 {
@@ -645,7 +646,7 @@ func (c *Client) UpdateIssue(id int, fields map[string]interface{}) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		// On a validation failure Redmine explains itself: {"errors": [...]}
+		// При ошибке проверки Redmine объясняет причину: {"errors": [...]}
 		var failure struct {
 			Errors []string `json:"errors"`
 		}
@@ -657,15 +658,15 @@ func (c *Client) UpdateIssue(id int, fields map[string]interface{}) error {
 	return nil
 }
 
-// IssueState is the part of an issue a Kanban move changes.
+// IssueState — та часть задачи, которую меняет перенос на доске Kanban.
 type IssueState struct {
 	StatusID     int
-	AssignedToID *int // nil = nobody
+	AssignedToID *int // nil — никто
 }
 
-// GetIssueState reads the current status and assignee of an issue. Redmine
-// silently ignores a change its workflow does not allow (the update still
-// succeeds), so a move is checked by reading the issue back.
+// GetIssueState читает текущие статус и исполнителя задачи. Redmine молча
+// пропускает изменение, которое не разрешает его workflow (запрос при этом
+// успешен), поэтому перенос проверяется повторным чтением задачи.
 func (c *Client) GetIssueState(id int) (*IssueState, error) {
 	data, err := c.doRequest(fmt.Sprintf("/issues/%d.json", id))
 	if err != nil {
@@ -750,7 +751,7 @@ type userResp struct {
 	TotalCount int `json:"total_count"`
 }
 
-// GetUsers returns all active users from Redmine.
+// GetUsers возвращает всех активных пользователей Redmine.
 func (c *Client) GetUsers() ([]Member, error) {
 	var all []Member
 	offset := 0
@@ -806,7 +807,7 @@ func (c *Client) GetProjectMembers(projectID int) ([]Member, error) {
 	return all, nil
 }
 
-// bytesReader wraps a byte slice into an io.ReadCloser for request bodies.
+// bytesReader оборачивает срез байт в io.ReadCloser для тела запроса.
 type bytesReaderData struct {
 	data []byte
 	pos  int
@@ -834,13 +835,13 @@ type categoryResp struct {
 	} `json:"issue_categories"`
 }
 
-// Category is an issue category of a Redmine project.
+// Category — категория задач проекта Redmine.
 type Category struct {
 	ID   int
 	Name string
 }
 
-// GetCategories returns all issue categories defined for a project.
+// GetCategories возвращает все категории задач проекта.
 func (c *Client) GetCategories(projectID int) ([]Category, error) {
 	data, err := c.doRequest(fmt.Sprintf("/projects/%d/issue_categories.json", projectID))
 	if err != nil {
@@ -857,7 +858,7 @@ func (c *Client) GetCategories(projectID int) ([]Category, error) {
 	return all, nil
 }
 
-// FindCategoryID resolves an issue category name to its id within a project.
+// FindCategoryID находит идентификатор категории задач проекта по её названию.
 func (c *Client) FindCategoryID(projectID int, name string) (int, error) {
 	categories, err := c.GetCategories(projectID)
 	if err != nil {

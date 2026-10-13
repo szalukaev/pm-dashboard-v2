@@ -39,12 +39,12 @@ func TestParseIssueDetails(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Comments are the entries with a note, as before
+	// Комментарии — записи с текстом, как и раньше
 	if len(d.Comments) != 1 || d.Comments[0].Text != "Looks fine" || d.Comments[0].Author != "Bob" {
 		t.Errorf("comments = %+v", d.Comments)
 	}
 
-	// The history keeps everything except the empty entry
+	// В истории остаётся всё, кроме пустой записи
 	if len(d.History) != 3 {
 		t.Fatalf("history has %d entries, want 3: %+v", len(d.History), d.History)
 	}
@@ -60,7 +60,7 @@ func TestParseIssueDetails(t *testing.T) {
 		t.Errorf("third entry changes = %+v", d.History[2].Changes)
 	}
 
-	// Relations are told from the point of view of issue 100
+	// Связи описаны с точки зрения задачи 100
 	wantRelated := []RelatedIssue{
 		{Relation: RelationParent, ID: 90},
 		{Relation: RelationChild, ID: 101},
@@ -80,7 +80,7 @@ func TestParseIssueDetailsEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The card expects lists, never null
+	// Карточка ждёт списки, а не null
 	if d.Attachments == nil || d.Comments == nil || d.History == nil || d.Related == nil {
 		t.Errorf("lists must not be nil: %+v", d)
 	}

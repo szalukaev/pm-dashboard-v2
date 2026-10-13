@@ -36,12 +36,12 @@ type Issue struct {
 	DoneRatio      int
 	TrackerName    string
 	AuthorName     string
-	// When the issue was created, last changed and closed in the source
-	// (RFC 3339), nil when the source does not say.
+	// Когда задача создана, изменена в последний раз и закрыта в источнике
+	// (RFC 3339); nil — источник этого не сообщает.
 	CreatedOn *string
 	UpdatedOn *string
 	ClosedOn  *string
-	// FixedVersionName: the version (sprint) the issue is planned for.
+	// FixedVersionName: версия (спринт), на которую запланирована задача.
 	FixedVersionName string
 }
 
@@ -71,7 +71,7 @@ type IssueFilter struct {
 	Search     string
 }
 
-// DataSource is the contract every data source must implement.
+// DataSource — контракт, который реализует каждый источник данных.
 type DataSource interface {
 	Name() string
 	TestConnection(ctx context.Context) error

@@ -5,13 +5,13 @@ import (
 	"time"
 )
 
-// Events sent to open pages over WebSocket.
+// События, которые уходят открытым страницам по WebSocket.
 const (
-	// EventSyncStatus: a sync started or finished, see SyncStatus.
+	// EventSyncStatus: синхронизация началась или закончилась, см. SyncStatus.
 	EventSyncStatus = "sync-status"
-	// EventIssuesChanged: issues were added, updated or removed, see IssueChanges.
+	// EventIssuesChanged: задачи добавлены, изменены или удалены, см. IssueChanges.
 	EventIssuesChanged = "issues-changed"
-	// EventCollectionComplete: a sync finished successfully.
+	// EventCollectionComplete: синхронизация завершилась успешно.
 	EventCollectionComplete = "collection-complete"
 )
 
@@ -20,8 +20,8 @@ type SyncStatus struct {
 	At     time.Time `json:"at"`
 }
 
-// IssueChanges lists issue ids only: every page re-reads what it shows with
-// the rights of its own user.
+// IssueChanges перечисляет только номера задач: каждая страница сама
+// перечитывает то, что показывает, с правами своего пользователя.
 type IssueChanges struct {
 	Added   []int `json:"added"`
 	Updated []int `json:"updated"`
@@ -32,7 +32,7 @@ func (c IssueChanges) Empty() bool {
 	return len(c.Added) == 0 && len(c.Updated) == 0 && len(c.Removed) == 0
 }
 
-// DiffIssues compares two snapshots (issue id → fingerprint).
+// DiffIssues сравнивает два снимка (номер задачи → отпечаток).
 func DiffIssues(before, after map[int]string) IssueChanges {
 	changes := IssueChanges{Added: []int{}, Updated: []int{}, Removed: []int{}}
 	for id, hash := range after {

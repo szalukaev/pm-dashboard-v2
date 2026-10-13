@@ -1,6 +1,6 @@
-// Package manager owns the connection to the data source and its background
-// sync, so connection settings and the sync interval can change while the
-// server is running.
+// Package manager владеет подключением к источнику данных и фоновой
+// синхронизацией, поэтому параметры подключения и интервал синхронизации
+// можно менять на работающем сервере.
 package manager
 
 import (
@@ -32,7 +32,7 @@ var (
 	ErrReadOnly       = errors.New("system is in read-only mode")
 )
 
-// ConfigStore is the part of the SQLite config store the manager needs.
+// ConfigStore — та часть хранилища конфигурации SQLite, которая нужна менеджеру.
 type ConfigStore interface {
 	LoadAppConfig() *config.AppConfig
 	Get(key string) (string, error)
@@ -46,29 +46,29 @@ type syncer interface {
 type Manager struct {
 	store    ConfigStore
 	db       **sql.DB
-	readOnly func() bool // nil = never read-only
+	readOnly func() bool // nil — режима «только чтение» нет
 
-	// newSyncer builds the syncer for a client; replaced in tests.
+	// newSyncer создаёт синхронизатор для клиента; в тестах подменяется.
 	newSyncer func(*redmine.Client) syncer
-	// snapshot reads issue fingerprints for change detection; replaced in tests.
+	// snapshot читает отпечатки задач, по которым видны изменения; в тестах подменяется.
 	snapshot func() (map[int]string, error)
-	// projectSource decides which projects are synced; nil = the syncer's default.
+	// projectSource решает, какие проекты синхронизируются; nil — как решит синхронизатор.
 	projectSource func() ([]int, error)
-	// beforeSync runs at the start of every sync; nil = nothing.
+	// beforeSync выполняется в начале каждой синхронизации; nil — ничего.
 	beforeSync func()
-	// afterSync runs after every sync that finished; nil = nothing.
+	// afterSync выполняется после каждой завершившейся синхронизации; nil — ничего.
 	afterSync func()
-	// notify reports sync events to open pages; nil = nobody listens.
+	// notify сообщает о событиях синхронизации открытым страницам; nil — слушать некому.
 	notify func(event string, data interface{})
 
 	mu      sync.Mutex
 	client  *redmine.Client
 	syncer  syncer
 	running bool
-	// cancel stops the sync that is running; nil when none is.
+	// cancel останавливает идущую синхронизацию; nil — ничего не идёт.
 	cancel context.CancelFunc
 
-	// wake restarts the wait between periodic syncs (the interval changed).
+	// wake заново запускает ожидание между синхронизациями (изменился интервал).
 	wake chan struct{}
 }
 
@@ -90,8 +90,8 @@ func New(store ConfigStore, db **sql.DB, readOnly func() bool) *Manager {
 	return m
 }
 
-// Reload re-reads the connection settings. Handlers and the next sync use the
-// new client at once; a sync that is already running finishes with the old one.
+// Reload перечитывает параметры подключения. Обработчики и следующая
+// синхронизация сразу берут нового клиента; уже идущая заканчивает со старым.
 func (m *Manager) Reload() {
 	cfg := m.store.LoadAppConfig()
 
@@ -102,20 +102,20 @@ func (m *Manager) Reload() {
 		return
 	}
 	m.client = redmine.NewClient(cfg.RedmineURL, cfg.RedmineAPIKey, cfg.RedmineBasicLogin, cfg.RedmineBasicPass)
-	// A new syncer drops the incremental state, so the first sync after a
-	// change of settings reads everything again.
+	// Новый синхронизатор не помнит, что уже загружено, поэтому первая
+	// синхронизация после смены параметров читает всё заново.
 	m.syncer = m.newSyncer(m.client)
 }
 
-// Client returns the current data source client, nil when not configured.
+// Client возвращает текущего клиента источника данных; nil — не настроен.
 func (m *Manager) Client() *redmine.Client {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.client
 }
 
-// SourceType returns the kind of the configured data source ("redmine"),
-// or "" when none is configured.
+// SourceType возвращает вид настроенного источника данных ("redmine") или
+// "", если источник не настроен.
 func (m *Manager) SourceType() string {
 	if m.Client() == nil {
 		return ""
@@ -123,8 +123,8 @@ func (m *Manager) SourceType() string {
 	return m.store.LoadAppConfig().DataSourceType
 }
 
-// ClientWithKey returns a client of the data source that acts with the given
-// personal API key instead of the system one; nil when not configured.
+// ClientWithKey возвращает клиента источника данных, который действует с
+// заданным личным ключом API вместо системного; nil — источник не настроен.
 func (m *Manager) ClientWithKey(apiKey string) *redmine.Client {
 	cfg := m.store.LoadAppConfig()
 	if cfg.RedmineURL == "" {
@@ -133,7 +133,7 @@ func (m *Manager) ClientWithKey(apiKey string) *redmine.Client {
 	return redmine.NewClient(cfg.RedmineURL, apiKey, cfg.RedmineBasicLogin, cfg.RedmineBasicPass)
 }
 
-// Interval returns the time between periodic syncs in minutes.
+// Interval возвращает время между синхронизациями по расписанию, в минутах.
 func (m *Manager) Interval() int {
 	v, _ := m.store.Get(intervalKey)
 	n, err := strconv.Atoi(v)
@@ -143,7 +143,7 @@ func (m *Manager) Interval() int {
 	return n
 }
 
-// SetInterval saves the interval and applies it to the running loop.
+// SetInterval сохраняет интервал и применяет его к работающему циклу.
 func (m *Manager) SetInterval(minutes int) error {
 	if minutes < MinInterval || minutes > MaxInterval {
 		return errors.New("interval out of range")
@@ -158,14 +158,14 @@ func (m *Manager) SetInterval(minutes int) error {
 	return nil
 }
 
-// TriggerSync starts a sync in the background. It returns an error when the
-// sync cannot start; the outcome of the sync itself goes to collection_log.
+// TriggerSync запускает синхронизацию в фоне. Ошибка возвращается, если она
+// не может начаться; итог самой синхронизации пишется в collection_log.
 func (m *Manager) TriggerSync() error {
 	return m.trigger(false)
 }
 
-// TriggerFullSync starts a sync that re-reads every project completely
-// instead of only what changed.
+// TriggerFullSync запускает синхронизацию, которая перечитывает каждый
+// проект целиком, а не только изменения.
 func (m *Manager) TriggerFullSync() error {
 	return m.trigger(true)
 }
@@ -179,7 +179,7 @@ func (m *Manager) trigger(full bool) error {
 	return nil
 }
 
-// Stop interrupts the sync that is running. It reports whether there was one.
+// Stop прерывает идущую синхронизацию и сообщает, была ли она.
 func (m *Manager) Stop() bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -190,14 +190,14 @@ func (m *Manager) Stop() bool {
 	return true
 }
 
-// Enabled reports whether the periodic sync is on. A sync started by hand
-// runs either way.
+// Enabled сообщает, включена ли синхронизация по расписанию. Запущенная
+// вручную работает в любом случае.
 func (m *Manager) Enabled() bool {
 	v, _ := m.store.Get(enabledKey)
 	return v != "0"
 }
 
-// SetEnabled switches the periodic sync on or off.
+// SetEnabled включает или выключает синхронизацию по расписанию.
 func (m *Manager) SetEnabled(enabled bool) error {
 	value := "1"
 	if !enabled {
@@ -206,8 +206,8 @@ func (m *Manager) SetEnabled(enabled bool) error {
 	return m.store.Set(enabledKey, value)
 }
 
-// FullSyncTime returns the time of day ("HH:MM", server time) after which
-// the projects are re-read completely once a day.
+// FullSyncTime возвращает время суток ("HH:MM", время сервера), после
+// которого проекты раз в день перечитываются целиком.
 func (m *Manager) FullSyncTime() string {
 	v, _ := m.store.Get(fullTimeKey)
 	if _, _, ok := redmine.ParseTimeOfDay(v); !ok {
@@ -216,7 +216,7 @@ func (m *Manager) FullSyncTime() string {
 	return v
 }
 
-// SetFullSyncTime saves the time of the daily complete pass.
+// SetFullSyncTime сохраняет время ежедневного полного прохода.
 func (m *Manager) SetFullSyncTime(timeOfDay string) error {
 	if _, _, ok := redmine.ParseTimeOfDay(timeOfDay); !ok {
 		return errors.New("time of day must be HH:MM")
@@ -224,7 +224,7 @@ func (m *Manager) SetFullSyncTime(timeOfDay string) error {
 	return m.store.Set(fullTimeKey, timeOfDay)
 }
 
-// begin claims the single sync slot.
+// begin занимает единственное место для синхронизации.
 func (m *Manager) begin() (syncer, error) {
 	if *m.db == nil {
 		return nil, ErrNoDatabase
@@ -268,15 +268,15 @@ func (m *Manager) run(s syncer, full bool) {
 
 	err := s.SyncAll(ctx, m.db)
 
-	// Tell open pages what the sync changed, even a failed one: a part of
-	// the issues may have been updated before the failure.
+	// Открытым страницам сообщается, что изменила синхронизация, даже
+	// неудачная: часть задач могла обновиться до сбоя.
 	if before != nil {
 		if changes := DiffIssues(before, m.takeSnapshot()); !changes.Empty() {
 			m.emit(EventIssuesChanged, changes)
 		}
 	}
 	if errors.Is(err, context.Canceled) {
-		// Stopped by the administrator: neither a success nor a failure
+		// Остановлена администратором: это и не успех, и не сбой
 		m.emit(EventSyncStatus, SyncStatus{Status: "stopped", At: time.Now()})
 		return
 	}
@@ -292,34 +292,34 @@ func (m *Manager) run(s syncer, full bool) {
 	m.emit(EventSyncStatus, SyncStatus{Status: "success", At: time.Now()})
 }
 
-// Running reports whether a sync is in progress.
+// Running сообщает, идёт ли синхронизация.
 func (m *Manager) Running() bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.running
 }
 
-// SetProjectSource sets what decides which projects are synced (access
-// control: the projects the users are shown). Call it before Run.
+// SetProjectSource задаёт, кто решает, какие проекты синхронизируются
+// (права доступа: проекты, показанные пользователям). Вызывать до Run.
 func (m *Manager) SetProjectSource(source func() ([]int, error)) {
 	m.projectSource = source
 	m.Reload()
 }
 
-// SetBeforeSync sets what runs at the start of every sync, before the
-// projects to sync are chosen. Call it before Run.
+// SetBeforeSync задаёт, что выполняется в начале каждой синхронизации, до
+// выбора проектов. Вызывать до Run.
 func (m *Manager) SetBeforeSync(hook func()) {
 	m.beforeSync = hook
 }
 
-// SetAfterSync sets what runs after every sync that finished, before open
-// pages are told about it. Call it before Run.
+// SetAfterSync задаёт, что выполняется после каждой завершившейся
+// синхронизации, до сообщения открытым страницам. Вызывать до Run.
 func (m *Manager) SetAfterSync(hook func()) {
 	m.afterSync = hook
 }
 
-// SetNotifier sets where the manager reports sync events (the WebSocket hub).
-// Call it before Run.
+// SetNotifier задаёт, куда менеджер сообщает о событиях синхронизации
+// (хаб WebSocket). Вызывать до Run.
 func (m *Manager) SetNotifier(notify func(event string, data interface{})) {
 	m.notify = notify
 }
@@ -342,7 +342,7 @@ func (m *Manager) takeSnapshot() map[int]string {
 	return snap
 }
 
-// issueFingerprints returns a hash of the visible fields of every issue.
+// issueFingerprints возвращает хэш видимых полей каждой задачи.
 func (m *Manager) issueFingerprints() (map[int]string, error) {
 	rows, err := (*m.db).Query(`SELECT external_id, md5(ROW(
 			project_id, subject, status_id, priority_id, assigned_to_id, category_name,
@@ -364,9 +364,9 @@ func (m *Manager) issueFingerprints() (map[int]string, error) {
 	return snap, rows.Err()
 }
 
-// Run syncs once shortly after start and then periodically until ctx is done.
+// Run синхронизирует один раз вскоре после запуска и затем по расписанию, пока жив ctx.
 func (m *Manager) Run(ctx context.Context) {
-	// A sync cut short by a restart left its log entry "running" forever.
+	// Синхронизация, оборванная перезапуском, навсегда оставила в журнале запись «running».
 	if *m.db != nil {
 		(*m.db).Exec(`UPDATE collection_log SET status = 'error', finished_at = NOW(),
 			error_text = 'interrupted by a server restart' WHERE status = 'running'`)
@@ -383,7 +383,7 @@ func (m *Manager) Run(ctx context.Context) {
 			timer.Stop()
 		case <-timer.C:
 			if !m.Enabled() {
-				// Switched off by the administrator; a run by hand still works
+				// Выключена администратором; запуск вручную по-прежнему работает
 				break
 			}
 			if s, err := m.begin(); err == nil {

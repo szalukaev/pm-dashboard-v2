@@ -15,32 +15,32 @@ import (
 type Syncer struct {
 	client *Client
 
-	// Projects returns the projects whose issues are synced; optional.
+	// Projects возвращает проекты, задачи которых синхронизируются; необязательно.
 	Projects func() ([]int, error)
 
-	// FullSyncTime returns the time of day ("HH:MM", server time) after
-	// which the projects are re-read completely once a day; optional.
+	// FullSyncTime возвращает время суток ("HH:MM", время сервера), после
+	// которого проекты раз в день перечитываются целиком; необязательно.
 	FullSyncTime func() string
 
-	// One sync of issues at a time.
+	// Одновременно идёт только одна синхронизация задач.
 	mu sync.Mutex
 }
 
-// Statuses a sync is recorded with in collection_log.
+// Статусы, с которыми синхронизация записывается в collection_log.
 const (
 	StatusSuccess = "success"
-	// StatusPartial: the sync finished, but some projects could not be read.
-	// error_text holds "<failed>/<total>".
+	// StatusPartial: синхронизация завершилась, но часть проектов прочитать
+	// не удалось. В error_text лежит "<не прочитано>/<всего>".
 	StatusPartial = "partial"
 	StatusError   = "error"
-	// StatusStopped: the sync was stopped by the administrator.
+	// StatusStopped: синхронизацию остановил администратор.
 	StatusStopped = "stopped"
 )
 
 type fullSyncKey struct{}
 
-// WithFullSync marks a sync that must re-read every project completely
-// whatever the schedule says.
+// WithFullSync помечает синхронизацию, которая должна перечитать каждый
+// проект целиком независимо от расписания.
 func WithFullSync(ctx context.Context) context.Context {
 	return context.WithValue(ctx, fullSyncKey{}, true)
 }
@@ -58,7 +58,7 @@ func (s *Syncer) SyncAll(ctx context.Context, db **sql.DB) error {
 	startTime := time.Now()
 	slog.Info("Starting sync from Redmine")
 
-	// Log sync start
+	// Запись о начале синхронизации
 	var logID int
 	(*db).QueryRow(`INSERT INTO collection_log (started_at, status, data_source)
 		VALUES ($1, 'running', 'redmine') RETURNING id`, startTime).Scan(&logID)
@@ -66,38 +66,38 @@ func (s *Syncer) SyncAll(ctx context.Context, db **sql.DB) error {
 	var stats syncStats
 	var syncErr error
 
-	// The requests of this sync end when it is stopped
+	// Запросы этой синхронизации обрываются, когда её останавливают
 	original := s.client
 	s.client = original.withContext(ctx)
 	defer func() { s.client = original }()
 
-	// Sync statuses
+	// Статусы
 	if err := s.syncStatuses(ctx, db); err != nil {
 		syncErr = fmt.Errorf("sync statuses: %w", err)
 	}
 
-	// Sync priorities
+	// Приоритеты
 	if syncErr == nil {
 		if err := s.syncPriorities(ctx, db); err != nil {
 			syncErr = fmt.Errorf("sync priorities: %w", err)
 		}
 	}
 
-	// Sync projects
+	// Проекты
 	if syncErr == nil {
 		if err := s.syncProjects(ctx, db); err != nil {
 			syncErr = fmt.Errorf("sync projects: %w", err)
 		}
 	}
 
-	// Sync members (from all projects)
+	// Сотрудники (по всем проектам)
 	if syncErr == nil {
 		if err := s.syncMembers(ctx, db); err != nil {
 			syncErr = fmt.Errorf("sync members: %w", err)
 		}
 	}
 
-	// Sync issues (from all projects)
+	// Задачи (по всем проектам)
 	if syncErr == nil {
 		var err error
 		if stats, err = s.syncIssues(ctx, db); err != nil {
@@ -108,7 +108,7 @@ func (s *Syncer) SyncAll(ctx context.Context, db **sql.DB) error {
 	duration := time.Since(startTime)
 	durationMs := int(duration.Milliseconds())
 
-	// Update collection log
+	// Итог — в журнал синхронизации
 	if ctx.Err() != nil {
 		(*db).Exec(`UPDATE collection_log SET finished_at=$1, duration_ms=$2, status=$3 WHERE id=$4`,
 			time.Now(), durationMs, StatusStopped, logID)
@@ -122,7 +122,7 @@ func (s *Syncer) SyncAll(ctx context.Context, db **sql.DB) error {
 		return syncErr
 	}
 
-	// issues_collected is what this sync brought: the issues it wrote.
+	// issues_collected — что принесла эта синхронизация: записанные ею задачи.
 	status, note := StatusSuccess, ""
 	if stats.failed > 0 {
 		status, note = StatusPartial, fmt.Sprintf("%d/%d", stats.failed, stats.projects)
@@ -140,11 +140,11 @@ func (s *Syncer) syncStatuses(_ context.Context, db **sql.DB) error {
 		return err
 	}
 	for _, st := range statuses {
-		// group_name is user configuration (Настройки → Данные: Открытые/
-		// Тестирование/Закрытые). Redmine only knows is_closed — overwriting
-		// group_name on every sync used to wipe the custom layout (and the
-		// "testing" group entirely), which emptied the Tasks tab filters.
-		// On first insert only, seed a default group from is_closed.
+		// group_name — настройка пользователя (Настройки → Данные: Открытые/
+		// Тестирование/Закрытые). Redmine знает только is_closed: перезапись
+		// group_name при каждой синхронизации стирала заданную раскладку (а
+		// группу «testing» — целиком), и фильтры вкладки «Задачи» пустели.
+		// Группа по умолчанию из is_closed ставится только при первой вставке.
 		group := "open"
 		if st.IsClosed {
 			group = "closed"
@@ -172,9 +172,9 @@ func (s *Syncer) syncPriorities(_ context.Context, db **sql.DB) error {
 		return err
 	}
 	for i, p := range priorities {
-		// sort_order is user configuration (the administrator reorders
-		// priorities in the settings): seed it from the Redmine order on
-		// first insert only, never overwrite it afterwards.
+		// sort_order — настройка пользователя (администратор меняет порядок
+		// приоритетов в настройках): берётся из порядка Redmine только при
+		// первой вставке и после этого не перезаписывается.
 		_, err := (*db).Exec(`
 			INSERT INTO priorities (external_id, name, sort_order, data_source, synced_at)
 			VALUES ($1, $2, $3, 'redmine', NOW())
@@ -213,7 +213,7 @@ func (s *Syncer) syncProjects(_ context.Context, db **sql.DB) error {
 }
 
 func (s *Syncer) syncMembers(_ context.Context, db **sql.DB) error {
-	// Get all active users in one API call instead of iterating all projects
+	// Все активные пользователи одним запросом, без обхода всех проектов
 	members, err := s.client.GetUsers()
 	if err != nil {
 		return fmt.Errorf("get users: %w", err)
@@ -236,7 +236,8 @@ func (s *Syncer) syncMembers(_ context.Context, db **sql.DB) error {
 	}
 	slog.Info("Synced members", "count", count, "total", len(members))
 
-	// Cleanup: remove members not in the active users list (stale data from old project-membership sync)
+	// Очистка: удаляются сотрудники, которых нет среди активных пользователей
+	// (остатки прежней синхронизации по участию в проектах)
 	if len(members) > 0 {
 		placeholders := make([]string, len(members))
 		args := make([]interface{}, len(members))
@@ -258,9 +259,9 @@ func (s *Syncer) syncMembers(_ context.Context, db **sql.DB) error {
 }
 
 func (s *Syncer) syncIssues(ctx context.Context, db **sql.DB) (syncStats, error) {
-	// The projects to sync: what the users are shown within their rights
-	// (Projects), or — without access control wired in — the union of the
-	// projects selected by all users.
+	// Что синхронизировать: проекты, показанные пользователям в пределах их
+	// прав (Projects), либо — если права доступа не подключены — объединение
+	// проектов, выбранных всеми пользователями.
 	var projectIDs []int
 	if s.Projects != nil {
 		ids, err := s.Projects()
@@ -288,7 +289,7 @@ func (s *Syncer) syncIssues(ctx context.Context, db **sql.DB) (syncStats, error)
 		return syncStats{}, nil
 	}
 
-	// Selected projects include all their descendants
+	// Выбранные проекты включают всех своих потомков
 	if expanded, err := datasource.ExpandProjects(*db, projectIDs); err == nil {
 		projectIDs = expanded
 	}

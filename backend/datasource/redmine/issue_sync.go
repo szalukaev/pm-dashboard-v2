@@ -13,65 +13,65 @@ import (
 	"github.com/lib/pq"
 )
 
-// DefaultFullSyncTime is when the daily complete pass starts unless set
-// otherwise: at night, when nobody waits for fresh data.
+// DefaultFullSyncTime — когда начинается ежедневный полный проход, если не
+// задано иное: ночью, когда свежих данных никто не ждёт.
 const DefaultFullSyncTime = "03:00"
 
 const (
-	// fullSyncInterval: how often a project is re-read from Redmine
-	// completely. In between only changes are fetched; the full pass picks
-	// up what the changes cannot show: deleted issues, deleted time entries
-	// and time logged for long-past dates.
+	// fullSyncInterval: как часто проект перечитывается из Redmine целиком.
+	// В промежутке забираются только изменения; полный проход находит то,
+	// чего по изменениям не видно: удалённые задачи, удалённые трудозатраты
+	// и время, списанное на давние даты.
 	fullSyncInterval = 24 * time.Hour
-	// syncOverlap widens the incremental window against clock skew between
-	// this server and Redmine.
+	// syncOverlap расширяет окно изменений на случай расхождения часов
+	// этого сервера и Redmine.
 	syncOverlap = 10 * time.Minute
-	// fullSyncWorkers projects are read completely at the same time.
+	// fullSyncWorkers — сколько проектов читается целиком одновременно.
 	fullSyncWorkers = 3
-	// emptyAnswerGuard: a project that has more issues than this here and
-	// none in the answer of Redmine looks like a failure, not like the truth;
-	// nothing is deleted on such an answer.
+	// emptyAnswerGuard: проект, у которого здесь задач больше этого числа,
+	// а в ответе Redmine ни одной, похож на сбой, а не на правду; по такому
+	// ответу ничего не удаляется.
 	emptyAnswerGuard = 50
-	// issueBatchSize rows per INSERT: 22 params each, well below the 65535 limit.
+	// issueBatchSize — строк в одном INSERT: по 22 параметра, много меньше предела 65535.
 	issueBatchSize = 500
-	// timeEntryBatchSize rows per INSERT: 5 params each.
+	// timeEntryBatchSize — строк в одном INSERT: по 5 параметров.
 	timeEntryBatchSize = 1000
 )
 
-// projectState is when a project was last read: any successful load and the
-// last complete one.
+// projectState — когда проект читался в последний раз: любая успешная
+// загрузка и последняя полная.
 type projectState struct {
 	lastSync time.Time
 	lastFull time.Time
 }
 
-// syncStore is where a sync keeps the issues and its own state: the
-// database (pgStore), or a stand-in in tests.
+// syncStore — где синхронизация хранит задачи и своё состояние: база
+// (pgStore) или заглушка в тестах.
 type syncStore interface {
 	loadStates() (map[int]projectState, error)
 	saveState(projectID int, state projectState) error
 	storeTimeEntries(projectID int, entries []TimeEntry, replace bool) error
 	upsertIssues(batch []Issue) error
 	updateIssueHours(issueIDs []int64) error
-	// countIssues: how many issues of the project are stored.
+	// countIssues: сколько задач проекта хранится.
 	countIssues(projectID int) (int, error)
-	// deleteMissing removes the issues of the project that are not in keep
-	// and returns their numbers.
+	// deleteMissing удаляет задачи проекта, которых нет в keep, и
+	// возвращает их номера.
 	deleteMissing(projectID int, keep []int) ([]int, error)
-	// deleteIssues removes the given issues wherever they are.
+	// deleteIssues удаляет заданные задачи, где бы они ни были.
 	deleteIssues(issueIDs []int) error
 	cleanupUnselected(projectIDs []int) error
 }
 
-// syncStats is what a sync of issues did.
+// syncStats — что сделала синхронизация задач.
 type syncStats struct {
-	issues   int // issues written
-	deleted  int // issues removed because they are gone from the source
-	projects int // projects that were to be synced
-	failed   int // projects that could not be read
+	issues   int // записано задач
+	deleted  int // удалено задач, пропавших из источника
+	projects int // проектов нужно было синхронизировать
+	failed   int // проектов не удалось прочитать
 }
 
-// ParseTimeOfDay reads "HH:MM".
+// ParseTimeOfDay разбирает "HH:MM".
 func ParseTimeOfDay(value string) (hour, minute int, ok bool) {
 	t, err := time.Parse("15:04", value)
 	if err != nil {
@@ -80,8 +80,8 @@ func ParseTimeOfDay(value string) (hour, minute int, ok bool) {
 	return t.Hour(), t.Minute(), true
 }
 
-// lastScheduled returns the latest moment not after now when the clock
-// showed the given time of day.
+// lastScheduled возвращает последний момент не позже now, когда часы
+// показывали заданное время суток.
 func lastScheduled(now time.Time, timeOfDay string) time.Time {
 	hour, minute, ok := ParseTimeOfDay(timeOfDay)
 	if !ok {
@@ -94,10 +94,10 @@ func lastScheduled(now time.Time, timeOfDay string) time.Time {
 	return at
 }
 
-// needsFull reports whether a project must be re-read completely: it was
-// never read, or its last complete read is older than the latest scheduled
-// time of the full pass. Without a schedule a full pass is due a day after
-// the previous one.
+// needsFull сообщает, нужно ли перечитать проект целиком: он не читался ни
+// разу либо его последнее полное чтение старше последнего времени полного
+// прохода по расписанию. Без расписания полный проход нужен через сутки
+// после предыдущего.
 func needsFull(state projectState, known bool, now time.Time, fullTime string) bool {
 	if !known {
 		return true
@@ -108,26 +108,27 @@ func needsFull(state projectState, known bool, now time.Time, fullTime string) b
 	return state.lastFull.Before(lastScheduled(now, fullTime))
 }
 
-// fullLoad is everything Redmine has for one project.
+// fullLoad — всё, что есть в Redmine по одному проекту.
 type fullLoad struct {
 	projectID int
 	issues    []Issue
 	entries   []TimeEntry
-	// noTimeAccess: the API key may not read the time entries of the project.
+	// noTimeAccess: ключу API нельзя читать трудозатраты проекта.
 	noTimeAccess bool
 	err          error
 }
 
-// syncProjectIssues loads issues and time entries of the given projects.
+// syncProjectIssues загружает задачи и трудозатраты заданных проектов.
 //
-// A project that was never read, or was last read completely more than
-// fullSyncInterval ago, is read completely; issues that are no longer in
-// Redmine are deleted then. For the other projects only the issues updated
-// and the time spent since their last sync are fetched. Fact and bug fix hours are then recomputed from the stored time
-// entries of the affected issues.
+// Проект, который не читался ни разу или был прочитан целиком больше
+// fullSyncInterval назад, читается целиком; задачи, которых в Redmine больше
+// нет, при этом удаляются. По остальным проектам забираются только задачи,
+// изменённые с прошлой синхронизации, и списанное с тех пор время. Затем
+// фактические часы и часы на исправление багов пересчитываются по
+// сохранённым трудозатратам затронутых задач.
 //
-// The state is kept per project: a project that failed is read again next
-// time and does not make the others be re-read.
+// Состояние хранится по каждому проекту: проект со сбоем читается заново в
+// следующий раз и не заставляет перечитывать остальные.
 func (s *Syncer) syncProjectIssues(ctx context.Context, store syncStore, projectIDs []int, started time.Time, fullTime string) (syncStats, error) {
 	var stats syncStats
 	states, err := store.loadStates()
@@ -165,14 +166,14 @@ func (s *Syncer) syncProjectIssues(ctx context.Context, store syncStore, project
 	}
 	failed := 0
 
-	// Changes of the projects that are up to date: two requests for all of them
+	// Изменения актуальных проектов: два запроса на все сразу
 	quickDone, movedOut := s.loadChanges(store, quickIDs, selected, states, addIssues, touched)
 	failed += len(quickIDs) - len(quickDone)
 
-	// Complete loads, a few projects at a time
+	// Полные загрузки, по несколько проектов одновременно
 	loads := s.loadFull(ctx, fullIDs)
-	// A stopped sync keeps nothing of what it was in the middle of: the
-	// projects are read again next time.
+	// Остановленная синхронизация не сохраняет то, на чём её прервали:
+	// проекты читаются заново в следующий раз.
 	if ctx.Err() != nil {
 		return stats, ctx.Err()
 	}
@@ -206,14 +207,14 @@ func (s *Syncer) syncProjectIssues(ctx context.Context, store syncStore, project
 		}
 	}
 
-	// Issues that are gone from Redmine. After the upsert: an issue moved to
-	// another synced project already belongs to it and is not touched here.
+	// Задачи, пропавшие из Redmine. После записи: задача, перенесённая в
+	// другой синхронизируемый проект, уже принадлежит ему и здесь не затрагивается.
 	deleted := 0
 	for _, load := range complete {
 		deleted += deleteGone(store, load)
 	}
 	if len(movedOut) > 0 {
-		// Moved to a project that is not synced
+		// Перенесены в проект, который не синхронизируется
 		if err := store.deleteIssues(movedOut); err != nil {
 			slog.Warn("Failed to delete issues moved out of the synced projects", "error", err)
 		}
@@ -227,7 +228,7 @@ func (s *Syncer) syncProjectIssues(ctx context.Context, store syncStore, project
 		return stats, fmt.Errorf("update issue hours: %w", err)
 	}
 
-	// Everything is stored: the projects that were read move on
+	// Всё сохранено: у прочитанных проектов сдвигаются отметки
 	for _, load := range complete {
 		if err := store.saveState(load.projectID, projectState{lastSync: started, lastFull: started}); err != nil {
 			slog.Warn("Failed to save sync state", "project_id", load.projectID, "error", err)
@@ -250,14 +251,15 @@ func (s *Syncer) syncProjectIssues(ctx context.Context, store syncStore, project
 	return stats, nil
 }
 
-// loadChanges fetches what changed in the given projects since their last
-// sync and stores the time entries. It returns the projects whose changes
-// were read (the others may not be taken as synced) and the changed issues
-// that now belong to a project that is not synced at all.
+// loadChanges забирает то, что изменилось в заданных проектах с их прошлой
+// синхронизации, и сохраняет трудозатраты. Возвращает проекты, изменения
+// которых прочитаны (остальные нельзя считать синхронизированными), и
+// изменённые задачи, которые теперь принадлежат проекту, не
+// синхронизируемому вовсе.
 //
-// The changed issues of all projects come with one request. The time is
-// asked project by project: Redmine is too slow to answer for all of them
-// at once.
+// Изменённые задачи всех проектов приходят одним запросом. Время
+// запрашивается по каждому проекту: на все сразу Redmine отвечает слишком
+// долго.
 func (s *Syncer) loadChanges(store syncStore, projectIDs []int, selected map[int]bool, states map[int]projectState,
 	addIssues func([]Issue), touched map[int]bool) (done map[int]bool, movedOut []int) {
 	done = make(map[int]bool, len(projectIDs))
@@ -280,8 +282,8 @@ func (s *Syncer) loadChanges(store syncStore, projectIDs []int, selected map[int
 		return done, nil
 	}
 
-	// Entries are filtered by the day they were spent on; one extra day
-	// covers time logged for yesterday.
+	// Записи отбираются по дню, на который списано время; лишний день
+	// покрывает время, списанное на вчера.
 	from := since.AddDate(0, 0, -1).Format("2006-01-02")
 	type recent struct {
 		entries []TimeEntry
@@ -298,8 +300,8 @@ func (s *Syncer) loadChanges(store syncStore, projectIDs []int, selected map[int
 			defer func() { <-slots }()
 			entries, err := s.client.GetTimeEntries(pid, from)
 			if errors.Is(err, ErrForbidden) {
-				// No right to the time of this project: its issues are
-				// synced without hours, see loadProject
+				// Права на время этого проекта нет: его задачи
+				// синхронизируются без часов, см. loadProject
 				err = nil
 			}
 			loaded[i] = recent{entries: entries, err: err}
@@ -334,8 +336,8 @@ func (s *Syncer) loadChanges(store syncStore, projectIDs []int, selected map[int
 		case !selected[iss.ProjectID]:
 			movedOut = append(movedOut, iss.ExternalID)
 		}
-		// An issue of a project that is being read completely comes with
-		// it; one of a project that failed is read again next time
+		// Задача проекта, который читается целиком, придёт вместе с ним;
+		// задача проекта со сбоем прочитается в следующий раз
 	}
 	addIssues(mine)
 	slog.Info("Loaded changes from Redmine", "projects", len(done), "since", since.Format(time.RFC3339),
@@ -343,7 +345,7 @@ func (s *Syncer) loadChanges(store syncStore, projectIDs []int, selected map[int
 	return done, movedOut
 }
 
-// loadFull reads the given projects completely, fullSyncWorkers at a time.
+// loadFull читает заданные проекты целиком, по fullSyncWorkers одновременно.
 func (s *Syncer) loadFull(ctx context.Context, projectIDs []int) []fullLoad {
 	loads := make([]fullLoad, len(projectIDs))
 	var wg sync.WaitGroup
@@ -370,9 +372,8 @@ func (s *Syncer) loadProject(pid int) fullLoad {
 	entries, err := s.client.GetTimeEntries(pid, "")
 	switch {
 	case errors.Is(err, ErrForbidden):
-		// The key has no right to the time of this project. It is not a
-		// failure and will not pass by itself: the issues are synced
-		// without their hours.
+		// У ключа нет права на время этого проекта. Это не сбой и само не
+		// пройдёт: задачи синхронизируются без часов.
 		slog.Warn("The API key has no access to the time entries of a project: its issues are synced without hours",
 			"project_id", pid)
 		load.noTimeAccess = true
@@ -389,8 +390,8 @@ func (s *Syncer) loadProject(pid int) fullLoad {
 	return load
 }
 
-// deleteGone removes the issues of a completely read project that Redmine
-// no longer has, and returns how many were removed.
+// deleteGone удаляет задачи целиком прочитанного проекта, которых в Redmine
+// больше нет, и возвращает их число.
 func deleteGone(store syncStore, load fullLoad) int {
 	if len(load.issues) == 0 {
 		if stored, err := store.countIssues(load.projectID); err != nil || stored > emptyAnswerGuard {
@@ -414,7 +415,7 @@ func deleteGone(store syncStore, load fullLoad) int {
 	return len(gone)
 }
 
-// pgStore keeps the synced data in PostgreSQL.
+// pgStore хранит синхронизированные данные в PostgreSQL.
 type pgStore struct {
 	db *sql.DB
 }
@@ -483,8 +484,8 @@ func (p pgStore) deleteMissing(projectID int, keep []int) ([]int, error) {
 	return gone, p.deleteIssues(gone)
 }
 
-// deleteIssues removes issues together with what exists only for them:
-// their time entries and their places in sprints. Snapshots keep the history.
+// deleteIssues удаляет задачи вместе с тем, что существует только ради них:
+// их трудозатратами и местами в спринтах. История остаётся в снимках.
 func (p pgStore) deleteIssues(issueIDs []int) error {
 	if len(issueIDs) == 0 {
 		return nil
@@ -511,14 +512,14 @@ func (p pgStore) cleanupUnselected(projectIDs []int) error {
 	if err := cleanupUnselected(p.db, projectIDs); err != nil {
 		return err
 	}
-	// A project that is selected again later starts from a complete load
+	// Проект, выбранный позже снова, начинает с полной загрузки
 	_, err := p.db.Exec(`DELETE FROM sync_state WHERE data_source = 'redmine' AND NOT (project_id = ANY($1::int[]))`,
 		pq.Array(projectIDs))
 	return err
 }
 
-// storeTimeEntries saves time entries of a project. A full load replaces the
-// project's entries, so entries deleted in Redmine disappear as well.
+// storeTimeEntries сохраняет трудозатраты проекта. Полная загрузка заменяет
+// записи проекта, поэтому удалённые в Redmine записи пропадают и здесь.
 func storeTimeEntries(db *sql.DB, projectID int, entries []TimeEntry, replace bool) error {
 	tx, err := db.Begin()
 	if err != nil {
@@ -532,7 +533,7 @@ func storeTimeEntries(db *sql.DB, projectID int, entries []TimeEntry, replace bo
 		}
 	}
 
-	// A parent project may still return entries of a subproject: keep each id once.
+	// Родительский проект всё же может вернуть записи подпроекта: каждый id берётся один раз.
 	seen := make(map[int]bool, len(entries))
 	unique := make([]TimeEntry, 0, len(entries))
 	for _, e := range entries {
@@ -568,9 +569,9 @@ func storeTimeEntries(db *sql.DB, projectID int, entries []TimeEntry, replace bo
 	return tx.Commit()
 }
 
-// upsertIssues writes a batch of issues with a single multi-row statement —
-// the database is remote, so one round trip per issue made the sync slow.
-// Fact and bug fix hours are maintained by updateIssueHours.
+// upsertIssues записывает пачку задач одним многострочным запросом: база
+// удалённая, и запрос на каждую задачу делал синхронизацию медленной.
+// Фактические часы и часы на исправление багов ведёт updateIssueHours.
 func upsertIssues(db *sql.DB, batch []Issue) error {
 	const cols = 22
 	values := make([]string, len(batch))
@@ -624,8 +625,9 @@ func upsertIssues(db *sql.DB, batch []Issue) error {
 	return err
 }
 
-// updateIssueHours recomputes fact (all time entries) and bug fix hours
-// (the "Fixing bugs" activity) of the given issues from stored time entries.
+// updateIssueHours пересчитывает фактические часы (все трудозатраты) и часы
+// на исправление багов (деятельность «Fixing bugs») заданных задач по
+// сохранённым трудозатратам.
 func updateIssueHours(db *sql.DB, issueIDs []int64) error {
 	if len(issueIDs) == 0 {
 		return nil
@@ -646,8 +648,8 @@ func updateIssueHours(db *sql.DB, issueIDs []int64) error {
 	return err
 }
 
-// cleanupUnselected removes issues and time entries of projects that are no
-// longer selected by any user.
+// cleanupUnselected удаляет задачи и трудозатраты проектов, которые больше
+// не выбраны ни одним пользователем.
 func cleanupUnselected(db *sql.DB, projectIDs []int) error {
 	ids := make([]int64, len(projectIDs))
 	for i, pid := range projectIDs {

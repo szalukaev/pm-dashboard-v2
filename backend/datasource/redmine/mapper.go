@@ -2,7 +2,7 @@ package redmine
 
 import "pm-dashboard/datasource"
 
-// Type aliases to satisfy the datasource interface types
+// Псевдонимы типов: интерфейс datasource работает со своими типами
 type Project = datasource.Project
 type Issue = datasource.Issue
 type Member = datasource.Member

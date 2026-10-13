@@ -37,7 +37,7 @@ func (s *fakeStore) Set(key, value string) error {
 	return nil
 }
 
-// blockingSyncer counts passes and holds each one until released.
+// blockingSyncer считает проходы и держит каждый, пока его не отпустят.
 type blockingSyncer struct {
 	passes  atomic.Int32
 	started chan struct{}
@@ -55,7 +55,7 @@ func newTestManager(store *fakeStore, s syncer) *Manager {
 	db := &sql.DB{}
 	m := New(store, &db, nil)
 	m.newSyncer = func(*redmine.Client) syncer { return s }
-	m.snapshot = nil // no real database in tests
+	m.snapshot = nil // настоящей базы в тестах нет
 	m.Reload()
 	return m
 }
@@ -74,7 +74,7 @@ func TestDiffIssues(t *testing.T) {
 	}
 }
 
-// stepSyncer changes the "database" during its pass.
+// stepSyncer меняет «базу» во время своего прохода.
 type stepSyncer struct {
 	pass func()
 	err  error
@@ -118,7 +118,7 @@ func TestSyncReportsEvents(t *testing.T) {
 		t.Errorf("changes = %+v, want %+v", changes, want)
 	}
 
-	// A failed pass that changed nothing reports only its status.
+	// Неудачный проход, ничего не изменивший, сообщает только свой статус.
 	events = nil
 	s.pass, s.err = func() {}, errors.New("redmine is down")
 	current, _ = m.begin()
@@ -145,7 +145,7 @@ func TestTriggerSyncRunsOnePassAtATime(t *testing.T) {
 	}
 	close(s.release)
 
-	// The slot is free again once the pass is over.
+	// Когда проход закончен, место снова свободно.
 	for m.TriggerSync() != nil {
 	}
 	<-s.started
@@ -198,7 +198,7 @@ func TestInterval(t *testing.T) {
 	}
 }
 
-// waitingSyncer runs until its context ends and reports how it was called.
+// waitingSyncer работает, пока жив его контекст, и сообщает, как был вызван.
 type waitingSyncer struct {
 	started chan struct{}
 }

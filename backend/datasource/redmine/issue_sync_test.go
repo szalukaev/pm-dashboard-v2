@@ -14,12 +14,12 @@ import (
 	"time"
 )
 
-// memStore stands in for the database.
+// memStore заменяет базу.
 type memStore struct {
 	mu      sync.Mutex
 	states  map[int]projectState
-	issues  map[int]int // issue → project
-	entries map[int]int // time entry → issue
+	issues  map[int]int // задача → проект
+	entries map[int]int // запись времени → задача
 	deleted []int
 }
 
@@ -114,17 +114,17 @@ func (m *memStore) issueIDs() []int {
 	return ids
 }
 
-// fakeRedmine serves issues and time entries per project and records the
-// requests it got.
+// fakeRedmine отдаёт задачи и трудозатраты по проектам и запоминает
+// полученные запросы.
 type fakeRedmine struct {
 	mu sync.Mutex
-	// project → issue numbers
+	// проект → номера задач
 	issues map[int][]int
-	// project → time entries as "id:issue"
+	// проект → трудозатраты в виде "id:задача"
 	entries map[int][]string
-	// projects whose time entries the key may not read
+	// проекты, трудозатраты которых ключу читать нельзя
 	forbidden map[int]bool
-	// projects whose issues fail with 500
+	// проекты, запрос задач которых отвечает 500
 	broken   map[int]bool
 	requests []string
 }
@@ -208,8 +208,8 @@ func TestSyncProjectIssues(t *testing.T) {
 	store := newMemStore()
 	start := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
 
-	// First run: nothing is known, every selected project is read completely.
-	// Project 2 denies its time entries, which must not count as a failure.
+	// Первый запуск: ничего не известно, каждый выбранный проект читается
+	// целиком. Проект 2 не отдаёт трудозатраты — это не должно считаться сбоем.
 	if _, err := syncer.syncProjectIssues(context.Background(), store, []int{1, 2}, start, ""); err != nil {
 		t.Fatal(err)
 	}
@@ -229,10 +229,10 @@ func TestSyncProjectIssues(t *testing.T) {
 		t.Errorf("requests of the first run = %v", got)
 	}
 
-	// Second run a few minutes later: the changed issues of all projects
-	// with one request, the recent time project by project. An issue of
-	// project 3, which is not selected, is not taken; project 2 still denies
-	// its time and still does not count as a failure.
+	// Второй запуск через несколько минут: изменённые задачи всех проектов
+	// одним запросом, свежее время — по каждому проекту. Задача проекта 3,
+	// который не выбран, не берётся; проект 2 по-прежнему не отдаёт время
+	// и по-прежнему не считается сбоем.
 	redmine.issues[1] = append(redmine.issues[1], 13)
 	second := start.Add(5 * time.Minute)
 	if _, err := syncer.syncProjectIssues(context.Background(), store, []int{1, 2}, second, ""); err != nil {
@@ -252,7 +252,7 @@ func TestSyncProjectIssues(t *testing.T) {
 		t.Errorf("project 1: state = %+v, want the sync mark moved and the full mark kept", st)
 	}
 
-	// A project selected later is read completely, the others are not.
+	// Проект, выбранный позже, читается целиком, остальные — нет.
 	third := second.Add(5 * time.Minute)
 	if _, err := syncer.syncProjectIssues(context.Background(), store, []int{1, 2, 3}, third, ""); err != nil {
 		t.Fatal(err)
@@ -266,8 +266,8 @@ func TestSyncProjectIssues(t *testing.T) {
 		t.Errorf("issues after the third run = %v", got)
 	}
 
-	// The state survives a restart: a new syncer over the same store still
-	// asks only for changes.
+	// Состояние переживает перезапуск: новый синхронизатор над тем же
+	// хранилищем по-прежнему запрашивает только изменения.
 	restarted := NewSyncer(NewClient(srv.URL, "key", "", ""))
 	if _, err := restarted.syncProjectIssues(context.Background(), store, []int{1, 2, 3}, third.Add(5*time.Minute), ""); err != nil {
 		t.Fatal(err)
@@ -294,12 +294,12 @@ func TestSyncDeletesIssuesGoneFromRedmine(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Issue 12 is deleted in Redmine, issue 13 is moved to project 2
+	// Задача 12 удалена в Redmine, задача 13 перенесена в проект 2
 	redmine.issues[1] = []int{11}
 	redmine.issues[2] = []int{21, 13}
 	redmine.entries[1] = []string{"100:11"}
 
-	// Changes alone do not show a deletion…
+	// По одним изменениям удаление не видно…
 	if _, err := syncer.syncProjectIssues(context.Background(), store, []int{1, 2}, start.Add(time.Hour), ""); err != nil {
 		t.Fatal(err)
 	}
@@ -307,8 +307,8 @@ func TestSyncDeletesIssuesGoneFromRedmine(t *testing.T) {
 		t.Errorf("deleted on a pass of changes: %v", store.deleted)
 	}
 
-	// …the next complete pass does: the deleted issue goes with its time
-	// entries, the moved one stays.
+	// …а следующий полный проход его находит: удалённая задача уходит
+	// вместе с трудозатратами, перенесённая остаётся.
 	if _, err := syncer.syncProjectIssues(context.Background(), store, []int{1, 2}, start.Add(fullSyncInterval), ""); err != nil {
 		t.Fatal(err)
 	}
@@ -343,7 +343,7 @@ func TestSyncDeletesNothingOnFailureOrSuspiciousAnswer(t *testing.T) {
 	}
 	stored := len(store.issues)
 
-	// Project 1 fails, project 2 suddenly answers with nothing
+	// Проект 1 отвечает сбоем, проект 2 вдруг не возвращает ничего
 	redmine.broken = map[int]bool{1: true}
 	redmine.issues[2] = nil
 	next := start.Add(fullSyncInterval)
@@ -353,11 +353,11 @@ func TestSyncDeletesNothingOnFailureOrSuspiciousAnswer(t *testing.T) {
 	if len(store.deleted) != 0 || len(store.issues) != stored {
 		t.Errorf("deleted %v, %d issues left of %d", store.deleted, len(store.issues), stored)
 	}
-	// The failed project is read again next time; its marks have not moved
+	// Проект со сбоем читается заново в следующий раз; его отметки не сдвинулись
 	if st := store.states[1]; !st.lastFull.Equal(start) {
 		t.Errorf("project 1: full mark = %v, want it unchanged", st.lastFull)
 	}
-	// The other one was read, whatever came of it
+	// Второй прочитан, что бы из этого ни вышло
 	if st := store.states[2]; !st.lastFull.Equal(next) {
 		t.Errorf("project 2: full mark = %v, want %v", st.lastFull, next)
 	}
@@ -375,8 +375,8 @@ func TestSyncRemovesIssueMovedOutOfSyncedProjects(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Issue 12 is moved to project 9, which nobody selected: the change is
-	// seen on the next pass and the issue is removed here at once.
+	// Задача 12 перенесена в проект 9, который никто не выбрал: изменение
+	// видно на следующем проходе, и задача сразу удаляется здесь.
 	redmine.issues[1] = []int{11}
 	redmine.issues[9] = []int{12}
 	if _, err := syncer.syncProjectIssues(context.Background(), store, []int{1}, start.Add(5*time.Minute), ""); err != nil {
@@ -435,7 +435,7 @@ func TestSyncFullOnRequestAndStats(t *testing.T) {
 	}
 	redmine.takeRequests()
 
-	// Nothing changed and no full pass is due: no issue is written
+	// Ничего не изменилось, полный проход не нужен: ни одна задача не записывается
 	stats, err = syncer.syncProjectIssues(context.Background(), store, []int{1, 2}, start.Add(5*time.Minute), "03:00")
 	if err != nil {
 		t.Fatal(err)
@@ -444,7 +444,7 @@ func TestSyncFullOnRequestAndStats(t *testing.T) {
 		t.Errorf("a pass of changes made %d requests: %v", len(got), got)
 	}
 
-	// A full pass on request reads every project again and deletes what is gone
+	// Полный проход по запросу читает каждый проект заново и удаляет пропавшее
 	redmine.issues[1] = []int{11}
 	stats, err = syncer.syncProjectIssues(WithFullSync(context.Background()), store, []int{1, 2}, start.Add(10*time.Minute), "03:00")
 	if err != nil {
@@ -454,7 +454,7 @@ func TestSyncFullOnRequestAndStats(t *testing.T) {
 		t.Errorf("full pass on request: stats = %+v, deleted = %v", stats, store.deleted)
 	}
 
-	// A project that cannot be read is counted
+	// Проект, который не удалось прочитать, учитывается в счётчике
 	redmine.broken = map[int]bool{2: true}
 	stats, err = syncer.syncProjectIssues(WithFullSync(context.Background()), store, []int{1, 2}, start.Add(15*time.Minute), "03:00")
 	if err != nil {

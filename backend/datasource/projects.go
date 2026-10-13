@@ -2,8 +2,8 @@ package datasource
 
 import "database/sql"
 
-// ExpandProjects returns the given projects together with all their
-// descendants (children, grandchildren, …), read from the projects table.
+// ExpandProjects возвращает заданные проекты вместе со всеми их потомками
+// (дочерними, внучатыми, …), прочитанными из таблицы projects.
 func ExpandProjects(db *sql.DB, ids []int) ([]int, error) {
 	rows, err := db.Query("SELECT external_id, parent_id FROM projects WHERE data_source = 'redmine'")
 	if err != nil {
@@ -28,8 +28,8 @@ func ExpandProjects(db *sql.DB, ids []int) ([]int, error) {
 	return withDescendants(ids, children), nil
 }
 
-// withDescendants walks the parent → children map breadth-first. The result
-// keeps the given ids first and has no duplicates.
+// withDescendants обходит карту «родитель → дочерние» в ширину. В результате
+// сначала идут заданные проекты, повторов нет.
 func withDescendants(ids []int, children map[int][]int) []int {
 	seen := make(map[int]bool, len(ids))
 	result := make([]int, 0, len(ids))

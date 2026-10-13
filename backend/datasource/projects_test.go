@@ -6,7 +6,7 @@ import (
 )
 
 func TestWithDescendants(t *testing.T) {
-	// 1 → 2 → 4, 1 → 3; 5 is unrelated; 6 ↔ 7 is a cycle
+	// 1 → 2 → 4, 1 → 3; 5 ни с кем не связан; 6 ↔ 7 — цикл
 	children := map[int][]int{1: {2, 3}, 2: {4}, 6: {7}, 7: {6}}
 
 	tests := []struct {

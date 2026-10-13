@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// Attachment is a file attached to an issue.
+// Attachment — файл, приложенный к задаче.
 type Attachment struct {
 	ID          int    `json:"id"`
 	Filename    string `json:"filename"`
@@ -20,18 +20,18 @@ type Attachment struct {
 	CreatedOn   string `json:"created_on"`
 }
 
-// FieldChange is one changed field of a journal entry. Redmine reports ids
-// for most fields (a status, a member); Old and New hold what it reported
-// until the caller replaces the ids with names.
+// FieldChange — одно изменённое поле записи журнала. Для большинства полей
+// (статус, сотрудник) Redmine сообщает идентификаторы; в Old и New лежит то,
+// что он сообщил, пока вызывающий не заменит идентификаторы названиями.
 type FieldChange struct {
-	// Field is what changed: "status", "priority", "assigned_to", "due_date",
-	// "attachment", "relation", "cf_12" (a custom field) and so on.
+	// Field — что изменилось: "status", "priority", "assigned_to", "due_date",
+	// "attachment", "relation", "cf_12" (настраиваемое поле) и так далее.
 	Field string `json:"field"`
 	Old   string `json:"old"`
 	New   string `json:"new"`
 }
 
-// HistoryEntry is a journal entry of an issue: a note, changed fields or both.
+// HistoryEntry — запись журнала задачи: комментарий, изменённые поля или и то и другое.
 type HistoryEntry struct {
 	ID        int           `json:"id"`
 	Author    string        `json:"author"`
@@ -40,16 +40,16 @@ type HistoryEntry struct {
 	Changes   []FieldChange `json:"changes"`
 }
 
-// Kinds of RelatedIssue besides the relation types of Redmine.
+// Виды RelatedIssue помимо типов связей самого Redmine.
 const (
 	RelationParent = "parent"
 	RelationChild  = "child"
 )
 
-// RelatedIssue is an issue tied to the one shown. Relation is told from the
-// point of view of the shown issue: "blocks" — it blocks the related one,
-// "blocked" — it is blocked by it. Subject, Status and Accessible are filled
-// by the caller for the issues the user may see.
+// RelatedIssue — задача, связанная с показанной. Relation описывает связь с
+// точки зрения показанной задачи: "blocks" — она блокирует связанную,
+// "blocked" — заблокирована ею. Subject, Status и Accessible заполняет
+// вызывающий для задач, которые пользователь вправе видеть.
 type RelatedIssue struct {
 	Relation   string `json:"relation"`
 	ID         int    `json:"id"`
@@ -58,9 +58,9 @@ type RelatedIssue struct {
 	Accessible bool   `json:"accessible"`
 }
 
-// IssueDetails is the part of an issue that is read live from Redmine for
-// the task card: the raw description markup, files, comments, the whole
-// history of changes and the related issues.
+// IssueDetails — часть задачи, которая для карточки читается из Redmine
+// напрямую: исходная разметка описания, файлы, комментарии, вся история
+// изменений и связанные задачи.
 type IssueDetails struct {
 	Description string         `json:"description"`
 	Attachments []Attachment   `json:"attachments"`
@@ -111,7 +111,7 @@ type issueDetailsResp struct {
 	} `json:"issue"`
 }
 
-// inverseRelations: how a relation reads from its other end.
+// inverseRelations: как связь читается с другого её конца.
 var inverseRelations = map[string]string{
 	"relates":     "relates",
 	"duplicates":  "duplicated",
@@ -124,7 +124,7 @@ var inverseRelations = map[string]string{
 	"copied_from": "copied_to",
 }
 
-// changedField names what a journal detail is about (see FieldChange.Field).
+// changedField называет, о чём запись журнала (см. FieldChange.Field).
 func changedField(property, name string) string {
 	switch property {
 	case "attr":
@@ -136,8 +136,8 @@ func changedField(property, name string) string {
 	}
 }
 
-// GetIssueDetails loads description, attachments, history and related
-// issues of an issue.
+// GetIssueDetails загружает описание, файлы, историю и связанные задачи
+// одной задачи.
 func (c *Client) GetIssueDetails(issueID int) (*IssueDetails, error) {
 	data, err := c.doRequest(fmt.Sprintf("/issues/%d.json?include=attachments,journals,relations,children", issueID))
 	if err != nil {
@@ -174,7 +174,7 @@ func parseIssueDetails(data []byte, issueID int) (*IssueDetails, error) {
 		for _, detail := range j.Details {
 			change := FieldChange{Field: changedField(detail.Property, detail.Name), Old: detail.OldValue, New: detail.NewValue}
 			if detail.Property == "relation" {
-				// name is the relation type, the values are issue numbers
+				// name — тип связи, значения — номера задач
 				change.Old, change.New = issueRef(detail.OldValue), issueRef(detail.NewValue)
 			}
 			entry.Changes = append(entry.Changes, change)
@@ -202,7 +202,7 @@ func parseIssueDetails(data []byte, issueID int) (*IssueDetails, error) {
 	for _, rel := range resp.Issue.Relations {
 		related := RelatedIssue{Relation: rel.RelationType, ID: rel.IssueToID}
 		if rel.IssueToID == issueID {
-			// The relation is recorded from the other issue: turn it around
+			// Связь записана со стороны другой задачи: разворачиваем её
 			related.ID = rel.IssueID
 			if inverse, ok := inverseRelations[rel.RelationType]; ok {
 				related.Relation = inverse
@@ -213,7 +213,7 @@ func parseIssueDetails(data []byte, issueID int) (*IssueDetails, error) {
 	return d, nil
 }
 
-// issueRef shows an issue number the way issues are referred to: "#123".
+// issueRef записывает номер задачи так, как на задачи ссылаются: "#123".
 func issueRef(value string) string {
 	if _, err := strconv.Atoi(value); err != nil {
 		return value
@@ -228,7 +228,7 @@ type versionsResp struct {
 	} `json:"versions"`
 }
 
-// GetVersionNames returns the names of the versions of a project by id.
+// GetVersionNames возвращает названия версий проекта по их идентификаторам.
 func (c *Client) GetVersionNames(projectID int) (map[int]string, error) {
 	data, err := c.doRequest(fmt.Sprintf("/projects/%d/versions.json", projectID))
 	if err != nil {
@@ -245,8 +245,8 @@ func (c *Client) GetVersionNames(projectID int) (map[int]string, error) {
 	return names, nil
 }
 
-// DownloadAttachment streams the content of an attachment. The caller must
-// close the returned body.
+// DownloadAttachment отдаёт содержимое файла потоком. Возвращённое тело
+// должен закрыть вызывающий.
 func (c *Client) DownloadAttachment(id int) (io.ReadCloser, error) {
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/attachments/download/%d", c.BaseURL, id), nil)
 	if err != nil {
@@ -258,7 +258,7 @@ func (c *Client) DownloadAttachment(id int) (io.ReadCloser, error) {
 	if c.BasicLogin != "" {
 		req.SetBasicAuth(c.BasicLogin, c.BasicPass)
 	}
-	// Attachments may be large: no overall client timeout for the body.
+	// Файлы бывают большими: общего тайм-аута клиента на чтение тела нет.
 	client := &http.Client{Transport: c.HTTPClient.Transport}
 	resp, err := client.Do(req)
 	if err != nil {
