@@ -8,7 +8,7 @@ RUN npm run build
 FROM nginx:alpine
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/nginx.conf
-# 127.0.0.1, not localhost: busybox wget resolves localhost to ::1 first,
-# while nginx listens on IPv4 only → healthcheck spuriously fails.
+# 127.0.0.1, а не localhost: wget из busybox сначала превращает localhost в ::1,
+# а nginx слушает только IPv4 — проверка состояния ложно падает.
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -qO- http://127.0.0.1:82/ || exit 1
 EXPOSE 82

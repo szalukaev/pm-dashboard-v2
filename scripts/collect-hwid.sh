@@ -1,23 +1,23 @@
 #!/bin/sh
-# Collects the hardware identifiers of this host for the PM Dashboard license.
+# Собирает аппаратные идентификаторы этого хоста для лицензии PM Dashboard.
 #
-# docker-compose runs it by itself before every start of the backend (the
-# "hwid" service), so normally there is nothing to do by hand.
+# docker-compose сам запускает скрипт перед каждым стартом backend (служба
+# "hwid"), поэтому обычно делать вручную ничего не нужно.
 #
-# It writes /etc/pmdashboard/hwid-source; the directory is mounted into the
-# backend container read-only. The application reads the identifiers from
-# this file: it never queries the hardware itself, so its container needs no
-# extra privileges.
+# Скрипт пишет /etc/pmdashboard/hwid-source; каталог монтируется в контейнер
+# backend только для чтения. Приложение читает идентификаторы из этого
+# файла: само оно железо не опрашивает, и его контейнеру не нужны лишние
+# привилегии.
 #
-# Two identifiers are collected; the license stays valid while at least one
-# of them is unchanged:
-#   machine_id    /etc/machine-id — survives a board replacement
-#   board_serial  the baseboard serial number — survives an OS reinstall
+# Собираются два идентификатора; лицензия действует, пока не изменился хотя
+# бы один из них:
+#   machine_id    /etc/machine-id — переживает замену платы
+#   board_serial  серийный номер материнской платы — переживает переустановку ОС
 #
-# If the license screen reports that the hardware fingerprint is not
-# available, see "docker compose logs hwid". Where it cannot be collected
-# automatically (for example, rootless Docker cannot read the board serial
-# number), run the script on the HOST as root and restart the backend:
+# Если экран лицензии сообщает, что аппаратный отпечаток недоступен,
+# смотрите "docker compose logs hwid". Там, где собрать его автоматически
+# нельзя (например, Docker без root не может прочитать серийный номер
+# платы), запустите скрипт на ХОСТЕ от root и перезапустите backend:
 #
 #     sudo sh scripts/collect-hwid.sh
 
@@ -30,20 +30,20 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-# A board without a real serial number reports a stub; a stub is the same on
-# thousands of machines and must not become a license binding.
+# Плата без настоящего серийного номера сообщает заглушку; заглушка
+# одинакова на тысячах машин и не должна стать привязкой лицензии.
 is_placeholder() {
     value=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
     case "$value" in
         ""|*"to be filled"*|*"o.e.m"*|*"oem"*|*"not specified"*|*"not applicable"*|*"default string"*|*"system serial"*|none|unknown|n/a)
             return 0 ;;
     esac
-    # Only zeros or only "x"
+    # Одни нули или одни "x"
     stripped=$(printf '%s' "$value" | tr -d '0x')
     [ -z "$stripped" ]
 }
 
-# In the container the machine id of the host is mounted at another path
+# В контейнере machine-id хоста смонтирован по другому пути
 MACHINE_ID_FILE="${MACHINE_ID_FILE:-/etc/machine-id}"
 
 machine_id=""

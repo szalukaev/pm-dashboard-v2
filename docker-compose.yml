@@ -1,7 +1,7 @@
 services:
   redis:
     image: redis:7-alpine
-    # Redis is internal-only: no host port, password required.
+    # Redis доступен только внутри сети: порта на хосте нет, пароль обязателен.
     command: redis-server --requirepass ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
     networks:
       - backend
@@ -13,9 +13,9 @@ services:
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
 
-  # Collects the hardware identifiers of the host for the license before the
-  # backend starts and exits. It has no network and no extra privileges; the
-  # backend itself only reads the resulting file.
+  # Собирает аппаратные идентификаторы хоста для лицензии перед стартом
+  # backend и завершается. У службы нет сети и лишних привилегий; сам backend
+  # только читает получившийся файл.
   hwid:
     image: alpine:3.19
     network_mode: none
@@ -31,9 +31,9 @@ services:
         bind:
           create_host_path: false
       - /etc/pmdashboard:/etc/pmdashboard
-    # A failure must not keep the application from starting: the license
-    # screen reports a missing fingerprint, the reason is in the log of
-    # this service (docker compose logs hwid).
+    # Сбой не должен мешать запуску приложения: об отсутствии отпечатка
+    # сообщает экран лицензии, причина — в журнале этой службы
+    # (docker compose logs hwid).
     command: sh -c "sh /collect-hwid.sh || true"
 
   backend:
@@ -45,13 +45,13 @@ services:
     # После смены параметров базы на экране «Подключения» сервер завершается
     # сам, чтобы прочитать их заново, — Docker должен поднять его обратно.
     restart: unless-stopped
-    # No host port: the API is reachable only through the frontend nginx (port 82).
+    # Порта на хосте нет: API доступен только через nginx службы frontend (порт 82).
     expose:
       - "8080"
     volumes:
       - ./data:/data
-      # Hardware identifiers of the host for the license, read-only;
-      # the file in it is written by the hwid service.
+      # Аппаратные идентификаторы хоста для лицензии, только для чтения;
+      # файл в каталоге пишет служба hwid.
       - /etc/pmdashboard:/etc/pmdashboard:ro
     networks:
       - backend
@@ -60,8 +60,8 @@ services:
       - DATA_DIR=/data
       - REDIS_URL=redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}@redis:6379/0
       - SECURE_COOKIES=${SECURE_COOKIES:-false}
-      # The time zone of the schedules (cleanup, full sync) and of the days
-      # the history is kept by. Set TZ in .env to change it.
+      # Часовой пояс расписаний (очистка, полная синхронизация) и дней, по
+      # которым хранится история. Меняется переменной TZ в .env.
       - TZ=${TZ:-Asia/Yekaterinburg}
     depends_on:
       redis:
