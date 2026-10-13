@@ -1,5 +1,5 @@
 <template>
-  <!-- The whole block takes a dragged task: the header and a collapsed sprint too -->
+  <!-- Перетаскиваемую задачу принимает весь блок: и шапка, и свёрнутый спринт -->
   <div
     class="sprint-widget"
     :class="{ 'is-closed': sprint.status === 'closed', 'is-overdue': sprint.is_overdue, 'is-drop-target': dragDepth > 0 }"
@@ -36,7 +36,7 @@
       </span>
 
       <div class="header-actions" v-if="sprint.status !== 'closed'" @click.stop>
-        <!-- Each action is a right of its own -->
+        <!-- Каждое действие — отдельное право -->
         <button v-if="auth.canSprint('close')" class="action-btn" @click="$emit('complete', sprint.id)" :title="$t('sprint.complete')">
           <CheckCircle2 :size="16" />
         </button>
@@ -63,7 +63,7 @@
     </div>
 
     <div v-if="expanded" class="widget-body">
-      <!-- Progress bar -->
+      <!-- Шкала готовности -->
       <SprintProgressBar
         :progress="sprint.progress"
         :testing-count="sprint.testing_count"
@@ -71,10 +71,10 @@
         :total-count="sprint.task_count"
       />
 
-      <!-- Description -->
+      <!-- Описание -->
       <p v-if="sprint.description" class="sprint-desc">{{ sprint.description }}</p>
 
-      <!-- Tasks grid -->
+      <!-- Плитки задач -->
       <div
         v-if="sprint.tasks.length > 0"
         class="tasks-grid"
@@ -141,11 +141,11 @@ function toggleExpanded() {
   expanded.value = !expanded.value
 }
 
-// Tasks are taken by a sprint that is not closed
+// Задачи принимает только незакрытый спринт
 const acceptsTasks = () => props.sprint.status !== 'closed'
 
-// dragenter and dragleave fire for every child element the pointer crosses,
-// so the highlight is counted, not switched
+// dragenter и dragleave срабатывают на каждом дочернем элементе, который
+// пересекает указатель, поэтому подсветка считается, а не переключается
 const dragDepth = ref(0)
 
 function onDragEnter(e: DragEvent) {

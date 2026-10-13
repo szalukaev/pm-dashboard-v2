@@ -1,5 +1,5 @@
-// The columns of the table of tasks, in the standard order. The key is also
-// the name the server sorts by.
+// Колонки таблицы задач в стандартном порядке. Ключ — это ещё и имя, по
+// которому сортирует сервер.
 export const TASKS_TABLE = 'tasks_table'
 
 export const TASK_COLUMNS = [

@@ -41,7 +41,7 @@
 
       <div class="form-field">
         <label>{{ $t('sprint.form.category') }}</label>
-        <!-- The categories of the chosen project -->
+        <!-- Категории выбранного проекта -->
         <select v-model="form.category_name" :disabled="!projectId">
           <option value="">{{ projectId ? '—' : $t('sprint.form.category_pick_project') }}</option>
           <option v-for="c in categoryOptions" :key="c" :value="c">{{ c }}</option>
@@ -125,7 +125,7 @@ const projectOptions = computed(() => {
 
 const projectId = computed(() => props.projects.find(p => p.name === form.project_name)?.id)
 
-// A category saved earlier stays selectable even if the project no longer has it
+// Сохранённая ранее категория остаётся в списке, даже если в проекте её уже нет
 const categoryOptions = computed(() => {
   const list = (projectId.value && tasksStore.projectCategories[projectId.value]) || []
   return form.category_name && !list.includes(form.category_name) ? [form.category_name, ...list] : list
@@ -142,7 +142,7 @@ function onProjectChange() {
 
 watch(projectId, loadCategories)
 
-// Filled every time the window opens: a new sprint starts from a blank form
+// Заполняется при каждом открытии окна: новый спринт начинается с пустой формы
 watch([() => props.visible, () => props.sprint], ([visible, s]) => {
   if (!visible) return
   if (s) {
@@ -150,7 +150,7 @@ watch([() => props.visible, () => props.sprint], ([visible, s]) => {
     form.project_name = s.project_name || ''
     form.category_name = s.category_name || ''
     form.auto_fill_category = s.auto_fill_category
-    // The server sends a date with a time part; the field takes the date only
+    // Сервер присылает дату со временем; в поле идёт только дата
     form.start_date = (s.start_date || '').slice(0, 10)
     form.due_date = (s.due_date || '').slice(0, 10)
     form.description = s.description || ''
@@ -171,12 +171,12 @@ watch([() => props.visible, () => props.sprint], ([visible, s]) => {
 // Срок не раньше начала; без срока сравнивать не с чем
 const datesInOrder = computed(() => !form.start_date || !form.due_date || form.due_date >= form.start_date)
 
-// The name and the start date are required
+// Название и дата начала обязательны
 const canSubmit = computed(() => form.name.trim() !== '' && form.start_date !== '' && datesInOrder.value)
 
 function submit() {
   if (!canSubmit.value) return
-  // A field left blank is "not set", not an empty string
+  // Незаполненное поле — «не задано», а не пустая строка
   emit('submit', {
     ...form,
     name: form.name.trim(),

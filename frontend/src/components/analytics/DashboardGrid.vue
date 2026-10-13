@@ -60,12 +60,12 @@ import { placedWidgets, hiddenWidgets } from '../../utils/dashboardLayout'
 import type { WidgetDef, PlacedWidget } from '../../utils/dashboardLayout'
 import DashboardWidget from './DashboardWidget.vue'
 
-// widgets: every widget of the tab in the standard order; available: the ones
-// the user may see. A widget the administrator hid is not shown and cannot be
-// added, whatever the user's own layout says; its place in the layout is kept
-// for the day it is allowed again.
-// Slots: <id> — the content of a widget, <id>-actions — its extra buttons in
-// the header, title — the heading of the page.
+// widgets: все виджеты вкладки в стандартном порядке; available: те, что
+// пользователь вправе видеть. Виджет, скрытый администратором, не
+// показывается и не добавляется, что бы ни говорила раскладка пользователя;
+// его место в раскладке сохраняется до дня, когда его снова разрешат.
+// Слоты: <id> — содержимое виджета, <id>-actions — его дополнительные кнопки
+// в шапке, title — заголовок страницы.
 const props = defineProps<{
   widgets: WidgetDef[]
   available: string[]
@@ -75,7 +75,7 @@ defineSlots<Record<string, () => any>>()
 
 type Side = 'left' | 'right' | 'top' | 'bottom'
 
-// Below this width every widget takes the whole row and stays where it is
+// Уже этой ширины каждый виджет занимает всю строку и остаётся на своём месте
 const NARROW_QUERY = '(max-width: 767px)'
 
 const settingsStore = useSettingsStore()
@@ -101,7 +101,7 @@ function hide(id: string) {
   save(placed.value.filter(w => w.id !== id), [...hidden.value, id])
 }
 
-// A returned widget goes back to its standard place
+// Возвращённый виджет встаёт на своё стандартное место
 function show(id: string) {
   addOpen.value = false
   const layout = { widgets: placed.value, hidden_widgets: hidden.value.filter(h => h !== id) }
@@ -113,12 +113,12 @@ function reset() {
   settingsStore.setDashboardLayout({})
 }
 
-// Reordering by dragging a widget by its handle
+// Перестановка перетаскиванием виджета за ручку
 const dragId = ref<string | null>(null)
 const over = ref<{ id: string; side: Side } | null>(null)
 
 function onOver(e: DragEvent, target: PlacedWidget) {
-  // Something else is dragged inside a widget, e.g. a column of its table
+  // Внутри виджета перетаскивают что-то другое, например колонку его таблицы
   if (dragId.value === null) return
   e.preventDefault()
   if (target.id === dragId.value) {
@@ -126,7 +126,7 @@ function onOver(e: DragEvent, target: PlacedWidget) {
     return
   }
   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-  // A widget of the whole row has neighbours only above and below
+  // У виджета во всю строку соседи только сверху и снизу
   const side: Side = target.cols === 12
     ? (e.clientY < rect.top + rect.height / 2 ? 'top' : 'bottom')
     : (e.clientX < rect.left + rect.width / 2 ? 'left' : 'right')

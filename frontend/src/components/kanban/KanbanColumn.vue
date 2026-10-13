@@ -37,7 +37,7 @@ import { UNASSIGNED, type KanbanColumn as ColumnType } from '../../stores/kanban
 const props = defineProps<{ column: ColumnType }>()
 defineEmits(['open-task', 'move-card'])
 
-// Data type of a dragged column header (a dragged card uses text/plain)
+// Тип данных перетаскиваемой шапки колонки (у перетаскиваемой карточки — text/plain)
 const COLUMN_DRAG = 'application/x-kanban-column'
 
 const isDragOver = ref(false)
@@ -48,7 +48,7 @@ function onDragOver(e: DragEvent) {
 }
 
 function onDragLeave(e: DragEvent) {
-  // Only trigger if actually leaving the column
+  // Срабатывает, только когда указатель действительно покинул колонку
   const related = e.relatedTarget as HTMLElement
   if (!related || !(e.currentTarget as HTMLElement).contains(related)) {
     isDragOver.value = false
@@ -58,7 +58,7 @@ function onDragLeave(e: DragEvent) {
 function onDrop(e: DragEvent) {
   isDragOver.value = false
 
-  // A column header dropped here: this column gives up its place to it
+  // Сюда бросили шапку колонки: эта колонка уступает ей своё место
   const fromId = e.dataTransfer?.getData(COLUMN_DRAG)
   if (fromId) {
     e.currentTarget?.dispatchEvent(new CustomEvent('kanban-column-drop', {
@@ -70,7 +70,7 @@ function onDrop(e: DragEvent) {
 
   const issueId = parseInt(e.dataTransfer?.getData('text/plain') || '0')
   if (issueId) {
-    // The parent handles the actual move
+    // Сам перенос выполняет родитель
     e.currentTarget?.dispatchEvent(new CustomEvent('kanban-drop', {
       detail: { issueId, columnId: props.column.id },
       bubbles: true,

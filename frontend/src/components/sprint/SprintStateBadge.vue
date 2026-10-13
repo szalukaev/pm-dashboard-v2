@@ -8,8 +8,8 @@ import type { Sprint } from '../../stores/sprint'
 
 const props = defineProps<{ sprint: Pick<Sprint, 'status' | 'due_date'> }>()
 
-// What the user sees as the status: a sprint is closed, or its due date has
-// passed, or it is open.
+// Что пользователь видит как статус: спринт закрыт, либо его срок прошёл,
+// либо он открыт.
 const state = computed(() => {
   if (props.sprint.status === 'closed') return 'closed'
   const due = (props.sprint.due_date || '').slice(0, 10)

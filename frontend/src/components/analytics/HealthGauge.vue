@@ -4,7 +4,7 @@
 
     <template v-else>
       <div class="gauge" :class="'level-' + health.level" data-testid="health-gauge">
-        <!-- A half circle: the track and, over it, the part the score fills -->
+        <!-- Полукруг: дорожка и поверх неё часть, которую заполняет оценка -->
         <svg viewBox="0 0 200 110" class="gauge-svg" role="img" :aria-label="$t('analytics.health') + ': ' + health.score">
           <path :d="ARC" class="gauge-track" />
           <path :d="ARC" class="gauge-value" pathLength="100" :stroke-dasharray="health.score + ' 100'" />
@@ -17,7 +17,7 @@
 
       <div class="health-active">{{ $t('analytics.health_active', { n: health.active }) }}</div>
 
-      <!-- What lowers the score and by how much -->
+      <!-- Что снижает оценку и насколько -->
       <ul class="parts">
         <li v-for="part in health.parts" :key="part.key" class="part">
           <span class="part-name">{{ $t('analytics.health_parts.' + part.key) }}</span>
@@ -34,7 +34,7 @@ import type { Health } from '../../stores/analytics'
 
 defineProps<{ health: Health | null }>()
 
-// The half circle, from the left end to the right one over the top
+// Полукруг от левого конца к правому через верх
 const ARC = 'M 14 100 A 86 86 0 0 1 186 100'
 </script>
 

@@ -191,7 +191,7 @@ function taskLink(externalId: number): string {
   color: var(--text-faint);
 }
 
-/* The columns follow the width of the widget, which the user sets */
+/* Колонки следуют за шириной виджета, которую задаёт пользователь */
 @container (max-width: 760px) {
   .deadlines-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

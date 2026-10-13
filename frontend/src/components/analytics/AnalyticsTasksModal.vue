@@ -21,7 +21,7 @@
           </thead>
           <tbody>
             <template v-for="group in groups" :key="group.key">
-              <!-- The tasks go by project; a project may continue on the next page -->
+              <!-- Задачи идут по проектам; проект может продолжаться на следующей странице -->
               <tr class="group-row">
                 <td :colspan="showAssignee ? 8 : 7">{{ group.name || '—' }}</td>
               </tr>
@@ -88,7 +88,7 @@ const offset = ref(0)
 const loading = ref(false)
 const failed = ref(false)
 
-// One employee's tasks need no column with their name
+// Задачам одного сотрудника колонка с его именем не нужна
 const showAssignee = computed(() => props.query?.assignee === undefined)
 
 const groups = computed(() => {
@@ -112,7 +112,7 @@ async function load(from: number) {
     const params: Record<string, string | number> = { ...useAnalyticsStore().periodParams(), metric: query.metric, offset: from }
     if (query.assignee !== undefined) params.assignee = query.assignee
     const { data } = await axios.get('/api/analytics/tasks', { params })
-    // The answer to a figure that is not shown any more is of no use
+    // Ответ по цифре, которая уже не показана, не нужен
     if (props.query !== query) return
     tasks.value = data.tasks || []
     total.value = data.total || 0

@@ -13,7 +13,7 @@
       <span class="backlog-count">{{ totalTasks }}</span>
     </h3>
 
-    <!-- Applied on Enter: by project name, task subject or task number -->
+    <!-- Применяется по Enter: по названию проекта, теме или номеру задачи -->
     <div v-if="backlog.length > 0" class="backlog-filter">
       <Search :size="14" class="filter-icon" />
       <input
@@ -133,15 +133,15 @@ function onDrop(e: DragEvent) {
 
 const openGroups = ref<Set<string>>(new Set())
 
-// Each project shows its tasks page by page; the backlog is already loaded
-// whole (the filter works over all of it), so the pages are cut here.
+// Каждый проект показывает свои задачи постранично; бэклог уже загружен
+// целиком (фильтр работает по всему бэклогу), поэтому страницы режутся здесь.
 const settingsStore = useSettingsStore()
 settingsStore.ensureLoaded()
 const PAGE_TABLE = 'backlog'
 const pageSize = computed(() => settingsStore.pageSize(PAGE_TABLE))
 const offsets = ref<Record<string, number>>({})
 
-// A page that no longer exists (tasks left the backlog) falls back to the last one
+// Вместо страницы, которой больше нет (задачи ушли из бэклога), показывается последняя
 function offsetOf(group: BacklogGroup): number {
   const last = group.tasks.length > 0 ? Math.floor((group.tasks.length - 1) / pageSize.value) * pageSize.value : 0
   return Math.min(offsets.value[group.project_name] || 0, last)
@@ -157,11 +157,11 @@ async function setPageSize(size: number) {
   offsets.value = {}
 }
 
-// query is what is being typed, applied is what the list is filtered by
+// query — то, что печатают; applied — то, по чему отобран список
 const query = ref('')
 const applied = ref('')
 
-// A project whose name matches stays whole; otherwise only its matching tasks
+// Проект с подходящим названием остаётся целиком; иначе — только его подходящие задачи
 const visibleGroups = computed<BacklogGroup[]>(() => {
   const q = applied.value
   if (!q) return props.backlog
@@ -182,7 +182,7 @@ const totalTasks = computed(() =>
 function applyFilter() {
   applied.value = query.value.trim().toLowerCase()
   offsets.value = {}
-  // What was found is shown at once, without opening every project by hand
+  // Найденное показывается сразу, без раскрытия каждого проекта вручную
   if (applied.value) openGroups.value = new Set(visibleGroups.value.map(g => g.project_name))
 }
 

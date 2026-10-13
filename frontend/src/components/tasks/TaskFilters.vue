@@ -1,6 +1,6 @@
 <template>
   <div class="task-filters">
-    <!-- Row 1: status, project, search, reset, counter -->
+    <!-- Строка 1: статус, проект, поиск, сброс, счётчик -->
     <div class="filter-bar">
       <button
         v-for="t in typeOptions"
@@ -39,7 +39,7 @@
       <span class="found">{{ $t('tasks.filters.found') }}: <strong>{{ total }}</strong></span>
     </div>
 
-    <!-- Row 2: grouping, categories -->
+    <!-- Строка 2: группировка, категории -->
     <div class="filter-row">
       <div class="filter-group">
         <span class="filter-label">{{ $t('tasks.filters.grouping') }}:</span>
@@ -102,7 +102,7 @@ const settingsStore = useSettingsStore()
 const { filters, projects, categories, useGrouping, total } = storeToRefs(store)
 const { settings } = storeToRefs(settingsStore)
 
-// Show only projects selected in user settings (if any selected)
+// Показываются только проекты, выбранные в настройках пользователя (если выбраны)
 const visibleProjects = computed(() => {
   const selected = settings.value.selected_projects || []
   if (selected.length === 0) return projects.value
@@ -110,10 +110,10 @@ const visibleProjects = computed(() => {
 })
 
 const searchInput = ref(filters.value.search)
-// Saved filters are restored after this component is created.
+// Сохранённые фильтры восстанавливаются после создания этого компонента.
 watch(() => filters.value.search, (val) => { searchInput.value = val })
 
-// Load settings to get selected_projects for filtering
+// Настройки нужны, чтобы взять из них selected_projects для отбора
 settingsStore.fetchSettings()
 
 const typeOptions = [
@@ -179,7 +179,7 @@ watch(searchInput, (val) => {
   flex-wrap: wrap;
 }
 
-/* The column settings sit at the right edge of the row */
+/* Настройка колонок стоит у правого края строки */
 .columns-gear {
   margin-left: auto;
   order: 1;
@@ -211,7 +211,7 @@ watch(searchInput, (val) => {
   white-space: nowrap;
 }
 
-/* Not "sm": Quasar hides elements with breakpoint class names on wide screens */
+/* Не "sm": элементы с классами-брейкпоинтами Quasar скрывает на широких экранах */
 .pill-btn.compact {
   padding: 4px 8px;
   font-size: 11px;

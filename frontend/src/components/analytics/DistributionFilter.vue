@@ -37,12 +37,12 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { Filter } from 'lucide-vue-next'
 
-// projects: the projects of the widget; hidden: ids of the ones the user
-// switched off. A project that appears later is shown until switched off.
+// projects: проекты виджета; hidden: идентификаторы тех, что пользователь
+// отключил. Проект, появившийся позже, показывается, пока его не отключат.
 const props = defineProps<{
   projects: { id: number; name: string }[]
   hidden: number[]
-  // A parent project and its nested ones are drawn as one chart
+  // Родительский проект и его вложенные рисуются одной диаграммой
   grouped: boolean
 }>()
 

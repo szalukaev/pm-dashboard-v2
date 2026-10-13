@@ -21,7 +21,7 @@
     <div v-if="tasks.length === 0" class="empty-hint">{{ $t('common.empty') }}</div>
 
     <div v-else class="gantt-table" data-testid="gantt">
-      <!-- The dates of the scale -->
+      <!-- Даты шкалы -->
       <div class="gantt-row gantt-head">
         <div class="gantt-label"></div>
         <div class="gantt-track">
@@ -35,11 +35,11 @@
         </button>
         <div class="gantt-track" @mousemove="showTip($event, task)" @mouseleave="tip = null">
           <span class="gantt-today" :style="{ left: todayLeft + '%' }"></span>
-          <!-- What was planned for the task: from its start to the deadline -->
+          <!-- Что было запланировано на задачу: от начала до срока -->
           <span class="gantt-line planned" :style="{ left: task.left + '%', width: task.width + '%' }">
             {{ $t('analytics.gantt_days', { n: task.plannedDays }) }}
           </span>
-          <!-- An overdue task goes on from the deadline to today -->
+          <!-- Просроченная задача продолжается от срока до сегодняшнего дня -->
           <span
             v-if="task.lateDays > 0"
             class="gantt-line late"
@@ -53,7 +53,7 @@
 
     <AppPagination :total="total" :limit="PAGE" :offset="offset" :sizes="[PAGE]" @update:offset="$emit('update:offset', $event)" />
 
-    <!-- Follows the pointer over a bar; lives in the body so that no widget cuts it -->
+    <!-- Следует за указателем над полосой; лежит в body, чтобы её не обрезал ни один виджет -->
     <Teleport to="body">
       <div v-if="tip" class="gantt-tip" :style="{ left: tip.x + 'px', top: tip.y + 'px' }">
         <div class="gantt-tip-title">#{{ tip.task.external_id }} {{ tip.task.subject }}</div>
@@ -71,8 +71,8 @@ import { ref, computed } from 'vue'
 import type { GanttTask, GanttProject } from '../../stores/analytics'
 import AppPagination from '../ui/AppPagination.vue'
 
-// tasks: the bars of the shown page, by deadline; total and offset: all the
-// tasks and where the page starts; project: the project chosen in the filter.
+// tasks: полосы показанной страницы по сроку; total и offset: всего задач и
+// с какой начинается страница; project: проект, выбранный в фильтре.
 const props = defineProps<{
   tasks: GanttTask[]
   projects: GanttProject[]
@@ -89,15 +89,15 @@ const emit = defineEmits<{
 
 const PAGE = 25
 
-// A long-running task must not squeeze the others into a sliver: the scale
-// starts at most this many days before today
+// Очень долгая задача не должна сжимать остальные в ниточку: шкала
+// начинается не раньше чем за столько дней до сегодняшнего
 const MAX_DAYS_BACK = 90
 const MIN_DAYS_AHEAD = 7
 const TICKS = 6
-// A bar is never thinner than this, in percent of the scale
+// Полоса не бывает уже этого значения, в процентах шкалы
 const MIN_WIDTH = 0.8
 
-// A date as the number of its day, so that dates can be subtracted
+// Дата как номер её дня, чтобы даты можно было вычитать
 function dayOf(date: string): number {
   const [y, m, d] = date.split('-').map(Number)
   return Math.round(Date.UTC(y, m - 1, d) / 86400000)
@@ -113,7 +113,7 @@ const today = computed(() => {
   return Math.round(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) / 86400000)
 })
 
-// The scale: from the earliest start (or today) to the latest deadline
+// Шкала: от самого раннего начала (или сегодняшнего дня) до самого позднего срока
 const range = computed(() => {
   let from = today.value
   let to = today.value + MIN_DAYS_AHEAD
@@ -122,11 +122,11 @@ const range = computed(() => {
     to = Math.max(to, dayOf(t.due))
   }
   from = Math.max(from, today.value - MAX_DAYS_BACK)
-  // The day of the deadline is a part of the bar
+  // День срока входит в полосу
   return { from, days: Math.max(1, to + 1 - from) }
 })
 
-// Where a day begins on the scale, in percent
+// Где на шкале начинается день, в процентах
 function leftOf(day: number): number {
   return Math.min(100, Math.max(0, ((day - range.value.from) / range.value.days) * 100))
 }
@@ -148,7 +148,7 @@ const bars = computed(() =>
     const due = dayOf(t.due)
     const left = leftOf(start)
     const end = leftOf(due + 1)
-    // Overdue: the days after the deadline up to and including today
+    // Просрочка: дни после срока до сегодняшнего включительно
     const lateDays = Math.max(0, today.value - due)
     return {
       ...t,
@@ -171,7 +171,7 @@ const TIP_WIDTH = 320
 const tip = ref<{ x: number; y: number; task: Bar } | null>(null)
 
 function showTip(e: MouseEvent, task: Bar) {
-  // Beside the pointer, inside the window
+  // Рядом с указателем, в пределах окна
   const x = Math.min(e.clientX + 14, window.innerWidth - TIP_WIDTH - 8)
   tip.value = { x: Math.max(8, x), y: e.clientY + 16, task }
 }
@@ -270,7 +270,7 @@ function onProject(e: Event) {
   white-space: nowrap;
 }
 
-/* A bar with its figure inside; a figure that does not fit is cut */
+/* Полоса с цифрой внутри; не помещающаяся цифра обрезается */
 .gantt-line {
   position: absolute;
   top: 50%;
@@ -365,7 +365,7 @@ function onProject(e: Event) {
   color: var(--text-muted);
 }
 
-/* In a narrow widget the names give way to the timeline */
+/* В узком виджете названия уступают место шкале */
 @container (max-width: 640px) {
   .gantt-label {
     flex-basis: 130px;

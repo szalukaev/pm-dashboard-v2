@@ -80,10 +80,10 @@ import { Menu, ChevronDown, ChevronUp, X } from 'lucide-vue-next'
 import { WIDGET_WIDTHS, nearestWidth } from '../../utils/dashboardLayout'
 import InfoHint from '../ui/AppHint.vue'
 
-// movable: the widget can be dragged and resized (not on a narrow screen,
-// where every widget takes the whole width). dropSide: where the dragged
-// widget would land relative to this one.
-// hint: what the widget shows and how it is counted, behind the «i».
+// movable: виджет можно перетаскивать и менять по ширине (но не на узком
+// экране, где каждый виджет во всю ширину). dropSide: куда относительно
+// этого виджета встанет перетаскиваемый.
+// hint: что показывает виджет и как это считается — за значком «i».
 const props = defineProps<{
   id: string
   title: string
@@ -107,7 +107,7 @@ const emit = defineEmits<{
 
 const root = ref<HTMLElement | null>(null)
 
-// The handle is what is grabbed, the whole widget is what is seen moving
+// Берутся за ручку, а движется на экране весь виджет
 function onDragStart(e: DragEvent) {
   if (e.dataTransfer) {
     e.dataTransfer.effectAllowed = 'move'
@@ -125,7 +125,7 @@ function onResizeStart(e: PointerEvent) {
   e.preventDefault()
 }
 
-// The width follows the pointer by the steps of the grid
+// Ширина следует за указателем по шагам сетки
 function onResizeMove(e: PointerEvent) {
   const grid = root.value?.parentElement
   if (!resizing.value || !root.value || !grid || grid.clientWidth === 0) return
@@ -154,7 +154,7 @@ function onResizeEnd(e: PointerEvent) {
   opacity: 0.4;
 }
 
-/* Where the dragged widget lands */
+/* Куда встанет перетаскиваемый виджет */
 .dash-widget.drop-left { box-shadow: -4px 0 0 var(--accent); }
 .dash-widget.drop-right { box-shadow: 4px 0 0 var(--accent); }
 .dash-widget.drop-top { box-shadow: 0 -4px 0 var(--accent); }
@@ -234,7 +234,7 @@ function onResizeEnd(e: PointerEvent) {
   color: var(--text-bright);
 }
 
-/* The content adapts to the width of the widget, not of the window */
+/* Содержимое подстраивается под ширину виджета, а не окна */
 .dash-body {
   padding: 16px;
   container-type: inline-size;

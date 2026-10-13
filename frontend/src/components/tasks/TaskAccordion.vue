@@ -1,6 +1,6 @@
 <template>
   <div class="task-accordion">
-    <!-- A framed block with a compact header for each project or assignee -->
+    <!-- Блок в рамке с компактной шапкой на каждый проект или исполнителя -->
     <template v-if="sortedGroups.length">
       <div v-for="group in sortedGroups" :key="group.name" class="assignee-group">
         <div
@@ -55,7 +55,7 @@ defineEmits(['open-task', 'sort-change'])
 
 const { t } = useI18n()
 
-// Group name the server gives to tasks without an assignee
+// Имя группы, которое сервер даёт задачам без исполнителя
 const NO_ASSIGNEE = 'Без исполнителя'
 
 function groupTitle(name: string): string {
@@ -70,8 +70,8 @@ const sortedGroups = computed(() =>
   })
 )
 
-// Groups are collapsed by default; expanded ones are kept in the store and
-// saved with the filters, so they survive closing the browser.
+// По умолчанию группы свёрнуты; раскрытые хранятся в сторе и сохраняются
+// вместе с фильтрами, поэтому переживают закрытие браузера.
 const store = useTasksStore()
 
 function toggle(name: string) {
@@ -103,7 +103,7 @@ function formatTotal(h: number): string {
   transform: rotate(-90deg);
 }
 
-/* Groups */
+/* Группы */
 .assignee-group {
   margin-bottom: 8px;
   border: 1px solid var(--border);
@@ -156,7 +156,7 @@ function formatTotal(h: number): string {
   color: var(--text-muted);
 }
 
-/* Totals */
+/* Итоги */
 .group-metric {
   font-size: 12px;
   font-weight: 400;

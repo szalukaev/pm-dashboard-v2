@@ -9,10 +9,10 @@
         </thead>
         <tbody>
           <tr v-for="row in team" :key="row.name" data-testid="team-row">
-            <!-- The cells follow the columns the user chose and their order -->
+            <!-- Ячейки идут по колонкам, выбранным пользователем, в их порядке -->
             <template v-for="col in shownColumns" :key="col.key">
               <td v-if="col.key === 'employee'" class="name-cell">{{ assigneeLabel(row.name) }}</td>
-              <!-- A figure opens the tasks it counts -->
+              <!-- Цифра открывает задачи, которые она считает -->
               <td v-else class="num-cell">
                 <button
                   v-if="count(row, col.key) > 0"
@@ -40,16 +40,16 @@ import { assigneeLabel, type TeamLoadRow } from '../../stores/analytics'
 import { useSettingsStore } from '../../stores/settings'
 import { TEAM_LOAD_TABLE as TABLE, TEAM_LOAD_COLUMNS as COLUMNS } from './teamLoadColumns'
 
-// The button that sets up the columns lives in the header of the widget
+// Кнопка настройки колонок стоит в шапке виджета
 defineProps<{ team: TeamLoadRow[] }>()
 
-// open-tasks: a figure was clicked — the employee, the figure in the list of
-// tasks behind it and the dictionary key of the column
+// open-tasks: кликнули по цифре — сотрудник, цифра в списке задач, стоящих
+// за ней, и ключ словаря для колонки
 defineEmits<{
   (e: 'open-tasks', name: string, metric: string, label: string): void
 }>()
 
-// The figure each column of numbers stands for
+// Цифра, которая стоит за каждой колонкой с числами
 const METRICS: Record<string, keyof TeamLoadRow> = {
   open: 'open',
   testing: 'testing',
@@ -65,7 +65,7 @@ function count(row: TeamLoadRow, column: string): number {
   return typeof value === 'number' ? value : 0
 }
 
-// Problems stand out
+// Проблемы выделяются цветом
 function tone(column: string): string {
   if (column === 'overdue' || column === 'bugs') return 'danger-text'
   return column === 'no_estimate' ? 'warning-text' : ''

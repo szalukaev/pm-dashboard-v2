@@ -2,7 +2,7 @@
   <div class="app-layout" :class="{ 'with-banner': showBanner }">
     <AppHeader />
 
-    <!-- License trouble is shown to every user, not only to administrators -->
+    <!-- Проблема с лицензией показывается каждому пользователю, а не только администраторам -->
     <div v-if="showBanner" class="license-banner" :class="license.state" data-testid="license-banner">
       <AlertTriangle :size="16" />
       <span>{{ bannerText }}</span>
@@ -36,8 +36,8 @@ const bannerText = computed(() => {
   return t('license.banner.grace', { time: ends })
 })
 
-// The state is re-read while the page is open: the server checks the
-// license every hour
+// Состояние перечитывается, пока страница открыта: сервер проверяет
+// лицензию каждый час
 let timer: ReturnType<typeof setInterval> | null = null
 
 onMounted(() => {

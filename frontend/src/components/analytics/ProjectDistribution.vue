@@ -43,12 +43,12 @@ Chart.register(PieController, ArcElement, Tooltip, Legend)
 
 const props = defineProps<{ distribution: DistChart[] }>()
 
-// open: a chart that stands for several projects was clicked
+// open: кликнули по диаграмме, объединяющей несколько проектов
 defineEmits<{
   (e: 'open', chart: DistChart): void
 }>()
 
-// How many projects a chart stands for
+// Сколько проектов объединяет диаграмма
 function nested(chart: DistChart): number {
   return chart.parts ? chart.parts.length : 1
 }
@@ -79,7 +79,7 @@ function setCanvas(el: any, name: string) {
 }
 
 function renderCharts(distribution: DistChart[]) {
-  // Destroy old charts
+  // Прежние диаграммы уничтожаются
   chartInstances.value.forEach(chart => chart.destroy())
   chartInstances.value.clear()
 
@@ -123,8 +123,8 @@ function renderCharts(distribution: DistChart[]) {
   })
 }
 
-// The charts are drawn once their canvases are on the page: when the widget
-// appears (also after being expanded) and whenever the data changes
+// Диаграммы рисуются, когда их холсты уже на странице: при появлении
+// виджета (в том числе после разворачивания) и при каждом изменении данных
 function draw() {
   nextTick(() => renderCharts(props.distribution))
 }

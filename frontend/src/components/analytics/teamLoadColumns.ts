@@ -1,5 +1,5 @@
-// Name of the «Team load» table in the user's column settings and its columns
-// in the standard order; label is a dictionary key.
+// Имя таблицы «Нагрузка на команду» в настройках колонок пользователя и её
+// колонки в стандартном порядке; label — ключ словаря.
 export const TEAM_LOAD_TABLE = 'team_load_table'
 
 export const TEAM_LOAD_COLUMNS = [

@@ -24,9 +24,9 @@ import { cssVar, tooltipTheme } from '../../utils/chartTheme'
 
 Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip)
 
-// labels: the categories; datasets: a bar per category in each, color is the
-// name of a theme variable; horizontal: bars go from left to right, one row
-// per category; hint: an extra line of the tooltip for a category.
+// labels: категории; datasets: в каждом — столбец на категорию, color — имя
+// переменной темы; horizontal: столбцы идут слева направо, по строке на
+// категорию; hint: дополнительная строка подсказки для категории.
 const props = defineProps<{
   labels: string[]
   datasets: { label: string; data: number[]; color: string }[]
@@ -39,7 +39,7 @@ const ROW_GAP = 14
 const BAR_HEIGHT = 14
 const AXIS_HEIGHT = 40
 
-// A horizontal chart grows with the number of its rows
+// Горизонтальный график растёт вместе с числом строк
 const height = computed(() =>
   props.horizontal
     ? Math.max(140, props.labels.length * (props.datasets.length * BAR_HEIGHT + ROW_GAP) + AXIS_HEIGHT)
@@ -98,7 +98,7 @@ function render() {
   })
 }
 
-// The canvas appears together with the first data
+// Холст появляется вместе с первыми данными
 function draw() {
   nextTick(render)
 }

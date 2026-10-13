@@ -32,13 +32,13 @@ function variantOf(stat: StatCard): Variant {
   return stat.variant as Variant
 }
 
-// open-tasks: a card that counts tasks was clicked; metric names the figure
-// in the list of tasks behind it
+// open-tasks: кликнули по карточке, считающей задачи; metric называет цифру
+// в списке задач, стоящих за ней
 const emit = defineEmits<{
   (e: 'open-tasks', metric: string, label: string): void
 }>()
 
-// The cards that count tasks and the figures they stand for
+// Карточки, считающие задачи, и цифры, которые за ними стоят
 const METRICS: Record<string, string> = {
   open: 'open',
   in_test: 'testing',
@@ -53,7 +53,7 @@ function open(label: string) {
 </script>
 
 <style scoped>
-/* The cards share the whole width of the widget, however many there are */
+/* Карточки делят всю ширину виджета, сколько бы их ни было */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));

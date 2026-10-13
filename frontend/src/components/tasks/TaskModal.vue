@@ -18,7 +18,7 @@
     </div>
 
     <div v-else-if="task" class="task-card">
-      <!-- Parameters -->
+      <!-- Параметры -->
       <section class="params">
         <div class="params-col">
           <div class="param">
@@ -95,7 +95,7 @@
         </div>
       </section>
 
-      <!-- Description -->
+      <!-- Описание -->
       <section class="section">
         <h4 class="section-title">{{ $t('tasks.modal.description') }}</h4>
         <div v-if="detailsLoading" class="section-loading"><AppSpinner :size="20" /></div>
@@ -103,7 +103,7 @@
         <div v-else class="empty">{{ $t('tasks.modal.description_empty') }}</div>
       </section>
 
-      <!-- Files -->
+      <!-- Файлы -->
       <section class="section">
         <h4 class="section-title">
           {{ $t('tasks.modal.files') }}
@@ -131,7 +131,7 @@
         <div v-else class="empty">{{ $t('tasks.modal.files_empty') }}</div>
       </section>
 
-      <!-- Related issues -->
+      <!-- Связанные задачи -->
       <section v-if="related.length" class="section" data-testid="task-related">
         <h4 class="section-title">
           {{ $t('tasks.related.title') }}
@@ -155,7 +155,7 @@
         </div>
       </section>
 
-      <!-- Comments, or the whole history of the issue -->
+      <!-- Комментарии или вся история задачи -->
       <section class="section">
         <h4 class="section-title">
           <button type="button" class="mode-pill" :class="{ active: historyMode === 'comments' }" data-testid="mode-comments" @click="historyMode = 'comments'">
@@ -210,7 +210,7 @@
         <div v-if="detailsError" class="empty error-text">{{ detailsError }}</div>
       </section>
 
-      <!-- New comment -->
+      <!-- Новый комментарий -->
       <section v-if="auth.canWrite" class="section new-comment">
         <h4 class="section-title">{{ $t('tasks.modal.new_comment') }}</h4>
         <textarea
@@ -293,11 +293,11 @@ const { settings } = storeToRefs(settingsStore)
 const { statuses, priorities, members, projectCategories } = storeToRefs(store)
 const { showChange, error: swalError, toast } = useSwal()
 const auth = useAuthStore()
-// "t" is taken by a local variable in saveField
+// Имя "t" занято локальной переменной в saveField
 const i18n = useI18n()
 
-// The task shown: the one the card was opened for, or a related one the
-// user went to from it.
+// Показанная задача: та, для которой открыли карточку, или связанная, на
+// которую пользователь перешёл из неё.
 const currentId = ref<number | null>(props.taskId)
 watch(() => props.taskId, id => { currentId.value = id })
 
@@ -313,7 +313,7 @@ const editFields = reactive({
   estimated_hours: '' as string | number,
 })
 
-// Live part of the card, read from Redmine
+// Часть карточки, которая читается из Redmine напрямую
 const description = ref('')
 const attachments = ref<Attachment[]>([])
 const rawComments = ref<Comment[]>([])
@@ -335,7 +335,7 @@ const memberNames = computed(() => {
   return all.filter(m => selectedTeam.includes(m.id)).map(m => m.name).sort()
 })
 
-// All categories of the task's project; the current one stays selectable.
+// Все категории проекта задачи; текущую по-прежнему можно выбрать.
 const taskCategories = computed(() => {
   if (!task.value) return []
   const cats = new Set<string>(projectCategories.value[task.value.project_id] || [])
@@ -365,8 +365,8 @@ const history = computed(() =>
   rawHistory.value.map(e => ({ ...e, html: e.text ? renderRedmineMarkup(e.text, markupOptions()) : '' }))
 )
 
-// Name of a changed field; a field without a translation is shown as the
-// source names it.
+// Название изменённого поля; поле без перевода показывается так, как его
+// называет источник.
 function fieldName(field: string): string {
   const key = `tasks.history.fields.${field.startsWith('cf_') ? 'cf' : field}`
   return i18n.te(key) ? i18n.t(key) : field
@@ -398,7 +398,7 @@ function taskLink(id: number): string {
   return redmineUrl.value ? `${redmineUrl.value}/issues/${id}` : '#'
 }
 
-// quiet: re-read in the background, without the spinners
+// quiet: перечитать в фоне, без индикаторов загрузки
 async function loadDetails(id: number, quiet = false) {
   if (!quiet) detailsLoading.value = true
   detailsError.value = ''
@@ -413,7 +413,7 @@ async function loadDetails(id: number, quiet = false) {
   } catch {
     if (quiet) return
     if (task.value?.external_id !== id) return
-    // Fall back to the cached description
+    // Запасной вариант — описание из локальной копии
     description.value = task.value?.description || ''
     detailsError.value = i18n.t('tasks.messages.details_error')
   } finally {
@@ -430,7 +430,7 @@ async function submitComment() {
     newComment.value = ''
     const { data } = await axios.get(`/api/tasks/${id}/comments`)
     rawComments.value = data.comments || []
-    // The new comment belongs to the history too
+    // Новый комментарий — тоже часть истории
     loadDetails(id, true)
     toast(i18n.t('tasks.messages.comment_added'), 'success')
   } catch {
@@ -452,7 +452,7 @@ watch(currentId, async (id) => {
   if (!id) return
 
   loading.value = true
-  // Reference data may be missing when the card is opened outside the Tasks tab
+  // Справочников может не быть, если карточка открыта не с вкладки «Задачи»
   if (!statuses.value.length) store.fetchStatuses()
   if (!priorities.value.length) store.fetchPriorities()
   store.fetchMembers()
@@ -490,7 +490,7 @@ async function saveField(field: keyof typeof editFields) {
   let value = raw === '' || raw === null ? null : String(raw)
   const old = t[field] ?? null
   if (field === 'estimated_hours' && value !== null) {
-    // Plain text field: accept both "1,5" and "1.5"
+    // Обычное текстовое поле: принимаются и "1,5", и "1.5"
     value = value.trim().replace(',', '.') || null
     if (value !== null && !(Number(value) >= 0)) {
       editFields[field] = old ?? ''
@@ -560,7 +560,7 @@ function initials(name: string): string {
   text-decoration: underline;
 }
 
-/* Parameters */
+/* Параметры */
 .params {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -626,7 +626,7 @@ function initials(name: string): string {
   padding: 6px 10px;
   font-size: 13px;
   font-family: inherit;
-  /* Editable fields are always framed, read-only values are plain text */
+  /* Редактируемые поля всегда в рамке, значения только для чтения — обычный текст */
   background: var(--surface-1);
   border: 1px solid var(--hairline);
   border-radius: 8px;
@@ -656,7 +656,7 @@ function initials(name: string): string {
   font-variant-numeric: tabular-nums;
 }
 
-/* Sections */
+/* Разделы */
 .section {
   display: flex;
   flex-direction: column;
@@ -697,7 +697,7 @@ function initials(name: string): string {
   color: var(--danger);
 }
 
-/* Redmine markup */
+/* Разметка Redmine */
 .markup {
   font-size: 14px;
   line-height: 1.65;
@@ -809,7 +809,7 @@ function initials(name: string): string {
   margin: 12px 0;
 }
 
-/* Files */
+/* Файлы */
 .files {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -875,14 +875,14 @@ function initials(name: string): string {
   white-space: nowrap;
 }
 
-/* Comments */
+/* Комментарии */
 .comments {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-/* Comments / whole history */
+/* Комментарии / вся история */
 .mode-pill {
   display: inline-flex;
   align-items: center;
@@ -931,7 +931,7 @@ function initials(name: string): string {
   color: var(--text-faint);
 }
 
-/* Related issues */
+/* Связанные задачи */
 .related {
   display: flex;
   flex-direction: column;
@@ -1051,7 +1051,7 @@ button.related-row:hover {
   font-size: 13px;
 }
 
-/* New comment */
+/* Новый комментарий */
 .new-comment {
   padding-top: 20px;
   border-top: 1px solid var(--border-light);

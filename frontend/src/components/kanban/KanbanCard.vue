@@ -62,7 +62,7 @@ import { isFlashing } from '../../composables/useFlash'
 const settingsStore = useSettingsStore()
 const { settings } = storeToRefs(settingsStore)
 
-// compact: a tile as wide as its subject, several in a row (sprints, backlog)
+// compact: плитка шириной по своей теме, по несколько в строке (спринты, бэклог)
 const props = defineProps<{ card: KanbanCard; compact?: boolean }>()
 
 const COMPACT_SUBJECT_MAX = 150

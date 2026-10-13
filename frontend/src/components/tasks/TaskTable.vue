@@ -23,7 +23,7 @@
             :class="{ overdue: isOverdue(task), 'flash-update': isFlashing(task.external_id) }"
             :data-testid="'task-row-' + task.external_id"
           >
-            <!-- The cells follow the columns the user chose and their order -->
+            <!-- Ячейки идут по колонкам, выбранным пользователем, в их порядке -->
             <template v-for="col in shownColumns" :key="col.key">
             <td v-if="col.key === 'external_id'" class="center">
               <a :href="taskLink(task.external_id)" target="_blank" class="issue-link" :data-testid="'task-link-' + task.external_id">
@@ -151,11 +151,11 @@ const auth = useAuthStore()
 const { t } = useI18n()
 const { settings } = storeToRefs(settingsStore)
 
-// flat: no own frame (the table sits inside a framed group)
+// flat: без своей рамки (таблица стоит внутри группы с рамкой)
 defineProps<{ tasks: Task[]; flat?: boolean }>()
 
-// Team members for the assignee dropdown — loaded once for all tables
-// (every accordion group renders its own TaskTable).
+// Сотрудники для списка исполнителей — загружаются один раз на все таблицы
+// (у каждой раскрывающейся группы свой TaskTable).
 onMounted(() => tasksStore.fetchMembers())
 const emit = defineEmits(['open-task', 'sort-change', 'inline-edit'])
 
@@ -174,7 +174,7 @@ async function saveInlineEdit(task: Task, field: string, value: string) {
   const oldNormalized = oldValue === null || oldValue === undefined ? '' : String(oldValue).slice(0, field.endsWith('_date') ? 10 : undefined)
   if (value === oldNormalized) return
   const savedValue = value === '' ? null : value
-  // Optimistic update — change field in place without reloading table
+  // Поле меняется на месте сразу, без перезагрузки таблицы
   ;(task as any)[field] = field === 'estimated_hours' && savedValue !== null ? Number(savedValue) : savedValue
   try {
     const result = await tasksStore.updateTask(task.external_id, { [field]: savedValue }, true)
@@ -192,15 +192,15 @@ async function saveInlineEdit(task: Task, field: string, value: string) {
 
 const { statuses, priorities, members, projectCategories: projectCategoriesMap, filters, useGrouping } = storeToRefs(tasksStore)
 
-// The sorting is one for every table of tasks and lives with the filters:
-// a table is rebuilt when its data is reloaded, and a state of its own
-// would be lost between two clicks.
+// Сортировка одна на все таблицы задач и хранится вместе с фильтрами:
+// таблица строится заново при перезагрузке данных, и собственное состояние
+// терялось бы между двумя кликами.
 const sortBy = computed(() => filters.value.sort_by)
 const sortDir = computed(() => filters.value.sort_dir)
 
 const statusNames = computed(() => statuses.value.map(s => s.name))
 const priorityNames = computed(() => priorities.value.map(p => p.name))
-// Closed is whatever the status groups in the settings say, not a status name
+// Закрытой задачу делают группы статусов из настроек, а не название статуса
 const closedStatusIds = computed(() => new Set(statuses.value.filter(s => s.group === 'closed').map(s => s.id)))
 
 const memberNames = computed(() => {
@@ -209,12 +209,12 @@ const memberNames = computed(() => {
   return members.value.filter(m => selectedTeam.includes(m.id)).map(m => m.name).sort()
 })
 
-// The current value must stay selectable even if it is not in the list.
+// Текущее значение должно оставаться в списке выбора, даже если его там нет.
 function withCurrent(list: string[], current?: string | null): string[] {
   return current && !list.includes(current) ? [current, ...list] : list
 }
 
-// The columns the user chose to see, in their order
+// Колонки, которые пользователь выбрал, в их порядке
 // В группировке по проектам колонка «Проект» лишняя: проект назван в заголовке группы.
 // В режиме «Все» group_by хранит прошлую группировку, поэтому смотрим и на useGrouping.
 const groupedByProject = computed(() => useGrouping.value && filters.value.group_by === 'project')
@@ -241,14 +241,14 @@ function taskLink(id: number): string {
 }
 
 function projectCategories(task: Task): string[] {
-  // All categories of the task's project; the current value stays selectable
-  // even while the list is loading or if it was removed in Redmine.
+  // Все категории проекта задачи; текущее значение остаётся в списке, даже
+  // пока список загружается или если категорию удалили в Redmine.
   const projectCats = new Set<string>(projectCategoriesMap.value[task.project_id] || [])
   if (task.category_name) projectCats.add(task.category_name)
   return [...projectCats].sort()
 }
 
-// Share of bug fix hours in the fact, computed on the fly.
+// Доля часов на исправление багов в фактических; считается на лету.
 function formatBugFixPct(task: Task): string {
   if (!task.spent_hours || !task.bug_fix_hours) return '—'
   return (task.bug_fix_hours / task.spent_hours * 100).toFixed(1) + '%'
@@ -384,7 +384,7 @@ tr.overdue td:first-child {
   text-decoration: underline;
 }
 
-/* Inline editors look like plain text until hovered */
+/* Поля правки в строке выглядят обычным текстом, пока на них не навели */
 .cell-input {
   padding: 4px 6px;
   font-size: 12px;
@@ -401,7 +401,7 @@ tr.overdue td:first-child {
   border-color: var(--hairline);
 }
 
-/* A read-only user sees the values as plain text */
+/* Пользователь с правом только на чтение видит значения обычным текстом */
 .cell-input:disabled {
   cursor: default;
   opacity: 1;
@@ -438,7 +438,7 @@ tr.overdue td:first-child {
   color: var(--text-faint);
 }
 
-/* The status looks like the priority: colored text, no badge */
+/* Статус выглядит как приоритет: цветной текст без плашки */
 .status-select {
   width: 120px;
   font-size: 11px;
