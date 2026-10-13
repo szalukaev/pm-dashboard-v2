@@ -147,7 +147,7 @@ import TaskModal from '../components/tasks/TaskModal.vue'
 import AnalyticsTasksModal from '../components/analytics/AnalyticsTasksModal.vue'
 import AppModal from '../components/ui/AppModal.vue'
 import PeriodFilter from '../components/analytics/PeriodFilter.vue'
-import { PERIOD_MODES, DEFAULT_PERIOD, type AnalyticsPeriod, type TaskListQuery, type DistChart, type ProjectDist } from '../stores/analytics'
+import { PERIOD_MODES, DEFAULT_PERIOD, assigneeLabel, type AnalyticsPeriod, type TaskListQuery, type DistChart, type ProjectDist } from '../stores/analytics'
 
 // The widgets of the tab in the standard order with their standard widths.
 // The ids are the keys of the widgets in the access rights.
@@ -248,7 +248,7 @@ const velocityChart = computed(() => ({
 }))
 
 const hoursChart = computed(() => ({
-  labels: hoursRows.value.map(r => r.name),
+  labels: hoursRows.value.map(r => assigneeLabel(r.name)),
   datasets: [
     { label: t('analytics.charts.estimated'), data: hoursRows.value.map(r => roundHours(r.estimated_hours)), color: '--accent' },
     { label: t('analytics.charts.spent'), data: hoursRows.value.map(r => roundHours(r.spent_hours)), color: '--orange' },
@@ -256,7 +256,7 @@ const hoursChart = computed(() => ({
 }))
 
 const bugChart = computed(() => ({
-  labels: bugRows.value.map(r => r.name),
+  labels: bugRows.value.map(r => assigneeLabel(r.name)),
   datasets: [{ label: t('analytics.charts.bug_hours'), data: bugRows.value.map(r => roundHours(r.bug_hours)), color: '--danger' }],
 }))
 

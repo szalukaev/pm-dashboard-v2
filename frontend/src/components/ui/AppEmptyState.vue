@@ -13,6 +13,8 @@ import { computed } from 'vue'
 import { Inbox, AlertCircle, Loader2 } from 'lucide-vue-next'
 import AppButton from './AppButton.vue'
 
+import i18n from '../../i18n'
+
 const props = withDefaults(defineProps<{
   state: 'empty' | 'loading' | 'error'
   iconSize?: number
@@ -32,9 +34,9 @@ const iconComponent = computed(() => {
 
 const message = computed(() => {
   switch (props.state) {
-    case 'empty': return 'Пока ничего нет'
-    case 'loading': return 'Загрузка…'
-    case 'error': return 'Не удалось загрузить данные'
+    case 'empty': return i18n.global.t('common.empty')
+    case 'loading': return i18n.global.t('common.loading')
+    case 'error': return i18n.global.t('common.error')
   }
 })
 

@@ -51,7 +51,21 @@
     "login_subtitle": "Enter your credentials to continue",
     "error_invalid_credentials": "Invalid username or password",
     "error_blocked": "The account is blocked. Contact the administrator.",
-    "error_too_many_attempts": "Too many login attempts. Try again later."
+    "error_too_many_attempts": "Too many login attempts. Try again later.",
+    "password_change": {
+      "title": "Change password",
+      "force_hint": "The administrator created your account. For safety you must change the password.",
+      "current": "Current password",
+      "new": "New password",
+      "confirm": "Confirm password",
+      "submit": "Change password",
+      "change": "Change password",
+      "too_short": "At least 6 characters",
+      "mismatch": "The passwords do not match",
+      "change_error": "Could not change the password",
+      "change_error_current": "Could not change the password. Check the current one.",
+      "changed": "The password is changed"
+    }
   },
   "setup": {
     "title": "Initial Setup",
@@ -80,7 +94,15 @@
     "create_admin": "Create Administrator",
     "admin_created": "Administrator created",
     "setup_complete": "Setup Complete",
-    "go_to_app": "Go to Application"
+    "go_to_app": "Go to Application",
+    "db_exists": "The database already exists. Its structure will be updated when the setup is finished.",
+    "db_new": "A new database will be created.",
+    "db_failed": "Could not connect to the database.",
+    "db_failed_check": "Could not connect to the database. Check the credentials.",
+    "ds_failed": "Could not connect to the external system.",
+    "admin_redirect": "The administrator is created. Opening the dashboard…",
+    "admin_exists": "A user with this name already exists",
+    "admin_error": "Could not create the administrator"
   },
   "navigation": {
     "tasks": "Tasks",
@@ -643,14 +665,30 @@
     "personal": {
       "email": "Email",
       "email_placeholder": "address for messages",
-      "email_invalid": "Enter an email address or leave the field empty"
+      "email_invalid": "Enter an email address or leave the field empty",
+      "title": "Personal data",
+      "avatar_add": "Press to add a photo",
+      "avatar_change": "Press to change the photo",
+      "avatar_remove": "Remove the photo",
+      "display_name": "Display name",
+      "display_name_placeholder": "Enter the display name",
+      "login": "Login",
+      "last_login": "Last login"
     },
     "data": {
       "title": "Dashboard Data Filtering",
       "projects": "Projects",
       "projects_hint": "Select projects to display. Data for unselected projects will be hidden in all sections.",
       "team": "Team",
-      "reset": "Reset to Admin Defaults"
+      "reset": "Reset to Admin Defaults",
+      "change": "Change",
+      "select_all": "Select all",
+      "no_projects": "No projects are chosen",
+      "team_hint": "The members whose tasks are shown in the dashboard.",
+      "no_team": "No members are chosen — everyone is shown",
+      "pick_projects": "Choose projects",
+      "pick_team": "Choose members",
+      "picked": "Selected: {n} of {total}"
     },
     "interface": {
       "title": "Interface Settings",
@@ -659,7 +697,15 @@
       "timezone": "Time zone",
       "timezone_default": "Default — {zone}",
       "timezone_hint": "Times on every screen are shown in this zone. Task due dates and invoice dates do not depend on it. Mailing and background job schedules run by the server time — {zone}.",
-      "tab_order": "Tab Order"
+      "tab_order": "Tab Order",
+      "mode_dark": "Dark",
+      "mode_light": "Light",
+      "themes": {
+        "nord": "Arctic restraint, cold blue-grey tones",
+        "amber": "Warm amber and copper, deep rich tones",
+        "forest": "Deep green, natural earthy tones",
+        "dusk": "Dusky violet and amber, a warm coolness"
+      }
     },
     "notifications": {
       "title": "Notifications",
@@ -1329,6 +1375,37 @@
     "retention": "Once a day after a sync the system saves a snapshot: totals per member and the state of the tasks. The trend charts are built from the snapshots.\n\nA cleanup deletes only the snapshots older than the retention period. Tasks, time entries, invoices and settings are not touched. Delete all snapshots removes the whole history — the charts start anew.",
     "mail": "Get the settings from your mail administrator. SSL/TLS encrypts the connection from the start, usually port 465. STARTTLS turns encryption on after connecting, usually port 587. No encryption is acceptable only inside your own network.\n\nThe dashboard address is needed for links: with it the number and the name of a task in an email open its card.",
     "users": "Rights add up in this order. An administrator can do everything. Others get rights from a role template; an individual setup (the shield icon) replaces the template. Then groups narrow the result: only the projects and members allowed by at least one group of the user remain.\n\nUsers link themselves to a Redmine member with a personal API key. The time zone is the default one until the user chooses their own."
+  },
+  "audit": {
+    "title": "Audit log",
+    "hint": "The history of what users did in the system. Available to the administrator only.",
+    "all_actions": "All actions",
+    "all_entities": "All entities",
+    "actions": {
+      "created": "Created",
+      "updated": "Changed",
+      "deleted": "Deleted",
+      "login": "Login",
+      "login_failed": "Failed login",
+      "logout": "Logout"
+    },
+    "entities": {
+      "organization": "Organizations",
+      "contract": "Contracts",
+      "sprint": "Sprints",
+      "task": "Tasks",
+      "settings": "Settings",
+      "auth": "Authorization"
+    },
+    "col_time": "Date and time",
+    "col_user": "User",
+    "col_action": "Action",
+    "col_entity": "Entity",
+    "details": "Details",
+    "details_title": "Event details",
+    "before": "Before",
+    "after": "After",
+    "empty": "No records"
   },
   "debug_logs": {
     "title": "Debug logs",

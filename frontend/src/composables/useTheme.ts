@@ -3,11 +3,12 @@ import { ref } from 'vue'
 export type ThemeName = 'nord' | 'amber' | 'forest' | 'dusk'
 export type ThemeMode = 'dark' | 'light'
 
-export const THEMES: { id: ThemeName; name: string; description: string; preview: { accent: string; bg: string; surface: string } }[] = [
-  { id: 'nord', name: 'Nord', description: 'Арктическая сдержанность, холодные сине-серые тона', preview: { accent: '#5e9ab0', bg: '#1a1d23', surface: '#272b34' } },
-  { id: 'amber', name: 'Amber', description: 'Тёплый янтарно-медный, глубокие насыщенные тона', preview: { accent: '#c8942a', bg: '#1c1710', surface: '#2c251c' } },
-  { id: 'forest', name: 'Forest', description: 'Глубокий зелёный, натуральные земляные тона', preview: { accent: '#5a9a68', bg: '#171c1a', surface: '#242b28' } },
-  { id: 'dusk', name: 'Dusk', description: 'Сумеречный фиолетово-янтарный, тёплая прохлада', preview: { accent: '#8a6eb0', bg: '#1a1920', surface: '#272630' } },
+// Описание темы — в словаре: settings.interface.themes.<id>
+export const THEMES: { id: ThemeName; name: string; preview: { accent: string; bg: string; surface: string } }[] = [
+  { id: 'nord', name: 'Nord', preview: { accent: '#5e9ab0', bg: '#1a1d23', surface: '#272b34' } },
+  { id: 'amber', name: 'Amber', preview: { accent: '#c8942a', bg: '#1c1710', surface: '#2c251c' } },
+  { id: 'forest', name: 'Forest', preview: { accent: '#5a9a68', bg: '#171c1a', surface: '#242b28' } },
+  { id: 'dusk', name: 'Dusk', preview: { accent: '#8a6eb0', bg: '#1a1920', surface: '#272630' } },
 ]
 
 const THEME_KEY = 'pm-dashboard-theme'

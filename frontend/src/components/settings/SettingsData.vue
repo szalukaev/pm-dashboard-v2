@@ -10,33 +10,33 @@
         <span v-for="p in selectedProjectItems" :key="p.id" class="chip">
           {{ p.name }} <span class="chip-id">#{{ p.id }}</span>
         </span>
-        <span v-if="!selectedProjectItems.length" class="chips-empty">Проекты не выбраны</span>
+        <span v-if="!selectedProjectItems.length" class="chips-empty">{{ $t('settings.data.no_projects') }}</span>
       </div>
       <AppButton variant="ghost" size="sm" @click="openProjects">
-        <Pencil :size="14" /> Изменить
+        <Pencil :size="14" /> {{ $t('settings.data.change') }}
       </AppButton>
     </div>
 
     <!-- Team -->
     <div class="setting-block">
       <h4 class="block-title">{{ $t('settings.data.team') }} <AppHint help :text="$t('hints.team')" /></h4>
-      <p class="block-hint">Сотрудники, задачи которых показываются в дашборде.</p>
+      <p class="block-hint">{{ $t('settings.data.team_hint') }}</p>
       <div class="chips">
         <span v-for="m in selectedTeamItems" :key="m.id" class="chip">{{ m.name }}</span>
-        <span v-if="!selectedTeamItems.length" class="chips-empty">Сотрудники не выбраны — показываются все</span>
+        <span v-if="!selectedTeamItems.length" class="chips-empty">{{ $t('settings.data.no_team') }}</span>
       </div>
       <AppButton variant="ghost" size="sm" @click="openTeam">
-        <Pencil :size="14" /> Изменить
+        <Pencil :size="14" /> {{ $t('settings.data.change') }}
       </AppButton>
     </div>
 
     <!-- Projects dialog -->
-    <AppModal v-model="projectsOpen" title="Выбор проектов" width="700px" :busy="saving">
+    <AppModal v-model="projectsOpen" :title="$t('settings.data.pick_projects')" width="700px" :busy="saving">
       <div class="picker-toolbar">
-        <input v-model="projectQuery" class="picker-search" placeholder="Поиск проекта…" />
-        <AppButton variant="ghost" size="sm" @click="draftProjects = projects.map(p => p.id)">Выбрать все</AppButton>
-        <AppButton variant="ghost" size="sm" @click="draftProjects = []">Снять все</AppButton>
-        <span class="picker-count">Выбрано: <strong>{{ draftProjects.length }}</strong> из {{ projects.length }}</span>
+        <input v-model="projectQuery" class="picker-search" :placeholder="$t('access.editor.search_project')" />
+        <AppButton variant="ghost" size="sm" @click="draftProjects = projects.map(p => p.id)">{{ $t('settings.data.select_all') }}</AppButton>
+        <AppButton variant="ghost" size="sm" @click="draftProjects = []">{{ $t('access.editor.clear') }}</AppButton>
+        <span class="picker-count">{{ $t('settings.data.picked', { n: draftProjects.length, total: projects.length }) }}</span>
       </div>
       <div class="picker-list">
         <label
@@ -54,21 +54,21 @@
           <span class="tree-label" :class="{ 'has-children': item.hasChildren }">{{ item.name }}</span>
           <span class="picker-id">#{{ item.id }}</span>
         </label>
-        <div v-if="!visibleProjectTree.length" class="chips-empty">Ничего не найдено</div>
+        <div v-if="!visibleProjectTree.length" class="chips-empty">{{ $t('access.editor.nothing_found') }}</div>
       </div>
       <template #footer>
-        <AppButton variant="ghost" @click="projectsOpen = false">Отмена</AppButton>
-        <AppButton variant="primary" :loading="saving" @click="saveProjects">Сохранить</AppButton>
+        <AppButton variant="ghost" @click="projectsOpen = false">{{ $t('common.cancel') }}</AppButton>
+        <AppButton variant="primary" :loading="saving" @click="saveProjects">{{ $t('common.save') }}</AppButton>
       </template>
     </AppModal>
 
     <!-- Team dialog -->
-    <AppModal v-model="teamOpen" title="Выбор сотрудников" width="560px" :busy="saving">
+    <AppModal v-model="teamOpen" :title="$t('settings.data.pick_team')" width="560px" :busy="saving">
       <div class="picker-toolbar">
-        <input v-model="teamQuery" class="picker-search" placeholder="Поиск сотрудника…" />
-        <AppButton variant="ghost" size="sm" @click="draftTeam = members.map(m => m.id)">Выбрать все</AppButton>
-        <AppButton variant="ghost" size="sm" @click="draftTeam = []">Снять все</AppButton>
-        <span class="picker-count">Выбрано: <strong>{{ draftTeam.length }}</strong> из {{ members.length }}</span>
+        <input v-model="teamQuery" class="picker-search" :placeholder="$t('access.editor.search_member')" />
+        <AppButton variant="ghost" size="sm" @click="draftTeam = members.map(m => m.id)">{{ $t('settings.data.select_all') }}</AppButton>
+        <AppButton variant="ghost" size="sm" @click="draftTeam = []">{{ $t('access.editor.clear') }}</AppButton>
+        <span class="picker-count">{{ $t('settings.data.picked', { n: draftTeam.length, total: members.length }) }}</span>
       </div>
       <div class="picker-list">
         <label
@@ -80,11 +80,11 @@
           <input type="checkbox" :value="m.id" v-model="draftTeam" />
           <span>{{ m.name }}</span>
         </label>
-        <div v-if="!visibleMembers.length" class="chips-empty">Ничего не найдено</div>
+        <div v-if="!visibleMembers.length" class="chips-empty">{{ $t('access.editor.nothing_found') }}</div>
       </div>
       <template #footer>
-        <AppButton variant="ghost" @click="teamOpen = false">Отмена</AppButton>
-        <AppButton variant="primary" :loading="saving" @click="saveTeam">Сохранить</AppButton>
+        <AppButton variant="ghost" @click="teamOpen = false">{{ $t('common.cancel') }}</AppButton>
+        <AppButton variant="primary" :loading="saving" @click="saveTeam">{{ $t('common.save') }}</AppButton>
       </template>
     </AppModal>
 

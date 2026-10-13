@@ -7,10 +7,10 @@
       <h4 class="block-title">{{ $t('settings.interface.theme') }}</h4>
       <div class="mode-switch">
         <button class="mode-btn" :class="{ active: currentMode === 'dark' }" @click="changeMode('dark')" data-testid="mode-dark">
-          <Moon :size="14" /> Тёмная
+          <Moon :size="14" /> {{ $t('settings.interface.mode_dark') }}
         </button>
         <button class="mode-btn" :class="{ active: currentMode === 'light' }" @click="changeMode('light')" data-testid="mode-light">
-          <Sun :size="14" /> Светлая
+          <Sun :size="14" /> {{ $t('settings.interface.mode_light') }}
         </button>
       </div>
       <div class="theme-grid">
@@ -29,7 +29,7 @@
           </span>
           <span class="theme-text">
             <span class="theme-name">{{ t.name }}</span>
-            <span class="theme-desc">{{ t.description }}</span>
+            <span class="theme-desc">{{ $t('settings.interface.themes.' + t.id) }}</span>
           </span>
         </button>
       </div>

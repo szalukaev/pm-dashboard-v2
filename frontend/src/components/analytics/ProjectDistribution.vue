@@ -25,7 +25,7 @@
             class="legend-item"
           >
             <span class="legend-dot" :style="{ background: getChartColors()[idx % getChartColors().length] }"></span>
-            <span class="legend-name">{{ a.name }}</span>
+            <span class="legend-name">{{ assigneeLabel(a.name) }}</span>
             <span class="legend-count">{{ a.count }}</span>
           </div>
         </div>
@@ -37,7 +37,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { Chart, PieController, ArcElement, Tooltip, Legend } from 'chart.js'
-import type { DistChart } from '../../stores/analytics'
+import { assigneeLabel, type DistChart } from '../../stores/analytics'
 
 Chart.register(PieController, ArcElement, Tooltip, Legend)
 
@@ -95,7 +95,7 @@ function renderCharts(distribution: DistChart[]) {
     const chart = new Chart(ctx, {
       type: 'pie',
       data: {
-        labels: proj.assignees.map(a => a.name),
+        labels: proj.assignees.map(a => assigneeLabel(a.name)),
         datasets: [{
           data: proj.assignees.map(a => a.count),
           backgroundColor: proj.assignees.map((_, i) => colors[i % colors.length]),

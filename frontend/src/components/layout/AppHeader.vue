@@ -63,7 +63,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
   Users,
@@ -79,6 +79,7 @@ import {
 } from 'lucide-vue-next'
 import { useTheme } from '../../composables/useTheme'
 import { useAuthStore } from '../../stores/auth'
+import { useSettingsStore } from '../../stores/settings'
 import AppSyncStatus from '../ui/AppSyncStatus.vue'
 import NotificationBell from './NotificationBell.vue'
 
@@ -99,6 +100,9 @@ const tabs = ref([
   { path: '/payments', icon: CreditCard, label: 'navigation.payments', testId: 'payments' },
 ])
 
+const TAB_ORDER_KEY = 'pm-dashboard-tab-order'
+const settingsStore = useSettingsStore()
+
 let dragTabIndex = -1
 
 function onTabDragStart(e: DragEvent, index: number) {
@@ -115,25 +119,35 @@ function onTabDrop(e: DragEvent, index: number) {
   const moved = tabs.value.splice(dragTabIndex, 1)[0]
   tabs.value.splice(index, 0, moved)
   dragTabIndex = -1
-  // Save tab order
+  // Порядок хранится в настройках пользователя на сервере и идёт за ним на
+  // любое устройство; копия в браузере нужна, чтобы вкладки не прыгали при загрузке
   const order = tabs.value.map(t => t.path)
-  localStorage.setItem('pm-dashboard-tab-order', JSON.stringify(order))
+  localStorage.setItem(TAB_ORDER_KEY, JSON.stringify(order))
+  settingsStore.updateSettings({ tab_order: order })
 }
 
 function onTabDragEnd() {
   dragTabIndex = -1
 }
 
-// Restore tab order from localStorage
-const savedOrder = localStorage.getItem('pm-dashboard-tab-order')
-if (savedOrder) {
-  try {
-    const order = JSON.parse(savedOrder)
-    const ordered = order.map((path: string) => tabs.value.find(t => t.path === path)).filter(Boolean)
-    const remaining = tabs.value.filter(t => !order.includes(t.path))
-    tabs.value = [...ordered, ...remaining]
-  } catch {}
+// Расставляет вкладки в сохранённом порядке; вкладки, которых в нём нет, идут в конце
+function applyTabOrder(order: unknown) {
+  if (!Array.isArray(order) || order.length === 0) return
+  const ordered = tabs.value.filter(t => order.includes(t.path)).sort((a, b) => order.indexOf(a.path) - order.indexOf(b.path))
+  const remaining = tabs.value.filter(t => !order.includes(t.path))
+  tabs.value = [...ordered, ...remaining]
 }
+
+// Сразу — по копии в браузере, после загрузки настроек — по серверу
+try {
+  applyTabOrder(JSON.parse(localStorage.getItem(TAB_ORDER_KEY) || '[]'))
+} catch {}
+
+watch(() => settingsStore.settings.tab_order, order => {
+  if (!Array.isArray(order) || order.length === 0) return
+  applyTabOrder(order)
+  localStorage.setItem(TAB_ORDER_KEY, JSON.stringify(order))
+})
 
 function isActive(path: string) {
   return route.path === path

@@ -141,6 +141,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import AppButton from '../components/ui/AppButton.vue'
+import i18n from '../i18n'
 
 const router = useRouter()
 const step = ref(1)
@@ -176,15 +177,15 @@ async function testDb() {
     dbOk.value = data.success
     if (data.success) {
       dbMessage.value = data.db_exists
-        ? 'Указанная база данных уже существует. По завершению настроек будет произведена актуализация её структуры.'
-        : 'Будет создана новая БД.'
+        ? i18n.global.t('setup.db_exists')
+        : i18n.global.t('setup.db_new')
       dbStatus.value = 'success'
     } else {
-      dbMessage.value = data.error || 'Не удалось подключиться к БД.'
+      dbMessage.value = data.error || i18n.global.t('setup.db_failed')
       dbStatus.value = 'error'
     }
   } catch {
-    dbMessage.value = 'Не удалось подключиться к БД. Проверьте реквизиты.'
+    dbMessage.value = i18n.global.t('setup.db_failed_check')
     dbStatus.value = 'error'
   } finally {
     testingDb.value = false
@@ -237,10 +238,10 @@ async function testDs() {
     }
     const { data } = await axios.post('/api/setup/datasource/test', payload)
     dsOk.value = data.success
-    dsMessage.value = data.success ? 'Соединение установлено' : (data.error || 'Не удалось подключиться')
+    dsMessage.value = data.success ? i18n.global.t('setup.connection_ok') : (data.error || i18n.global.t('setup.connection_failed'))
     dsStatus.value = data.success ? 'success' : 'error'
   } catch {
-    dsMessage.value = 'Не удалось установить соединение с внешней системой.'
+    dsMessage.value = i18n.global.t('setup.ds_failed')
     dsStatus.value = 'error'
   } finally {
     testingDs.value = false
@@ -283,13 +284,13 @@ async function createAdmin() {
       password: adminPass.value,
       language: adminLang.value,
     })
-    adminMessage.value = 'Администратор создан. Перенаправление...'
+    adminMessage.value = i18n.global.t('setup.admin_redirect')
     adminStatus.value = 'success'
     setTimeout(() => router.push('/'), 1500)
   } catch (e: any) {
     adminMessage.value = e.response?.data?.error === 'USER_EXISTS'
-      ? 'Пользователь с таким именем уже существует'
-      : 'Ошибка создания администратора'
+      ? i18n.global.t('setup.admin_exists')
+      : i18n.global.t('setup.admin_error')
     adminStatus.value = 'error'
   } finally {
     creatingAdmin.value = false
@@ -298,9 +299,9 @@ async function createAdmin() {
 
 const stepTitle = computed(() => {
   switch (step.value) {
-    case 1: return 'Подключение к базе данных'
-    case 2: return 'Подключение к системе-источнику'
-    case 3: return 'Создание администратора'
+    case 1: return i18n.global.t('setup.db_connection')
+    case 2: return i18n.global.t('setup.datasource_connection')
+    case 3: return i18n.global.t('setup.create_admin')
     default: return ''
   }
 })

@@ -121,6 +121,14 @@ export interface Exceeded {
   project_name: string
 }
 
+// Так сервер называет в отчётах задачи без исполнителя. В запросах имя
+// остаётся как есть, на экране оно заменяется подписью на языке интерфейса.
+export const UNASSIGNED_NAME = 'Неназначенные'
+
+export function assigneeLabel(name: string): string {
+  return name === UNASSIGNED_NAME ? i18n.global.t('kanban.unassigned') : name
+}
+
 // Период отчётов: весь период, последние 14 или 30 дней либо диапазон дат
 // (ГГГГ-ММ-ДД, обе входят; достаточно одной). Действует на закрытые задачи:
 // считаются только закрытые в периоде.

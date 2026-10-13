@@ -5,17 +5,17 @@
     <!-- Force password change modal -->
     <AppModal
       :model-value="showForceChange"
-      title="Смена пароля"
+      :title="$t('auth.password_change.title')"
       width="400px"
     >
-      <p class="force-hint">Администратор создал ваш аккаунт. Для безопасности необходимо сменить пароль.</p>
+      <p class="force-hint">{{ $t('auth.password_change.force_hint') }}</p>
       <form @submit.prevent="submitPasswordChange" class="force-form">
         <div class="form-field">
-          <label>Новый пароль</label>
+          <label>{{ $t('auth.password_change.new') }}</label>
           <input v-model="newPassword" type="password" minlength="6" />
         </div>
         <div class="form-field">
-          <label>Подтверждение</label>
+          <label>{{ $t('auth.password_change.confirm') }}</label>
           <input v-model="confirmPassword" type="password" minlength="6" />
         </div>
         <div v-if="passwordError" class="error-msg">{{ passwordError }}</div>
@@ -26,7 +26,7 @@
           :disabled="newPassword.length < 6 || newPassword !== confirmPassword"
           @click="submitPasswordChange"
         >
-          Сменить пароль
+          {{ $t('auth.password_change.submit') }}
         </AppButton>
       </template>
     </AppModal>
@@ -53,11 +53,13 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useI18n } from 'vue-i18n'
 import { useAuthStore } from './stores/auth'
 import AppModal from './components/ui/AppModal.vue'
 import AppButton from './components/ui/AppButton.vue'
 import SourceTokenForm from './components/settings/SourceTokenForm.vue'
 
+const { t } = useI18n()
 const authStore = useAuthStore()
 const { user } = storeToRefs(authStore)
 
@@ -87,11 +89,11 @@ function postponeToken() {
 
 async function submitPasswordChange() {
   if (newPassword.value.length < 6) {
-    passwordError.value = 'Минимум 6 символов'
+    passwordError.value = t('auth.password_change.too_short')
     return
   }
   if (newPassword.value !== confirmPassword.value) {
-    passwordError.value = 'Пароли не совпадают'
+    passwordError.value = t('auth.password_change.mismatch')
     return
   }
   try {
@@ -100,7 +102,7 @@ async function submitPasswordChange() {
     newPassword.value = ''
     confirmPassword.value = ''
   } catch {
-    passwordError.value = 'Ошибка смены пароля'
+    passwordError.value = t('auth.password_change.change_error')
   }
 }
 </script>

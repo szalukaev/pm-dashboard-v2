@@ -1,4 +1,5 @@
 import Swal from 'sweetalert2'
+import i18n from '../i18n'
 
 // UI_GUIDE-compliant SweetAlert2 defaults
 const swalDefaults = {
@@ -30,8 +31,8 @@ export function useSwal() {
       title,
       text,
       showCancelButton: true,
-      confirmButtonText: 'Да',
-      cancelButtonText: 'Отмена',
+      confirmButtonText: i18n.global.t('common.yes'),
+      cancelButtonText: i18n.global.t('common.cancel'),
     })
   }
 

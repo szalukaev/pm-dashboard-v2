@@ -1,36 +1,27 @@
 <template>
   <div class="settings-audit">
-    <h3 class="section-title">Журнал аудита</h3>
-    <p class="section-hint">История действий пользователей в системе. Доступно только администратору.</p>
+    <h3 class="section-title">{{ $t('audit.title') }}</h3>
+    <p class="section-hint">{{ $t('audit.hint') }}</p>
 
     <!-- Filters -->
     <div class="audit-filters">
       <select v-model="filterAction" @change="loadLogs" class="filter-select">
-        <option value="">Все действия</option>
-        <option value="created">Создание</option>
-        <option value="updated">Изменение</option>
-        <option value="deleted">Удаление</option>
-        <option value="login">Вход</option>
-        <option value="login_failed">Неудачный вход</option>
-        <option value="logout">Выход</option>
+        <option value="">{{ $t('audit.all_actions') }}</option>
+        <option v-for="action in ACTIONS" :key="action" :value="action">{{ $t('audit.actions.' + action) }}</option>
       </select>
       <select v-model="filterEntity" @change="loadLogs" class="filter-select">
-        <option value="">Все сущности</option>
-        <option value="organization">Организации</option>
-        <option value="contract">Договоры</option>
-        <option value="sprint">Спринты</option>
-        <option value="task">Задачи</option>
-        <option value="auth">Авторизация</option>
+        <option value="">{{ $t('audit.all_entities') }}</option>
+        <option v-for="entity in ENTITIES" :key="entity" :value="entity">{{ $t('audit.entities.' + entity) }}</option>
       </select>
     </div>
 
     <table class="audit-table">
       <thead>
         <tr>
-          <th>Дата/время</th>
-          <th>Пользователь</th>
-          <th>Действие</th>
-          <th>Сущность</th>
+          <th>{{ $t('audit.col_time') }}</th>
+          <th>{{ $t('audit.col_user') }}</th>
+          <th>{{ $t('audit.col_action') }}</th>
+          <th>{{ $t('audit.col_entity') }}</th>
           <th>ID</th>
           <th>IP</th>
           <th></th>
@@ -51,7 +42,7 @@
               v-if="log.before_state || log.after_state"
               class="detail-btn"
               @click="showDetail(log)"
-              title="Детали"
+              :title="$t('audit.details')"
             >
               <Eye :size="14" />
             </button>
@@ -61,23 +52,23 @@
     </table>
 
     <div v-if="logs.length === 0" class="empty-hint">
-      Нет записей
+      {{ $t('audit.empty') }}
     </div>
 
     <!-- Detail Modal -->
     <AppModal
       :model-value="showDetailModal"
-      title="Детали события"
+      :title="$t('audit.details_title')"
       width="600px"
       @update:model-value="showDetailModal = $event"
     >
       <div class="detail-content" v-if="selectedLog">
         <div class="detail-section" v-if="selectedLog.before_state">
-          <h4>До</h4>
+          <h4>{{ $t('audit.before') }}</h4>
           <pre class="json-block">{{ formatJSON(selectedLog.before_state) }}</pre>
         </div>
         <div class="detail-section" v-if="selectedLog.after_state">
-          <h4>После</h4>
+          <h4>{{ $t('audit.after') }}</h4>
           <pre class="json-block">{{ formatJSON(selectedLog.after_state) }}</pre>
         </div>
       </div>
@@ -91,6 +82,7 @@ import { formatDateTime as formatAt } from '../../utils/format'
 import axios from 'axios'
 import { Eye } from 'lucide-vue-next'
 import AppModal from '../ui/AppModal.vue'
+import i18n from '../../i18n'
 
 interface AuditEntry {
   id: number
@@ -121,16 +113,14 @@ async function loadLogs() {
   } catch {}
 }
 
+// Действия и сущности, по которым можно отобрать записи; подписи — в словаре
+const ACTIONS = ['created', 'updated', 'deleted', 'login', 'login_failed', 'logout']
+const ENTITIES = ['organization', 'contract', 'sprint', 'task', 'settings', 'auth']
+
+// Подпись действия; неизвестное показывается как есть
 function actionLabel(action: string): string {
-  const map: Record<string, string> = {
-    created: 'Создание',
-    updated: 'Изменение',
-    deleted: 'Удаление',
-    login: 'Вход',
-    login_failed: 'Ошибка входа',
-    logout: 'Выход',
-  }
-  return map[action] || action
+  const key = 'audit.actions.' + action
+  return i18n.global.te(key) ? i18n.global.t(key) : action
 }
 
 function showDetail(log: AuditEntry) {

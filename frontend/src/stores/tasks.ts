@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import axios from 'axios'
 import { useSettingsStore } from './settings'
+import i18n from '../i18n'
 
 export interface Task {
   id: number
@@ -206,7 +207,7 @@ export const useTasksStore = defineStore('tasks', () => {
       }
       pruneTasks()
     } catch (e: any) {
-      if (requestId === tasksRequest && !opts.silent) error.value = 'Не удалось загрузить данные'
+      if (requestId === tasksRequest && !opts.silent) error.value = i18n.global.t('common.error')
     } finally {
       if (requestId === tasksRequest) loading.value = false
     }

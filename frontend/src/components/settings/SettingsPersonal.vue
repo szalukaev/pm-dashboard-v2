@@ -1,6 +1,6 @@
 <template>
   <div class="settings-personal">
-    <h3 class="section-title">Личные данные</h3>
+    <h3 class="section-title">{{ $t('settings.personal.title') }}</h3>
     <div class="personal-layout">
       <!-- Avatar -->
       <div class="avatar-block">
@@ -12,19 +12,19 @@
           </div>
         </div>
         <input ref="fileInput" type="file" accept="image/*" style="display:none" @change="onFileSelected" />
-        <p class="avatar-hint">Нажмите, чтобы {{ user?.avatar ? 'изменить' : 'добавить' }} фото</p>
-        <AppButton v-if="user?.avatar" variant="ghost" size="sm" @click="removeAvatar">Удалить фото</AppButton>
+        <p class="avatar-hint">{{ $t(user?.avatar ? 'settings.personal.avatar_change' : 'settings.personal.avatar_add') }}</p>
+        <AppButton v-if="user?.avatar" variant="ghost" size="sm" @click="removeAvatar">{{ $t('settings.personal.avatar_remove') }}</AppButton>
       </div>
 
       <!-- Info -->
       <div class="form-group">
         <div class="info-row">
-          <span class="info-label">Отображаемое имя</span>
+          <span class="info-label">{{ $t('settings.personal.display_name') }}</span>
           <span class="info-value editable-name">
             <input
               v-model="editDisplayName"
               class="name-input"
-              placeholder="Введите отображаемое имя"
+              :placeholder="$t('settings.personal.display_name_placeholder')"
               maxlength="255"
               @keyup.enter="saveDisplayName"
             />
@@ -35,7 +35,7 @@
               :disabled="!editDisplayName.trim() || editDisplayName === (user?.display_name || '')"
               @click="saveDisplayName"
             >
-              Сохранить
+              {{ $t('common.save') }}
             </AppButton>
           </span>
         </div>
@@ -65,17 +65,17 @@
         </div>
         <div v-if="emailError" class="email-error">{{ $t('settings.personal.email_invalid') }}</div>
         <div class="info-row">
-          <span class="info-label">Логин</span>
+          <span class="info-label">{{ $t('settings.personal.login') }}</span>
           <span class="info-value">{{ user?.username || '—' }}</span>
         </div>
         <div class="info-row">
-          <span class="info-label">Роль</span>
+          <span class="info-label">{{ $t('access.users.role') }}</span>
           <span class="info-value">
-            <span class="role-badge" :class="user?.role">{{ user?.role === 'admin' ? 'Администратор' : 'Пользователь' }}</span>
+            <span class="role-badge" :class="user?.role">{{ $t(user?.role === 'admin' ? 'access.users.role_admin' : 'access.users.role_user') }}</span>
           </span>
         </div>
         <div class="info-row">
-          <span class="info-label">Последний вход</span>
+          <span class="info-label">{{ $t('settings.personal.last_login') }}</span>
           <span class="info-value">{{ formatLastLogin(user?.last_login) }}</span>
         </div>
       </div>
@@ -83,7 +83,7 @@
 
     <div class="form-actions">
       <AppButton variant="primary" @click="showChangePassword = true">
-        Изменить пароль
+        {{ $t('auth.password_change.change') }}
       </AppButton>
     </div>
 
@@ -95,32 +95,32 @@
     </div>
 
     <!-- Change password modal -->
-    <AppModal v-model="showChangePassword" title="Изменение пароля" width="400px" :busy="changingPassword">
+    <AppModal v-model="showChangePassword" :title="$t('auth.password_change.title')" width="400px" :busy="changingPassword">
       <form @submit.prevent="submitPasswordChange" class="pw-form">
         <div class="form-field">
-          <label>Текущий пароль</label>
+          <label>{{ $t('auth.password_change.current') }}</label>
           <input v-model="currentPassword" type="password" />
         </div>
         <div class="form-field">
-          <label>Новый пароль</label>
+          <label>{{ $t('auth.password_change.new') }}</label>
           <input v-model="newPassword" type="password" minlength="6" />
         </div>
         <div class="form-field">
-          <label>Подтверждение пароля</label>
+          <label>{{ $t('auth.password_change.confirm') }}</label>
           <input v-model="confirmPassword" type="password" minlength="6" />
         </div>
         <div v-if="passwordError" class="error-msg">{{ passwordError }}</div>
         <div v-if="passwordSuccess" class="success-msg">{{ passwordSuccess }}</div>
       </form>
       <template #footer>
-        <AppButton variant="ghost" @click="showChangePassword = false">Отмена</AppButton>
+        <AppButton variant="ghost" @click="showChangePassword = false">{{ $t('common.cancel') }}</AppButton>
         <AppButton
           variant="primary"
           :disabled="!currentPassword || newPassword.length < 6 || newPassword !== confirmPassword"
           :loading="changingPassword"
           @click="submitPasswordChange"
         >
-          Сохранить
+          {{ $t('common.save') }}
         </AppButton>
       </template>
     </AppModal>
@@ -131,6 +131,7 @@
 import { ref, computed } from 'vue'
 import { formatDateTime } from '../../utils/format'
 import AppHint from '../ui/AppHint.vue'
+import i18n from '../../i18n'
 import { useAuthStore } from '../../stores/auth'
 import { storeToRefs } from 'pinia'
 import { Camera } from 'lucide-vue-next'
@@ -221,23 +222,23 @@ async function submitPasswordChange() {
   passwordError.value = ''
   passwordSuccess.value = ''
   if (newPassword.value.length < 6) {
-    passwordError.value = 'Минимум 6 символов'
+    passwordError.value = i18n.global.t('auth.password_change.too_short')
     return
   }
   if (newPassword.value !== confirmPassword.value) {
-    passwordError.value = 'Пароли не совпадают'
+    passwordError.value = i18n.global.t('auth.password_change.mismatch')
     return
   }
   changingPassword.value = true
   try {
     await authStore.changePassword(currentPassword.value, newPassword.value)
-    passwordSuccess.value = 'Пароль успешно изменён'
+    passwordSuccess.value = i18n.global.t('auth.password_change.changed')
     currentPassword.value = ''
     newPassword.value = ''
     confirmPassword.value = ''
     setTimeout(() => { showChangePassword.value = false; passwordSuccess.value = '' }, 1500)
   } catch {
-    passwordError.value = 'Ошибка смены пароля. Проверьте текущий пароль.'
+    passwordError.value = i18n.global.t('auth.password_change.change_error_current')
   } finally {
     changingPassword.value = false
   }

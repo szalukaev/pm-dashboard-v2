@@ -11,7 +11,7 @@
           <tr v-for="row in team" :key="row.name" data-testid="team-row">
             <!-- The cells follow the columns the user chose and their order -->
             <template v-for="col in shownColumns" :key="col.key">
-              <td v-if="col.key === 'employee'" class="name-cell">{{ row.name }}</td>
+              <td v-if="col.key === 'employee'" class="name-cell">{{ assigneeLabel(row.name) }}</td>
               <!-- A figure opens the tasks it counts -->
               <td v-else class="num-cell">
                 <button
@@ -36,7 +36,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { TeamLoadRow } from '../../stores/analytics'
+import { assigneeLabel, type TeamLoadRow } from '../../stores/analytics'
 import { useSettingsStore } from '../../stores/settings'
 import { TEAM_LOAD_TABLE as TABLE, TEAM_LOAD_COLUMNS as COLUMNS } from './teamLoadColumns'
 
