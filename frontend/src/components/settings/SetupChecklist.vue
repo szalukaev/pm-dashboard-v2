@@ -1,11 +1,15 @@
 <template>
   <!-- Чек-лист первого запуска: виден только администратору, над меню настроек -->
-  <div v-if="items.length" class="checklist" :class="{ complete }" data-testid="setup-checklist">
+  <!-- Всё настроено: одна надпись, родитель ставит её в правый верхний угол -->
+  <div v-if="complete" class="checklist-done" data-testid="setup-checklist-done">
+    <CheckCircle2 :size="16" />
+    {{ $t('checklist.complete') }}
+  </div>
+  <div v-else-if="items.length" class="checklist" data-testid="setup-checklist">
     <button type="button" class="checklist-head" :aria-expanded="open" data-testid="checklist-toggle" @click="toggle">
-      <CheckCircle2 v-if="complete" :size="16" class="head-icon" />
-      <ListChecks v-else :size="16" class="head-icon" />
-      <span class="head-title">{{ complete ? $t('checklist.complete') : $t('checklist.title') }}</span>
-      <span v-if="!complete" class="head-count">{{ $t('checklist.progress', { done, total: items.length }) }}</span>
+      <ListChecks :size="16" class="head-icon" />
+      <span class="head-title">{{ $t('checklist.title') }}</span>
+      <span class="head-count">{{ $t('checklist.progress', { done, total: items.length }) }}</span>
       <span class="head-bar"><span :style="{ width: percent + '%' }"></span></span>
       <ChevronDown :size="16" class="head-chevron" :class="{ collapsed: !open }" />
     </button>
@@ -55,8 +59,8 @@ const TARGETS: Record<string, { tab: string; sub?: string }> = {
   schedule: { tab: 'admin', sub: 'workers' },
 }
 
-// Свёрнут или развёрнут блок — помнит браузер; пока не выбирали, завершённый
-// чек-лист свёрнут, незавершённый развёрнут
+// Свёрнут или развёрнут незавершённый чек-лист — помнит браузер; пока не
+// выбирали, он развёрнут
 const OPEN_KEY = 'pm-dashboard-checklist-open'
 
 // open: перейти к вкладке шага — { tab, sub }
@@ -68,7 +72,7 @@ const chosen = ref<boolean | null>(null)
 const done = computed(() => items.value.filter(i => i.done).length)
 const complete = computed(() => items.value.length > 0 && done.value === items.value.length)
 const percent = computed(() => (items.value.length ? Math.round((done.value / items.value.length) * 100) : 0))
-const open = computed(() => chosen.value ?? !complete.value)
+const open = computed(() => chosen.value ?? true)
 
 function state(item: Item): string {
   return item.done ? 'done' : item.required ? 'required' : 'advised'
@@ -104,15 +108,26 @@ defineExpose({ reload: load })
 </script>
 
 <style scoped>
+/* Незавершённый чек-лист занимает всю строку под заголовком страницы */
 .checklist {
-  margin-bottom: 20px;
+  flex-basis: 100%;
   background: var(--surface-1);
   border: 1px solid var(--hairline);
   border-radius: 12px;
 }
 
-.checklist.complete {
-  border-color: color-mix(in srgb, var(--success) 45%, var(--hairline));
+.checklist-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+  border-radius: 9999px;
 }
 
 .checklist-head {
@@ -130,11 +145,6 @@ defineExpose({ reload: load })
 .head-icon {
   flex-shrink: 0;
   color: var(--accent);
-}
-
-.checklist.complete .head-icon,
-.checklist.complete .head-title {
-  color: var(--success);
 }
 
 .head-title {
@@ -161,10 +171,6 @@ defineExpose({ reload: load })
   background: var(--accent);
   border-radius: 9999px;
   transition: width 0.3s;
-}
-
-.checklist.complete .head-bar span {
-  background: var(--success);
 }
 
 .head-chevron {

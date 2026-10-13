@@ -1,8 +1,10 @@
 <template>
   <div class="settings-view">
-    <h1 class="page-title">{{ $t('settings.title') }}</h1>
-
-    <SetupChecklist v-if="isAdmin" ref="checklist" @open="openStep" />
+    <!-- Настроенная система — надпись справа от заголовка; иначе чек-лист во всю строку под ним -->
+    <div class="settings-head">
+      <h1 class="page-title">{{ $t('settings.title') }}</h1>
+      <SetupChecklist v-if="isAdmin" ref="checklist" @open="openStep" />
+    </div>
 
     <div class="settings-layout">
       <!-- Left menu -->
@@ -82,12 +84,19 @@ const visibleTabs = computed(() => tabs.filter(tab => !tab.adminOnly || isAdmin.
 </script>
 
 <style scoped>
+.settings-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
 .page-title {
   font-size: 20px;
   font-weight: 600;
   color: var(--text-bright);
   letter-spacing: -0.4px;
-  margin-bottom: 24px;
 }
 
 .settings-layout {
