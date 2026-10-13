@@ -38,6 +38,14 @@ defineEmits(['click'])
   border-radius: 8px;
   transition: all 0.15s;
   white-space: nowrap;
+  max-width: 100%;
+}
+
+/* На телефоне длинная подпись переносится, а не выталкивает кнопку за край */
+@media (max-width: 480px) {
+  .app-btn {
+    white-space: normal;
+  }
 }
 
 .primary {

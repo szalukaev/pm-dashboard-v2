@@ -463,6 +463,7 @@ onMounted(() => fetchAll())
 
 .header-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
