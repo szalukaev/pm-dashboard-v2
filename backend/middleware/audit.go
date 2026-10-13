@@ -12,8 +12,8 @@ import (
 	"time"
 )
 
-// maxAuditBodyBytes caps how much of a request body is read for the audit trail.
-const maxAuditBodyBytes = 1 << 20 // 1 MiB
+// maxAuditBodyBytes — сколько байт тела запроса читается для журнала аудита.
+const maxAuditBodyBytes = 1 << 20 // 1 МиБ
 
 type AuditMiddleware struct {
 	DB **sql.DB
@@ -35,14 +35,14 @@ func (w *auditResponseWriter) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
-// ClientIP extracts the real client address:
-// X-Real-IP → first X-Forwarded-For hop → host part of RemoteAddr.
+// ClientIP определяет настоящий адрес клиента:
+// X-Real-IP → первый адрес в X-Forwarded-For → хост из RemoteAddr.
 func ClientIP(r *http.Request) string {
 	if ip := r.Header.Get("X-Real-IP"); ip != "" {
 		return ip
 	}
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		// First hop is the original client when the chain is built correctly.
+		// Первый адрес — исходный клиент, если цепочка собрана правильно.
 		if i := strings.IndexByte(xff, ','); i >= 0 {
 			return strings.TrimSpace(xff[:i])
 		}
@@ -57,44 +57,44 @@ func ClientIP(r *http.Request) string {
 
 func (m *AuditMiddleware) Log(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Only audit mutating requests
+		// В журнал идут только изменяющие запросы
 		if r.Method == "GET" || r.Method == "OPTIONS" || r.Method == "HEAD" {
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		// Skip login/logout (handled separately)
+		// Вход и выход записываются отдельно
 		if strings.HasPrefix(r.URL.Path, "/api/auth/") {
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		// Read request body (capped — a huge payload must not OOM the process)
+		// Тело читается с пределом: огромный запрос не должен исчерпать память
 		var bodyBytes []byte
-		// An uploaded file is not something to keep in the trail, and it may
-		// be larger than the cap: its handler reads it itself.
+		// Загружаемый файл в журнале не нужен и может быть больше предела:
+		// его читает сам обработчик.
 		if r.Body != nil && !strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/") {
 			r.Body = http.MaxBytesReader(w, r.Body, maxAuditBodyBytes)
 			bodyBytes, _ = io.ReadAll(r.Body)
 			r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 		}
 
-		// Get user from context
+		// Пользователь — из контекста запроса
 		userID, _ := r.Context().Value(UserIDKey).(int)
 
-		// Determine action and entity from method + path
+		// Действие и сущность определяются по методу и пути
 		action := methodToAction(r.Method)
 		entityType, entityID := parseEntity(r.URL.Path)
 
-		// Wrap response writer
+		// Обёртка запоминает код ответа
 		aw := &auditResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}
 
-		// Call next handler
+		// Сам запрос
 		next.ServeHTTP(aw, r)
 
-		// Log after response
-		// before_state is a reserved column (JSONB) kept for future use;
-		// it is not populated yet and defaults to NULL in the DB.
+		// Запись делается после ответа.
+		// before_state — столбец (JSONB), оставленный на будущее: пока не
+		// заполняется и в базе равен NULL.
 		var afterState interface{}
 		if len(bodyBytes) > 0 {
 			json.Unmarshal(bodyBytes, &afterState)
@@ -104,8 +104,8 @@ func (m *AuditMiddleware) Log(next http.Handler) http.Handler {
 		userAgent := r.UserAgent()
 		statusCode := aw.statusCode
 
-		// entity_id is BIGINT: a path without a numeric id (POST /api/contracts)
-		// must be stored as NULL, otherwise the INSERT fails and the record is lost.
+		// entity_id — BIGINT: путь без числового id (POST /api/contracts)
+		// записывается как NULL, иначе INSERT падает и запись теряется.
 		var entityIDArg interface{}
 		if n, err := strconv.ParseInt(entityID, 10, 64); err == nil {
 			entityIDArg = n
@@ -129,7 +129,7 @@ func (m *AuditMiddleware) LogLogin(userID int, username string, success bool, r 
 		action = "login_failed"
 	}
 	afterData, _ := json.Marshal(map[string]interface{}{"username": username, "success": success})
-	// user_id references users(id): an unknown user (failed login) is stored as NULL.
+	// user_id ссылается на users(id): неизвестный пользователь (неудачный вход) записывается как NULL.
 	var userIDArg interface{}
 	if userID > 0 {
 		userIDArg = userID
@@ -147,7 +147,7 @@ func (m *AuditMiddleware) LogLogout(userID int, r *http.Request) {
 		time.Now(), userID, ClientIP(r), r.UserAgent())
 }
 
-// auditSecretKeys are request body fields that must never reach audit_log.
+// auditSecretKeys — поля тела запроса, которые не должны попасть в audit_log.
 var auditSecretKeys = map[string]bool{
 	"password":         true,
 	"new_password":     true,
@@ -176,7 +176,7 @@ func isSecretKey(name string) bool {
 	return false
 }
 
-// maskSecrets replaces secret values in a decoded JSON body (recursively).
+// maskSecrets заменяет секретные значения в разобранном теле JSON (рекурсивно).
 func maskSecrets(v interface{}) interface{} {
 	switch val := v.(type) {
 	case map[string]interface{}:
@@ -221,7 +221,7 @@ func parseEntity(path string) (string, string) {
 	if len(parts) > 1 {
 		entityID = parts[1]
 	}
-	// Clean up entity name
+	// Имя сущности приводится к принятому виду
 	switch entity {
 	case "organizations":
 		return "organization", entityID

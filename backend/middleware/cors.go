@@ -7,7 +7,7 @@ import (
 )
 
 func CORSMiddleware(next http.Handler) http.Handler {
-	// Allowed origins — comma-separated from env, or default local dev
+	// Разрешённые источники — через запятую из окружения; по умолчанию локальная разработка
 	allowedOrigins := map[string]bool{
 		"http://localhost:3000": true,
 		"http://localhost:8080": true,
@@ -25,7 +25,7 @@ func CORSMiddleware(next http.Handler) http.Handler {
 		origin := r.Header.Get("Origin")
 		if allowedOrigins[origin] {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
-			// Vary: Origin — responses differ per Origin (caching correctness).
+			// Vary: Origin — ответы различаются по Origin, это нужно кэшам.
 			w.Header().Add("Vary", "Origin")
 		}
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
@@ -40,10 +40,10 @@ func CORSMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// maxJSONBodyBytes is the maximum accepted JSON request body size.
-const maxJSONBodyBytes = 1 << 20 // 1 MiB
+// maxJSONBodyBytes — наибольший принимаемый размер тела JSON-запроса.
+const maxJSONBodyBytes = 1 << 20 // 1 МиБ
 
-// LimitJSONBody wraps r.Body with a size cap for application/json requests.
+// LimitJSONBody ограничивает размер r.Body у запросов application/json.
 func LimitJSONBody(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Body != nil && strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
@@ -53,7 +53,7 @@ func LimitJSONBody(next http.Handler) http.Handler {
 	})
 }
 
-// SecurityHeaders sets baseline hardening headers on every response.
+// SecurityHeaders ставит базовые защитные заголовки на каждый ответ.
 func SecurityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")

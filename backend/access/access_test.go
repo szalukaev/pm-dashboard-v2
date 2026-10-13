@@ -55,7 +55,7 @@ func TestEffective(t *testing.T) {
 	})
 
 	t.Run("a group hides tabs from a user who has all of them", func(t *testing.T) {
-		template := Permissions{AllProjects: true} // tabs: everything
+		template := Permissions{AllProjects: true} // вкладки: все
 		got := effective(nil, &template, []Permissions{groupA})
 		if got.VisibleTabs == nil || !reflect.DeepEqual(*got.VisibleTabs, []string{"tasks"}) {
 			t.Errorf("tabs = %v, want [tasks]", got.VisibleTabs)
@@ -69,7 +69,7 @@ func TestEffective(t *testing.T) {
 		if !reflect.DeepEqual(*got.VisibleTabs, []string{"analytics"}) || !reflect.DeepEqual(*got.Widgets, []string{"stats"}) {
 			t.Errorf("tabs = %v, widgets = %v, want the user's own", *got.VisibleTabs, *got.Widgets)
 		}
-		// Only the group that sets widgets decides them
+		// Виджеты определяет только та группа, которая их задаёт
 		withWidgets := Permissions{Widgets: keys("deadlines")}
 		got = effective(&individual, nil, []Permissions{silent, withWidgets})
 		if !reflect.DeepEqual(*got.Widgets, []string{"deadlines"}) || !reflect.DeepEqual(*got.VisibleTabs, []string{"analytics"}) {
@@ -139,7 +139,7 @@ func TestGroupsNarrow(t *testing.T) {
 		if !reflect.DeepEqual(s.AllowedProjects, []int{3}) || !reflect.DeepEqual(s.AllowedTeam, []int{10}) {
 			t.Errorf("projects = %v, team = %v", s.AllowedProjects, s.AllowedTeam)
 		}
-		// Not even to a user with no rights of their own
+		// Даже пользователю без собственных прав
 		none := newScope(1, false, effective(nil, nil, []Permissions{{AllProjects: true, AllTeam: true}}),
 			userFacts{limit: limitOf([]Permissions{{AllProjects: true, AllTeam: true}})})
 		if none.AllowedAllProjects || len(none.AllowedProjects) != 0 || none.AllowedAllTeam {
@@ -159,7 +159,7 @@ func TestGroupsNarrow(t *testing.T) {
 		if !reflect.DeepEqual(s.AllowedProjects, []int{1, 5}) || !reflect.DeepEqual(s.AllowedTeam, []int{10, 13}) {
 			t.Errorf("projects = %v, team = %v", s.AllowedProjects, s.AllowedTeam)
 		}
-		// A group that allows everything lifts the restriction of the others
+		// Группа, разрешающая всё, снимает ограничение остальных
 		s = scope(own, userFacts{}, Permissions{ProjectIDs: []int{1}}, Permissions{AllProjects: true})
 		if !reflect.DeepEqual(s.AllowedProjects, []int{1, 2, 3, 4, 5}) {
 			t.Errorf("with an unrestricted group: projects = %v", s.AllowedProjects)
@@ -167,12 +167,12 @@ func TestGroupsNarrow(t *testing.T) {
 	})
 
 	t.Run("a group that names nothing has no say", func(t *testing.T) {
-		// A group made only to hide tabs must not take the data away
+		// Группа, созданная только чтобы скрыть вкладки, данные не отнимает
 		s := scope(own, userFacts{}, Permissions{VisibleTabs: keys("tasks")})
 		if !reflect.DeepEqual(s.AllowedProjects, []int{1, 2, 3, 4, 5}) || !reflect.DeepEqual(s.AllowedTeam, []int{10, 11, 12, 13}) {
 			t.Errorf("projects = %v, team = %v", s.AllowedProjects, s.AllowedTeam)
 		}
-		// It restricts one side only when it names only that side
+		// Ограничивает одну сторону, если названа только она
 		s = scope(own, userFacts{}, Permissions{ProjectIDs: []int{2}})
 		if !reflect.DeepEqual(s.AllowedProjects, []int{2}) || !reflect.DeepEqual(s.AllowedTeam, []int{10, 11, 12, 13}) {
 			t.Errorf("projects = %v, team = %v", s.AllowedProjects, s.AllowedTeam)
@@ -217,7 +217,7 @@ func TestScope(t *testing.T) {
 	member := 42
 
 	t.Run("administrator is never restricted", func(t *testing.T) {
-		// Whatever is stored for an administrator is ignored.
+		// Что бы ни было записано для администратора, это не учитывается.
 		s := newScope(1, true, Permissions{ReadOnly: true, VisibleTabs: keys("tasks")}, userFacts{})
 		if s.ReadOnly || !s.TabVisible("payments") || !s.AllowsProject(123) || !s.AllowsMember(5) {
 			t.Errorf("admin scope = %+v", s)
@@ -300,14 +300,14 @@ func TestScope(t *testing.T) {
 	t.Run("rights as in the data source", func(t *testing.T) {
 		facts := userFacts{sourceProjects: []int{20, 10}}
 
-		// The template gives the projects of the source and the whole team
+		// Шаблон даёт проекты источника и всю команду
 		template := Permissions{FromSource: true, AllTeam: true}
 		s := newScope(5, false, effective(nil, &template, nil), facts)
 		if s.AllowedAllProjects || !reflect.DeepEqual(s.AllowedProjects, []int{10, 20}) || !s.AllowedAllTeam {
 			t.Errorf("scope = %+v", s)
 		}
 
-		// A group narrows them and cannot open a project the source does not give
+		// Группа их сужает и не может открыть проект, которого источник не даёт
 		group := []Permissions{{ProjectIDs: []int{20, 30}}}
 		withGroup := facts
 		withGroup.limit = limitOf(group)
@@ -316,8 +316,8 @@ func TestScope(t *testing.T) {
 			t.Errorf("with a group: projects = %v", s.AllowedProjects)
 		}
 
-		// The source is the ceiling for the team too: of the two members a
-		// group allows, only the one the source shows is visible
+		// Источник — потолок и для команды: из двух сотрудников, разрешённых
+		// группой, виден только тот, кого показывает источник
 		visible := []int{7}
 		group = []Permissions{{TeamIDs: []int{7, 8}}}
 		s = newScope(5, false, effective(nil, &template, group),
@@ -325,19 +325,19 @@ func TestScope(t *testing.T) {
 		if s.AllowedAllTeam || !reflect.DeepEqual(s.AllowedTeam, []int{7}) {
 			t.Errorf("team = %v (all: %v), want [7]", s.AllowedTeam, s.AllowedAllTeam)
 		}
-		// Until the members are read from the source there is no ceiling yet
+		// Пока сотрудники из источника не прочитаны, потолка ещё нет
 		s = newScope(5, false, effective(nil, &template, nil), userFacts{sourceProjects: []int{10}})
 		if !s.AllowedAllTeam {
 			t.Error("members not read yet: the template's own team must apply")
 		}
 
-		// Without the flag the membership in the source gives nothing
+		// Без флага участие в проектах источника ничего не даёт
 		s = newScope(5, false, Permissions{ProjectIDs: []int{30}}, facts)
 		if !reflect.DeepEqual(s.AllowedProjects, []int{30}) {
 			t.Errorf("without the flag: projects = %v", s.AllowedProjects)
 		}
 
-		// A user not linked to the source yet has no projects there
+		// У пользователя, ещё не привязанного к источнику, проектов там нет
 		s = newScope(5, false, effective(nil, &template, nil), userFacts{})
 		if len(s.AllowedProjects) != 0 || s.AllowsProject(10) {
 			t.Errorf("not linked: projects = %v", s.AllowedProjects)
@@ -394,13 +394,13 @@ func TestPrefixed(t *testing.T) {
 	}
 }
 
-// Every widget of the Analytics tab can be allowed or hidden through rights.
+// Каждый виджет вкладки «Аналитика» можно разрешить или скрыть через права.
 func TestWidgetKeys(t *testing.T) {
 	all := []string{"stats", "health", "velocity", "team_load", "hours", "bug_hours", "distribution", "deadlines", "gantt"}
 	if !reflect.DeepEqual(Widgets, all) {
 		t.Fatalf("widgets = %v, want %v", Widgets, all)
 	}
-	// Given in any order with an unknown key, they are kept in the standard order
+	// Переданные в любом порядке и с неизвестным ключом, они выстраиваются в принятом порядке
 	p := Permissions{Widgets: keys("deadlines", "bug_hours", "nonsense", "velocity", "hours")}.Normalized()
 	if want := []string{"velocity", "hours", "bug_hours", "deadlines"}; !reflect.DeepEqual(*p.Widgets, want) {
 		t.Errorf("widgets = %v, want %v", *p.Widgets, want)

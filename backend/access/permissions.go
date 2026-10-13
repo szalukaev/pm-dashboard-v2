@@ -1,10 +1,10 @@
-// Package access decides what data a user may see and change.
+// Package access решает, какие данные пользователь видит и может менять.
 //
-// The administrator gives rights individually or through a role template;
-// the groups of a user never add to them, they only narrow them. The user
-// may narrow the result further in their settings (selected projects and
-// team) but can never widen it. Every handler that returns data
-// asks this package for a Scope and filters by it in SQL.
+// Права администратор выдаёт лично или через шаблон роли; группы пользователя
+// никогда их не добавляют, а только сужают. Сам пользователь может сузить
+// итог ещё сильнее в настройках (выбранные проекты и команда), но расширить
+// не может. Каждый обработчик, отдающий данные, получает здесь Scope и
+// фильтрует по нему в SQL.
 package access
 
 import (
@@ -12,22 +12,22 @@ import (
 	"sort"
 )
 
-// Tabs and analytics widgets that can be hidden from a user.
+// Вкладки и виджеты аналитики, которые можно скрыть от пользователя.
 var (
 	Tabs    = []string{"tasks", "analytics", "kanban", "sprint", "payments"}
 	Widgets = []string{"stats", "health", "velocity", "team_load", "hours", "bug_hours", "distribution", "deadlines", "gantt"}
 )
 
-// What a user may do with sprints, each allowed separately.
+// Действия со спринтами; каждое разрешается отдельно.
 const (
-	SprintCreate = "create" // create a sprint
-	SprintEdit   = "edit"   // change its name, dates, description
-	SprintTasks  = "tasks"  // add and remove its tasks
-	SprintClose  = "close"  // close (and reopen) it
-	SprintDelete = "delete" // delete it
+	SprintCreate = "create" // создать спринт
+	SprintEdit   = "edit"   // изменить название, даты, описание
+	SprintTasks  = "tasks"  // добавлять и убирать задачи
+	SprintClose  = "close"  // закрыть (и открыть снова)
+	SprintDelete = "delete" // удалить
 )
 
-// SprintActions lists the sprint actions in the order they are shown.
+// SprintActions — действия со спринтами в том порядке, в каком они показаны.
 var SprintActions = []string{SprintCreate, SprintEdit, SprintTasks, SprintClose, SprintDelete}
 
 // Виды доски Kanban, каждый разрешается отдельно.
@@ -39,42 +39,42 @@ const (
 // KanbanModes — виды доски в том порядке, в каком они показаны.
 var KanbanModes = []string{KanbanUsers, KanbanStatuses}
 
-// Permissions is one permission set: of a user, a group or a role template.
+// Permissions — один набор прав: пользователя, группы или шаблона роли.
 type Permissions struct {
 	ProjectIDs []int `json:"project_ids"`
 	TeamIDs    []int `json:"team_ids"`
-	// AllProjects / AllTeam: everything, the lists are ignored.
+	// AllProjects / AllTeam: всё целиком, списки не учитываются.
 	AllProjects bool `json:"all_projects"`
 	AllTeam     bool `json:"all_team"`
-	// ShowUnassigned: issues without an assignee are visible too.
+	// ShowUnassigned: видны и задачи без исполнителя.
 	ShowUnassigned bool `json:"show_unassigned"`
-	// OwnTasksOnly adds the issues assigned to the user themselves.
+	// OwnTasksOnly добавляет задачи, назначенные самому пользователю.
 	OwnTasksOnly bool `json:"own_tasks_only"`
-	// ReadOnly: data may be viewed but not changed.
+	// ReadOnly: данные можно смотреть, но не менять.
 	ReadOnly bool `json:"read_only"`
-	// FromSource adds the projects the user is a member of in the data
-	// source ("rights as in Redmine"), kept up to date by the sync.
+	// FromSource добавляет проекты, в которых пользователь состоит в
+	// источнике данных («права как в Redmine»); список обновляет синхронизация.
 	FromSource bool `json:"from_source"`
-	// VisibleTabs / Widgets: nil = everything, otherwise the allowed keys.
+	// VisibleTabs / Widgets: nil — всё, иначе разрешённые ключи.
 	VisibleTabs *[]string `json:"visible_tabs"`
 	Widgets     *[]string `json:"widgets"`
-	// SprintActions: nil = every action, otherwise the allowed ones.
+	// SprintActions: nil — все действия, иначе разрешённые.
 	SprintActions *[]string `json:"sprint_actions"`
 	// KanbanModes: nil = оба вида доски, иначе разрешённые.
 	KanbanModes *[]string `json:"kanban_modes"`
 }
 
-// Columns is the list of permission columns shared by user_permissions,
-// group_permissions and role_templates, in the order Scan and Values use.
+// Columns — столбцы прав, общие для user_permissions, group_permissions и
+// role_templates, в том порядке, в каком их читает Scan и отдаёт Values.
 const Columns = "project_ids, team_ids, visible_tabs, widgets, all_projects, all_team, own_tasks_only, read_only, from_source, show_unassigned, sprint_actions, kanban_modes"
 
-// rawPermissions receives the permission columns of a row.
+// rawPermissions принимает столбцы прав одной строки.
 type rawPermissions struct {
 	projects, team, tabs, widgets, sprint, kanban []byte
 	p                                             Permissions
 }
 
-// keyList decodes a nullable JSON list of keys; NULL means "everything".
+// keyList разбирает JSON-список ключей из столбца, допускающего NULL; NULL — «всё».
 func keyList(raw []byte) *[]string {
 	if len(raw) == 0 || string(raw) == "null" {
 		return nil
@@ -86,7 +86,7 @@ func keyList(raw []byte) *[]string {
 	return &keys
 }
 
-// keyValue encodes a key list for a nullable JSON column.
+// keyValue готовит список ключей к записи в JSON-столбец, допускающий NULL.
 func keyValue(keys *[]string) interface{} {
 	if keys == nil {
 		return nil
@@ -95,7 +95,7 @@ func keyValue(keys *[]string) interface{} {
 	return data
 }
 
-// dest returns the scan destinations for Columns.
+// dest возвращает приёмники Scan для столбцов Columns.
 func (r *rawPermissions) dest() []interface{} {
 	return []interface{}{&r.projects, &r.team, &r.tabs, &r.widgets,
 		&r.p.AllProjects, &r.p.AllTeam, &r.p.OwnTasksOnly, &r.p.ReadOnly, &r.p.FromSource, &r.p.ShowUnassigned,
@@ -113,7 +113,7 @@ func (r *rawPermissions) permissions() Permissions {
 	return p.Normalized()
 }
 
-// Values returns the values for Columns, ready for INSERT / UPDATE.
+// Values возвращает значения столбцов Columns, готовые для INSERT / UPDATE.
 func (p Permissions) Values() []interface{} {
 	p = p.Normalized()
 	projects, _ := json.Marshal(p.ProjectIDs)
@@ -123,8 +123,8 @@ func (p Permissions) Values() []interface{} {
 		keyValue(p.SprintActions), keyValue(p.KanbanModes)}
 }
 
-// Normalized returns the set with sorted lists without duplicates, non-nil
-// id lists and only known tab / widget keys.
+// Normalized возвращает набор с отсортированными списками без повторов, с
+// непустыми (не nil) списками идентификаторов и только с известными ключами.
 func (p Permissions) Normalized() Permissions {
 	p.ProjectIDs = uniqueInts(p.ProjectIDs)
 	p.TeamIDs = uniqueInts(p.TeamIDs)
@@ -135,13 +135,13 @@ func (p Permissions) Normalized() Permissions {
 	return p
 }
 
-// Limit is the most the groups of a user allow, for projects and for the
-// team separately. A nil list means the groups do not restrict that side.
+// Limit — предел, который задают группы пользователя, отдельно для проектов
+// и для команды. Список nil значит, что с этой стороны группы не ограничивают.
 //
-// Several groups are summed: what at least one of them allows is allowed.
-// A group that names no projects (or no members) has no say about them — it
-// may exist only to hide tabs — and a group that allows all of them lifts
-// the restriction.
+// Несколько групп складываются: разрешено то, что разрешает хотя бы одна.
+// Группа, в которой не названы проекты (или сотрудники), на них не влияет —
+// она может существовать только ради скрытия вкладок, — а группа, которая
+// разрешает все, снимает ограничение.
 type Limit struct {
 	Projects *[]int
 	Team     *[]int
@@ -172,7 +172,7 @@ func limitOf(groups []Permissions) Limit {
 	}
 }
 
-// restrict narrows what a user has (everything, or a list) to a limit.
+// restrict сужает то, что есть у пользователя (всё или список), до предела.
 func restrict(all bool, list []int, limit *[]int) (bool, []int) {
 	switch {
 	case limit == nil:
@@ -197,7 +197,7 @@ func uniqueInts(list []int) []int {
 	return result
 }
 
-// knownKeys keeps the keys that exist, in the canonical order; nil stays nil.
+// knownKeys оставляет существующие ключи в принятом порядке; nil остаётся nil.
 func knownKeys(keys *[]string, known []string) *[]string {
 	if keys == nil {
 		return nil

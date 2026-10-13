@@ -38,15 +38,16 @@ func RequireAuth(sessionStore db.SessionStore, pgDB **sql.DB) func(http.Handler)
 				return
 			}
 
-			// Look up session in Redis/memory store
+			// Сессия ищется в Redis или в хранилище в памяти
 			userID, err := sessionStore.Get(r.Context(), cookie.Value)
 			if err != nil {
 				http.Error(w, `{"error":"UNAUTHORIZED"}`, http.StatusUnauthorized)
 				return
 			}
 
-			// What the user may see is resolved once per request. A deleted or
-			// blocked user has no scope: their sessions stop working at once.
+			// Что видит пользователь, определяется один раз на запрос. У
+			// удалённого или заблокированного пользователя Scope нет: его
+			// сессии перестают работать сразу.
 			scope, err := (&access.Resolver{DB: pgDB}).Scope(userID)
 			if err != nil {
 				http.Error(w, `{"error":"UNAUTHORIZED"}`, http.StatusUnauthorized)
@@ -65,8 +66,8 @@ func RequireAuth(sessionStore db.SessionStore, pgDB **sql.DB) func(http.Handler)
 	}
 }
 
-// RequireWSSession authenticates a WebSocket upgrade via the session cookie.
-// DB role lookup is skipped — presence of a valid session is enough for events.
+// RequireWSSession проверяет подключение WebSocket по куке сессии. Роль в
+// базе не запрашивается: для событий достаточно действующей сессии.
 func RequireWSSession(sessionStore db.SessionStore, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie("session_id")
@@ -95,8 +96,8 @@ func RequireAdmin(next http.Handler) http.Handler {
 	})
 }
 
-// GetScope returns what the current user may see. Outside RequireAuth it is
-// an empty scope that shows nothing.
+// GetScope возвращает то, что видит текущий пользователь. Вне RequireAuth
+// это пустой Scope, который не показывает ничего.
 func GetScope(r *http.Request) *access.Scope {
 	if scope, ok := r.Context().Value(scopeKey).(*access.Scope); ok {
 		return scope
@@ -104,13 +105,13 @@ func GetScope(r *http.Request) *access.Scope {
 	return &access.Scope{ReadOnly: true, VisibleTabs: &[]string{}}
 }
 
-// WithScope returns the request with the given scope; for tests.
+// WithScope возвращает запрос с заданным Scope; для тестов.
 func WithScope(r *http.Request, scope *access.Scope) *http.Request {
 	return r.WithContext(context.WithValue(r.Context(), scopeKey, scope))
 }
 
-// RequireTab rejects requests to the data of a tab the administrator hid
-// from the user.
+// RequireTab отклоняет запросы к данным вкладки, которую администратор
+// скрыл от пользователя.
 func RequireTab(tab string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -124,16 +125,16 @@ func RequireTab(tab string) func(http.Handler) http.Handler {
 	}
 }
 
-// TabRule ties a part of the API to the tab that shows its data.
+// TabRule связывает часть API с вкладкой, которая показывает её данные.
 type TabRule struct {
-	// Path is matched exactly, and as a prefix (Path + "/") unless Exact.
+	// Path сравнивается точно, а если Exact не задан — ещё и как префикс (Path + "/").
 	Path  string
 	Exact bool
 	Tab   string
 }
 
-// RequireTabs applies RequireTab to every request matching a rule, so a tab
-// hidden from a user is closed on the server and not only in the menu.
+// RequireTabs применяет RequireTab ко всем запросам, подходящим под правило:
+// скрытая от пользователя вкладка закрыта и на сервере, а не только в меню.
 func RequireTabs(rules []TabRule) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -149,8 +150,8 @@ func RequireTabs(rules []TabRule) func(http.Handler) http.Handler {
 	}
 }
 
-// RequireSprint rejects a request when the user is not allowed the given
-// action with sprints (access.Sprint* constants).
+// RequireSprint отклоняет запрос, если пользователю не разрешено это
+// действие со спринтами (константы access.Sprint*).
 func RequireSprint(action string, next http.HandlerFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !GetScope(r).CanSprint(action) {
@@ -162,7 +163,7 @@ func RequireSprint(action string, next http.HandlerFunc) http.Handler {
 	})
 }
 
-// RequireWrite rejects requests of a read-only user.
+// RequireWrite отклоняет запросы пользователя с правом только на чтение.
 func RequireWrite(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if GetScope(r).ReadOnly {

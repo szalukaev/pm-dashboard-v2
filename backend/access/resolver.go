@@ -8,39 +8,39 @@ import (
 	"pm-dashboard/datasource"
 )
 
-// ErrUserNotFound is returned for an unknown or blocked user.
+// ErrUserNotFound возвращается для неизвестного или заблокированного пользователя.
 var ErrUserNotFound = errors.New("user not found")
 
-// Resolver reads permissions from the database.
+// Resolver читает права из базы.
 type Resolver struct {
 	DB **sql.DB
 }
 
-// NamedPermissions is a permission set that came from a template or a group.
+// NamedPermissions — набор прав, пришедший из шаблона или группы.
 type NamedPermissions struct {
 	ID          int         `json:"id"`
 	Name        string      `json:"name"`
 	Permissions Permissions `json:"permissions"`
 }
 
-// Grants is everything the administrator gave a user, by source.
+// Grants — всё, что администратор выдал пользователю, по источникам.
 type Grants struct {
-	// Individual is nil when rights are not set individually.
+	// Individual равен nil, если лично права не заданы.
 	Individual *Permissions       `json:"individual"`
 	Template   *NamedPermissions  `json:"template"`
 	Groups     []NamedPermissions `json:"groups"`
-	// Effective is what the sources come to: the user's own rights narrowed
-	// by the groups. It does not include what "rights as in the data
-	// source" adds — that depends on the source, see Scope.
+	// Effective — итог по источникам: собственные права пользователя,
+	// суженные группами. Сюда не входит то, что добавляют «права как в
+	// источнике данных», — это зависит от источника, см. Scope.
 	Effective Permissions `json:"effective"`
 
-	// own: the rights before the groups narrow them; limit: what the groups
-	// allow. Both with subprojects.
+	// own: права до сужения группами; limit: то, что разрешают группы.
+	// Оба — с подпроектами.
 	own   Permissions
 	limit Limit
 }
 
-// Grants loads the permission sources of a user and their sum.
+// Grants загружает источники прав пользователя и их итог.
 func (r *Resolver) Grants(userID int) (*Grants, error) {
 	db := *r.DB
 	g := &Grants{Groups: []NamedPermissions{}}
@@ -97,9 +97,9 @@ func (r *Resolver) Grants(userID int) (*Grants, error) {
 	}
 	g.own = effective(g.Individual, templateSet, groupSets)
 	g.limit = limitOf(groupSets)
-	// A right to a project covers all its subprojects, including the ones
-	// created later: the lists are expanded every time, not when they are
-	// saved — and before they are compared with each other.
+	// Право на проект покрывает все его подпроекты, включая созданные
+	// позже: списки раскрываются при каждом чтении, а не при сохранении, —
+	// и до того, как сравниваются друг с другом.
 	if g.own.ProjectIDs, err = expand(db, g.own.ProjectIDs); err != nil {
 		return nil, err
 	}
@@ -124,7 +124,7 @@ func expand(db *sql.DB, projects []int) ([]int, error) {
 	return datasource.ExpandProjects(db, projects)
 }
 
-// Scope returns what the user may see right now.
+// Scope возвращает то, что пользователь видит прямо сейчас.
 func (r *Resolver) Scope(userID int) (*Scope, error) {
 	db := *r.DB
 
@@ -149,7 +149,7 @@ func (r *Resolver) Scope(userID int) (*Scope, error) {
 	var selectedProjects, selectedTeam []int
 	json.Unmarshal(projectsJSON, &selectedProjects)
 	json.Unmarshal(teamJSON, &selectedTeam)
-	// A selected project stands for its whole subtree.
+	// Выбранный проект означает всё его поддерево.
 	if len(selectedProjects) > 0 {
 		if expanded, err := datasource.ExpandProjects(db, selectedProjects); err == nil {
 			selectedProjects = expanded
@@ -169,16 +169,17 @@ func (r *Resolver) Scope(userID int) (*Scope, error) {
 	return newScope(userID, false, grants.own, facts), nil
 }
 
-// UsesSourceProjects reports whether the rights of the user include the
-// projects of the data source, i.e. whether they must be kept up to date.
+// UsesSourceProjects сообщает, входят ли в права пользователя проекты
+// источника данных, то есть нужно ли поддерживать их список в актуальном виде.
 func (r *Resolver) UsesSourceProjects(userID int) bool {
 	grants, err := r.Grants(userID)
 	return err == nil && grants.own.FromSource
 }
 
-// SyncProjects returns the projects whose issues must be synced: the union
-// of what every active user is shown. A user who may see every project and
-// selected none adds nothing — the whole data source is not synced by default.
+// SyncProjects возвращает проекты, задачи которых нужно синхронизировать:
+// объединение того, что показано каждому активному пользователю. Тот, кому
+// доступны все проекты, но ни один не выбран, ничего не добавляет — весь
+// источник данных по умолчанию не синхронизируется.
 func (r *Resolver) SyncProjects() ([]int, error) {
 	rows, err := (*r.DB).Query("SELECT id FROM users WHERE NOT is_blocked")
 	if err != nil {
@@ -206,7 +207,7 @@ func (r *Resolver) SyncProjects() ([]int, error) {
 	return uniqueInts(projects), nil
 }
 
-// prefixed puts a table alias before every column of a comma separated list.
+// prefixed ставит псевдоним таблицы перед каждым столбцом списка через запятую.
 func prefixed(alias, columns string) string {
 	result := ""
 	start := 0

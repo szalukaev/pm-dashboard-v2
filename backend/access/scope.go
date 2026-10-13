@@ -6,17 +6,17 @@ import (
 	"github.com/lib/pq"
 )
 
-// effective returns the rights of a user before the groups narrow them.
+// effective возвращает права пользователя до того, как их сузят группы.
 //
-// The user's own set is the individual one, or the role template when rights
-// are not set individually, or the default — own tasks only. Access to
-// projects and to the team comes from this set alone: groups give nothing,
-// they narrow it (see limitOf and newScope).
+// Собственный набор — личный, либо шаблон роли, если лично права не заданы,
+// либо набор по умолчанию: только свои задачи. Доступ к проектам и команде
+// берётся только из него: группы ничего не дают, они сужают (см. limitOf и
+// newScope).
 //
-// Tabs, widgets and sprint actions follow another rule: a group that sets
-// them has priority, so that a group can hide a tab from its members
-// whatever their own rights say. Several such groups are summed with each
-// other; a group that leaves them at "everything" has no say.
+// Для вкладок, виджетов и действий со спринтами правило другое: группа,
+// которая их задаёт, важнее — так группа может скрыть вкладку от своих
+// участников, что бы ни говорили их собственные права. Несколько таких
+// групп складываются; группа, оставившая «всё», на результат не влияет.
 func effective(individual, template *Permissions, groups []Permissions) Permissions {
 	own := Permissions{OwnTasksOnly: true}
 	switch {
@@ -31,13 +31,13 @@ func effective(individual, template *Permissions, groups []Permissions) Permissi
 		AllProjects: own.AllProjects, AllTeam: own.AllTeam,
 		ShowUnassigned: own.ShowUnassigned,
 	}
-	// Seeing issues without an assignee is a right any source may give
+	// Право видеть задачи без исполнителя может дать любой источник
 	for _, g := range groups {
 		result.ShowUnassigned = result.ShowUnassigned || g.ShowUnassigned
 	}
 	result.VisibleTabs = groupKeys(groups, func(p Permissions) *[]string { return p.VisibleTabs }, own.VisibleTabs)
 	result.Widgets = groupKeys(groups, func(p Permissions) *[]string { return p.Widgets }, own.Widgets)
-	// What may be done with sprints follows the same rule.
+	// Действия со спринтами подчиняются тому же правилу.
 	result.SprintActions = groupKeys(groups, func(p Permissions) *[]string { return p.SprintActions }, own.SprintActions)
 	// Виды доски Kanban — по тому же правилу
 	result.KanbanModes = groupKeys(groups, func(p Permissions) *[]string { return p.KanbanModes }, own.KanbanModes)
@@ -47,8 +47,8 @@ func effective(individual, template *Permissions, groups []Permissions) Permissi
 	return result.Normalized()
 }
 
-// groupKeys returns the tabs or widgets (picked by get) the groups set: the
-// sum over the groups that set them at all, or own when no group does.
+// groupKeys возвращает вкладки или виджеты (их выбирает get), заданные
+// группами: сумму по группам, которые их задают, либо own, если таких нет.
 func groupKeys(groups []Permissions, get func(Permissions) *[]string, own *[]string) *[]string {
 	var result *[]string
 	for _, g := range groups {
@@ -67,67 +67,67 @@ func groupKeys(groups []Permissions, get func(Permissions) *[]string, own *[]str
 	return result
 }
 
-// Scope is what one user may see right now: the maximum set by the
-// administrator, narrowed by the user's own settings.
+// Scope — то, что пользователь видит прямо сейчас: предел, заданный
+// администратором, суженный собственными настройками пользователя.
 type Scope struct {
 	UserID int
 	Admin  bool
-	// ReadOnly: the user may not change data.
+	// ReadOnly: менять данные пользователю нельзя.
 	ReadOnly bool
-	// VisibleTabs / Widgets: nil = everything.
+	// VisibleTabs / Widgets: nil — всё.
 	VisibleTabs *[]string
 	Widgets     *[]string
-	// SprintActions: nil = every action with sprints is allowed.
+	// SprintActions: nil — разрешены все действия со спринтами.
 	SprintActions *[]string
 	// KanbanModes: nil = доступны оба вида доски Kanban.
 	KanbanModes *[]string
 
-	// The maximum set by the administrator.
+	// Предел, заданный администратором.
 	AllowedAllProjects bool
 	AllowedProjects    []int
 	AllowedAllTeam     bool
 	AllowedTeam        []int
 
-	// What is shown: the maximum narrowed by the selected projects and team.
+	// Что показано: предел, суженный выбранными проектами и командой.
 	AllProjects bool
 	Projects    []int
 	AllTeam     bool
 	Team        []int
 
-	// ShowUnassigned: issues without an assignee are visible.
+	// ShowUnassigned: видны задачи без исполнителя.
 	ShowUnassigned bool
 
-	// OwnMember: issues assigned to this member are visible regardless of
-	// the lists above ("own tasks").
+	// OwnMember: задачи этого сотрудника видны независимо от списков выше
+	// («свои задачи»).
 	OwnMember *int
 }
 
-// userFacts is what is known about the user besides the permission sets.
+// userFacts — то, что известно о пользователе помимо наборов прав.
 type userFacts struct {
-	// memberID: who the user is in the data source, nil when not linked.
+	// memberID: кто этот пользователь в источнике данных; nil — не привязан.
 	memberID *int
-	// sourceProjects: the projects the user is a member of in the source.
+	// sourceProjects: проекты, в которых пользователь состоит в источнике.
 	sourceProjects []int
-	// sourceMembers: the members the source shows to the user; nil when
-	// they have not been read yet.
+	// sourceMembers: сотрудники, которых источник показывает пользователю;
+	// nil — ещё не прочитаны.
 	sourceMembers *[]int
-	// limit: the most the groups of the user allow (projects with their
-	// subprojects).
+	// limit: предел, который задают группы пользователя (проекты вместе с
+	// подпроектами).
 	limit Limit
-	// selectedProjects (with subprojects) and selectedTeam: the user's own
-	// choice in the settings.
+	// selectedProjects (с подпроектами) и selectedTeam: собственный выбор
+	// пользователя в настройках.
 	selectedProjects []int
 	selectedTeam     []int
 }
 
-// newScope builds the scope from effective permissions and what is known
-// about the user. perms.ProjectIDs must already include subprojects: a right
-// to a project is a right to its whole branch.
+// newScope собирает Scope из действующих прав и того, что известно о
+// пользователе. В perms.ProjectIDs уже должны входить подпроекты: право на
+// проект — это право на всю его ветку.
 func newScope(userID int, admin bool, perms Permissions, facts userFacts) *Scope {
 	memberID, selectedProjects, selectedTeam := facts.memberID, facts.selectedProjects, facts.selectedTeam
 	s := &Scope{UserID: userID, Admin: admin}
 	if admin {
-		// An administrator sees everything and is never restricted.
+		// Администратор видит всё и ничем не ограничен.
 		s.AllowedAllProjects, s.AllowedAllTeam = true, true
 		s.ShowUnassigned = true
 	} else {
@@ -138,19 +138,19 @@ func newScope(userID int, admin bool, perms Permissions, facts userFacts) *Scope
 		s.KanbanModes = perms.KanbanModes
 		s.AllowedAllProjects, s.AllowedProjects = perms.AllProjects, perms.ProjectIDs
 		if perms.FromSource {
-			// Exactly the projects of the source: membership there is per
-			// project and is not extended to subprojects here.
+			// Ровно проекты источника: участие там задаётся по каждому
+			// проекту и на подпроекты здесь не распространяется.
 			s.AllowedProjects = uniqueInts(append(append([]int{}, perms.ProjectIDs...), facts.sourceProjects...))
 		}
 		s.AllowedAllTeam, s.AllowedTeam = perms.AllTeam, perms.TeamIDs
 		if perms.FromSource {
-			// "As in the source" is a ceiling for the team too: nobody the
-			// source hides from the user is shown here.
+			// «Как в источнике» — потолок и для команды: тот, кого источник
+			// от пользователя скрывает, не показывается и здесь.
 			s.AllowedAllTeam, s.AllowedTeam = restrict(s.AllowedAllTeam, s.AllowedTeam, facts.sourceMembers)
 		}
-		// The groups narrow what the user has and never add to it — after
-		// the source, so that a group cannot open a project or a member
-		// the source does not give.
+		// Группы сужают то, что есть у пользователя, и ничего не добавляют —
+		// после источника, чтобы группа не могла открыть проект или
+		// сотрудника, которых источник не даёт.
 		s.AllowedAllProjects, s.AllowedProjects = restrict(s.AllowedAllProjects, s.AllowedProjects, facts.limit.Projects)
 		s.AllowedAllTeam, s.AllowedTeam = restrict(s.AllowedAllTeam, s.AllowedTeam, facts.limit.Team)
 		if perms.OwnTasksOnly && memberID != nil {
@@ -163,8 +163,8 @@ func newScope(userID int, admin bool, perms Permissions, facts userFacts) *Scope
 	return s
 }
 
-// narrow applies the user's selection to what is allowed. No selection means
-// "everything allowed"; a selection can only reduce it.
+// narrow применяет выбор пользователя к разрешённому. Пустой выбор значит
+// «всё разрешённое»; выбор может только уменьшить его.
 func narrow(allowedAll bool, allowed, selected []int) (bool, []int) {
 	selected = uniqueInts(selected)
 	switch {
@@ -177,24 +177,24 @@ func narrow(allowedAll bool, allowed, selected []int) (bool, []int) {
 	}
 }
 
-// The three conditions below select issues in SQL. alias is the table prefix
-// ("" or "i."); placeholders continue *args.
+// Три условия ниже отбирают задачи в SQL. alias — префикс таблицы ("" или
+// "i."); номера параметров продолжают *args.
 
-// IssueCond: the issues shown in lists — rights narrowed by both the
-// projects and the team the user selected.
+// IssueCond: задачи, показываемые в списках, — права, суженные и проектами,
+// и командой, которые выбрал пользователь.
 func (s *Scope) IssueCond(alias string, args *[]interface{}) string {
 	return s.issueCond(alias, args, s.AllProjects, s.Projects, s.AllTeam, s.Team)
 }
 
-// ProjectIssueCond: the issues of the selected projects whoever they are
-// assigned to (within rights) — for figures and boards "by projects", which
-// the selected team must not thin out.
+// ProjectIssueCond: задачи выбранных проектов, на кого бы они ни были
+// назначены (в пределах прав), — для цифр и досок «по проектам», которые
+// выбранная команда прореживать не должна.
 func (s *Scope) ProjectIssueCond(alias string, args *[]interface{}) string {
 	return s.issueCond(alias, args, s.AllProjects, s.Projects, s.AllowedAllTeam, s.AllowedTeam)
 }
 
-// AllowedIssueCond: every issue the administrator allows, ignoring the
-// user's own selection — for opening or changing one particular issue.
+// AllowedIssueCond: все задачи, разрешённые администратором, без учёта
+// собственного выбора пользователя, — чтобы открыть или изменить одну задачу.
 func (s *Scope) AllowedIssueCond(alias string, args *[]interface{}) string {
 	return s.issueCond(alias, args, s.AllowedAllProjects, s.AllowedProjects, s.AllowedAllTeam, s.AllowedTeam)
 }
@@ -215,8 +215,8 @@ func (s *Scope) issueCond(alias string, args *[]interface{}, allProjects bool, p
 	if !allProjects {
 		add(alias + "project_id = ANY(" + placeholder(pq.Array(projects)) + ")")
 	}
-	// Issues without an assignee belong to nobody's team: they are shown
-	// only to those given the right to see them.
+	// Задачи без исполнителя не относятся ни к чьей команде: их видят
+	// только те, кому дано такое право.
 	assignee := alias + "assigned_to_id"
 	switch {
 	case !allTeam && s.ShowUnassigned:
@@ -235,22 +235,22 @@ func (s *Scope) issueCond(alias string, args *[]interface{}, allProjects bool, p
 	return "(" + cond + ")"
 }
 
-// AllowsProject reports whether the administrator gave access to the project.
+// AllowsProject сообщает, дал ли администратор доступ к проекту.
 func (s *Scope) AllowsProject(id int) bool {
 	return s.AllowedAllProjects || containsInt(s.AllowedProjects, id)
 }
 
-// AllowsMember reports whether the user may see the member of the team.
+// AllowsMember сообщает, вправе ли пользователь видеть сотрудника.
 func (s *Scope) AllowsMember(id int) bool {
 	return s.AllowedAllTeam || containsInt(s.AllowedTeam, id) || (s.OwnMember != nil && *s.OwnMember == id)
 }
 
-// ShowsProject reports whether the project is among those shown now.
+// ShowsProject сообщает, входит ли проект в показываемые сейчас.
 func (s *Scope) ShowsProject(id int) bool {
 	return s.AllProjects || containsInt(s.Projects, id)
 }
 
-// TabVisible reports whether the user may open the tab.
+// TabVisible сообщает, может ли пользователь открыть вкладку.
 func (s *Scope) TabVisible(tab string) bool {
 	if s.Admin || s.VisibleTabs == nil {
 		return true
@@ -263,8 +263,8 @@ func (s *Scope) TabVisible(tab string) bool {
 	return false
 }
 
-// CanSprint reports whether the user may do the action with sprints (one of
-// the Sprint* constants).
+// CanSprint сообщает, разрешено ли пользователю действие со спринтами (одна
+// из констант Sprint*).
 func (s *Scope) CanSprint(action string) bool {
 	if s.Admin || s.SprintActions == nil {
 		return true
@@ -291,7 +291,7 @@ func (s *Scope) CanKanban(mode string) bool {
 	return false
 }
 
-// FilterProjects keeps the ids the administrator allows.
+// FilterProjects оставляет проекты, разрешённые администратором.
 func (s *Scope) FilterProjects(ids []int) []int {
 	if s.AllowedAllProjects {
 		return uniqueInts(ids)
@@ -299,7 +299,7 @@ func (s *Scope) FilterProjects(ids []int) []int {
 	return intersect(uniqueInts(ids), s.AllowedProjects)
 }
 
-// FilterTeam keeps the member ids the administrator allows.
+// FilterTeam оставляет сотрудников, разрешённых администратором.
 func (s *Scope) FilterTeam(ids []int) []int {
 	result := []int{}
 	for _, id := range uniqueInts(ids) {

@@ -30,7 +30,7 @@ func TestRoundTrip(t *testing.T) {
 		t.Error("the encrypted text contains the secret")
 	}
 
-	// A new box over the same store (a restart) reads the old values
+	// Новый Box над тем же хранилищем (перезапуск) читает прежние значения
 	reopened, err := Open(store)
 	if err != nil {
 		t.Fatal(err)
