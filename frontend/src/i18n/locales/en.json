@@ -1252,5 +1252,37 @@
       "FILE_REQUIRED": "No file is chosen",
       "TEMPLATE_SAVE_FAILED": "Could not save the template on the server"
     }
+  },
+  "connections": {
+    "title": "Connections",
+    "hint": "Connection settings of the database and the source system. Available to the administrator only. Only tested settings can be saved.",
+    "load_error": "Could not load the settings",
+    "db": {
+      "title": "Database (PostgreSQL)",
+      "hint": "The password is not shown back: leave the field as it is if it has not changed. Changing the database restarts the system.",
+      "confirm_title": "Changing the database settings requires a restart of the system. Continue?",
+      "confirm_text": "The restart takes up to a minute; the dashboard is unavailable to all users meanwhile. If the new database does not answer at start, the system returns to the previous one.",
+      "unchanged": "The settings have not changed, no restart is needed"
+    },
+    "restart": {
+      "title": "Restarting services…",
+      "hint": "This may take up to a minute. Please do not close or reload the page.",
+      "done": "The system has restarted and runs with the saved settings",
+      "timeout": "The server has not answered in two minutes. Check the containers on the server."
+    },
+    "source": {
+      "title": "Source system (Redmine)",
+      "hint": "The key and the password are not shown back: leave the fields as they are if they have not changed. Changes apply at once, without a restart.",
+      "saved": "Saved. A sync with the new settings has started.",
+      "save_error": "Could not save the settings"
+    },
+    "errors": {
+      "DB_FIELDS_REQUIRED": "Fill in the host, the port and the user. The port is a number from 1 to 65535.",
+      "INVALID_DB_NAME": "Database name: latin letters, digits, underscore and hyphen.",
+      "DB_CONNECTION_FAILED": "Could not connect to the database.",
+      "DB_NO_ADMIN": "This database holds no dashboard data or no administrator — nobody could log in after the restart. Give the database the system has already worked with.",
+      "CONFIG_SAVE_FAILED": "Could not save the settings on the server.",
+      "INVALID_REQUEST": "The request is malformed."
+    }
   }
 }

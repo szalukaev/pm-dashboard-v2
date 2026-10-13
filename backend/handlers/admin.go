@@ -22,6 +22,8 @@ type AdminHandler struct {
 	DB     **sql.DB
 	SQLite *config.SQLiteStore
 	Source *manager.Manager
+	// Restart перезапускает сервер после смены параметров базы; nil — не умеет
+	Restart func()
 }
 
 // Users, their rights, groups and role templates: see access_admin.go.
@@ -200,6 +202,14 @@ func (h *AdminHandler) TestDataSourceConfig(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// Метка вместо секрета значит «не менялся»: проверяем с сохранённым
+	if isSecretMask(req.APIKey) {
+		req.APIKey, _ = h.SQLite.Get("redmine_api_key")
+	}
+	if isSecretMask(req.BasicPasswd) {
+		req.BasicPasswd, _ = h.SQLite.Get("redmine_basic_password")
+	}
+
 	// Validate URL scheme — only http/https are allowed.
 	warning := ""
 	u, err := url.Parse(req.URL)
@@ -327,42 +337,7 @@ func (h *AdminHandler) SaveDataSourceConfig(w http.ResponseWriter, r *http.Reque
 
 // ─── DB Config ───
 
-func (h *AdminHandler) GetDBConfig(w http.ResponseWriter, r *http.Request) {
-	dsn, _ := h.SQLite.Get("db_dsn")
-	// Never return the raw password — mask it inside the DSN.
-	cfg := map[string]string{"dsn": maskDSNPassword(dsn)}
-	utils.JSON(w, http.StatusOK, map[string]interface{}{"config": cfg})
-}
-
-func (h *AdminHandler) TestDBConfig(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		DSN string `json:"dsn"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
-		return
-	}
-	// Cap connection setup time so a black-hole host can't hang the handler.
-	dsn := req.DSN
-	if strings.Contains(dsn, "connect_timeout=") {
-		// already set by caller — leave as-is
-	} else if strings.Contains(dsn, "?") {
-		dsn += "&connect_timeout=5"
-	} else {
-		dsn += "?connect_timeout=5"
-	}
-	testDB, err := sql.Open("postgres", dsn)
-	if err != nil {
-		utils.JSON(w, http.StatusOK, map[string]interface{}{"success": false, "error": err.Error()})
-		return
-	}
-	defer testDB.Close()
-	if err := testDB.Ping(); err != nil {
-		utils.JSON(w, http.StatusOK, map[string]interface{}{"success": false, "error": err.Error()})
-		return
-	}
-	utils.JSON(w, http.StatusOK, map[string]interface{}{"success": true})
-}
+// Обработчики параметров базы — в db_config.go.
 
 // ─── Sync Log ───
 

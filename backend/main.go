@@ -54,6 +54,21 @@ func main() {
 	var pgDB *sql.DB
 	if cfg.DSN != "" {
 		pgDB, err = db.Connect(cfg.DSN)
+		// Параметры базы меняли на экране «Подключения»: прежняя строка
+		// хранится до первого удачного старта с новой. Если новая база не
+		// отвечает — возвращаемся к прежней, иначе система осталась бы без базы.
+		if prev, _ := sqliteStore.Get("db_dsn_prev"); prev != "" {
+			if err != nil && prev != cfg.DSN {
+				if prevDB, prevErr := db.Connect(prev); prevErr == nil {
+					slog.Error("New database is not available, returned to the previous connection", "error", err)
+					sqliteStore.Set("db_dsn", prev)
+					pgDB, err = prevDB, nil
+				}
+			}
+			if err == nil {
+				sqliteStore.Set("db_dsn_prev", "")
+			}
+		}
 		if err != nil {
 			slog.Warn("PostgreSQL not available", "error", err)
 		} else {
@@ -114,6 +129,15 @@ func main() {
 	taskH.Source = source
 	kanbanH.Source = source
 	adminH.Source = source
+	// После смены параметров базы процесс завершается, и Docker поднимает его
+	// заново (restart: unless-stopped). Пауза — чтобы ответ успел уйти клиенту.
+	adminH.Restart = func() {
+		go func() {
+			time.Sleep(time.Second)
+			slog.Warn("Restarting to apply the new database connection")
+			os.Exit(0)
+		}()
+	}
 	setupH.Source = source
 	settingsH.Source = source
 	authH.Source = source
@@ -377,6 +401,7 @@ func main() {
 	admin.HandleFunc("/datasource-config", adminH.SaveDataSourceConfig).Methods("PUT")
 	admin.HandleFunc("/datasource-config/test", adminH.TestDataSourceConfig).Methods("POST")
 	admin.HandleFunc("/db-config", adminH.GetDBConfig).Methods("GET")
+	admin.HandleFunc("/db-config", adminH.SaveDBConfig).Methods("PUT")
 	admin.HandleFunc("/db-config/test", adminH.TestDBConfig).Methods("POST")
 	admin.HandleFunc("/sync-log", adminH.GetSyncLog).Methods("GET")
 	admin.HandleFunc("/sync/run", adminH.RunSync).Methods("POST")

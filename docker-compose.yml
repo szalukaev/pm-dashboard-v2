@@ -42,6 +42,9 @@ services:
       dockerfile: ../Dockerfile.backend
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    # После смены параметров базы на экране «Подключения» сервер завершается
+    # сам, чтобы прочитать их заново, — Docker должен поднять его обратно.
+    restart: unless-stopped
     # No host port: the API is reachable only through the frontend nginx (port 82).
     expose:
       - "8080"
