@@ -121,6 +121,7 @@
         </tbody>
       </table>
     </div>
+    <p v-if="!loaded" class="adm-hint users-loading" data-testid="users-loading">{{ $t('common.loading') }}</p>
     <AppPagination
       :total="total"
       :limit="pageSize"
@@ -314,6 +315,8 @@ const offset = ref(0)
 const templates = ref<{ id: number; name: string }[]>([])
 const groups = ref<{ id: number; name: string }[]>([])
 const saving = ref(false)
+// Пока первый ответ не пришёл, пустая таблица не значит «пользователей нет»
+const loaded = ref(false)
 
 async function load() {
   try {
@@ -335,6 +338,8 @@ async function load() {
     groups.value = g.data.groups || []
   } catch {
     toast(t('access.load_error'), 'error')
+  } finally {
+    loaded.value = true
   }
 }
 
@@ -605,6 +610,11 @@ defineExpose({ load })
 </script>
 
 <style scoped>
+.users-loading {
+  margin-top: 12px;
+  text-align: center;
+}
+
 .timezone-input {
   min-width: 170px;
 }
