@@ -846,7 +846,7 @@ func (h *TaskHandler) GetPriorities(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := (*h.DB).Query("SELECT external_id, name, sort_order FROM priorities WHERE data_source = 'redmine' ORDER BY external_id DESC")
+	rows, err := (*h.DB).Query("SELECT external_id, name, sort_order, COALESCE(color, '') FROM priorities WHERE data_source = 'redmine' ORDER BY external_id DESC")
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
@@ -857,11 +857,13 @@ func (h *TaskHandler) GetPriorities(w http.ResponseWriter, r *http.Request) {
 		ID       int    `json:"id"`
 		Name     string `json:"name"`
 		SortOrder int   `json:"sort_order"`
+		// Цвет, заданный администратором в «Порядке приоритетов»
+		Color string `json:"color"`
 	}
 	var priorities []PriorityInfo
 	for rows.Next() {
 		var p PriorityInfo
-		if rows.Scan(&p.ID, &p.Name, &p.SortOrder) == nil {
+		if rows.Scan(&p.ID, &p.Name, &p.SortOrder, &p.Color) == nil {
 			priorities = append(priorities, p)
 		}
 	}

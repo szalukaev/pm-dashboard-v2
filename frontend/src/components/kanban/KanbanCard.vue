@@ -52,6 +52,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { formatDate as formatDay } from '../../utils/format'
+import { priorityColor as priorityColorOf } from '../../utils/statusColor'
 import { storeToRefs } from 'pinia'
 import { AlertCircle } from 'lucide-vue-next'
 import type { KanbanCard } from '../../stores/kanban'
@@ -83,18 +84,9 @@ const issueLink = computed(() => {
 
 const isDragging = ref(false)
 
-const priorityColor = computed(() => {
-  const style = getComputedStyle(document.documentElement)
-  const colors: Record<number, string> = {
-    1: style.getPropertyValue('--priority-low').trim(),
-    2: style.getPropertyValue('--priority-low').trim(),
-    3: style.getPropertyValue('--priority-normal').trim(),
-    4: style.getPropertyValue('--priority-high').trim(),
-    5: style.getPropertyValue('--priority-urgent').trim(),
-    6: style.getPropertyValue('--priority-immediate').trim(),
-  }
-  return colors[props.card.priority_id] || style.getPropertyValue('--priority-low').trim()
-})
+// Цвет приоритета — из настроек администратора, а не по номеру приоритета:
+// номера в каждой установке Redmine свои
+const priorityColor = computed(() => priorityColorOf({ id: props.card.priority_id, name: props.card.priority_name }))
 
 function onDragStart(e: DragEvent) {
   isDragging.value = true

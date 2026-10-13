@@ -100,6 +100,8 @@ useLiveRefresh(() => fetchBoard({ silent: true }))
 
 onMounted(async () => {
   await kanbanStore.restoreState()
+  // Приоритеты — ради их цветов на карточках
+  if (!tasksStore.priorities.length) tasksStore.fetchPriorities()
   await Promise.all([
     fetchBoard(),
     tasksStore.fetchProjects().then(() => {

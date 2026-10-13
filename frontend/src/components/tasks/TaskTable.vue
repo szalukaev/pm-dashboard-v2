@@ -39,7 +39,7 @@
               <select
                 :disabled="!auth.canWrite"
                 class="cell-input priority"
-                :style="{ color: priorityColor(task.priority_name) }"
+                :style="{ color: priorityColor({ name: task.priority_name }) }"
                 :value="task.priority_name"
                 @change="saveInlineEdit(task, 'priority_name', ($event.target as HTMLSelectElement).value)"
               >
@@ -142,7 +142,7 @@ import { useSwal } from '../../composables/useSwal'
 import { useTasksStore } from '../../stores/tasks'
 import { isFlashing } from '../../composables/useFlash'
 import { TASK_COLUMNS, TASKS_TABLE } from './taskColumns'
-import { statusColor } from '../../utils/statusColor'
+import { statusColor, priorityColor } from '../../utils/statusColor'
 
 const settingsStore = useSettingsStore()
 const tasksStore = useTasksStore()
@@ -234,18 +234,6 @@ function isOverdue(task: Task): boolean {
   return task.due_date.slice(0, 10) < new Date().toISOString().slice(0, 10) && !closedStatusIds.value.has(task.status_id)
 }
 
-// Colors as in the previous version of the dashboard
-const priorityColors: Record<string, string> = {
-  immediate: '#ff4444',
-  urgent: '#ff8800',
-  high: '#ffaa00',
-  normal: '#4488ff',
-  low: '#888888',
-}
-
-function priorityColor(name: string): string {
-  return priorityColors[(name || '').toLowerCase()] || '#888888'
-}
 
 function taskLink(id: number): string {
   const base = settings.value.data_source_url || settings.value.redmine_url || ''

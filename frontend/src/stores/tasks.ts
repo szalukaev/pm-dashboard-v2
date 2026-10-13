@@ -154,8 +154,9 @@ export const useTasksStore = defineStore('tasks', () => {
   const categories = ref<string[]>([])
   const projectCategories = ref<Record<number, string[]>>({})
   const members = ref<{ id: number; name: string }[]>([])
-  const statuses = ref<{ id: number; name: string; is_closed: boolean; group: string }[]>([])
-  const priorities = ref<{ id: number; name: string; sort_order: number }[]>([])
+  const statuses = ref<{ id: number; name: string; is_closed: boolean; group: string; is_bug?: boolean }[]>([])
+  // color — цвет, заданный администратором; серый #888888 значит «не задан»
+  const priorities = ref<{ id: number; name: string; sort_order: number; color?: string }[]>([])
 
   // Only the latest request may update the list.
   let tasksRequest = 0
