@@ -24,6 +24,8 @@ const (
 	debugKeepDays = 7
 	// maxDebugBody — тело больше этого не сохраняется, пишется только размер.
 	maxDebugBody = 64 << 10
+	// maxDebugIP — длина колонки ip_address в debug_logs.
+	maxDebugIP = 64
 	// debugQueueSize — сколько записей ждут своей очереди; сверх того теряются.
 	debugQueueSize = 256
 	// debugCacheTTL — как часто перечитывается список пользователей с режимом.
@@ -70,6 +72,11 @@ func (d *DebugLog) Refresh() {
 	}
 	rows, err := (*d.DB).Query(`SELECT id, debug_until FROM users WHERE debug_until > NOW()`)
 	if err != nil {
+		// База не ответила: прежний список действует ещё один срок, иначе
+		// каждый запрос пользователя повторял бы этот запрос к лежащей базе
+		d.mu.Lock()
+		d.loaded = time.Now()
+		d.mu.Unlock()
 		return
 	}
 	defer rows.Close()
@@ -189,6 +196,11 @@ func (d *DebugLog) Log(next http.Handler) http.Handler {
 			userID: userID, at: started, method: r.Method, path: r.URL.Path, query: maskQuery(r.URL.Query()),
 			status: dw.status, durationMs: int(time.Since(started).Milliseconds()),
 			requestBody: requestBody, responseBody: responseBody, ip: ClientIP(r),
+		}
+		// Адрес приходит из заголовка и может быть любой длины, а колонка — нет:
+		// слишком длинный оборвал бы запись всей строки
+		if len(entry.ip) > maxDebugIP {
+			entry.ip = entry.ip[:maxDebugIP]
 		}
 		// Очередь полна — запись теряется: отладка не должна тормозить работу
 		select {

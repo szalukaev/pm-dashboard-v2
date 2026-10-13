@@ -205,11 +205,15 @@ async function waitForRestart() {
       if (!up) await sleep(RESTART_POLL_MS)
     }
     if (up) {
+      // Если новая база при старте не ответила, сервер вернулся к прежней:
+      // после перезапуска в параметрах стоит не то, что сохраняли
+      const wanted = { host: db.host.trim(), port: db.port.trim() || '5432', dbname: db.dbname.trim(), user: db.user.trim() }
       await loadDb()
       dbOk.value = false
-      dbMessage.value = t('connections.restart.done')
-      dbStatus.value = 'success'
-      toast(t('connections.restart.done'), 'success')
+      const applied = db.host === wanted.host && db.port === wanted.port && db.dbname === wanted.dbname && db.user === wanted.user
+      dbMessage.value = t(applied ? 'connections.restart.done' : 'connections.restart.rolled_back')
+      dbStatus.value = applied ? 'success' : 'error'
+      toast(dbMessage.value, applied ? 'success' : 'error')
     } else {
       dbMessage.value = t('connections.restart.timeout')
       dbStatus.value = 'error'

@@ -147,7 +147,8 @@ watch(() => settingsStore.settings.tab_order, order => {
   if (!Array.isArray(order) || order.length === 0) return
   applyTabOrder(order)
   localStorage.setItem(TAB_ORDER_KEY, JSON.stringify(order))
-})
+  // immediate: настройки могли загрузиться раньше шапки (повторный вход без перезагрузки)
+}, { immediate: true })
 
 function isActive(path: string) {
   return route.path === path

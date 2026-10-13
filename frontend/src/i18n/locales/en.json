@@ -278,7 +278,7 @@
     "hints": {
       "stats": "Summary figures over the selected projects within your rights.\n• Active Projects — projects with open tasks or tasks in testing.\n• Completion — closed ÷ (open + half of the tasks in testing + closed).\n• Open, In Test — tasks in the statuses of these groups (the groups are set in the status settings).\n• Overdue — open and in-testing tasks whose due date is before today.\n• Bugs — tasks in the statuses marked as Bugs.\n• No Estimate — open tasks without an estimate.\nClick a number to see its tasks.",
       "health": "A score of the projects from 0 to 100 over the active tasks — open and in testing.\nFormula: 100 × (1 − (0.5 × overdue share + 0.3 × share in Bugs statuses + 0.2 × share without an estimate)).\nOverdue tasks take off up to 50 points, Bugs up to 30, missing estimates up to 20.\n80 and above is good, 50–79 needs attention, below 50 is bad.\nUnder the gauge you can see how many points each cause took off.",
-      "velocity": "How many tasks were closed in each of the last 12 weeks, the current one included. A week runs from Monday to Sunday.\nTasks of the selected projects in a closed status are counted, by their closing date in Redmine. A reopened task does not count.\nThe tooltip of a bar shows the total estimate of the tasks closed that week.",
+      "velocity": "How many tasks were closed in each of the last 12 weeks, the current one included. A week runs from Monday to Sunday.\nTasks of the selected projects in a closed status are counted, by their closing date in Redmine. A reopened task does not count.\nThe tooltip of a bar shows the total estimate of the tasks closed that week.\nWhen a period is chosen in the header of the tab, its weeks are shown — the last 26 at most.",
       "team_load": "The number of tasks of each member of the selected team over the selected projects.\n• Open, In Test, closed — by status group.\n• Overdue — open and in-testing tasks whose due date is before today.\n• Bugs — tasks in the statuses marked as Bugs.\n• High — tasks with the highest priority.\n• No Estimate — open tasks without an estimate.\nClick a number to see its tasks. The columns are set up with the button in the header.",
       "hours": "Hours over the tasks that are not closed, for each member of the selected team: the sum of estimates and the sum of time actually logged.\nWhen the logged time is well above the estimate, the tasks are underestimated or dragging on. Employees without hours are not shown.",
       "bug_hours": "Time an employee logged on fixing bugs, over their tasks that are not closed.\nThe tooltip shows its share of all the time they logged: bug hours ÷ spent × 100.\nEmployees without bug hours are not shown.",
@@ -1484,6 +1484,7 @@
     "restart": {
       "hint": "This may take up to a minute. Please do not close or reload the page.",
       "done": "The system has restarted and runs with the saved settings",
+      "rolled_back": "The new database did not answer at start — the system returned to the previous settings. Check the database and try again.",
       "timeout": "The server has not answered in two minutes. Check the containers on the server."
     },
     "source": {
