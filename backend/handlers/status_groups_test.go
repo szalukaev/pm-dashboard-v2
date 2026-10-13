@@ -13,7 +13,7 @@ func TestStatusConditions(t *testing.T) {
 }
 
 func TestSprintProgressUsesStatusGroups(t *testing.T) {
-	// Status names say nothing: only the configured group counts.
+	// Названия статусов ничего не значат: учитывается только заданная группа.
 	s := Sprint{Tasks: []SprintTask{
 		{StatusName: "Closed", statusGroup: GroupOpen},
 		{StatusName: "Готово", statusGroup: GroupClosed},
@@ -25,7 +25,7 @@ func TestSprintProgressUsesStatusGroups(t *testing.T) {
 	if s.ClosedCount != 1 || s.TestingCount != 1 {
 		t.Errorf("closed = %d, testing = %d, want 1 and 1", s.ClosedCount, s.TestingCount)
 	}
-	// (1 closed + 0.5 * 1 testing) / 4 tasks
+	// (1 закрытая + 0,5 × 1 в тестировании) / 4 задачи
 	if s.Progress != 37.5 {
 		t.Errorf("progress = %v, want 37.5", s.Progress)
 	}

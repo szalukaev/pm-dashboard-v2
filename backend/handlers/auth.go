@@ -26,11 +26,11 @@ type AuthHandler struct {
 	DB       **sql.DB
 	Sessions db.SessionStore
 	Audit    *middleware.AuditMiddleware
-	// Source checks personal API keys of the data source, see source_link.go.
+	// Source проверяет личные ключи API источника данных, см. source_link.go.
 	Source *manager.Manager
-	// Secrets encrypts the personal API keys.
+	// Secrets шифрует личные ключи API.
 	Secrets *secrets.Box
-	// Keys reads what the keys give access to in the data source.
+	// Keys читает, к чему ключи дают доступ в источнике данных.
 	Keys *UserKeys
 }
 
@@ -39,13 +39,13 @@ type loginRequest struct {
 	Password string `json:"password"`
 }
 
-// dummyPasswordHash is a precomputed bcrypt hash used when the username does
-// not exist, so the response time does not reveal whether the account is real
-// (user-enumeration via timing).
+// dummyPasswordHash — заранее посчитанный хэш bcrypt для случая, когда
+// логина не существует: время ответа не должно выдавать, настоящая ли
+// учётная запись (перебор логинов по времени ответа).
 var dummyPasswordHash = []byte("$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy")
 
-// Rate limiter: 5 failed attempts per 15 minutes per username,
-// 20 failed attempts per 15 minutes per client IP.
+// Ограничение попыток входа: 5 неудачных за 15 минут на логин и 20
+// неудачных за 15 минут на адрес клиента.
 type loginAttempt struct {
 	Count       int
 	FirstFail   time.Time
@@ -65,8 +65,8 @@ var (
 	loginMu         sync.Mutex
 )
 
-// attemptLocked reports whether the entry is currently locked or its window expired.
-// Caller must hold loginMu. Returns locked, expired.
+// attemptLocked сообщает, заблокирована ли запись сейчас и истекло ли её
+// окно. Вызывающий держит loginMu. Возвращает «заблокирована», «истекла».
 func attemptLocked(a *loginAttempt) (bool, bool) {
 	if a == nil {
 		return false, false
@@ -75,7 +75,7 @@ func attemptLocked(a *loginAttempt) (bool, bool) {
 		if time.Now().Before(a.LockedUntil) {
 			return true, false
 		}
-		// lock expired
+		// блокировка истекла
 		return false, true
 	}
 	if time.Since(a.FirstFail) > loginWindow {
@@ -99,7 +99,7 @@ func isLocked(username string) bool {
 	return locked
 }
 
-// isIPLocked blocks a client IP after too many failures from many usernames.
+// isIPLocked блокирует адрес клиента после слишком многих неудач по разным логинам.
 func isIPLocked(ip string) bool {
 	loginMu.Lock()
 	defer loginMu.Unlock()
@@ -133,7 +133,7 @@ func recordFailure(username string) {
 	}
 }
 
-// recordIPFailure counts a failed login against the client IP.
+// recordIPFailure засчитывает неудачный вход адресу клиента.
 func recordIPFailure(ip string) {
 	loginMu.Lock()
 	defer loginMu.Unlock()
@@ -174,7 +174,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check rate limit (username + client IP)
+	// Ограничение попыток (логин и адрес клиента)
 	clientIP := middleware.ClientIP(r)
 	if isLocked(req.Username) || isIPLocked(clientIP) {
 		utils.Error(w, http.StatusTooManyRequests, "TOO_MANY_ATTEMPTS")
@@ -188,8 +188,9 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	err := (*h.DB).QueryRow("SELECT id, password_hash, role, COALESCE(display_name,''), COALESCE(avatar,''), COALESCE(force_password_change, false), last_login FROM users WHERE username = $1", req.Username).
 		Scan(&id, &passwordHash, &role, &displayName, &avatar, &forcePasswordChange, &lastLogin)
 	if err != nil {
-		// Unknown user: still run bcrypt against a dummy hash so the timing
-		// matches a real failed password check (blocks account enumeration).
+		// Неизвестный логин: bcrypt всё равно считается по хэшу-пустышке,
+		// чтобы время совпало с настоящей неудачной проверкой пароля (так
+		// логины нельзя перебрать).
 		_ = bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(req.Password))
 		recordFailure(req.Username)
 		recordIPFailure(clientIP)
@@ -210,8 +211,8 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// A blocked user is told so only after the correct password, so the
-	// answer does not reveal which accounts exist.
+	// О блокировке пользователь узнаёт только после верного пароля, чтобы
+	// ответ не выдавал, какие учётные записи существуют.
 	var blocked bool
 	(*h.DB).QueryRow("SELECT is_blocked FROM users WHERE id = $1", id).Scan(&blocked)
 	if blocked {
@@ -222,10 +223,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Successful login — clear attempts
+	// Вход успешен — счётчик попыток сбрасывается
 	clearAttempts(req.Username)
 	(*h.DB).Exec("UPDATE users SET last_login = NOW() WHERE id = $1", id)
-	// Re-read last_login so response has fresh value
+	// last_login перечитывается, чтобы в ответе было свежее значение
 	(*h.DB).QueryRow("SELECT last_login FROM users WHERE id = $1", id).Scan(&lastLogin)
 	if h.Audit != nil {
 		h.Audit.LogLogin(id, req.Username, true, r)
@@ -267,8 +268,8 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// accessInfo tells the client what to show: hidden tabs and widgets, and
-// whether data may be changed. The server enforces all of it by itself.
+// accessInfo сообщает клиенту, что показывать: скрытые вкладки и виджеты и
+// можно ли менять данные. Всё это сервер проверяет и сам.
 func (h *AuthHandler) accessInfo(userID int) map[string]interface{} {
 	scope, err := (&access.Resolver{DB: h.DB}).Scope(userID)
 	if err != nil {
@@ -457,7 +458,7 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If current_password is provided, verify it (skip if force_password_change)
+	// Если current_password передан, он проверяется (кроме случая force_password_change)
 	var forcePasswordChange bool
 	(*h.DB).QueryRow("SELECT COALESCE(force_password_change, false) FROM users WHERE id = $1", userID).Scan(&forcePasswordChange)
 

@@ -26,13 +26,13 @@ type AdminHandler struct {
 	Restart func()
 }
 
-// Users, their rights, groups and role templates: see access_admin.go.
+// Пользователи, их права, группы и шаблоны ролей — в access_admin.go.
 
 func isValidRole(role string) bool {
 	return role == "admin" || role == "user"
 }
 
-// ─── Status Mapping ───
+// ─── Группы статусов ───
 
 func (h *AdminHandler) ListStatuses(w http.ResponseWriter, r *http.Request) {
 	if *h.DB == nil {
@@ -78,8 +78,8 @@ func (h *AdminHandler) UpdateStatusGroup(w http.ResponseWriter, r *http.Request)
 		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
 		return
 	}
-	// Either field may be sent alone: moving a status between groups and
-	// marking it as a bug status are separate actions in the settings.
+	// Любое из полей может прийти отдельно: перенос статуса между группами
+	// и отметка статуса как «баг» — разные действия в настройках.
 	var body struct {
 		Group *string `json:"group"` // "open", "testing", "closed"
 		IsBug *bool   `json:"is_bug"`
@@ -111,7 +111,7 @@ func (h *AdminHandler) UpdateStatusGroup(w http.ResponseWriter, r *http.Request)
 	utils.Success(w)
 }
 
-// ─── Priorities ───
+// ─── Приоритеты ───
 
 func (h *AdminHandler) ListPriorities(w http.ResponseWriter, r *http.Request) {
 	if *h.DB == nil {
@@ -187,7 +187,7 @@ func (h *AdminHandler) UpdatePriority(w http.ResponseWriter, r *http.Request) {
 	utils.Success(w)
 }
 
-// ─── Data Source Config ───
+// ─── Подключение к источнику данных ───
 
 func (h *AdminHandler) TestDataSourceConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
@@ -210,7 +210,7 @@ func (h *AdminHandler) TestDataSourceConfig(w http.ResponseWriter, r *http.Reque
 		req.BasicPasswd, _ = h.SQLite.Get("redmine_basic_password")
 	}
 
-	// Validate URL scheme — only http/https are allowed.
+	// Схема адреса — только http или https.
 	warning := ""
 	u, err := url.Parse(req.URL)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
@@ -247,11 +247,12 @@ func (h *AdminHandler) TestDataSourceConfig(w http.ResponseWriter, r *http.Reque
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"success": true, "warning": warning})
 }
 
-// secretMask is returned for stored secrets so the UI can round-trip the form
-// without exposing the real value. Save* ignores this mask and keeps the old value.
+// secretMask возвращается вместо сохранённых секретов: интерфейс может
+// отправить форму обратно, не получив настоящего значения. Save* эту маску
+// пропускает и оставляет прежнее значение.
 const secretMask = "••••••••"
 
-// maskSecret returns secretMask if v is set, otherwise an empty string.
+// maskSecret возвращает secretMask, если v задано, иначе пустую строку.
 func maskSecret(v string) string {
 	if v == "" {
 		return ""
@@ -259,13 +260,14 @@ func maskSecret(v string) string {
 	return secretMask
 }
 
-// isSecretMask reports whether the incoming value is the UI placeholder.
+// isSecretMask сообщает, является ли пришедшее значение маской из интерфейса.
 func isSecretMask(v string) bool {
 	return v == secretMask
 }
 
-// maskDSNPassword replaces the password part of a postgres URL DSN with ****.
-// Non-URL DSNs are returned as-is (cannot reliably locate the password).
+// maskDSNPassword заменяет пароль в строке подключения вида postgres://… на
+// ****. Строки другого вида возвращаются как есть: пароль в них надёжно не
+// найти.
 func maskDSNPassword(dsn string) string {
 	if dsn == "" {
 		return ""
@@ -278,7 +280,7 @@ func maskDSNPassword(dsn string) string {
 			if colon := strings.Index(cred, ":"); colon >= 0 {
 				return dsn[:i+3] + cred[:colon+1] + "****" + rest[at:]
 			}
-			// no password in userinfo
+			// пароля в адресе нет
 			return dsn
 		}
 	}
@@ -317,7 +319,7 @@ func (h *AdminHandler) SaveDataSourceConfig(w http.ResponseWriter, r *http.Reque
 	h.SQLite.Set("data_source_type", body.Type)
 	h.SQLite.Set("redmine_url", body.URL)
 	h.SQLite.Set("redmine_basic_login", body.BasicLogin)
-	// Masked values mean "unchanged" — don't overwrite real secrets.
+	// Маска значит «не менялось» — настоящий секрет не перезаписывается.
 	if !isSecretMask(body.APIKey) {
 		h.SQLite.Set("redmine_api_key", body.APIKey)
 	}
@@ -325,8 +327,8 @@ func (h *AdminHandler) SaveDataSourceConfig(w http.ResponseWriter, r *http.Reque
 		h.SQLite.Set("redmine_basic_password", body.BasicPasswd)
 	}
 
-	// Apply on the fly: handlers use the new connection at once and a sync
-	// with it starts right away.
+	// Применяется на ходу: обработчики сразу берут новое подключение, и
+	// синхронизация с ним начинается тут же.
 	if h.Source != nil {
 		h.Source.Reload()
 		h.Source.TriggerSync()
@@ -335,11 +337,11 @@ func (h *AdminHandler) SaveDataSourceConfig(w http.ResponseWriter, r *http.Reque
 	utils.Success(w)
 }
 
-// ─── DB Config ───
+// ─── Подключение к базе ───
 
 // Обработчики параметров базы — в db_config.go.
 
-// ─── Sync Log ───
+// ─── Журнал синхронизации ───
 
 func (h *AdminHandler) GetSyncLog(w http.ResponseWriter, r *http.Request) {
 	if *h.DB == nil {
@@ -374,15 +376,15 @@ func (h *AdminHandler) GetSyncLog(w http.ResponseWriter, r *http.Request) {
 	if logs == nil {
 		logs = []LogEntry{}
 	}
-	// issues_collected of an entry is what that sync brought; how many
-	// issues there are in all is a figure of its own
+	// issues_collected записи — то, что принесла эта синхронизация; сколько
+	// задач всего — отдельная цифра
 	totalIssues := 0
 	(*h.DB).QueryRow("SELECT COUNT(*) FROM issues WHERE data_source = 'redmine'").Scan(&totalIssues)
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"logs": logs, "total_issues": totalIssues})
 }
 
-// RunSync starts an unscheduled sync. The sync runs in the background; its
-// outcome appears in the sync log.
+// RunSync запускает синхронизацию вне расписания. Она идёт в фоне; итог
+// появляется в журнале синхронизации.
 func (h *AdminHandler) RunSync(w http.ResponseWriter, r *http.Request) {
 	if h.Source == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "SYNC_NOT_AVAILABLE")
@@ -437,7 +439,7 @@ func (h *AdminHandler) UpdateSyncSettings(w http.ResponseWriter, r *http.Request
 	utils.Success(w)
 }
 
-// ─── Audit Log ───
+// ─── Журнал аудита ───
 
 func (h *AdminHandler) GetAuditLog(w http.ResponseWriter, r *http.Request) {
 	if *h.DB == nil {

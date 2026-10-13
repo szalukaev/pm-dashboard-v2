@@ -1,16 +1,15 @@
 package handlers
 
-// Limits of a saved column setup: enough for any table of the dashboard.
+// Пределы сохранённой настройки колонок: хватает любой таблице дашборда.
 const (
 	maxTableNameLen = 50
 	maxColumnKeyLen = 50
 	maxTableColumns = 50
 )
 
-// validTableColumns checks the column setups sent by the client:
-// {"<table>": {"visible": [keys], "order": [keys]}}. The keys themselves are
-// not checked here — the tables live in the client, which ignores the keys
-// it does not know.
+// validTableColumns проверяет настройки колонок, присланные клиентом:
+// {"<таблица>": {"visible": [ключи], "order": [ключи]}}. Сами ключи здесь не
+// проверяются: таблицы живут в клиенте, и неизвестные ключи он пропускает.
 func validTableColumns(v interface{}) bool {
 	tables, ok := v.(map[string]interface{})
 	if !ok {

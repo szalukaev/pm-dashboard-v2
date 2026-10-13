@@ -68,7 +68,7 @@ func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 
 	scope := middleware.GetScope(r)
 
-	// Parse query params
+	// Параметры запроса
 	taskType := r.URL.Query().Get("type") // "open", "testing", "closed", "all"
 	projectID := r.URL.Query().Get("project_id")
 	search := r.URL.Query().Get("search")
@@ -77,46 +77,46 @@ func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 	sortDir := r.URL.Query().Get("sort_dir")
 	category := r.URL.Query().Get("category")
 
-	// Only what the user may see: the rights given by the administrator,
-	// narrowed by the projects and team selected in the user's settings.
+	// Только то, что пользователь вправе видеть: права от администратора,
+	// суженные проектами и командой, выбранными в настройках пользователя.
 	args := []interface{}{}
 	where := []string{scope.IssueCond("", &args)}
 	argIdx := len(args) + 1
 	warnForeignProject(r, scope, projectID)
 
-	// Filter by task type using status groups from statuses table
+	// Отбор по типу задач — через группы статусов из таблицы statuses
 	switch taskType {
 	case "open", "testing", "closed":
 		where = append(where, "status_id IN (SELECT external_id FROM statuses WHERE group_name = $"+strconv.Itoa(argIdx)+" AND data_source = 'redmine')")
 		args = append(args, taskType)
 		argIdx++
 	case "all", "":
-		// no filter
+		// без отбора
 	}
 
-	// Filter by project
+	// Отбор по проекту
 	if projectID != "" {
 		where = append(where, "project_id = $"+strconv.Itoa(argIdx))
 		args = append(args, projectID)
 		argIdx++
 	}
 
-	// Filter by category
+	// Отбор по категории
 	if category != "" {
 		where = append(where, "category_name = $"+strconv.Itoa(argIdx))
 		args = append(args, category)
 		argIdx++
 	}
 
-	// Search
+	// Поиск
 	if search != "" {
 		where = append(where, "(LOWER(subject) LIKE $"+strconv.Itoa(argIdx)+" OR CAST(external_id AS TEXT) LIKE $"+strconv.Itoa(argIdx)+")")
 		args = append(args, "%"+strings.ToLower(search)+"%")
 		argIdx++
 	}
 
-	// Grouped view: without a group the answer is the headers of the groups
-	// (name, number of tasks, totals), with one — the tasks of that group.
+	// Вид с группировкой: без группы ответ — заголовки групп (название,
+	// число задач, итоги), с группой — задачи этой группы.
 	groupExpr := ""
 	switch groupBy {
 	case "":
@@ -135,7 +135,7 @@ func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 		argIdx++
 	}
 
-	// Sort
+	// Сортировка
 	orderBy := "external_id DESC"
 	if sortBy != "" {
 		validSorts := map[string]string{
@@ -158,9 +158,10 @@ func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 			if sortDir == "desc" {
 				dir = "DESC"
 			}
-			// The number breaks ties: without it rows with equal values could
-			// move between pages from one request to the next
-			// Empty values go to the end in both directions
+			// Номер задачи разрешает равенство: без него строки с равными
+			// значениями могли бы переходить со страницы на страницу от
+			// запроса к запросу. Пустые значения идут в конец при любом
+			// направлении.
 			orderBy = col + " " + dir + " NULLS LAST, external_id DESC"
 		}
 	}
@@ -210,7 +211,7 @@ func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 		tasks = []TaskResponse{}
 	}
 
-	// Not paged: everything was returned
+	// Без страниц: возвращено всё
 	if limit == 0 {
 		total = len(tasks)
 	}
@@ -221,8 +222,8 @@ func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// listTaskGroups answers the grouped view with the headers of the groups;
-// the tasks of a group are requested separately, page by page.
+// listTaskGroups отвечает на вид с группировкой заголовками групп; задачи
+// группы запрашиваются отдельно, постранично.
 func (h *TaskHandler) listTaskGroups(w http.ResponseWriter, groupExpr, condition string, args []interface{}) {
 	rows, err := (*h.DB).Query(`SELECT `+groupExpr+` AS name, COUNT(*),
 		COALESCE(SUM(estimated_hours), 0), COALESCE(SUM(spent_hours), 0)
@@ -311,19 +312,19 @@ func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The category is resolved within the project of the issue.
+	// Категория ищется в пределах проекта задачи.
 	var projectID int
 	if err := (*h.DB).QueryRow("SELECT COALESCE(project_id, 0) FROM issues WHERE external_id = $1", externalID).Scan(&projectID); err != nil {
 		utils.Error(w, http.StatusNotFound, "TASK_NOT_FOUND")
 		return
 	}
 
-	// Changes go to the source under the user's own name when they gave
-	// their personal API key.
+	// Изменения уходят в источник от имени самого пользователя, если он
+	// ввёл личный ключ API.
 	client := h.writeClient(r)
 
-	// localSets: column -> new value for the local cache;
-	// redmineFields: payload for the data source. An empty string clears a field in Redmine.
+	// localSets: столбец -> новое значение для локальной копии;
+	// redmineFields: поля для источника данных. Пустая строка очищает поле в Redmine.
 	localSets := map[string]interface{}{}
 	redmineFields := map[string]interface{}{}
 	editable := []string{}
@@ -361,7 +362,7 @@ func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 				utils.Error(w, http.StatusBadRequest, "MEMBER_NOT_FOUND")
 				return
 			}
-			// An issue may be given only to a member the user may see.
+			// Назначить задачу можно только сотруднику, которого пользователь вправе видеть.
 			if !middleware.GetScope(r).AllowsMember(assigneeID) {
 				utils.Error(w, http.StatusForbidden, "MEMBER_NOT_ALLOWED")
 				return
@@ -390,8 +391,8 @@ func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 			if client == nil {
 				break
 			}
-			// Goes to the developer estimate if the issue already has one,
-			// otherwise to the standard estimated_hours.
+			// Пишется в оценку разработчика, если она у задачи уже есть,
+			// иначе в стандартное estimated_hours.
 			fields, err := client.EstimateFields(externalID, hours)
 			if err != nil {
 				slog.Warn("Failed to read issue estimate fields", "issue", externalID, "error", err)
@@ -427,7 +428,7 @@ func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Old values for the change notification. Field names come from the switch above.
+	// Прежние значения — для уведомления об изменении. Имена полей берутся из switch выше.
 	oldValues := make(map[string]interface{})
 	for _, field := range editable {
 		var oldVal sql.NullString
@@ -439,9 +440,9 @@ func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// The data source is the system of record: write there first and touch
-	// the local cache only on success, otherwise the next sync would silently
-	// roll the change back.
+	// Главный — источник данных: сначала запись туда, а локальная копия
+	// меняется только при успехе, иначе следующая синхронизация молча
+	// откатила бы изменение.
 	if client != nil {
 		if err := client.UpdateIssue(externalID, redmineFields); err != nil {
 			slog.Warn("Failed to update issue in Redmine", "issue", externalID, "error", err)
@@ -483,8 +484,8 @@ func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// parseHours accepts a JSON number, a numeric string ("1.5" / "1,5") or an
-// empty value. A nil result with ok=true means "clear the estimate".
+// parseHours принимает число JSON, строку с числом ("1.5" / "1,5") или
+// пустое значение. Результат nil при ok=true значит «очистить оценку».
 func parseHours(value interface{}) (*float64, bool) {
 	switch v := value.(type) {
 	case nil:
@@ -509,8 +510,8 @@ func parseHours(value interface{}) (*float64, bool) {
 	}
 }
 
-// writeClient returns the client to change data with: the user's personal
-// one when they have a key, otherwise the system one.
+// writeClient возвращает клиента для изменения данных: личного, если у
+// пользователя есть ключ, иначе системного.
 func (h *TaskHandler) writeClient(r *http.Request) *redmine.Client {
 	if h.Keys != nil {
 		return h.Keys.ClientFor(middleware.GetUserID(r))
@@ -518,8 +519,8 @@ func (h *TaskHandler) writeClient(r *http.Request) *redmine.Client {
 	return h.getRedmineClient()
 }
 
-// getRedmineClient returns the current data source client, nil when the
-// source is not configured.
+// getRedmineClient возвращает текущего клиента источника данных; nil —
+// источник не настроен.
 func (h *TaskHandler) getRedmineClient() *redmine.Client {
 	if h.Source == nil {
 		return nil
@@ -559,8 +560,8 @@ func (h *TaskHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"comments": comments})
 }
 
-// GetTaskDetails returns the live part of the task card from Redmine:
-// raw description markup, attached files and comment history.
+// GetTaskDetails возвращает ту часть карточки задачи, которая читается из
+// Redmine напрямую: исходную разметку описания, файлы и историю комментариев.
 func (h *TaskHandler) GetTaskDetails(w http.ResponseWriter, r *http.Request) {
 	externalID, err := strconv.Atoi(mux.Vars(r)["id"])
 	if err != nil {
@@ -590,8 +591,9 @@ func (h *TaskHandler) GetTaskDetails(w http.ResponseWriter, r *http.Request) {
 	utils.JSON(w, http.StatusOK, details)
 }
 
-// inlineImageTypes may be shown in the page; anything else is served as a
-// download so that an uploaded HTML/SVG file cannot run in our origin.
+// inlineImageTypes можно показывать на странице; всё остальное отдаётся как
+// скачиваемый файл, чтобы загруженный HTML или SVG не выполнился на нашем
+// адресе.
 var inlineImageTypes = map[string]bool{
 	"image/png":  true,
 	"image/jpeg": true,
@@ -600,8 +602,8 @@ var inlineImageTypes = map[string]bool{
 	"image/bmp":  true,
 }
 
-// GetTaskAttachment proxies a file of the task from Redmine (the browser has
-// no Redmine credentials). Only attachments of that task are served.
+// GetTaskAttachment отдаёт файл задачи из Redmine через сервер (у браузера
+// нет учётных данных Redmine). Отдаются только файлы этой задачи.
 func (h *TaskHandler) GetTaskAttachment(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	externalID, err1 := strconv.Atoi(vars["id"])
@@ -688,7 +690,7 @@ func (h *TaskHandler) AddComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The comment is written under the user's own name when possible
+	// Комментарий по возможности пишется от имени самого пользователя
 	client := h.writeClient(r)
 	if client == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "REDMINE_NOT_CONFIGURED")
@@ -709,7 +711,7 @@ func (h *TaskHandler) GetCategories(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Categories of the issues the user may see only
+	// Категории только тех задач, которые пользователь вправе видеть
 	scope := middleware.GetScope(r)
 	args := []interface{}{}
 	where := "category_name IS NOT NULL AND category_name != '' AND " + scope.ProjectIssueCond("", &args)
@@ -740,8 +742,8 @@ func (h *TaskHandler) GetCategories(w http.ResponseWriter, r *http.Request) {
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"categories": categories})
 }
 
-// GetProjectCategories returns every category defined in the project (not
-// only the ones already used by issues) — the choices for editing a task.
+// GetProjectCategories возвращает все категории проекта (а не только уже
+// использованные в задачах) — варианты для правки задачи.
 func (h *TaskHandler) GetProjectCategories(w http.ResponseWriter, r *http.Request) {
 	projectID, err := strconv.Atoi(r.URL.Query().Get("project_id"))
 	if err != nil || projectID <= 0 {
@@ -782,8 +784,8 @@ func (h *TaskHandler) GetProjects(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The projects the administrator allows; the user's own selection does
-	// not apply here — this list is what the selection is made from.
+	// Проекты, разрешённые администратором; собственный выбор пользователя
+	// здесь не действует — из этого списка выбор и делается.
 	cond, args := allowedProjectsCond(middleware.GetScope(r), "external_id")
 	rows, err := (*h.DB).Query("SELECT external_id, name, parent_id FROM projects WHERE "+cond+" ORDER BY name", args...)
 	if err != nil {
@@ -812,7 +814,7 @@ func (h *TaskHandler) GetProjects(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TaskHandler) GetMembers(w http.ResponseWriter, r *http.Request) {
-	// The members the administrator allows (see GetProjects)
+	// Сотрудники, разрешённые администратором (см. GetProjects)
 	cond, args := allowedMembersCond(middleware.GetScope(r), "external_id")
 	rows, err := (*h.DB).Query("SELECT external_id, name FROM members WHERE data_source = 'redmine' AND name != '' AND "+cond+" ORDER BY name", args...)
 	if err != nil {

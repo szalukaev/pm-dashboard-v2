@@ -52,7 +52,7 @@ type KanbanColumn struct {
 }
 
 type KanbanBoard struct {
-	Mode    string         `json:"mode"` // "users" or "statuses"
+	Mode    string         `json:"mode"` // "users" или "statuses"
 	Columns []KanbanColumn `json:"columns"`
 	Total   int            `json:"total"`
 }
@@ -96,9 +96,9 @@ func (h *KanbanHandler) GetBoard(w http.ResponseWriter, r *http.Request) {
 	utils.JSON(w, http.StatusOK, board)
 }
 
-// statusBoard: a column for every status of the data source, with the issues
-// of the chosen project and all its subprojects. No project — no columns, the
-// client asks to choose one.
+// statusBoard: колонка на каждый статус источника данных с задачами
+// выбранного проекта и всех его подпроектов. Нет проекта — нет колонок,
+// клиент просит его выбрать.
 func (h *KanbanHandler) statusBoard(scope *access.Scope, projectParam string) ([]KanbanColumn, error) {
 	userID := scope.UserID
 	projectID, err := strconv.Atoi(projectParam)
@@ -109,8 +109,8 @@ func (h *KanbanHandler) statusBoard(scope *access.Scope, projectParam string) ([
 	if err != nil {
 		return nil, err
 	}
-	// The project is chosen explicitly, so the user's own selection of
-	// projects does not apply — only the rights do.
+	// Проект выбран явно, поэтому собственный выбор проектов пользователя
+	// не действует — действуют только права.
 	args := []interface{}{pq.Array(projects)}
 	cards, err := h.loadCards("project_id = ANY($1) AND "+scope.AllowedIssueCond("", &args), args...)
 	if err != nil {
@@ -136,13 +136,13 @@ func (h *KanbanHandler) statusBoard(scope *access.Scope, projectParam string) ([
 	return orderColumns(columns, h.columnOrder(userID, "kanban_column_order_statuses")), nil
 }
 
-// userBoard: a column for every member of the user's team plus "no assignee"
-// (hidden when empty), with the issues in open statuses only.
+// userBoard: колонка на каждого сотрудника команды пользователя и «без
+// исполнителя» (пустая скрыта); только задачи в открытых статусах.
 func (h *KanbanHandler) userBoard(scope *access.Scope) ([]KanbanColumn, error) {
 	userID := scope.UserID
 
-	// The team is what the user tracks within rights; the user themselves
-	// has a column too when they only see their own tasks.
+	// Команда — те, за кем пользователь следит в пределах прав; у самого
+	// пользователя тоже есть колонка, если он видит только свои задачи.
 	var team []int
 	if !scope.AllTeam {
 		team = append(team, scope.Team...)
@@ -158,8 +158,8 @@ func (h *KanbanHandler) userBoard(scope *access.Scope) ([]KanbanColumn, error) {
 		return nil, err
 	}
 
-	// With a team the columns are its members, including those without
-	// issues; without one — everybody who has issues.
+	// Если команда задана, колонки — её сотрудники, включая тех, у кого
+	// задач нет; если нет — все, у кого задачи есть.
 	columns := []KanbanColumn{}
 	if !scope.AllTeam {
 		rows, err := (*h.DB).Query("SELECT external_id, name FROM members WHERE data_source = 'redmine' AND external_id = ANY($1) ORDER BY name",
@@ -186,7 +186,7 @@ func (h *KanbanHandler) userBoard(scope *access.Scope) ([]KanbanColumn, error) {
 		}
 		sort.Slice(columns, func(i, j int) bool { return columns[i].Name < columns[j].Name })
 	}
-	// The title of this column is set on the client (it is translated).
+	// Заголовок этой колонки задаёт клиент (он переводится).
 	columns = append(columns, KanbanColumn{ID: unassignedColumn})
 
 	columns = fillColumns(columns, cards, func(c KanbanCard) string {
@@ -201,7 +201,7 @@ func (h *KanbanHandler) userBoard(scope *access.Scope) ([]KanbanColumn, error) {
 	return orderColumns(columns, h.columnOrder(userID, "kanban_column_order_users")), nil
 }
 
-// loadCards reads issues for the board, most important first.
+// loadCards читает задачи для доски, сначала самые важные.
 func (h *KanbanHandler) loadCards(where string, args ...interface{}) ([]KanbanCard, error) {
 	rows, err := (*h.DB).Query(`SELECT external_id, subject, project_name, status_name, status_id,
 		priority_name, priority_id, assigned_to_name, assigned_to_id,
@@ -224,14 +224,14 @@ func (h *KanbanHandler) loadCards(where string, args ...interface{}) ([]KanbanCa
 			&c.CategoryName, &c.DueDate, &c.EstimatedHours, &notClosed); err != nil {
 			return nil, err
 		}
-		// Overdue: the due date has passed and the issue is not closed
+		// Просрочена: срок прошёл, а задача не закрыта
 		c.IsOverdue = notClosed && c.DueDate != nil && (*c.DueDate)[:min(10, len(*c.DueDate))] < today
 		cards = append(cards, c)
 	}
 	return cards, rows.Err()
 }
 
-// columnOrder returns the column ids saved by the user for a mode.
+// columnOrder возвращает порядок колонок, сохранённый пользователем для вида доски.
 func (h *KanbanHandler) columnOrder(userID int, column string) []string {
 	var data []byte
 	(*h.DB).QueryRow("SELECT "+column+" FROM user_settings WHERE user_id = $1", userID).Scan(&data)
@@ -242,8 +242,9 @@ func (h *KanbanHandler) columnOrder(userID int, column string) []string {
 	return order
 }
 
-// fillColumns puts every card into the column with the id key(card) returns;
-// cards without a column are dropped. Tasks is never nil in the result.
+// fillColumns кладёт каждую карточку в колонку с идентификатором, который
+// возвращает key(card); карточки без колонки отбрасываются. Tasks в
+// результате никогда не равен nil.
 func fillColumns(columns []KanbanColumn, cards []KanbanCard, key func(KanbanCard) string) []KanbanColumn {
 	index := make(map[string]int, len(columns))
 	for i := range columns {
@@ -258,8 +259,8 @@ func fillColumns(columns []KanbanColumn, cards []KanbanCard, key func(KanbanCard
 	return columns
 }
 
-// orderColumns puts the columns listed in order (ids) first, in that order;
-// the rest keep their relative position.
+// orderColumns ставит колонки, перечисленные в order (идентификаторы),
+// первыми и в этом порядке; остальные сохраняют взаимное расположение.
 func orderColumns(columns []KanbanColumn, order []string) []KanbanColumn {
 	position := make(map[string]int, len(order))
 	for i, id := range order {
@@ -286,15 +287,15 @@ func (h *KanbanHandler) MoveCard(w http.ResponseWriter, r *http.Request) {
 
 	var body struct {
 		IssueID  int    `json:"issue_id"`
-		TargetID string `json:"target_id"` // status_id or user name
-		Mode     string `json:"mode"`      // "users" or "statuses"
+		TargetID string `json:"target_id"` // status_id или имя сотрудника
+		Mode     string `json:"mode"`      // "users" или "statuses"
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
 		return
 	}
 
-	// The issue must be within the user's rights.
+	// Задача должна входить в права пользователя.
 	scope := middleware.GetScope(r)
 	// Перенос карточки на доске, вид которой закрыт администратором, не принимается
 	if (body.Mode == access.KanbanUsers || body.Mode == access.KanbanStatuses) && !scope.CanKanban(body.Mode) {
@@ -305,8 +306,8 @@ func (h *KanbanHandler) MoveCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// localSet: new values for the local cache; redmineFields: payload for
-	// the data source (an empty string clears a field in Redmine).
+	// localSet: новые значения для локальной копии; redmineFields: поля для
+	// источника данных (пустая строка очищает поле в Redmine).
 	var localSet string
 	var localArgs []interface{}
 	redmineFields := map[string]interface{}{}
@@ -338,7 +339,7 @@ func (h *KanbanHandler) MoveCard(w http.ResponseWriter, r *http.Request) {
 			utils.Error(w, http.StatusBadRequest, "MEMBER_NOT_FOUND")
 			return
 		}
-		// An issue may be given only to a member the user may see.
+		// Назначить задачу можно только сотруднику, которого пользователь вправе видеть.
 		if !scope.AllowsMember(memberID) {
 			utils.Error(w, http.StatusForbidden, "FORBIDDEN")
 			return
@@ -352,11 +353,11 @@ func (h *KanbanHandler) MoveCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The data source is the system of record: write there first and touch
-	// the local cache only on success, otherwise the next sync would silently
-	// roll the move back.
-	// The move is made under the user's own name when they gave their
-	// personal API key.
+	// Главный — источник данных: сначала запись туда, а локальная копия
+	// меняется только при успехе, иначе следующая синхронизация молча
+	// откатила бы перенос.
+	// Перенос делается от имени самого пользователя, если он ввёл личный
+	// ключ API.
 	var client *redmine.Client
 	if h.Keys != nil {
 		client = h.Keys.ClientFor(scope.UserID)
@@ -375,8 +376,8 @@ func (h *KanbanHandler) MoveCard(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	// Redmine accepts an update but silently skips a change its workflow
-	// forbids: read the issue back before trusting the move.
+	// Redmine принимает запрос, но молча пропускает изменение, которое
+	// запрещает его workflow: прежде чем верить переносу, задача читается заново.
 	if state, err := client.GetIssueState(body.IssueID); err != nil {
 		slog.Warn("Could not verify the move in Redmine", "issue", body.IssueID, "error", err)
 	} else if !moveApplied(state, redmineFields) {
@@ -396,11 +397,11 @@ func (h *KanbanHandler) MoveCard(w http.ResponseWriter, r *http.Request) {
 	utils.Success(w)
 }
 
-// unassignedColumn is the id of the "no assignee" column in the users mode.
+// unassignedColumn — идентификатор колонки «без исполнителя» на доске по сотрудникам.
 const unassignedColumn = "unassigned"
 
-// moveApplied reports whether the issue in Redmine has the values a move
-// asked for (fields as sent to UpdateIssue).
+// moveApplied сообщает, имеет ли задача в Redmine значения, которых
+// требовал перенос (fields — то, что ушло в UpdateIssue).
 func moveApplied(state *redmine.IssueState, fields map[string]interface{}) bool {
 	if want, ok := fields["status_id"]; ok && state.StatusID != want {
 		return false

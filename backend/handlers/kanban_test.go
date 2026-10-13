@@ -23,7 +23,7 @@ func TestFillColumns(t *testing.T) {
 		[]KanbanCard{
 			{ExternalID: 10, AssignedToID: &ivan},
 			{ExternalID: 11},
-			{ExternalID: 12, AssignedToID: &stranger}, // nobody's column: dropped
+			{ExternalID: 12, AssignedToID: &stranger}, // колонки нет: отброшена
 			{ExternalID: 13, AssignedToID: &ivan},
 		},
 		func(c KanbanCard) string {
@@ -37,7 +37,7 @@ func TestFillColumns(t *testing.T) {
 	if got := len(columns[0].Tasks); got != 2 {
 		t.Errorf("column 1 has %d cards, want 2", got)
 	}
-	// A member without issues still has a column, and its list is not null in JSON
+	// У сотрудника без задач колонка всё равно есть, и её список в JSON не null
 	if columns[1].Tasks == nil || len(columns[1].Tasks) != 0 {
 		t.Errorf("empty column tasks = %v, want an empty list", columns[1].Tasks)
 	}

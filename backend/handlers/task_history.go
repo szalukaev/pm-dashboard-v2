@@ -11,8 +11,8 @@ import (
 	"github.com/lib/pq"
 )
 
-// Fields of the history whose values Redmine reports as ids, and the table
-// the names are read from.
+// Поля истории, значения которых Redmine сообщает идентификаторами, и
+// таблица, из которой читаются названия.
 var historyNameTables = map[string]string{
 	"status":      "statuses",
 	"priority":    "priorities",
@@ -20,11 +20,11 @@ var historyNameTables = map[string]string{
 	"project":     "projects",
 }
 
-// describeHistory replaces the ids in the history of an issue with names,
-// so that the card says "Status: New → In progress" and not "1 → 2". A value
-// that cannot be resolved is left as Redmine gave it.
+// describeHistory заменяет идентификаторы в истории задачи названиями,
+// чтобы в карточке было «Статус: Новая → В работе», а не «1 → 2». Значение,
+// для которого название не нашлось, остаётся таким, каким его дал Redmine.
 func describeHistory(db *sql.DB, client *redmine.Client, issueID int, history []redmine.HistoryEntry) {
-	// Which ids of which field are mentioned
+	// Какие идентификаторы каких полей упомянуты
 	ids := map[string]map[int]bool{}
 	for _, entry := range history {
 		for _, change := range entry.Changes {
@@ -45,8 +45,8 @@ func describeHistory(db *sql.DB, client *redmine.Client, issueID int, history []
 			names[field] = namesByID(db, table, ids[field])
 		}
 	}
-	// Categories and versions are not synced: they are asked from the source
-	// only when the history mentions them.
+	// Категории и версии не синхронизируются: они запрашиваются у источника,
+	// только когда упомянуты в истории.
 	if len(ids["category"]) > 0 || len(ids["fixed_version"]) > 0 {
 		var projectID int
 		if db.QueryRow("SELECT project_id FROM issues WHERE external_id = $1 AND data_source = 'redmine'", issueID).Scan(&projectID) == nil {
@@ -87,7 +87,7 @@ func describeHistory(db *sql.DB, client *redmine.Client, issueID int, history []
 		for j := range history[i].Changes {
 			change := &history[i].Changes[j]
 			if change.Field == "description" {
-				// A description is long; the card only says that it changed
+				// Описание длинное; в карточке сказано только, что оно изменилось
 				change.Old, change.New = "", ""
 				continue
 			}
@@ -96,8 +96,8 @@ func describeHistory(db *sql.DB, client *redmine.Client, issueID int, history []
 	}
 }
 
-// namesByID reads the names of the given ids from a reference table of the
-// data source (statuses, priorities, members, projects).
+// namesByID читает названия заданных идентификаторов из справочной таблицы
+// источника данных (statuses, priorities, members, projects).
 func namesByID(db *sql.DB, table string, ids map[int]bool) map[int]string {
 	list := make([]int, 0, len(ids))
 	for id := range ids {
@@ -119,9 +119,9 @@ func namesByID(db *sql.DB, table string, ids map[int]bool) map[int]string {
 	return result
 }
 
-// describeRelated fills the subject and the status of the related issues
-// the user may see. The others keep only their number: that an issue exists
-// is visible in the source anyway, what it is about is not shown.
+// describeRelated заполняет тему и статус связанных задач, которые
+// пользователь вправе видеть. У остальных остаётся только номер: то, что
+// задача существует, в источнике и так видно, а о чём она — не показывается.
 func describeRelated(db *sql.DB, scope *access.Scope, related []redmine.RelatedIssue) {
 	if len(related) == 0 {
 		return

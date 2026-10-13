@@ -22,12 +22,12 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// AccessHandler is the administrator's side of access control: users, their
-// rights, groups and role templates. All routes are admin-only.
+// AccessHandler — администраторская часть прав доступа: пользователи, их
+// права, группы и шаблоны ролей. Все маршруты — только для администратора.
 type AccessHandler struct {
 	DB     **sql.DB
 	Source *manager.Manager
-	// Sessions ends the sessions of a user whose password was reset.
+	// Sessions завершает сессии пользователя, которому сбросили пароль.
 	Sessions db.SessionStore
 }
 
@@ -35,8 +35,8 @@ func (h *AccessHandler) resolver() *access.Resolver {
 	return &access.Resolver{DB: h.DB}
 }
 
-// rightsChanged is called after any change of rights: the set of projects
-// to sync may have changed with them.
+// rightsChanged вызывается после любого изменения прав: вместе с ними мог
+// измениться набор синхронизируемых проектов.
 func (h *AccessHandler) rightsChanged() {
 	if h.Source != nil {
 		h.Source.TriggerSync()
@@ -48,7 +48,7 @@ func pathID(r *http.Request, name string) (int, bool) {
 	return id, err == nil && id > 0
 }
 
-// decodePermissions reads a permission set from the request body.
+// decodePermissions читает набор прав из тела запроса.
 func decodePermissions(r *http.Request) (access.Permissions, bool) {
 	var p access.Permissions
 	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
@@ -57,7 +57,7 @@ func decodePermissions(r *http.Request) (access.Permissions, bool) {
 	return p.Normalized(), true
 }
 
-// ─── Users ───
+// ─── Пользователи ───
 
 type adminUser struct {
 	ID             int     `json:"id"`
@@ -71,7 +71,7 @@ type adminUser struct {
 	MemberName     string  `json:"member_name"`
 	RoleTemplateID *int    `json:"role_template_id"`
 	TemplateName   string  `json:"template_name"`
-	// Custom: rights are set individually and override the template.
+	// Custom: права заданы лично и перекрывают шаблон.
 	Custom bool     `json:"custom"`
 	Groups []string `json:"groups"`
 	// Часовой пояс, заданный администратором; пусто — не задан
@@ -81,8 +81,8 @@ type adminUser struct {
 }
 
 func (h *AccessHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
-	// Paged for the table of users; without a limit — the whole list, for
-	// the places that choose a user from it.
+	// Постранично — для таблицы пользователей; без предела — весь список,
+	// для мест, где из него выбирают пользователя.
 	limit, offset := pageOf(r)
 	total := 0
 	if err := (*h.DB).QueryRow("SELECT COUNT(*) FROM users").Scan(&total); err != nil {
@@ -144,7 +144,7 @@ func (h *AccessHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusBadRequest, "INVALID_ROLE")
 		return
 	}
-	// A template that grants administration decides the role.
+	// Шаблон, дающий администрирование, определяет роль.
 	if body.RoleTemplateID != nil {
 		var grantsAdmin bool
 		if err := (*h.DB).QueryRow("SELECT grants_admin FROM role_templates WHERE id = $1", *body.RoleTemplateID).Scan(&grantsAdmin); err != nil {
@@ -165,9 +165,9 @@ func (h *AccessHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	if displayName == "" {
 		displayName = body.Username
 	}
-	// The password is set by the administrator, so it is temporary. Who the
-	// user is in the data source they tell themselves on the first login
-	// (a personal API key, see source_link.go).
+	// Пароль задаёт администратор, поэтому он временный. Кто этот
+	// пользователь в источнике данных, он сообщает сам при первом входе
+	// (личный ключ API, см. source_link.go).
 	_, err = (*h.DB).Exec(`INSERT INTO users (username, password_hash, role, display_name, role_template_id, force_password_change)
 		VALUES ($1, $2, $3, $4, $5, true)`,
 		body.Username, string(hash), body.Role, displayName, body.RoleTemplateID)
@@ -179,8 +179,8 @@ func (h *AccessHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	utils.Success(w)
 }
 
-// UpdateUser changes the fields present in the body: role, display_name,
-// is_blocked, role_template_id (may be null).
+// UpdateUser меняет поля, присутствующие в теле: role, display_name,
+// is_blocked, role_template_id (может быть null).
 func (h *AccessHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	userID, ok := pathID(r, "id")
 	if !ok {
@@ -218,7 +218,7 @@ func (h *AccessHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 			utils.Error(w, http.StatusBadRequest, "INVALID_ROLE")
 			return
 		}
-		// An administrator cannot demote themselves — protects against losing the last admin.
+		// Администратор не может понизить сам себя — так не теряется последний администратор.
 		if self && role != "admin" {
 			utils.Error(w, http.StatusBadRequest, "CANNOT_DEMOTE_SELF")
 			return
@@ -253,8 +253,8 @@ func (h *AccessHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		}
 		set("default_timezone", name)
 	}
-	// member_id is not here on purpose: the link to the account in the data
-	// source is set only by the user themselves, with a personal API key.
+	// member_id здесь нет намеренно: привязку к учётной записи в источнике
+	// данных задаёт только сам пользователь личным ключом API.
 	if raw, ok := body["role_template_id"]; ok {
 		templateID, valid := nullableInt(raw)
 		if !valid {
@@ -272,8 +272,8 @@ func (h *AccessHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		set("role_template_id", templateID)
-		// Choosing a template applies its rights: an individual override,
-		// if there was one, is dropped.
+		// Выбор шаблона применяет его права: личные права, если они были,
+		// сбрасываются.
 		if _, err := (*h.DB).Exec("DELETE FROM user_permissions WHERE user_id = $1", userID); err != nil {
 			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 			return
@@ -314,8 +314,8 @@ func (h *AccessHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	utils.Success(w)
 }
 
-// temporaryPassword returns a random password that is easy to read aloud
-// and type: no look-alike characters.
+// temporaryPassword возвращает случайный пароль, который легко продиктовать
+// и набрать: без похожих друг на друга символов.
 func temporaryPassword() (string, error) {
 	const alphabet = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 	const length = 12
@@ -329,9 +329,9 @@ func temporaryPassword() (string, error) {
 	return string(buf), nil
 }
 
-// ResetPassword gives the user a random temporary password and returns it
-// once: the administrator passes it on outside of the system, and the user
-// must replace it on the next login.
+// ResetPassword выдаёт пользователю случайный временный пароль и возвращает
+// его один раз: администратор передаёт пароль вне системы, а пользователь
+// обязан сменить его при следующем входе.
 func (h *AccessHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	userID, ok := pathID(r, "id")
 	if !ok {
@@ -357,8 +357,8 @@ func (h *AccessHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusNotFound, "USER_NOT_FOUND")
 		return
 	}
-	// The old password no longer works, and neither must the sessions
-	// opened with it: the user is logged out on every device.
+	// Прежний пароль больше не действует — не должны действовать и
+	// открытые с ним сессии: пользователь выходит на всех устройствах.
 	if h.Sessions != nil {
 		if _, err := h.Sessions.DeleteUser(r.Context(), userID); err != nil {
 			slog.Warn("Could not end the sessions after a password reset", "user", userID, "error", err)
@@ -367,10 +367,10 @@ func (h *AccessHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"password": password})
 }
 
-// ─── Rights of a user ───
+// ─── Права пользователя ───
 
-// GetUserPermissions returns the rights of a user by source — individual,
-// role template, groups — and what they add up to.
+// GetUserPermissions возвращает права пользователя по источникам — личные,
+// шаблон роли, группы — и их итог.
 func (h *AccessHandler) GetUserPermissions(w http.ResponseWriter, r *http.Request) {
 	userID, ok := pathID(r, "id")
 	if !ok {
@@ -385,7 +385,7 @@ func (h *AccessHandler) GetUserPermissions(w http.ResponseWriter, r *http.Reques
 	utils.JSON(w, http.StatusOK, grants)
 }
 
-// SetUserPermissions sets the rights of a user individually.
+// SetUserPermissions задаёт личные права пользователя.
 func (h *AccessHandler) SetUserPermissions(w http.ResponseWriter, r *http.Request) {
 	userID, ok := pathID(r, "id")
 	if !ok {
@@ -405,8 +405,8 @@ func (h *AccessHandler) SetUserPermissions(w http.ResponseWriter, r *http.Reques
 	utils.Success(w)
 }
 
-// ClearUserPermissions drops the individual rights: the role template (or
-// the default, own tasks only) applies again.
+// ClearUserPermissions сбрасывает личные права: снова действует шаблон роли
+// (или набор по умолчанию — только свои задачи).
 func (h *AccessHandler) ClearUserPermissions(w http.ResponseWriter, r *http.Request) {
 	userID, ok := pathID(r, "id")
 	if !ok {
@@ -421,12 +421,12 @@ func (h *AccessHandler) ClearUserPermissions(w http.ResponseWriter, r *http.Requ
 	utils.Success(w)
 }
 
-// ─── Cloning ───
+// ─── Копирование прав ───
 
 var errNotFound = errors.New("not found")
 
-// sourcePermissions returns the rights to copy: of a user — everything they
-// have in sum, of a group or a template — its own set.
+// sourcePermissions возвращает права для копирования: у пользователя — всё,
+// что у него есть в итоге, у группы или шаблона — их собственный набор.
 func (h *AccessHandler) sourcePermissions(kind string, id int) (access.Permissions, error) {
 	switch kind {
 	case "user":
@@ -443,8 +443,8 @@ func (h *AccessHandler) sourcePermissions(kind string, id int) (access.Permissio
 	return access.Permissions{}, errNotFound
 }
 
-// ClonePermissions copies rights from a user or a group to another user or
-// group. Tabs and widgets are copied only when asked to.
+// ClonePermissions копирует права от пользователя или группы другому
+// пользователю или группе. Вкладки и виджеты копируются только по запросу.
 func (h *AccessHandler) ClonePermissions(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		FromType       string `json:"from_type"` // user | group
@@ -474,7 +474,7 @@ func (h *AccessHandler) ClonePermissions(w http.ResponseWriter, r *http.Request)
 	if body.ToType == "group" {
 		table, key = "group_permissions", "group_id"
 	}
-	// What is not copied stays as the target has it.
+	// То, что не копируется, остаётся у получателя как было.
 	if !body.IncludeTabs || !body.IncludeWidgets {
 		current, err := access.Scan((*h.DB).QueryRow("SELECT "+access.Columns+" FROM "+table+" WHERE "+key+" = $1", body.ToID).Scan)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
@@ -496,7 +496,7 @@ func (h *AccessHandler) ClonePermissions(w http.ResponseWriter, r *http.Request)
 	utils.Success(w)
 }
 
-// ─── Groups ───
+// ─── Группы ───
 
 type adminGroup struct {
 	ID          int                `json:"id"`
@@ -531,7 +531,7 @@ func (h *AccessHandler) ListGroups(w http.ResponseWriter, r *http.Request) {
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"groups": groups})
 }
 
-// prefixedPermissionColumns returns access.Columns with a table alias.
+// prefixedPermissionColumns возвращает access.Columns с псевдонимом таблицы.
 func prefixedPermissionColumns(alias string) string {
 	parts := strings.Split(access.Columns, ", ")
 	for i, p := range parts {
@@ -562,8 +562,8 @@ func (h *AccessHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusConflict, "GROUP_EXISTS")
 		return
 	}
-	// A group always has a permission row; a new group grants nothing and
-	// hides nothing by itself.
+	// У группы всегда есть строка прав; новая группа сама ничего не даёт и
+	// ничего не скрывает.
 	if _, err := tx.Exec("INSERT INTO group_permissions (group_id) VALUES ($1)", id); err != nil {
 		utils.Error(w, http.StatusInternalServerError, "CREATE_FAILED")
 		return
@@ -575,8 +575,8 @@ func (h *AccessHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"success": true, "id": id})
 }
 
-// UpdateGroup changes what is present in the body: name, description,
-// member_ids (the full list), permissions.
+// UpdateGroup меняет то, что есть в теле: name, description, member_ids
+// (полный список), permissions.
 func (h *AccessHandler) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 	groupID, ok := pathID(r, "id")
 	if !ok {
@@ -628,7 +628,7 @@ func (h *AccessHandler) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 			return
 		}
-		// Unknown user ids are skipped by the join.
+		// Несуществующие пользователи отсеиваются соединением с users.
 		if _, err := tx.Exec(`INSERT INTO group_members (group_id, user_id)
 			SELECT $1, id FROM users WHERE id = ANY($2)`, groupID, pq.Array(*body.MemberIDs)); err != nil {
 			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
@@ -668,7 +668,7 @@ func (h *AccessHandler) DeleteGroup(w http.ResponseWriter, r *http.Request) {
 	utils.Success(w)
 }
 
-// ─── Role templates ───
+// ─── Шаблоны ролей ───
 
 type adminTemplate struct {
 	ID          int                `json:"id"`
@@ -705,8 +705,8 @@ func (h *AccessHandler) ListTemplates(w http.ResponseWriter, r *http.Request) {
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"templates": templates})
 }
 
-// CreateTemplate creates a template with the given rights, or with the
-// rights copied from a user (from_user_id) or another template
+// CreateTemplate создаёт шаблон с заданными правами либо с правами,
+// скопированными у пользователя (from_user_id) или другого шаблона
 // (from_template_id).
 func (h *AccessHandler) CreateTemplate(w http.ResponseWriter, r *http.Request) {
 	var body struct {
@@ -749,9 +749,9 @@ func (h *AccessHandler) CreateTemplate(w http.ResponseWriter, r *http.Request) {
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"success": true, "id": id})
 }
 
-// UpdateTemplate changes name, description and rights of a template. New
-// rights apply at once to every user of the template whose rights are not
-// set individually.
+// UpdateTemplate меняет название, описание и права шаблона. Новые права
+// сразу действуют на всех пользователей шаблона, у которых права не заданы
+// лично.
 func (h *AccessHandler) UpdateTemplate(w http.ResponseWriter, r *http.Request) {
 	templateID, ok := pathID(r, "id")
 	if !ok {
@@ -800,8 +800,8 @@ func (h *AccessHandler) UpdateTemplate(w http.ResponseWriter, r *http.Request) {
 	utils.Success(w)
 }
 
-// DeleteTemplate removes a template. Its users keep their rights: the
-// template's set becomes their individual one ("custom").
+// DeleteTemplate удаляет шаблон. Его пользователи сохраняют права: набор
+// шаблона становится их личным («custom»).
 func (h *AccessHandler) DeleteTemplate(w http.ResponseWriter, r *http.Request) {
 	templateID, ok := pathID(r, "id")
 	if !ok {

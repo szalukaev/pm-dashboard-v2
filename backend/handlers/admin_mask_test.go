@@ -31,8 +31,8 @@ func TestMaskDSNPassword(t *testing.T) {
 	}{
 		{"", ""},
 		{"postgres://user:pass@host:5432/db?sslmode=disable", "postgres://user:****@host:5432/db?sslmode=disable"},
-		{"postgres://user@host:5432/db", "postgres://user@host:5432/db"}, // no password
-		{"host=localhost port=5432", "host=localhost port=5432"},         // keyword DSN — left as-is
+		{"postgres://user@host:5432/db", "postgres://user@host:5432/db"}, // пароля нет
+		{"host=localhost port=5432", "host=localhost port=5432"},         // строка из пар «ключ=значение» — остаётся как есть
 	}
 	for _, c := range cases {
 		if got := maskDSNPassword(c.in); got != c.want {
@@ -41,7 +41,7 @@ func TestMaskDSNPassword(t *testing.T) {
 	}
 }
 
-// TestNilDBReturns503 — handlers must not panic when PostgreSQL was never connected.
+// TestNilDBReturns503 — обработчики не должны падать, если PostgreSQL так и не подключили.
 func TestNilDBReturns503(t *testing.T) {
 	var nilDB *sql.DB
 	paymentsH := &PaymentsHandler{DB: &nilDB}
@@ -60,7 +60,7 @@ func TestNilDBReturns503(t *testing.T) {
 	for _, c := range cases {
 		req := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 		rr := httptest.NewRecorder()
-		c.fn(rr, req) // must not panic
+		c.fn(rr, req) // не должно быть паники
 		if rr.Code != http.StatusServiceUnavailable {
 			t.Errorf("%s: status = %d, want 503", c.name, rr.Code)
 		}

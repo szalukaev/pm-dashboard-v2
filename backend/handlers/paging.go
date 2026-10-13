@@ -5,15 +5,14 @@ import (
 	"strconv"
 )
 
-// PageSizes are the page sizes a user may choose for a table.
+// PageSizes — размеры страницы, которые пользователь может выбрать для таблицы.
 var PageSizes = []int{10, 25, 50, 100}
 
-// maxPageSize bounds a page whatever the request asks for.
+// maxPageSize ограничивает страницу, что бы ни просил запрос.
 const maxPageSize = 100
 
-// pageOf reads limit and offset of a list request. Without a limit the list
-// is not paged (limit 0): that is what the callers that need the whole list
-// rely on.
+// pageOf читает limit и offset запроса списка. Без limit список не делится
+// на страницы (limit 0): на это рассчитывают те, кому нужен список целиком.
 func pageOf(r *http.Request) (limit, offset int) {
 	q := r.URL.Query()
 	limit, _ = strconv.Atoi(q.Get("limit"))
@@ -30,8 +29,9 @@ func pageOf(r *http.Request) (limit, offset int) {
 	return limit, offset
 }
 
-// pageClause is the LIMIT/OFFSET tail of a query; empty when the list is not
-// paged. Both numbers come from pageOf, so they are safe to put into SQL.
+// pageClause — окончание запроса с LIMIT/OFFSET; пусто, если список не
+// делится на страницы. Оба числа приходят из pageOf, поэтому их безопасно
+// подставлять в SQL.
 func pageClause(limit, offset int) string {
 	if limit == 0 {
 		return ""
@@ -39,7 +39,7 @@ func pageClause(limit, offset int) string {
 	return " LIMIT " + strconv.Itoa(limit) + " OFFSET " + strconv.Itoa(offset)
 }
 
-// validPageSize reports whether n is one of the sizes offered to the user.
+// validPageSize сообщает, входит ли n в размеры, предлагаемые пользователю.
 func validPageSize(n int) bool {
 	for _, size := range PageSizes {
 		if n == size {

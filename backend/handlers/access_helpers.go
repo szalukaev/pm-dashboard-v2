@@ -13,7 +13,7 @@ import (
 	"github.com/lib/pq"
 )
 
-// canSeeIssue reports whether the issue is within the user's rights.
+// canSeeIssue сообщает, входит ли задача в права пользователя.
 func canSeeIssue(db *sql.DB, scope *access.Scope, issueID int) bool {
 	args := []interface{}{issueID}
 	cond := scope.AllowedIssueCond("", &args)
@@ -23,9 +23,9 @@ func canSeeIssue(db *sql.DB, scope *access.Scope, issueID int) bool {
 	return err == nil && visible
 }
 
-// requireIssue answers 404 and returns false when the issue does not exist
-// or the user has no right to see it — the two cases look the same from
-// outside, so the existence of foreign issues does not leak.
+// requireIssue отвечает 404 и возвращает false, если задачи нет или у
+// пользователя нет права её видеть: снаружи оба случая выглядят одинаково,
+// поэтому существование чужих задач не раскрывается.
 func requireIssue(w http.ResponseWriter, r *http.Request, db *sql.DB, issueID int) bool {
 	scope := middleware.GetScope(r)
 	if canSeeIssue(db, scope, issueID) {
@@ -40,8 +40,8 @@ func requireIssue(w http.ResponseWriter, r *http.Request, db *sql.DB, issueID in
 	return false
 }
 
-// canSeeProject reports whether the user may see anything of the project:
-// the project is allowed or holds an issue visible to the user.
+// canSeeProject сообщает, видит ли пользователь в проекте хоть что-нибудь:
+// проект разрешён или в нём есть задача, видимая пользователю.
 func canSeeProject(db *sql.DB, scope *access.Scope, projectID int) bool {
 	if scope.AllowsProject(projectID) {
 		return true
@@ -53,23 +53,24 @@ func canSeeProject(db *sql.DB, scope *access.Scope, projectID int) bool {
 	return err == nil && visible
 }
 
-// warnForeignProject logs a request for a project the user has no right to:
-// the query returns nothing for it, but the attempt must be visible.
+// warnForeignProject пишет в журнал запрос к проекту, на который у
+// пользователя нет права: запрос по нему ничего не вернёт, но попытка
+// должна быть видна.
 func warnForeignProject(r *http.Request, scope *access.Scope, projectParam string) {
 	if projectParam == "" {
 		return
 	}
 	if id, err := strconv.Atoi(projectParam); err != nil || !scope.AllowsProject(id) {
 		if scope.OwnMember != nil && err == nil {
-			// Own tasks may live in any project; the query itself filters them.
+			// Свои задачи могут быть в любом проекте; их отбирает сам запрос.
 			return
 		}
 		slog.Warn("Request for a project outside of user rights", "user", scope.UserID, "project", projectParam, "path", r.URL.Path)
 	}
 }
 
-// intList reads a JSON array of numbers decoded into interface{}; anything
-// that is not a whole number is skipped.
+// intList читает JSON-массив чисел, разобранный в interface{}; всё, что не
+// является целым числом, пропускается.
 func intList(v interface{}) []int {
 	items, _ := v.([]interface{})
 	result := make([]int, 0, len(items))
@@ -81,7 +82,7 @@ func intList(v interface{}) []int {
 	return result
 }
 
-// uniqueIntCount returns the distinct values of a list.
+// uniqueIntCount возвращает различные значения списка.
 func uniqueIntCount(list []int) map[int]bool {
 	set := make(map[int]bool, len(list))
 	for _, v := range list {
@@ -90,8 +91,9 @@ func uniqueIntCount(list []int) map[int]bool {
 	return set
 }
 
-// allowedProjectsCond returns a condition on a projects query (column col
-// holds the project id) keeping the projects the user may see, and its args.
+// allowedProjectsCond возвращает условие для запроса проектов (в столбце
+// col — идентификатор проекта), оставляющее проекты, которые пользователь
+// вправе видеть, и его параметры.
 func allowedProjectsCond(scope *access.Scope, col string) (string, []interface{}) {
 	if scope.AllowedAllProjects {
 		return "TRUE", nil
@@ -99,14 +101,14 @@ func allowedProjectsCond(scope *access.Scope, col string) (string, []interface{}
 	args := []interface{}{pq.Array(scope.AllowedProjects)}
 	cond := col + " = ANY($1)"
 	if scope.OwnMember != nil {
-		// Projects of the user's own tasks are visible by name as well.
+		// Проекты собственных задач пользователя тоже видны по названию.
 		args = append(args, *scope.OwnMember)
 		cond = "(" + cond + " OR " + col + " IN (SELECT project_id FROM issues WHERE assigned_to_id = $2))"
 	}
 	return cond, args
 }
 
-// allowedMembersCond is allowedProjectsCond for members.
+// allowedMembersCond — то же, что allowedProjectsCond, для сотрудников.
 func allowedMembersCond(scope *access.Scope, col string) (string, []interface{}) {
 	if scope.AllowedAllTeam {
 		return "TRUE", nil
