@@ -1,24 +1,24 @@
-// Access control: the shapes the administration screens exchange with the
-// server (see backend/access).
+// Права доступа: структуры, которыми экраны администрирования обмениваются
+// с сервером (см. backend/access).
 
 export interface Permissions {
   project_ids: number[]
   team_ids: number[]
-  // Everything, the lists are ignored
+  // Всё целиком, списки не учитываются
   all_projects: boolean
   all_team: boolean
-  // Issues without an assignee are visible too
+  // Видны и задачи без исполнителя
   show_unassigned: boolean
-  // Plus the issues assigned to the user themselves
+  // Плюс задачи, назначенные самому пользователю
   own_tasks_only: boolean
-  // Data may be viewed but not changed
+  // Данные можно смотреть, но не менять
   read_only: boolean
-  // Plus the projects the user is a member of in the data source
+  // Плюс проекты, в которых пользователь состоит в источнике данных
   from_source: boolean
-  // null = everything, otherwise the allowed keys
+  // null — всё, иначе разрешённые ключи
   visible_tabs: string[] | null
   widgets: string[] | null
-  // Allowed actions with sprints; null = every action
+  // Разрешённые действия со спринтами; null — все действия
   sprint_actions: string[] | null
   // Доступные виды доски Kanban; null = оба
   kanban_modes: string[] | null
@@ -30,7 +30,7 @@ export interface NamedPermissions {
   permissions: Permissions
 }
 
-// Rights of a user by source and what they add up to
+// Права пользователя по источникам и их итог
 export interface Grants {
   individual: Permissions | null
   template: NamedPermissions | null
@@ -49,11 +49,11 @@ export interface MemberItem {
   name: string
 }
 
-// Keys of the tabs and analytics widgets that can be hidden; labels are
-// navigation.<tab> and access.widgets.<widget> in the dictionary.
+// Ключи вкладок и виджетов аналитики, которые можно скрыть; подписи —
+// navigation.<вкладка> и access.widgets.<виджет> в словаре.
 export const TABS = ['tasks', 'analytics', 'kanban', 'sprint', 'payments']
 export const WIDGETS = ['stats', 'health', 'velocity', 'team_load', 'hours', 'bug_hours', 'distribution', 'deadlines', 'gantt']
-// Actions with sprints, each allowed separately; labels are access.sprint.<action>
+// Действия со спринтами, каждое разрешается отдельно; подписи — access.sprint.<действие>
 export const SPRINT_ACTIONS = ['create', 'edit', 'tasks', 'close', 'delete']
 // Виды доски Kanban: users — по сотрудникам, statuses — по проектам (статусы
 // одного проекта); подписи — access.kanban.<вид>
@@ -95,8 +95,8 @@ export interface TreeItem {
   hasChildren: boolean
 }
 
-// Projects as a flat list in tree order with the nesting depth. A project
-// whose parent is not in the list starts its own branch.
+// Проекты плоским списком в порядке дерева с глубиной вложенности. Проект,
+// родителя которого нет в списке, начинает свою ветку.
 export function projectTree(projects: ProjectItem[]): TreeItem[] {
   const ids = new Set(projects.map(p => p.id))
   const children = new Map<number, ProjectItem[]>()
@@ -116,7 +116,7 @@ export function projectTree(projects: ProjectItem[]): TreeItem[] {
   return result
 }
 
-// A project with all its subprojects
+// Проект со всеми его подпроектами
 export function withDescendants(projects: ProjectItem[], id: number): number[] {
   const result = [id]
   for (let i = 0; i < result.length; i++) {
@@ -127,8 +127,8 @@ export function withDescendants(projects: ProjectItem[], id: number): number[] {
   return result
 }
 
-// The subprojects covered by the given projects: a right to a project is a
-// right to its whole branch, so these need no tick of their own.
+// Подпроекты, покрытые заданными проектами: право на проект — это право на
+// всю его ветку, поэтому своя галочка им не нужна.
 export function coveredByParents(projects: ProjectItem[], selected: number[]): Set<number> {
   const covered = new Set<number>()
   for (const id of selected) {

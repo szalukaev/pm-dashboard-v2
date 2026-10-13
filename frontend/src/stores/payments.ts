@@ -27,12 +27,12 @@ export interface Contract {
   start_date: string | null
   end_date: string | null
   org_name: string
-  // The amount of the contract with VAT
+  // Сумма договора с НДС
   total_amount: number
-  // The sum of the invoices, with VAT
+  // Сумма счетов с НДС
   invoiced_amount: number
   total_paid: number
-  // Invoiced and not paid yet
+  // Выставлено и ещё не оплачено
   debt_amount: number
   is_closed: boolean
   is_overdue: boolean
@@ -48,9 +48,9 @@ export interface Invoice {
   status: string
   total: number
   remainder: number
-  // The date of issue as YYYYMM-DD
+  // Дата выставления в виде YYYYMM-DD
   number: string
-  // The date of the last payment
+  // Дата последней оплаты
   paid_at: string | null
 }
 
@@ -60,8 +60,8 @@ export interface InvoiceLine {
   price: number
 }
 
-// What the server answers to a payment: applied may be less than what was
-// entered when it was more than the remainder (clamped).
+// Ответ сервера на оплату: applied может быть меньше введённого, если
+// введено больше остатка (clamped).
 export interface PaymentResult {
   paid_amount: number
   status: string
@@ -82,7 +82,7 @@ export const usePaymentsStore = defineStore('payments', () => {
   const loading = ref(false)
   const error = ref('')
 
-  // Grows whenever invoices change, so that open invoice tables re-read theirs
+  // Растёт при каждом изменении счетов, чтобы открытые таблицы счетов перечитали свои
   const invoicesVersion = ref(0)
 
   const filterType = ref('')
@@ -162,7 +162,7 @@ export const usePaymentsStore = defineStore('payments', () => {
     await refresh()
   }
 
-  // One page of the invoices of a contract and how many there are in all
+  // Одна страница счетов договора и их общее число
   async function fetchInvoices(contractId: number, limit: number, offset: number): Promise<{ invoices: Invoice[]; total: number }> {
     try {
       const { data } = await axios.get(`/api/contracts/${contractId}/invoices`, { params: { limit, offset } })
@@ -170,7 +170,7 @@ export const usePaymentsStore = defineStore('payments', () => {
     } catch { return { invoices: [], total: 0 } }
   }
 
-  // The lines of an invoice: name, quantity and price of each
+  // Позиции счёта: название, количество и цена каждой
   async function fetchInvoiceItems(contractId: number, invoiceId: number): Promise<InvoiceLine[]> {
     const { data } = await axios.get(`/api/contracts/${contractId}/invoices/${invoiceId}/items`)
     return data.items || []
@@ -199,18 +199,18 @@ export const usePaymentsStore = defineStore('payments', () => {
     return data
   }
 
-  // Re-reads the figures quietly: the page stays in place, opened
-  // organizations and contracts stay open
+  // Тихо перечитывает цифры: страница остаётся на месте, раскрытые
+  // организации и договоры остаются раскрытыми
   async function refresh() {
     await Promise.all([fetchOrganizations(), fetchContracts(), fetchStats()])
   }
 
-  // The export holds what the list shows: the same filters apply
+  // В выгрузке то же, что в списке: действуют те же фильтры
   async function exportCSV() {
     await downloadFile('/api/contracts/export/csv', 'contracts.csv', contractParams())
   }
 
-  // Downloads the .docx of an invoice under the name the server gives it
+  // Скачивает .docx счёта под именем, которое даёт сервер
   async function downloadInvoice(contractId: number, invoiceId: number) {
     await downloadFile(`/api/contracts/${contractId}/invoices/${invoiceId}/download`, 'invoice.docx')
   }

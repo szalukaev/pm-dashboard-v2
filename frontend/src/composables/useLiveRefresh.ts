@@ -12,7 +12,7 @@ const DEBOUNCE_MS = 400
 const BUSY_RETRY_MS = 1500
 const BUSY_RETRIES = 20
 
-// A card or a column is being dragged somewhere on the page
+// Где-то на странице перетаскивают карточку или колонку
 let dragging = false
 if (typeof document !== 'undefined') {
   document.addEventListener('dragstart', () => { dragging = true }, true)
@@ -20,8 +20,9 @@ if (typeof document !== 'undefined') {
   document.addEventListener('drop', () => { dragging = false }, true)
 }
 
-// Re-rendering under the user's hands would reset a field being typed in or
-// break a drag, so a refresh waits until they are done.
+// Перерисовка под руками пользователя сбросила бы поле, в которое он
+// печатает, или сорвала бы перетаскивание, поэтому обновление ждёт, пока он
+// закончит.
 function userIsBusy(): boolean {
   if (dragging) return true
   const el = document.activeElement
@@ -29,9 +30,10 @@ function userIsBusy(): boolean {
 }
 
 /**
- * Keeps a page up to date while it is open: when the server reports changed
- * issues (after a sync or another user's edit), `refresh` re-reads the data
- * quietly and the changed issues flash.
+ * Поддерживает страницу в актуальном виде, пока она открыта: когда сервер
+ * сообщает об изменённых задачах (после синхронизации или правки другого
+ * пользователя), `refresh` тихо перечитывает данные, а изменённые задачи
+ * подсвечиваются.
  */
 export function useLiveRefresh(refresh: () => Promise<unknown> | unknown) {
   const { on, off } = useWebSocket()
@@ -70,7 +72,7 @@ export function useLiveRefresh(refresh: () => Promise<unknown> | unknown) {
     schedule(DEBOUNCE_MS)
   }
 
-  // A finished sync may also have changed statuses, members or projects
+  // Завершившаяся синхронизация могла изменить и статусы, сотрудников или проекты
   function onCollectionComplete() {
     schedule(DEBOUNCE_MS)
   }

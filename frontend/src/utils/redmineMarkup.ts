@@ -9,29 +9,29 @@ export interface MarkupAttachment {
 
 export interface MarkupOptions {
   attachments: MarkupAttachment[]
-  // URL the browser loads an attachment from (proxied by the backend).
+  // Адрес, с которого браузер загружает файл (через backend).
   attachmentUrl: (id: number) => string
-  // Redmine base URL for #123 issue references; empty disables them.
+  // Базовый адрес Redmine для ссылок на задачи вида #123; пустой — ссылок нет.
   redmineUrl: string
 }
 
-// Redmine stores text as Textile (its default) or Markdown. The setting is
-// not exposed via the API, so the format is guessed from the text itself.
+// Redmine хранит текст в Textile (по умолчанию) или в Markdown. Через API
+// эта настройка не отдаётся, поэтому формат определяется по самому тексту.
 const markdownSignals = [
-  /^#{1,6}\s/m, // # heading
-  /^```/m, // fenced code
+  /^#{1,6}\s/m, // # заголовок
+  /^```/m, // блок кода
   /!\[[^\]]*\]\([^)]+\)/, // ![alt](image)
   /\[[^\]]+\]\([^)\s]+\)/, // [text](url)
-  /\*\*[^*\n]+\*\*/, // **bold**
-  /^\s*[-*]\s+\[[ xX]\]/m, // task list
+  /\*\*[^*\n]+\*\*/, // **полужирный**
+  /^\s*[-*]\s+\[[ xX]\]/m, // список задач
 ]
 const textileSignals = [
-  /^h[1-6]\.\s/m, // h2. heading
-  /^(bc|bq|p|pre)\.\s/m, // block signatures
+  /^h[1-6]\.\s/m, // h2. заголовок
+  /^(bc|bq|p|pre)\.\s/m, // признаки блоков
   /(^|\s)![^!\s][^!\n]*!(\s|$|[.,:;])/m, // !image.png!
   /"[^"\n]+":\S+/, // "text":url
   /(^|\s)@[^@\n]+@/, // @code@
-  /^\s*#\s/m, // # numbered list (a heading in Markdown needs a following word too, but Redmine Textile lists are common)
+  /^\s*#\s/m, // # нумерованный список (заголовку Markdown тоже нужно слово после #, но списки Textile в Redmine встречаются часто)
 ]
 
 export function isMarkdown(source: string): boolean {
@@ -52,10 +52,10 @@ function findAttachment(ref: string, attachments: MarkupAttachment[]): MarkupAtt
     name = decodeURIComponent(ref)
   } catch {}
   name = name.split(/[?#]/)[0].toLowerCase()
-  // Redmine resolves a name to the most recent attachment with that name.
+  // По имени Redmine берёт самый свежий файл с таким именем.
   const byName = [...attachments].reverse().find(a => a.filename.toLowerCase() === name)
   if (byName) return byName
-  // Absolute links to Redmine attachments: /attachments/download/123/x.png
+  // Абсолютные ссылки на файлы Redmine: /attachments/download/123/x.png
   const m = ref.match(/\/attachments\/(?:download\/|thumbnail\/)?(\d+)/)
   if (m) return attachments.find(a => a.id === Number(m[1]))
   return undefined
@@ -91,7 +91,7 @@ function linkIssueRefs(root: ParentNode, redmineUrl: string) {
   }
 }
 
-/** Renders Redmine text (Textile or Markdown) into safe HTML. */
+/** Превращает текст Redmine (Textile или Markdown) в безопасный HTML. */
 export function renderRedmineMarkup(source: string | null | undefined, opts: MarkupOptions): string {
   if (!source || !source.trim()) return ''
 

@@ -12,19 +12,19 @@ interface User {
   avatar?: string
   last_login?: string
   force_password_change?: boolean
-  // What the administrator lets the user see and do. The server enforces
-  // it; the client only hides what would not work anyway.
+  // Что администратор разрешает пользователю видеть и делать. Проверяет это
+  // сервер; клиент лишь скрывает то, что всё равно не сработало бы.
   access?: {
     visible_tabs: string[]
     widgets: string[]
     read_only: boolean
-    // Allowed actions with sprints: create, edit, tasks, close, delete
+    // Разрешённые действия со спринтами: create, edit, tasks, close, delete
     sprint_actions?: string[]
     // Доступные виды доски Kanban: users, statuses
     kanban_modes?: string[]
   }
-  // The user's account in the data source, tied by a personal API key.
-  // type is the kind of the source ('redmine'); needs_token asks for the key.
+  // Учётная запись пользователя в источнике данных, привязанная личным
+  // ключом API. type — вид источника ('redmine'); needs_token просит ввести ключ.
   source?: {
     type: string
     linked: boolean
@@ -40,7 +40,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuthenticated = ref(false)
 
   const isAdmin = computed(() => user.value?.role === 'admin')
-  // The user may change data (not a read-only one)
+  // Пользователь может менять данные (не «только чтение»)
   const canWrite = computed(() => !user.value?.access?.read_only)
 
   function tabVisible(tab: string): boolean {
@@ -100,7 +100,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // The user may do the action with sprints (create | edit | tasks | close | delete)
+  // Пользователю разрешено действие со спринтами (create | edit | tasks | close | delete)
   function canSprint(action: string): boolean {
     const actions = user.value?.access?.sprint_actions
     return isAdmin.value || !actions || actions.includes(action)
@@ -112,8 +112,8 @@ export const useAuthStore = defineStore('auth', () => {
     return isAdmin.value || !modes || modes.includes(mode)
   }
 
-  // Ties the user to the owner of the personal API key of the data source.
-  // Only the user can do it, and only for themselves.
+  // Привязывает пользователя к владельцу личного ключа API источника
+  // данных. Сделать это может только сам пользователь и только для себя.
   async function setSourceToken(token: string) {
     const { data } = await axios.put('/api/auth/source-token', { token })
     if (user.value) user.value.source = data.source

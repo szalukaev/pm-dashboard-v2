@@ -33,13 +33,13 @@ export interface TaskGroup {
   task_count: number
   estimate_total: number
   fact_total: number
-  // The loaded page of the group
+  // Загруженная страница группы
   tasks: Task[]
   offset: number
   loading: boolean
 }
 
-// Name of the table in the user's page size settings
+// Имя таблицы в настройках размера страницы пользователя
 const PAGE_TABLE = 'tasks_table'
 
 interface GroupHeader {
@@ -69,13 +69,13 @@ export interface TaskFilters {
 export const useTasksStore = defineStore('tasks', () => {
   const settingsStore = useSettingsStore()
 
-  // Every loaded task lives once in this map (number → task). The flat list
-  // and the groups only refer to it, so a change of a task shows everywhere
-  // and its table row is updated in place instead of being rebuilt.
+  // Каждая загруженная задача лежит в этой карте один раз (номер → задача).
+  // Плоский список и группы только ссылаются на неё, поэтому изменение
+  // задачи видно везде, а её строка обновляется на месте, а не строится заново.
   //
-  // Tasks are loaded page by page: the flat list holds one page, and every
-  // expanded group holds one page of its own. The headers of the groups
-  // (number of tasks, totals) come from the server and cover the whole group.
+  // Задачи загружаются постранично: в плоском списке — одна страница, у
+  // каждой раскрытой группы — своя страница. Заголовки групп (число задач,
+  // итоги) приходят с сервера и относятся ко всей группе.
   const taskMap = ref(new Map<number, Task>())
   const taskOrder = ref<number[]>([])
   const groupDefs = ref<GroupHeader[]>([])
@@ -104,8 +104,8 @@ export const useTasksStore = defineStore('tasks', () => {
     }
   }))
 
-  // Puts a fresh server answer into the map. A task that was already loaded
-  // keeps its object and only gets the new field values.
+  // Кладёт свежий ответ сервера в карту. Уже загруженная задача сохраняет
+  // свой объект и только получает новые значения полей.
   function storeTasks(incoming: Task[]) {
     const map = taskMap.value
     for (const task of incoming) {
@@ -115,7 +115,7 @@ export const useTasksStore = defineStore('tasks', () => {
     }
   }
 
-  // Drops the tasks no loaded page refers to any more
+  // Убирает задачи, на которые больше не ссылается ни одна загруженная страница
   function pruneTasks() {
     const used = new Set<number>(taskOrder.value)
     for (const page of Object.values(groupPages.value)) {
@@ -126,8 +126,9 @@ export const useTasksStore = defineStore('tasks', () => {
     }
   }
 
-  // The page the user was on may be gone after a refresh (tasks were closed
-  // or filtered out): the last page that still exists is shown instead.
+  // Страницы, на которой был пользователь, после обновления может не стать
+  // (задачи закрылись или ушли из отбора): тогда показывается последняя
+  // существующая.
   function lastPageOffset(count: number): number {
     return count > 0 ? Math.floor((count - 1) / pageSize.value) * pageSize.value : 0
   }
@@ -136,7 +137,7 @@ export const useTasksStore = defineStore('tasks', () => {
   const error = ref('')
   const total = ref(0)
   const useGrouping = ref(false)
-  // Accordion groups the user expanded; everything else is collapsed.
+  // Группы, которые пользователь раскрыл; остальные свёрнуты.
   const expandedGroups = ref<string[]>([])
 
   const filters = ref<TaskFilters>({
@@ -149,7 +150,7 @@ export const useTasksStore = defineStore('tasks', () => {
     sort_dir: 'desc',
   })
 
-  // Reference data
+  // Справочники
   const projects = ref<{ id: number; name: string; parent_id: number | null }[]>([])
   const categories = ref<string[]>([])
   const projectCategories = ref<Record<number, string[]>>({})
@@ -158,11 +159,11 @@ export const useTasksStore = defineStore('tasks', () => {
   // color — цвет, заданный администратором; серый #888888 значит «не задан»
   const priorities = ref<{ id: number; name: string; sort_order: number; color?: string }[]>([])
 
-  // Only the latest request may update the list.
+  // Обновить список может только самый свежий запрос.
   let tasksRequest = 0
 
-  // silent: refresh in the background without the loading skeleton, so the
-  // table does not flicker and expanded groups stay open.
+  // silent: обновление в фоне без заглушки загрузки, чтобы таблица не
+  // мигала, а раскрытые группы оставались раскрытыми.
   async function fetchTasks(opts: { silent?: boolean } = {}) {
     const requestId = ++tasksRequest
     if (!opts.silent) {
@@ -180,7 +181,7 @@ export const useTasksStore = defineStore('tasks', () => {
           estimate_total: g.estimate_total,
           fact_total: g.fact_total,
         }))
-        // Pages of the groups that are gone or collapsed are not kept
+        // Страницы исчезнувших или свёрнутых групп не хранятся
         const kept: Record<string, GroupPage> = {}
         for (const g of headers) {
           const page = groupPages.value[g.name]
@@ -237,8 +238,8 @@ export const useTasksStore = defineStore('tasks', () => {
     return data
   }
 
-  // Loads the current page of a group. Only the latest request for a group
-  // may fill it.
+  // Загружает текущую страницу группы. Заполнить группу может только самый
+  // свежий запрос по ней.
   const groupRequests = new Map<string, number>()
 
   async function loadGroup(name: string) {
@@ -267,13 +268,13 @@ export const useTasksStore = defineStore('tasks', () => {
     }
   }
 
-  // Page of the flat list
+  // Страница плоского списка
   async function setPage(pageOffset: number) {
     offset.value = pageOffset
     await fetchTasks({ silent: true })
   }
 
-  // Page of one group
+  // Страница одной группы
   async function setGroupPage(name: string, pageOffset: number) {
     const page = groupPages.value[name]
     if (!page) return
@@ -282,15 +283,15 @@ export const useTasksStore = defineStore('tasks', () => {
     pruneTasks()
   }
 
-  // The page size is one for every table of tasks; changing it starts from
-  // the first page.
+  // Размер страницы один на все таблицы задач; после его смены показ
+  // начинается с первой страницы.
   async function setPageSize(size: number) {
     await settingsStore.setPageSize(PAGE_TABLE, size)
     resetPages()
     await fetchTasks({ silent: true })
   }
 
-  // A new filter or sorting makes the current pages meaningless
+  // Новый фильтр или сортировка лишают текущие страницы смысла
   function resetPages() {
     offset.value = 0
     const pages: Record<string, GroupPage> = {}
@@ -298,8 +299,8 @@ export const useTasksStore = defineStore('tasks', () => {
     groupPages.value = pages
   }
 
-  // Applies a saved change to the loaded task right away; the list, the
-  // groups and their totals follow by themselves.
+  // Сразу применяет сохранённое изменение к загруженной задаче; список,
+  // группы и их итоги обновляются сами.
   function applyTaskChange(id: number, fields: Record<string, any>) {
     const task = taskMap.value.get(id)
     if (!task) return
@@ -322,8 +323,9 @@ export const useTasksStore = defineStore('tasks', () => {
     if (!skipReload) {
       await fetchTasks()
     } else if (data?.redmine_ok) {
-      // Redmine and our database already hold the new value: show it at once,
-      // then re-read quietly so the task moves to its new group / filter.
+      // В Redmine и в нашей базе уже новое значение: оно показывается сразу,
+      // а затем данные тихо перечитываются, чтобы задача перешла в свою
+      // новую группу или отбор.
       applyTaskChange(id, fields)
       fetchTasks({ silent: true })
     }
@@ -337,8 +339,8 @@ export const useTasksStore = defineStore('tasks', () => {
     } catch {}
   }
 
-  // Only the latest request may update the list: a slow response for a
-  // previous project must not overwrite the categories of the current one.
+  // Обновить список может только самый свежий запрос: медленный ответ по
+  // прежнему проекту не должен затереть категории текущего.
   let categoriesRequest = 0
 
   async function fetchCategories(projectId?: string | number) {
@@ -350,7 +352,7 @@ export const useTasksStore = defineStore('tasks', () => {
     } catch {}
   }
 
-  // Assignee choices; loaded once and shared by every task table.
+  // Варианты исполнителей; загружаются один раз и общие для всех таблиц задач.
   let membersRequest: Promise<void> | null = null
 
   function fetchMembers(): Promise<void> {
@@ -362,7 +364,7 @@ export const useTasksStore = defineStore('tasks', () => {
     return membersRequest
   }
 
-  // All categories defined in a project, for inline editing; cached per project.
+  // Все категории проекта — для правки в таблице; запоминаются по каждому проекту.
   async function fetchProjectCategories(projectId: number) {
     if (projectCategories.value[projectId]) return
     try {
@@ -391,7 +393,7 @@ export const useTasksStore = defineStore('tasks', () => {
     saveFilters()
   }
 
-  // Active query filters that narrow the result set (grouping/sort are view prefs).
+  // Действующие фильтры, сужающие результат (группировка и сортировка — настройки вида).
   function hasActiveFilters(): boolean {
     return !!(
       filters.value.project_id ||
@@ -451,12 +453,12 @@ export const useTasksStore = defineStore('tasks', () => {
     expandedGroups.value = expand
       ? [...expandedGroups.value, name]
       : expandedGroups.value.filter(n => n !== name)
-    // The tasks of a group are loaded when it is opened
+    // Задачи группы загружаются при её раскрытии
     if (expand && !groupPages.value[name]?.loaded) loadGroup(name)
     saveFilters()
   }
 
-  // A new grouping starts with every group collapsed.
+  // При новой группировке все группы сначала свёрнуты.
   function setGrouping(mode: string) {
     expandedGroups.value = []
     groupPages.value = {}

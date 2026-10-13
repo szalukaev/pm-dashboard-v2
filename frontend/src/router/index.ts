@@ -2,10 +2,10 @@ import { createRouter, createWebHistory } from 'vue-router'
 import axios from 'axios'
 
 const APP_VERSION = '3.0.0'
-// Tabs the administrator can hide from a user (route names)
+// Вкладки, которые администратор может скрыть от пользователя (имена маршрутов)
 const DATA_TABS = ['tasks', 'analytics', 'kanban', 'sprint', 'payments']
 let versionWarningShown = false
-// /api/setup/status is stable for the lifetime of the SPA — fetch once.
+// /api/setup/status не меняется, пока открыто приложение, — запрашивается один раз.
 let setupStatusChecked = false
 let setupIsComplete = false
 
@@ -43,14 +43,14 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to, _from, next) => {
-  // Check setup status (once per session — value cannot change without a reload)
+  // Состояние настройки (раз за сеанс — без перезагрузки оно измениться не может)
   if (!setupStatusChecked) {
     try {
       const { data } = await axios.get('/api/setup/status')
       setupIsComplete = !!data.isComplete
       setupStatusChecked = true
     } catch {
-      // API not available — allow navigation, retry on next nav
+      // API недоступен — переход разрешается, повтор при следующем переходе
     }
   }
   if (setupStatusChecked) {
@@ -62,13 +62,13 @@ router.beforeEach(async (to, _from, next) => {
     }
   }
 
-  // Version check (once per session) — show visible warning
+  // Проверка версии (раз за сеанс) — с видимым предупреждением
   if (!versionWarningShown) {
     try {
       const { data } = await axios.get('/api/status')
       if (data.version && data.version !== APP_VERSION) {
         versionWarningShown = true
-        // Show visible warning banner (not just console)
+        // Предупреждение показывается плашкой, а не только в консоли
         const banner = document.createElement('div')
         banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:var(--warning);color:#111;padding:8px 16px;text-align:center;font-size:13px;font-weight:500;z-index:99999;'
         banner.textContent = `Версии фронтенда и бэкенда не совпадают (frontend: ${APP_VERSION}, backend: ${data.version}). Обновите страницу или обратитесь к администратору.`
@@ -78,21 +78,21 @@ router.beforeEach(async (to, _from, next) => {
     } catch {}
   }
 
-  // Auth check — fetchMe stores user data in the auth store
+  // Проверка входа — fetchMe кладёт данные пользователя в стор auth
   if (to.meta.requiresAuth) {
     try {
       const { useAuthStore } = await import('../stores/auth')
       const authStore = useAuthStore()
       await authStore.fetchMe()
       if (authStore.isAuthenticated) {
-        // Without an activated license only the license screen works
+        // Без активированной лицензии работает только экран лицензии
         const { useLicenseStore } = await import('../stores/license')
         const licenseStore = useLicenseStore()
         await licenseStore.fetchStatus(licenseStore.notActivated)
         if (licenseStore.notActivated && to.name !== 'license') {
           return next({ name: 'license' })
         }
-        // A tab hidden by the administrator: go to the first one allowed
+        // Вкладка скрыта администратором: переход на первую разрешённую
         const tab = typeof to.name === 'string' ? to.name : ''
         if (DATA_TABS.includes(tab) && !authStore.tabVisible(tab)) {
           const first = DATA_TABS.find(t => authStore.tabVisible(t))

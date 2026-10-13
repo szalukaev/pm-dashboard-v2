@@ -29,7 +29,7 @@ function writeStorage(key: string, value: string) {
   } catch {}
 }
 
-// Earlier versions stored a single value: 'dark', 'light' or a theme name.
+// Прежние версии хранили одно значение: 'dark', 'light' или название темы.
 function initialState(): { theme: ThemeName; mode: ThemeMode } {
   const stored = readStorage(THEME_KEY) || ''
   const storedMode = readStorage(MODE_KEY)

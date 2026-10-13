@@ -18,11 +18,11 @@ interface Settings {
   overdue_alerts: boolean
   data_source_url: string
   redmine_url: string
-  // Rows per page chosen for each table; a table not listed uses the default
+  // Число строк на странице, выбранное для каждой таблицы; у таблицы, которой нет в списке, — значение по умолчанию
   pagination: Record<string, number>
-  // Visible columns and their order chosen for each table
+  // Видимые колонки и их порядок, выбранные для каждой таблицы
   table_columns: Record<string, { visible: string[]; order: string[] }>
-  // Arrangement of the widgets of the Analytics tab; {} is the standard one
+  // Раскладка виджетов вкладки «Аналитика»; {} — стандартная
   dashboard_layout: DashboardLayout
   // Правила уведомлений: куда доставлять и порог в днях
   alert_rules: Record<string, AlertRule>
@@ -68,8 +68,8 @@ export interface AlertRule {
 export const PAGE_SIZES = [10, 25, 50, 100]
 export const DEFAULT_PAGE_SIZE = 25
 
-// A dragged or resized widget changes the layout many times in a row; it is
-// saved once the user stops
+// Виджет при перетаскивании или изменении размера меняет раскладку много
+// раз подряд; она сохраняется, когда пользователь остановился
 const LAYOUT_SAVE_DELAY_MS = 500
 
 const defaultSettings: Settings = {
@@ -102,7 +102,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
   let loaded: Promise<void> | null = null
 
-  // For those who only need the settings to be there: loads them once
+  // Для тех, кому нужно только, чтобы настройки были: загружает их один раз
   function ensureLoaded(): Promise<void> {
     if (!loaded) loaded = fetchSettings()
     return loaded
@@ -116,7 +116,7 @@ export const useSettingsStore = defineStore('settings', () => {
       applyTimeZone()
       applyLanguage()
     } catch {
-      // Use defaults
+      // Остаются значения по умолчанию
     } finally {
       loading.value = false
     }
@@ -150,7 +150,7 @@ export const useSettingsStore = defineStore('settings', () => {
     return size !== undefined && PAGE_SIZES.includes(size) ? size : DEFAULT_PAGE_SIZE
   }
 
-  // The choice is kept per table and survives a reload
+  // Выбор хранится по каждой таблице и переживает перезагрузку
   async function setPageSize(table: string, size: number) {
     if (!PAGE_SIZES.includes(size)) return
     settings.value = { ...settings.value, pagination: { ...settings.value.pagination, [table]: size } }
@@ -159,8 +159,8 @@ export const useSettingsStore = defineStore('settings', () => {
     } catch {}
   }
 
-  // Every column of a table in the order the user chose. all is the standard
-  // order. Колонка, добавленная в таблицу позже, встаёт после своей соседки
+  // Все колонки таблицы в порядке, выбранном пользователем. all — стандартный
+  // порядок. Колонка, добавленная в таблицу позже, встаёт после своей соседки
   // слева из стандартного порядка, а не в конец.
   function columnOrder(table: string, all: string[]): string[] {
     const saved = settings.value.table_columns?.[table]
@@ -174,8 +174,8 @@ export const useSettingsStore = defineStore('settings', () => {
     return order
   }
 
-  // The columns of a table the user sees, in their order. A column added to
-  // the table later is visible until the user hides it.
+  // Колонки таблицы, которые видит пользователь, в их порядке. Колонка,
+  // добавленная в таблицу позже, видна, пока пользователь её не скроет.
   function tableColumns(table: string, all: string[]): string[] {
     const saved = settings.value.table_columns?.[table]
     if (!saved || !Array.isArray(saved.order) || !Array.isArray(saved.visible)) return all
@@ -191,8 +191,8 @@ export const useSettingsStore = defineStore('settings', () => {
     } catch {}
   }
 
-  // The filters of a page or a widget, remembered between visits. The filters
-  // saved under the other names stay as they are.
+  // Фильтры страницы или виджета, которые запоминаются между посещениями.
+  // Фильтры, сохранённые под другими именами, остаются как есть.
   async function setLastFilters(name: string, filters: Record<string, any>) {
     settings.value = { ...settings.value, last_filters: { ...settings.value.last_filters, [name]: filters } }
     try {
@@ -210,7 +210,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
   let layoutTimer: ReturnType<typeof setTimeout> | null = null
 
-  // Applied at once, saved after a pause
+  // Применяется сразу, сохраняется после паузы
   function setDashboardLayout(layout: DashboardLayout) {
     settings.value = { ...settings.value, dashboard_layout: layout }
     if (layoutTimer) clearTimeout(layoutTimer)

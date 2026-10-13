@@ -1,8 +1,8 @@
-// Copies text to the clipboard and reports whether it worked.
+// Копирует текст в буфер обмена и сообщает, получилось ли.
 //
-// The clipboard API exists only on https and localhost; the dashboard is
-// often opened by plain http inside a network, so there is a fallback
-// through a hidden text field.
+// API буфера обмена есть только на https и localhost; дашборд часто
+// открывают по обычному http внутри сети, поэтому есть запасной способ
+// через скрытое текстовое поле.
 export async function copyText(text: string): Promise<boolean> {
   try {
     if (navigator.clipboard && window.isSecureContext) {

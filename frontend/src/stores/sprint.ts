@@ -63,7 +63,7 @@ export const useSprintStore = defineStore('sprint', () => {
   const loading = ref(false)
   const error = ref('')
 
-  // silent: refresh in the background, without the spinner.
+  // silent: обновление в фоне, без индикатора загрузки.
   async function fetchAll(opts: { silent?: boolean } = {}) {
     const silent = opts.silent === true
     if (!silent) {

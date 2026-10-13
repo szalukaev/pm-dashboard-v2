@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-// Saves a blob as a file.
+// Сохраняет blob как файл.
 export function saveBlob(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -10,8 +10,8 @@ export function saveBlob(blob: Blob, name: string) {
   URL.revokeObjectURL(url)
 }
 
-// Downloads a file from the server under the name the server gives it
-// (the name may be in Russian and comes encoded), or under fallbackName.
+// Скачивает файл с сервера под именем, которое даёт сервер (имя может быть
+// русским и приходит закодированным), либо под fallbackName.
 export async function downloadFile(url: string, fallbackName: string, params?: Record<string, string>) {
   const response = await axios.get(url, { params, responseType: 'blob' })
   const header = String(response.headers['content-disposition'] || '')

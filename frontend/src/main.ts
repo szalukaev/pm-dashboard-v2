@@ -17,7 +17,7 @@ app.use(i18n)
 app.use(Quasar, { config: {} })
 app.mount('#app')
 
-// Register PWA service worker
+// Регистрация service worker для PWA
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {})

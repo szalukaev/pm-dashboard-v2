@@ -90,7 +90,7 @@ export function useWebSocket() {
   }
 
   onUnmounted(() => {
-    // Don't disconnect — shared connection
+    // Соединение не закрывается — оно общее
   })
 
   return { connected, reconnecting, reconnectAttempts, on, off, manualReconnect }

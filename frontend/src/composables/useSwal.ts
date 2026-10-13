@@ -1,7 +1,7 @@
 import Swal from 'sweetalert2'
 import i18n from '../i18n'
 
-// UI_GUIDE-compliant SweetAlert2 defaults
+// Настройки SweetAlert2 по умолчанию, соответствующие UI-гайду
 const swalDefaults = {
   customClass: {
     popup: 'swal-popup',

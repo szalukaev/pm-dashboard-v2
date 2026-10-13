@@ -5,7 +5,7 @@ import i18n from '../i18n'
 import { useSwal } from '../composables/useSwal'
 import { useAuthStore } from './auth'
 
-// Id of the "no assignee" column in the users mode
+// Идентификатор колонки «без исполнителя» на доске по сотрудникам
 export const UNASSIGNED = 'unassigned'
 
 export interface KanbanCard {
@@ -39,7 +39,7 @@ export const useKanbanStore = defineStore('kanban', () => {
   const error = ref('')
   const projectId = ref('')
 
-  // The board opens in the mode and on the project the user left it
+  // Доска открывается в том виде и на том проекте, где пользователь её оставил
   async function restoreState() {
     try {
       const { data } = await axios.get('/api/settings')
@@ -55,15 +55,15 @@ export const useKanbanStore = defineStore('kanban', () => {
     axios.put('/api/settings', fields).catch(() => {})
   }
 
-  // Only the latest request may update the board.
+  // Обновить доску может только самый свежий запрос.
   let boardRequest = 0
 
-  // silent: refresh in the background, without the spinner and without
-  // replacing the board by an error if the request fails.
+  // silent: обновление в фоне, без индикатора загрузки и без замены доски
+  // ошибкой, если запрос не удался.
   async function fetchBoard(opts: { silent?: boolean } = {}) {
     const silent = opts.silent === true
     const requestId = ++boardRequest
-    // By statuses the board needs a project; the view asks to choose one
+    // Доске по статусам нужен проект; экран просит его выбрать
     if (mode.value === 'statuses' && !projectId.value) {
       columns.value = []
       total.value = 0
@@ -98,7 +98,7 @@ export const useKanbanStore = defineStore('kanban', () => {
     const byStatuses = mode.value === 'statuses'
     const columnTitle = (col: KanbanColumn) => (col.id === UNASSIGNED ? t('kanban.unassigned') : col.name)
 
-    // Optimistic update; everything needed to undo it is kept
+    // Экран меняется сразу; всё нужное для отката сохраняется
     const sourceIndex = sourceCol.tasks.indexOf(card)
     const before = {
       status_id: card.status_id,
@@ -108,7 +108,7 @@ export const useKanbanStore = defineStore('kanban', () => {
     }
     sourceCol.tasks.splice(sourceIndex, 1)
     targetCol.tasks.push(card)
-    // The card itself shows status and assignee
+    // Статус и исполнителя показывает сама карточка
     if (byStatuses) {
       card.status_id = Number(targetCol.id)
       card.status_name = targetCol.name
@@ -129,8 +129,8 @@ export const useKanbanStore = defineStore('kanban', () => {
         `#${issueId} — ${t(byStatuses ? 'tasks.fields.status' : 'tasks.fields.assignee')}`,
       )
     } catch (e: any) {
-      // The data source did not take the change: put just this card back
-      // where it was (no board reload) and say why
+      // Источник данных не принял изменение: на место возвращается только
+      // эта карточка (доска не перезагружается), и объясняется причина
       Object.assign(card, before)
       const at = targetCol.tasks.indexOf(card)
       if (at >= 0) targetCol.tasks.splice(at, 1)
@@ -164,7 +164,7 @@ export const useKanbanStore = defineStore('kanban', () => {
     return columns.value.find(col => col.tasks.some(t => t.external_id === issueId))
   }
 
-  // Puts the dragged column on the place of the one it was dropped on
+  // Ставит перетащенную колонку на место той, на которую её бросили
   function moveColumn(fromId: string, toId: string) {
     const from = columns.value.findIndex(c => c.id === fromId)
     const to = columns.value.findIndex(c => c.id === toId)

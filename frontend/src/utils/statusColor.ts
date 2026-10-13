@@ -4,7 +4,7 @@ import { useTasksStore } from '../stores/tasks'
 // приоритета администратор выбирает в «Порядке приоритетов», а статус без
 // своего цвета красится по группе, к которой он отнесён в настройках.
 
-// Colors of the statuses, as in the previous version of the dashboard
+// Цвета статусов, как в прежней версии дашборда
 const statusColors: Record<string, string> = {
   'new': '#5e6ad2',
   'in progress': '#ffd93d',

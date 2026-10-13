@@ -1,7 +1,7 @@
 import { reactive } from 'vue'
 
-// Issues that have just changed: their rows and cards flash briefly
-// (class "flash-update" in global.css).
+// Только что изменившиеся задачи: их строки и карточки ненадолго
+// подсвечиваются (класс "flash-update" в global.css).
 const flashing = reactive(new Set<number>())
 
 const FLASH_MS = 800

@@ -2,17 +2,17 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import axios from 'axios'
 
-// State of the installation with respect to its license:
-//   not_activated — only the activation screen works;
-//   active        — everything works;
-//   grace         — everything works, the countdown to read-only is running;
-//   read_only     — data can be read but not changed.
+// Состояние установки по отношению к её лицензии:
+//   not_activated — работает только экран активации;
+//   active        — работает всё;
+//   grace         — работает всё, идёт отсчёт до режима «только чтение»;
+//   read_only     — данные можно читать, но не менять.
 export type LicenseState = 'not_activated' | 'active' | 'grace' | 'read_only'
 
 const REFRESH_MS = 60_000
 
 export const useLicenseStore = defineStore('license', () => {
-  // Until the server answers, nothing is assumed to be wrong
+  // Пока сервер не ответил, считается, что всё в порядке
   const state = ref<LicenseState>('active')
   const graceEndsAt = ref<string | null>(null)
   let loadedAt = 0
@@ -28,7 +28,7 @@ export const useLicenseStore = defineStore('license', () => {
     loadedAt = Date.now()
   }
 
-  // force: ask the server even if the answer is fresh
+  // force: спросить сервер, даже если ответ свежий
   async function fetchStatus(force = false) {
     if (!force && Date.now() - loadedAt < REFRESH_MS) return
     try {

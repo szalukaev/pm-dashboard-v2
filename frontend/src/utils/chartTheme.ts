@@ -1,11 +1,11 @@
-// Colours of the charts come from the theme, so a chart looks like the rest
-// of the page in every theme.
+// Цвета графиков берутся из темы, поэтому график в любой теме выглядит как
+// остальная страница.
 
 export function cssVar(name: string, fallback = ''): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback
 }
 
-// The look of a Chart.js tooltip shared by every chart
+// Оформление подсказки Chart.js, общее для всех графиков
 export function tooltipTheme() {
   return {
     backgroundColor: cssVar('--surface-3', 'rgba(15, 16, 17, 0.9)'),
@@ -18,7 +18,7 @@ export function tooltipTheme() {
   }
 }
 
-// Hours with at most one decimal: 12, 7.5
+// Часы не более чем с одним знаком после запятой: 12, 7.5
 export function roundHours(hours: number): number {
   return Math.round(hours * 10) / 10
 }

@@ -26,8 +26,8 @@ export interface AssigneeCount {
   count: number
 }
 
-// root_id / root_name: the topmost parent of the project, the project itself
-// when it has none
+// root_id / root_name: самый верхний родитель проекта; сам проект, если
+// родителя нет
 export interface ProjectDist {
   project_id: number
   project_name: string
@@ -36,8 +36,8 @@ export interface ProjectDist {
   assignees: AssigneeCount[]
 }
 
-// A chart of the distribution: a project, or a parent project together with
-// its nested ones — then parts are the projects it is made of
+// Диаграмма распределения: проект либо родительский проект вместе с
+// вложенными — тогда parts содержит проекты, из которых она состоит
 export interface DistChart {
   project_id: number
   project_name: string
@@ -50,7 +50,7 @@ export interface DeadlineGroup {
   tasks: any[]
 }
 
-// Hours of an employee over their tasks that are not closed
+// Часы сотрудника по его незакрытым задачам
 export interface HoursRow {
   name: string
   estimated_hours: number
@@ -59,15 +59,15 @@ export interface HoursRow {
   bug_percent: number
 }
 
-// Tasks closed during a week; week_start is its Monday, YYYY-MM-DD
+// Задачи, закрытые за неделю; week_start — её понедельник, YYYY-MM-DD
 export interface VelocityWeek {
   week_start: string
   closed: number
   estimated_hours: number
 }
 
-// One of the problems that lower the health score: share is the percent of
-// the active tasks, penalty is the points taken off
+// Одна из проблем, снижающих оценку здоровья: share — процент активных
+// задач, penalty — сколько баллов снято
 export interface HealthPart {
   key: string
   count: number
@@ -75,7 +75,7 @@ export interface HealthPart {
   penalty: number
 }
 
-// Health of the projects, 0–100, over the active tasks
+// Здоровье проектов, 0–100, по активным задачам
 export interface Health {
   score: number
   level: 'good' | 'warning' | 'bad'
@@ -83,16 +83,16 @@ export interface Health {
   parts: HealthPart[]
 }
 
-// The tasks behind a figure of the tab. metric is the figure; assignee, when
-// given, is the employee whose row of the team load table was clicked —
-// otherwise the figure is a card of the statistics.
+// Задачи, стоящие за цифрой вкладки. metric — цифра; assignee, если задан, —
+// сотрудник, по строке которого в «Нагрузке на команду» кликнули; иначе
+// цифра — карточка статистики.
 export interface TaskListQuery {
   title: string
   metric: string
   assignee?: string
 }
 
-// A bar of the timeline, from start to due (YYYY-MM-DD)
+// Полоса диаграммы от start до due (YYYY-MM-DD)
 export interface GanttTask {
   external_id: number
   subject: string
@@ -101,7 +101,7 @@ export interface GanttTask {
   assigned_to_name: string
   start: string
   due: string
-  // Hours planned for the task; null when it has no estimate
+  // Часы, заложенные на задачу; null — оценки нет
   estimated_hours: number | null
 }
 
@@ -165,9 +165,9 @@ export const useAnalyticsStore = defineStore('analytics', () => {
 
   const exceeded = ref<Exceeded[]>([])
   const gantt = ref<{ tasks: GanttTask[]; projects: GanttProject[]; total: number }>({ tasks: [], projects: [], total: 0 })
-  // The project chosen in the filter of the timeline; null — every project
+  // Проект, выбранный в фильтре диаграммы; null — все проекты
   const ganttProject = ref<number | null>(null)
-  // The first task of the shown page of the timeline
+  // Первая задача показанной страницы диаграммы
   const ganttOffset = ref(0)
   const health = ref<Health | null>(null)
   const stats = ref<StatCard[]>([])
@@ -179,7 +179,7 @@ export const useAnalyticsStore = defineStore('analytics', () => {
   const loading = ref(false)
   const error = ref('')
 
-  // silent: refresh in the background, without the loading skeleton.
+  // silent: обновление в фоне, без заглушки загрузки.
   async function fetchAll(opts: { silent?: boolean } = {}) {
     const silent = opts.silent === true
     if (!silent) {
@@ -270,13 +270,13 @@ export const useAnalyticsStore = defineStore('analytics', () => {
       const projects: GanttProject[] = data.projects || []
       const tasks: GanttTask[] = data.tasks || []
       const total: number = data.total || 0
-      // The chosen project has no tasks with a deadline left: back to all
+      // У выбранного проекта не осталось задач со сроком: возврат ко всем
       if (ganttProject.value !== null && !projects.some(p => p.id === ganttProject.value)) {
         ganttProject.value = null
         ganttOffset.value = 0
         return fetchGantt()
       }
-      // Tasks were closed and the page is past the end now: back to the first
+      // Задачи закрылись, и страница оказалась за концом списка: возврат к первой
       if (tasks.length === 0 && total > 0 && ganttOffset.value > 0) {
         ganttOffset.value = 0
         return fetchGantt()
