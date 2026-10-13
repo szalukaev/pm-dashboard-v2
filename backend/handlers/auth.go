@@ -272,7 +272,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) accessInfo(userID int) map[string]interface{} {
 	scope, err := (&access.Resolver{DB: h.DB}).Scope(userID)
 	if err != nil {
-		return map[string]interface{}{"visible_tabs": []string{}, "widgets": []string{}, "read_only": true, "sprint_actions": []string{}}
+		return map[string]interface{}{"visible_tabs": []string{}, "widgets": []string{}, "read_only": true, "sprint_actions": []string{}, "kanban_modes": []string{}}
 	}
 	return scopeInfo(scope)
 }
@@ -289,11 +289,16 @@ func scopeInfo(scope *access.Scope) map[string]interface{} {
 	if !scope.Admin && scope.SprintActions != nil {
 		sprintActions = *scope.SprintActions
 	}
+	kanbanModes := access.KanbanModes
+	if !scope.Admin && scope.KanbanModes != nil {
+		kanbanModes = *scope.KanbanModes
+	}
 	return map[string]interface{}{
 		"visible_tabs":   tabs,
 		"widgets":        widgets,
 		"read_only":      scope.ReadOnly,
 		"sprint_actions": sprintActions,
+		"kanban_modes":   kanbanModes,
 	}
 }
 

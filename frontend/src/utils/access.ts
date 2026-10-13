@@ -20,6 +20,8 @@ export interface Permissions {
   widgets: string[] | null
   // Allowed actions with sprints; null = every action
   sprint_actions: string[] | null
+  // Доступные виды доски Kanban; null = оба
+  kanban_modes: string[] | null
 }
 
 export interface NamedPermissions {
@@ -53,6 +55,9 @@ export const TABS = ['tasks', 'analytics', 'kanban', 'sprint', 'payments']
 export const WIDGETS = ['stats', 'health', 'velocity', 'team_load', 'hours', 'bug_hours', 'distribution', 'deadlines', 'gantt']
 // Actions with sprints, each allowed separately; labels are access.sprint.<action>
 export const SPRINT_ACTIONS = ['create', 'edit', 'tasks', 'close', 'delete']
+// Виды доски Kanban: users — по сотрудникам, statuses — по проектам (статусы
+// одного проекта); подписи — access.kanban.<вид>
+export const KANBAN_MODES = ['users', 'statuses']
 
 export function emptyPermissions(): Permissions {
   return {
@@ -67,6 +72,7 @@ export function emptyPermissions(): Permissions {
     visible_tabs: null,
     widgets: null,
     sprint_actions: null,
+    kanban_modes: null,
   }
 }
 
@@ -78,6 +84,7 @@ export function clonePermissions(p: Permissions): Permissions {
     visible_tabs: p.visible_tabs ? [...p.visible_tabs] : null,
     widgets: p.widgets ? [...p.widgets] : null,
     sprint_actions: p.sprint_actions ? [...p.sprint_actions] : null,
+    kanban_modes: p.kanban_modes ? [...p.kanban_modes] : null,
   }
 }
 

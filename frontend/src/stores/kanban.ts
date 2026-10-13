@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import axios from 'axios'
 import i18n from '../i18n'
 import { useSwal } from '../composables/useSwal'
+import { useAuthStore } from './auth'
 
 // Id of the "no assignee" column in the users mode
 export const UNASSIGNED = 'unassigned'
@@ -43,6 +44,9 @@ export const useKanbanStore = defineStore('kanban', () => {
     try {
       const { data } = await axios.get('/api/settings')
       mode.value = data.kanban_last_mode === 'statuses' ? 'statuses' : 'users'
+      // Вид, закрытый администратором, не открывается: берём доступный
+      const auth = useAuthStore()
+      if (!auth.canKanban(mode.value)) mode.value = mode.value === 'users' ? 'statuses' : 'users'
       projectId.value = data.kanban_last_project ? String(data.kanban_last_project) : ''
     } catch {}
   }

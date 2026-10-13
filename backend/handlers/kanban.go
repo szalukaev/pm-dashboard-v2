@@ -71,6 +71,12 @@ func (h *KanbanHandler) GetBoard(w http.ResponseWriter, r *http.Request) {
 	var columns []KanbanColumn
 	var err error
 	scope := middleware.GetScope(r)
+	// Вид доски, закрытый администратором, не отдаётся и по прямому запросу
+	if !scope.CanKanban(mode) {
+		slog.Warn("Kanban mode outside of user rights", "user", middleware.GetUserID(r), "mode", mode)
+		utils.Error(w, http.StatusForbidden, "KANBAN_MODE_FORBIDDEN")
+		return
+	}
 	if mode == "statuses" {
 		warnForeignProject(r, scope, r.URL.Query().Get("project_id"))
 		columns, err = h.statusBoard(scope, r.URL.Query().Get("project_id"))
@@ -290,6 +296,11 @@ func (h *KanbanHandler) MoveCard(w http.ResponseWriter, r *http.Request) {
 
 	// The issue must be within the user's rights.
 	scope := middleware.GetScope(r)
+	// Перенос карточки на доске, вид которой закрыт администратором, не принимается
+	if (body.Mode == access.KanbanUsers || body.Mode == access.KanbanStatuses) && !scope.CanKanban(body.Mode) {
+		utils.Error(w, http.StatusForbidden, "KANBAN_MODE_FORBIDDEN")
+		return
+	}
 	if !requireIssue(w, r, *h.DB, body.IssueID) {
 		return
 	}

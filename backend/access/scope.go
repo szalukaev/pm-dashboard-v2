@@ -39,6 +39,8 @@ func effective(individual, template *Permissions, groups []Permissions) Permissi
 	result.Widgets = groupKeys(groups, func(p Permissions) *[]string { return p.Widgets }, own.Widgets)
 	// What may be done with sprints follows the same rule.
 	result.SprintActions = groupKeys(groups, func(p Permissions) *[]string { return p.SprintActions }, own.SprintActions)
+	// Виды доски Kanban — по тому же правилу
+	result.KanbanModes = groupKeys(groups, func(p Permissions) *[]string { return p.KanbanModes }, own.KanbanModes)
 	result.OwnTasksOnly = own.OwnTasksOnly
 	result.ReadOnly = own.ReadOnly
 	result.FromSource = own.FromSource
@@ -77,6 +79,8 @@ type Scope struct {
 	Widgets     *[]string
 	// SprintActions: nil = every action with sprints is allowed.
 	SprintActions *[]string
+	// KanbanModes: nil = доступны оба вида доски Kanban.
+	KanbanModes *[]string
 
 	// The maximum set by the administrator.
 	AllowedAllProjects bool
@@ -131,6 +135,7 @@ func newScope(userID int, admin bool, perms Permissions, facts userFacts) *Scope
 		s.ReadOnly = perms.ReadOnly
 		s.VisibleTabs, s.Widgets = perms.VisibleTabs, perms.Widgets
 		s.SprintActions = perms.SprintActions
+		s.KanbanModes = perms.KanbanModes
 		s.AllowedAllProjects, s.AllowedProjects = perms.AllProjects, perms.ProjectIDs
 		if perms.FromSource {
 			// Exactly the projects of the source: membership there is per
@@ -266,6 +271,20 @@ func (s *Scope) CanSprint(action string) bool {
 	}
 	for _, a := range *s.SprintActions {
 		if a == action {
+			return true
+		}
+	}
+	return false
+}
+
+// CanKanban сообщает, доступен ли пользователю вид доски Kanban (одна из
+// констант Kanban*).
+func (s *Scope) CanKanban(mode string) bool {
+	if s.Admin || s.KanbanModes == nil {
+		return true
+	}
+	for _, m := range *s.KanbanModes {
+		if m == mode {
 			return true
 		}
 	}

@@ -30,6 +30,15 @@ const (
 // SprintActions lists the sprint actions in the order they are shown.
 var SprintActions = []string{SprintCreate, SprintEdit, SprintTasks, SprintClose, SprintDelete}
 
+// Виды доски Kanban, каждый разрешается отдельно.
+const (
+	KanbanUsers    = "users"    // по сотрудникам: колонка на исполнителя
+	KanbanStatuses = "statuses" // по проектам: колонки статусов одного проекта
+)
+
+// KanbanModes — виды доски в том порядке, в каком они показаны.
+var KanbanModes = []string{KanbanUsers, KanbanStatuses}
+
 // Permissions is one permission set: of a user, a group or a role template.
 type Permissions struct {
 	ProjectIDs []int `json:"project_ids"`
@@ -51,16 +60,18 @@ type Permissions struct {
 	Widgets     *[]string `json:"widgets"`
 	// SprintActions: nil = every action, otherwise the allowed ones.
 	SprintActions *[]string `json:"sprint_actions"`
+	// KanbanModes: nil = оба вида доски, иначе разрешённые.
+	KanbanModes *[]string `json:"kanban_modes"`
 }
 
 // Columns is the list of permission columns shared by user_permissions,
 // group_permissions and role_templates, in the order Scan and Values use.
-const Columns = "project_ids, team_ids, visible_tabs, widgets, all_projects, all_team, own_tasks_only, read_only, from_source, show_unassigned, sprint_actions"
+const Columns = "project_ids, team_ids, visible_tabs, widgets, all_projects, all_team, own_tasks_only, read_only, from_source, show_unassigned, sprint_actions, kanban_modes"
 
 // rawPermissions receives the permission columns of a row.
 type rawPermissions struct {
-	projects, team, tabs, widgets, sprint []byte
-	p                                     Permissions
+	projects, team, tabs, widgets, sprint, kanban []byte
+	p                                             Permissions
 }
 
 // keyList decodes a nullable JSON list of keys; NULL means "everything".
@@ -88,7 +99,7 @@ func keyValue(keys *[]string) interface{} {
 func (r *rawPermissions) dest() []interface{} {
 	return []interface{}{&r.projects, &r.team, &r.tabs, &r.widgets,
 		&r.p.AllProjects, &r.p.AllTeam, &r.p.OwnTasksOnly, &r.p.ReadOnly, &r.p.FromSource, &r.p.ShowUnassigned,
-		&r.sprint}
+		&r.sprint, &r.kanban}
 }
 
 func (r *rawPermissions) permissions() Permissions {
@@ -98,6 +109,7 @@ func (r *rawPermissions) permissions() Permissions {
 	p.VisibleTabs = keyList(r.tabs)
 	p.Widgets = keyList(r.widgets)
 	p.SprintActions = keyList(r.sprint)
+	p.KanbanModes = keyList(r.kanban)
 	return p.Normalized()
 }
 
@@ -108,7 +120,7 @@ func (p Permissions) Values() []interface{} {
 	team, _ := json.Marshal(p.TeamIDs)
 	return []interface{}{projects, team, keyValue(p.VisibleTabs), keyValue(p.Widgets),
 		p.AllProjects, p.AllTeam, p.OwnTasksOnly, p.ReadOnly, p.FromSource, p.ShowUnassigned,
-		keyValue(p.SprintActions)}
+		keyValue(p.SprintActions), keyValue(p.KanbanModes)}
 }
 
 // Normalized returns the set with sorted lists without duplicates, non-nil
@@ -119,6 +131,7 @@ func (p Permissions) Normalized() Permissions {
 	p.VisibleTabs = knownKeys(p.VisibleTabs, Tabs)
 	p.Widgets = knownKeys(p.Widgets, Widgets)
 	p.SprintActions = knownKeys(p.SprintActions, SprintActions)
+	p.KanbanModes = knownKeys(p.KanbanModes, KanbanModes)
 	return p
 }
 

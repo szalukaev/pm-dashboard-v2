@@ -875,7 +875,52 @@
       "selected": "Selected: {n}",
       "clear": "Clear all",
       "nothing_found": "Nothing found",
-      "projects_note": "A right to a project covers all its subprojects, including the ones created later."
+      "projects_note": "A right to a project covers all its subprojects, including the ones created later.",
+      "sections_label": "Sections of the rights",
+      "sections": {
+        "general": "General",
+        "projects": "Projects",
+        "team": "Team",
+        "tabs": "Tabs",
+        "widgets": "Analytics widgets",
+        "sprints": "Sprints",
+        "kanban": "Kanban"
+      },
+      "desc": {
+        "general": "What the user may do with the data they see.",
+        "projects": "Tasks of which projects the user sees. They choose their own set of the allowed ones in the data settings.",
+        "team": "Tasks of which members the user sees and whom they may assign.",
+        "tabs": "Which tabs of the dashboard are available. A hidden tab is closed by a direct link as well.",
+        "widgets": "Which widgets are shown on the Analytics tab.",
+        "sprints": "What the user may do with sprints. Sprints can be viewed without these rights.",
+        "kanban": "Which kinds of the Kanban board the user may open. At least one kind always remains."
+      },
+      "all_projects_hint": "including the ones created later",
+      "some_projects": "Selected projects",
+      "all_team_hint": "including the ones added later",
+      "some_team": "Selected members",
+      "all": {
+        "tabs": "All tabs",
+        "widgets": "All widgets",
+        "sprints": "All actions",
+        "kanban": "All board kinds"
+      },
+      "all_hint": "including the ones that appear later",
+      "some": "Selected",
+      "count": "{n} of {total}",
+      "status_all": "no limits",
+      "status_write": "changes allowed",
+      "status_read_only": "read-only",
+      "last_one": "The last board kind cannot be turned off",
+      "tab_hidden": "The {tab} tab is hidden from the user — this setting has no effect while it is hidden."
+    },
+    "kanban": {
+      "users": "By members",
+      "statuses": "By projects"
+    },
+    "kanban_hint": {
+      "users": "A column per assignee: cards are moved between members",
+      "statuses": "Status columns of the chosen project: cards are moved between statuses"
     },
     "clone": {
       "title_short": "Clone rights",

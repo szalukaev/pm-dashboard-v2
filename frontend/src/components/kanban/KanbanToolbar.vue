@@ -1,6 +1,7 @@
 <template>
   <div class="kanban-toolbar">
-    <div class="mode-switch">
+    <!-- Переключатель есть, только когда пользователю доступны оба вида доски -->
+    <div v-if="canUsers && canStatuses" class="mode-switch">
       <button
         class="pill-btn"
         :class="{ active: mode === 'users' }"
@@ -37,6 +38,9 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useAuthStore } from '../../stores/auth'
+
 defineProps<{
   mode: 'users' | 'statuses'
   projectId: string
@@ -45,6 +49,11 @@ defineProps<{
 }>()
 
 defineEmits(['change-mode', 'change-project'])
+
+// Виды доски, которые администратор оставил пользователю
+const auth = useAuthStore()
+const canUsers = computed(() => auth.canKanban('users'))
+const canStatuses = computed(() => auth.canKanban('statuses'))
 </script>
 
 <style scoped>

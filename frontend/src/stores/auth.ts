@@ -20,6 +20,8 @@ interface User {
     read_only: boolean
     // Allowed actions with sprints: create, edit, tasks, close, delete
     sprint_actions?: string[]
+    // Доступные виды доски Kanban: users, statuses
+    kanban_modes?: string[]
   }
   // The user's account in the data source, tied by a personal API key.
   // type is the kind of the source ('redmine'); needs_token asks for the key.
@@ -104,6 +106,12 @@ export const useAuthStore = defineStore('auth', () => {
     return isAdmin.value || !actions || actions.includes(action)
   }
 
+  // Пользователю доступен вид доски Kanban (users | statuses)
+  function canKanban(mode: string): boolean {
+    const modes = user.value?.access?.kanban_modes
+    return isAdmin.value || !modes || modes.includes(mode)
+  }
+
   // Ties the user to the owner of the personal API key of the data source.
   // Only the user can do it, and only for themselves.
   async function setSourceToken(token: string) {
@@ -117,7 +125,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   return {
-    user, isAuthenticated, isAdmin, canWrite, tabVisible, widgetVisible, canSprint,
+    user, isAuthenticated, isAdmin, canWrite, tabVisible, widgetVisible, canSprint, canKanban,
     login, logout, fetchMe, changePassword, updateMe, setSourceToken, clearSourceToken,
   }
 })

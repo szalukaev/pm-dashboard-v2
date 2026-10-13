@@ -17,7 +17,7 @@ func Scan(scan func(dest ...interface{}) error, leading ...interface{}) (Permiss
 
 // assignments returns "col = $n, …" for Columns, placeholders starting at first.
 func assignments(first int) string {
-	names := []string{"project_ids", "team_ids", "visible_tabs", "widgets", "all_projects", "all_team", "own_tasks_only", "read_only", "from_source", "show_unassigned", "sprint_actions"}
+	names := []string{"project_ids", "team_ids", "visible_tabs", "widgets", "all_projects", "all_team", "own_tasks_only", "read_only", "from_source", "show_unassigned", "sprint_actions", "kanban_modes"}
 	result := ""
 	for i, name := range names {
 		if i > 0 {
