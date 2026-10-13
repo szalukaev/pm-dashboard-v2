@@ -190,7 +190,7 @@ async function saveInlineEdit(task: Task, field: string, value: string) {
   }
 }
 
-const { statuses, priorities, members, projectCategories: projectCategoriesMap, filters } = storeToRefs(tasksStore)
+const { statuses, priorities, members, projectCategories: projectCategoriesMap, filters, useGrouping } = storeToRefs(tasksStore)
 
 // The sorting is one for every table of tasks and lives with the filters:
 // a table is rebuilt when its data is reloaded, and a state of its own
@@ -215,10 +215,12 @@ function withCurrent(list: string[], current?: string | null): string[] {
 }
 
 // The columns the user chose to see, in their order
-// В группировке по проектам колонка «Проект» лишняя: проект назван в заголовке группы
+// В группировке по проектам колонка «Проект» лишняя: проект назван в заголовке группы.
+// В режиме «Все» group_by хранит прошлую группировку, поэтому смотрим и на useGrouping.
+const groupedByProject = computed(() => useGrouping.value && filters.value.group_by === 'project')
 const shownColumns = computed(() =>
   settingsStore.tableColumns(TASKS_TABLE, TASK_COLUMNS.map(c => c.key))
-    .filter(key => key !== 'project_name' || filters.value.group_by !== 'project')
+    .filter(key => key !== 'project_name' || !groupedByProject.value)
     .map(key => TASK_COLUMNS.find(c => c.key === key)!)
 )
 
