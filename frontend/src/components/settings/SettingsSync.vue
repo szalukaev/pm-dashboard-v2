@@ -28,6 +28,7 @@
 
     <p class="total-issues" data-testid="sync-total-issues">{{ $t('settings.sync.total_issues', { count: totalIssues.toLocaleString() }) }}</p>
 
+    <div class="table-scroll">
     <table class="sync-table">
       <thead>
         <tr>
@@ -52,6 +53,7 @@
         </tr>
       </tbody>
     </table>
+    </div>
 
     <div v-if="logs.length === 0" class="empty-hint">
       {{ $t('settings.sync.empty') }}
@@ -245,6 +247,11 @@ onUnmounted(() => off('sync-status', loadLogs))
 
 .interval-input:focus-visible {
   border-color: var(--accent);
+}
+
+/* Широкая таблица прокручивается внутри своего блока, а не вместе со страницей */
+.table-scroll {
+  overflow-x: auto;
 }
 
 .sync-table {

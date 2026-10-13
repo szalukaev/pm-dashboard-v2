@@ -95,7 +95,8 @@ onMounted(async () => {
 .threshold-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 6px 10px;
   font-size: 13px;
   color: var(--text);
 }

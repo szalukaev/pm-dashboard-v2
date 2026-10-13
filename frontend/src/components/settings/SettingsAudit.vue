@@ -15,6 +15,7 @@
       </select>
     </div>
 
+    <div class="table-scroll">
     <table class="audit-table">
       <thead>
         <tr>
@@ -50,6 +51,7 @@
         </tr>
       </tbody>
     </table>
+    </div>
 
     <div v-if="logs.length === 0" class="empty-hint">
       {{ $t('audit.empty') }}
@@ -156,8 +158,14 @@ onMounted(loadLogs)
 
 .audit-filters {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 16px;
+}
+
+/* Широкая таблица прокручивается внутри своего блока, а не вместе со страницей */
+.table-scroll {
+  overflow-x: auto;
 }
 
 .filter-select {

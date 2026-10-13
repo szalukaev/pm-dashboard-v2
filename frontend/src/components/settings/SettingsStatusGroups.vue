@@ -305,4 +305,10 @@ onMounted(async () => {
   color: var(--text-faintest);
   margin-top: 8px;
 }
+
+@media (max-width: 640px) {
+  .columns-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 </style>

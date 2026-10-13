@@ -147,7 +147,8 @@ const visibleTabs = computed(() => tabs.filter(tab => !tab.adminOnly || isAdmin.
 
 @media (max-width: 768px) {
   .settings-layout {
-    grid-template-columns: 1fr;
+    /* Не шире окна: колонка «1fr» растягивается по самому широкому блоку */
+    grid-template-columns: minmax(0, 1fr);
   }
   .settings-menu {
     flex-direction: row;

@@ -237,6 +237,7 @@ onMounted(async () => {
 
 .report-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 16px;
 }

@@ -210,6 +210,8 @@
 /* Tabs inside a screen or a dialog */
 .adm-tabs {
   display: flex;
+  /* Вкладок больше, чем помещается в строку на ноутбуке и телефоне */
+  flex-wrap: wrap;
   gap: 4px;
   margin-bottom: 16px;
   border-bottom: 1px solid var(--hairline);

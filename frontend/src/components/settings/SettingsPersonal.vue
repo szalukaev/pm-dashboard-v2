@@ -455,4 +455,27 @@ async function submitPasswordChange() {
   font-size: 12px;
   color: var(--success);
 }
+
+/* На телефоне аватар стоит над данными, подпись поля — над значением */
+@media (max-width: 640px) {
+  .personal-layout {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .info-row,
+  .editable-name {
+    flex-wrap: wrap;
+  }
+
+  .info-label {
+    min-width: 0;
+    flex-basis: 100%;
+  }
+
+  .name-input {
+    width: 100%;
+    max-width: 220px;
+  }
+}
 </style>
