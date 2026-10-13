@@ -85,7 +85,15 @@ func (h *AnalyticsHandler) GetVelocity(w http.ResponseWriter, r *http.Request) {
 	}
 
 	projectFilter, args := projectIssues(r)
-	weeks := lastWeeks(time.Now(), velocityWeeks)
+	now := time.Now()
+	period, ok := parsePeriod(r.URL.Query(), now)
+	if !ok {
+		utils.Error(w, http.StatusBadRequest, "INVALID_PERIOD")
+		return
+	}
+	// С периодом показываются его недели, и задачи считаются только в его границах
+	weeks := velocityWeeksOf(period, now)
+	projectFilter += period.closedCond(&args)
 
 	// A task reopened after closing is not a closed one
 	q := `SELECT closed_on, COALESCE(estimated_hours, 0)

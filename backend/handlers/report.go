@@ -353,7 +353,7 @@ func (h *ReportHandler) build(scope *access.Scope, settings ReportSettings, lang
 	if settings.has("stats") {
 		section("stats")
 		table()
-		for _, stat := range analytics.stats(scope, now) {
+		for _, stat := range analytics.stats(scope, now, Period{}) {
 			value := fmt.Sprintf("%d", int(math.Round(stat.Value)))
 			if stat.IsPct {
 				value = fmt.Sprintf("%.1f%%", stat.Value)
@@ -367,7 +367,7 @@ func (h *ReportHandler) build(scope *access.Scope, settings ReportSettings, lang
 	}
 
 	if settings.has("team_load") {
-		team, err := analytics.teamLoad(scope, now)
+		team, err := analytics.teamLoad(scope, now, Period{})
 		if err != nil {
 			return "", "", err
 		}

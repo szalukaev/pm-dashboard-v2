@@ -121,7 +121,40 @@ export interface Exceeded {
   project_name: string
 }
 
+// Период отчётов: весь период, последние 14 или 30 дней либо диапазон дат
+// (ГГГГ-ММ-ДД, обе входят; достаточно одной). Действует на закрытые задачи:
+// считаются только закрытые в периоде.
+export type PeriodMode = 'all' | '14' | '30' | 'range'
+export interface AnalyticsPeriod {
+  mode: PeriodMode
+  from: string
+  to: string
+}
+
+export const PERIOD_MODES: PeriodMode[] = ['all', 'range', '14', '30']
+export const DEFAULT_PERIOD: AnalyticsPeriod = { mode: '14', from: '', to: '' }
+
 export const useAnalyticsStore = defineStore('analytics', () => {
+  const period = ref<AnalyticsPeriod>({ ...DEFAULT_PERIOD })
+
+  // Параметры периода для запросов; пусто — за весь период
+  function periodParams(): Record<string, string> {
+    const p = period.value
+    if (p.mode === 'all') return {}
+    if (p.mode !== 'range') return { period: p.mode }
+    if (!p.from && !p.to) return {}
+    const params: Record<string, string> = { period: 'range' }
+    if (p.from) params.from = p.from
+    if (p.to) params.to = p.to
+    return params
+  }
+
+  // Новый период: перестраиваются отчёты, которые от него зависят
+  function setPeriod(next: AnalyticsPeriod) {
+    period.value = { ...next }
+    return Promise.all([fetchStats(), fetchTeamLoad(), fetchVelocity()])
+  }
+
   const exceeded = ref<Exceeded[]>([])
   const gantt = ref<{ tasks: GanttTask[]; projects: GanttProject[]; total: number }>({ tasks: [], projects: [], total: 0 })
   // The project chosen in the filter of the timeline; null — every project
@@ -166,14 +199,14 @@ export const useAnalyticsStore = defineStore('analytics', () => {
 
   async function fetchStats() {
     try {
-      const { data } = await axios.get('/api/analytics/stats')
+      const { data } = await axios.get('/api/analytics/stats', { params: periodParams() })
       stats.value = data.stats || []
     } catch {}
   }
 
   async function fetchTeamLoad() {
     try {
-      const { data } = await axios.get('/api/analytics/team-load')
+      const { data } = await axios.get('/api/analytics/team-load', { params: periodParams() })
       teamLoad.value = data.team || []
     } catch {}
   }
@@ -201,7 +234,7 @@ export const useAnalyticsStore = defineStore('analytics', () => {
 
   async function fetchVelocity() {
     try {
-      const { data } = await axios.get('/api/analytics/velocity')
+      const { data } = await axios.get('/api/analytics/velocity', { params: periodParams() })
       velocity.value = data.weeks || []
     } catch {}
   }
@@ -259,5 +292,6 @@ export const useAnalyticsStore = defineStore('analytics', () => {
     stats, teamLoad, distribution, deadlines, hours, velocity, health, gantt, ganttProject, loading, error,
     fetchAll, fetchStats, fetchTeamLoad, fetchDistribution, fetchDeadlines, fetchHours, fetchVelocity, fetchHealth,
     fetchGantt, setGanttProject, ganttOffset, setGanttOffset, exceeded, fetchThresholds,
+    period, periodParams, setPeriod,
   }
 })

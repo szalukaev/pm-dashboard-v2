@@ -65,14 +65,22 @@ func (h *AnalyticsHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	utils.JSON(w, http.StatusOK, map[string]interface{}{"stats": h.stats(middleware.GetScope(r), time.Now())})
+	now := time.Now()
+	period, ok := parsePeriod(r.URL.Query(), now)
+	if !ok {
+		utils.Error(w, http.StatusBadRequest, "INVALID_PERIOD")
+		return
+	}
+	utils.JSON(w, http.StatusOK, map[string]interface{}{"stats": h.stats(middleware.GetScope(r), now, period)})
 }
 
 // stats считает карточки статистики по проектам пользователя в пределах его
-// прав. Этим же расчётом пользуется письмо со сводкой.
-func (h *AnalyticsHandler) stats(scope *access.Scope, now time.Time) []StatCard {
+// прав. Этим же расчётом пользуется письмо со сводкой. period ограничивает
+// закрытые задачи теми, что закрыты в периоде.
+func (h *AnalyticsHandler) stats(scope *access.Scope, now time.Time, period Period) []StatCard {
 	args := []interface{}{}
 	projectFilter := scope.ProjectIssueCond("", &args)
+	projectFilter += period.closedCond(&args)
 
 	var stats []StatCard
 	today := now.Format("2006-01-02")
@@ -138,7 +146,13 @@ func (h *AnalyticsHandler) GetTeamLoad(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	team, err := h.teamLoad(middleware.GetScope(r), time.Now())
+	now := time.Now()
+	period, ok := parsePeriod(r.URL.Query(), now)
+	if !ok {
+		utils.Error(w, http.StatusBadRequest, "INVALID_PERIOD")
+		return
+	}
+	team, err := h.teamLoad(middleware.GetScope(r), now, period)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
@@ -148,12 +162,14 @@ func (h *AnalyticsHandler) GetTeamLoad(w http.ResponseWriter, r *http.Request) {
 
 // teamLoad считает нагрузку на команду, которую пользователь отслеживает, в
 // пределах его прав. Этим же расчётом пользуется письмо со сводкой.
-func (h *AnalyticsHandler) teamLoad(scope *access.Scope, now time.Time) ([]TeamLoadRow, error) {
+func (h *AnalyticsHandler) teamLoad(scope *access.Scope, now time.Time, period Period) ([]TeamLoadRow, error) {
 	today := now.Format("2006-01-02")
 
 	// The team the user tracks, within rights
 	args := []interface{}{}
 	projectFilter := scope.IssueCond("", &args)
+	// Закрытые считаются только за период
+	projectFilter += period.closedCond(&args)
 	teamFilter := ""
 	if !scope.AllTeam {
 		// A chosen team means a row per member, without "unassigned"

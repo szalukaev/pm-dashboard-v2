@@ -68,7 +68,16 @@ func (h *AnalyticsHandler) GetTasks(w http.ResponseWriter, r *http.Request) {
 		filter, args = projectIssues(r)
 	}
 
-	args = append(args, time.Now().Format("2006-01-02"))
+	// Тот же период, что у цифры: иначе список закрытых разошёлся бы с числом
+	now := time.Now()
+	period, periodOK := parsePeriod(query, now)
+	if !periodOK {
+		utils.Error(w, http.StatusBadRequest, "INVALID_PERIOD")
+		return
+	}
+	filter += period.closedCond(&args)
+
+	args = append(args, now.Format("2006-01-02"))
 	cond, ok := analyticsTaskCond(query.Get("metric"), "$"+itoa(len(args)))
 	if !ok {
 		utils.Error(w, http.StatusBadRequest, "INVALID_METRIC")

@@ -55,7 +55,7 @@
 import { ref, computed, watch } from 'vue'
 import axios from 'axios'
 import { useSettingsStore } from '../../stores/settings'
-import type { TaskListQuery } from '../../stores/analytics'
+import { useAnalyticsStore, type TaskListQuery } from '../../stores/analytics'
 import { statusColor } from '../../utils/statusColor'
 import AppModal from '../ui/AppModal.vue'
 import AppPagination from '../ui/AppPagination.vue'
@@ -108,7 +108,8 @@ async function load(from: number) {
   loading.value = true
   failed.value = false
   try {
-    const params: Record<string, string | number> = { metric: query.metric, offset: from }
+    // Тот же период, что у цифры, по которой открыт список
+    const params: Record<string, string | number> = { ...useAnalyticsStore().periodParams(), metric: query.metric, offset: from }
     if (query.assignee !== undefined) params.assignee = query.assignee
     const { data } = await axios.get('/api/analytics/tasks', { params })
     // The answer to a figure that is not shown any more is of no use

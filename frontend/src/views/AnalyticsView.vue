@@ -18,7 +18,10 @@
          user by the administrator are not shown -->
     <DashboardGrid v-else :widgets="WIDGETS" :available="available">
       <template #title>
-        <h1 class="page-title">{{ $t('analytics.title') }}</h1>
+        <div class="title-row">
+          <h1 class="page-title">{{ $t('analytics.title') }}</h1>
+          <PeriodFilter :model-value="period" @update:model-value="changePeriod" />
+        </div>
       </template>
 
       <!-- Индикаторы выше порогов, заданных пользователем в настройках -->
@@ -143,7 +146,8 @@ import AppEmptyState from '../components/ui/AppEmptyState.vue'
 import TaskModal from '../components/tasks/TaskModal.vue'
 import AnalyticsTasksModal from '../components/analytics/AnalyticsTasksModal.vue'
 import AppModal from '../components/ui/AppModal.vue'
-import type { TaskListQuery, DistChart, ProjectDist } from '../stores/analytics'
+import PeriodFilter from '../components/analytics/PeriodFilter.vue'
+import { PERIOD_MODES, DEFAULT_PERIOD, type AnalyticsPeriod, type TaskListQuery, type DistChart, type ProjectDist } from '../stores/analytics'
 
 // The widgets of the tab in the standard order with their standard widths.
 // The ids are the keys of the widgets in the access rights.
@@ -164,7 +168,23 @@ const { t } = useI18n()
 const store = useAnalyticsStore()
 const auth = useAuthStore()
 const settingsStore = useSettingsStore()
-const { stats, teamLoad, distribution, deadlines, hours, velocity, health, gantt, ganttProject, ganttOffset, exceeded, loading, error } = storeToRefs(store)
+const { stats, teamLoad, distribution, deadlines, hours, velocity, health, gantt, ganttProject, ganttOffset, exceeded, loading, error, period } = storeToRefs(store)
+
+// Период отчётов запоминается в настройках пользователя под этим именем
+const PERIOD_FILTER = 'analytics_period'
+
+// Сохранённый период; чего не было или что испорчено — период по умолчанию
+function savedPeriod(): AnalyticsPeriod {
+  const saved = settingsStore.settings.last_filters?.[PERIOD_FILTER]
+  if (!saved || !PERIOD_MODES.includes(saved.mode)) return { ...DEFAULT_PERIOD }
+  return { mode: saved.mode, from: typeof saved.from === 'string' ? saved.from : '', to: typeof saved.to === 'string' ? saved.to : '' }
+}
+
+// Отчёты перестраиваются сразу, выбор запоминается
+function changePeriod(next: AnalyticsPeriod) {
+  store.setPeriod(next)
+  settingsStore.setLastFilters(PERIOD_FILTER, { ...next })
+}
 
 // Индикаторы, превысившие порог хотя бы в одном проекте: их карточки красные
 const exceededIndicators = computed(() => [...new Set(exceeded.value.map(e => e.indicator))])
@@ -280,12 +300,23 @@ function openTask(id: number) {
 useLiveRefresh(() => fetchAll({ silent: true }))
 
 onMounted(async () => {
-  await Promise.all([settingsStore.ensureLoaded(), fetchAll()])
+  // Сначала настройки: в них период, с которым запрашиваются отчёты
+  await settingsStore.ensureLoaded()
+  period.value = savedPeriod()
+  await fetchAll()
   ready.value = true
 })
 </script>
 
 <style scoped>
+/* Заголовок вкладки и период отчётов рядом; на узком экране период уходит под заголовок */
+.title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+}
+
 .page-title {
   margin: 0;
   font-size: 20px;
