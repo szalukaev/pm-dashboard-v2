@@ -76,6 +76,7 @@
           {{ $t('mail.clear_password') }}
         </AppButton>
       </div>
+      <AppSavingOverlay cover :active="saving" />
     </form>
 
     <!-- Проверка идёт по сохранённым настройкам -->
@@ -103,6 +104,7 @@ import { useI18n } from 'vue-i18n'
 import { useSwal } from '../../../composables/useSwal'
 import { useAuthStore } from '../../../stores/auth'
 import AppButton from '../../ui/AppButton.vue'
+import AppSavingOverlay from '../../ui/AppSavingOverlay.vue'
 
 const { t, te } = useI18n()
 const { toast } = useSwal()
@@ -204,6 +206,7 @@ onMounted(load)
 
 <style scoped>
 .mail-form {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 14px;

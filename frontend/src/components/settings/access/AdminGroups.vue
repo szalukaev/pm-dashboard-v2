@@ -42,7 +42,7 @@
     </div>
 
     <!-- New group -->
-    <AppModal v-model="createOpen" :title="$t('access.groups.new_title')" width="440px">
+    <AppModal v-model="createOpen" :title="$t('access.groups.new_title')" width="440px" :busy="saving">
       <form class="adm-form" @submit.prevent="createGroup">
         <div class="adm-field">
           <label>{{ $t('access.groups.name') }}</label>
@@ -60,7 +60,7 @@
     </AppModal>
 
     <!-- Edit group: members and rights -->
-    <AppModal v-model="editOpen" :title="$t('access.groups.edit_title', { name: edit.name })" width="900px">
+    <AppModal v-model="editOpen" :title="$t('access.groups.edit_title', { name: edit.name })" width="900px" :busy="saving">
       <div class="adm-tabs">
         <button type="button" class="adm-tab" :class="{ active: editTab === 'members' }" @click="editTab = 'members'">{{ $t('access.groups.tab_members') }}</button>
         <button type="button" class="adm-tab" :class="{ active: editTab === 'rights' }" data-testid="group-tab-rights" @click="editTab = 'rights'">{{ $t('access.groups.tab_rights') }}</button>
@@ -105,7 +105,7 @@
     </AppModal>
 
     <!-- Copy rights of a group -->
-    <AppModal v-model="cloneOpen" :title="$t('access.clone.group_title', { name: cloneSource?.name || '' })" width="440px">
+    <AppModal v-model="cloneOpen" :title="$t('access.clone.group_title', { name: cloneSource?.name || '' })" width="440px" :busy="saving">
       <div class="adm-form">
         <div class="adm-field">
           <label>{{ $t('access.clone.target_type') }}</label>

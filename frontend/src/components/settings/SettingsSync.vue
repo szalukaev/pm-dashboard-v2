@@ -22,6 +22,8 @@
         />
         <span class="interval-label">{{ $t('settings.sync.minutes') }}</span>
       </label>
+      <!-- Новый интервал подхватывает фоновая синхронизация: до ответа сервера страницу покидать нельзя -->
+      <AppSavingOverlay cover :active="savingInterval" :text="$t('common.restarting')" progress guard />
     </div>
 
     <p class="total-issues" data-testid="sync-total-issues">{{ $t('settings.sync.total_issues', { count: totalIssues.toLocaleString() }) }}</p>
@@ -68,6 +70,7 @@ import { RefreshCw } from 'lucide-vue-next'
 import { useSwal } from '../../composables/useSwal'
 import { useWebSocket } from '../../composables/useWebSocket'
 import AppButton from '../ui/AppButton.vue'
+import AppSavingOverlay from '../ui/AppSavingOverlay.vue'
 import SettingsDataRetention from './SettingsDataRetention.vue'
 
 interface SyncLog {
@@ -92,6 +95,7 @@ const syncing = ref(false)
 const interval = ref(5)
 const intervalInput = ref('5')
 const intervalLimits = ref({ min: 1, max: 1440 })
+const savingInterval = ref(false)
 
 async function loadSettings() {
   try {
@@ -111,6 +115,7 @@ async function saveInterval() {
     return
   }
   if (value === interval.value) return
+  savingInterval.value = true
   try {
     await axios.put('/api/admin/sync-settings', { interval_minutes: value })
     interval.value = value
@@ -118,6 +123,8 @@ async function saveInterval() {
   } catch {
     intervalInput.value = String(interval.value)
     toast(t('settings.sync.interval_error'), 'error')
+  } finally {
+    savingInterval.value = false
   }
 }
 
@@ -205,6 +212,7 @@ onUnmounted(() => off('sync-status', loadLogs))
 }
 
 .sync-actions {
+  position: relative;
   display: flex;
   align-items: center;
   flex-wrap: wrap;

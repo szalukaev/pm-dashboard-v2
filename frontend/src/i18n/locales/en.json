@@ -13,6 +13,9 @@
     "export": "Export",
     "refresh": "Refresh",
     "loading": "Loading…",
+    "saving": "Saving…",
+    "saving_long": "This may take a few minutes, please do not close the page.",
+    "restarting": "Restarting services…",
     "empty": "Nothing here yet",
     "error": "Failed to load data",
     "retry": "Retry",
@@ -711,6 +714,7 @@
       "auto": "Enable automatic cleanup (daily at {time})",
       "cleanup_now": "Clean up now",
       "purge": "Delete all snapshots",
+      "cleaning": "Cleaning up…",
       "days_invalid": "The retention is a whole number from {min} to {max} days",
       "saved": "Retention settings saved",
       "save_error": "Could not save the retention settings",
@@ -1265,7 +1269,6 @@
       "unchanged": "The settings have not changed, no restart is needed"
     },
     "restart": {
-      "title": "Restarting services…",
       "hint": "This may take up to a minute. Please do not close or reload the page.",
       "done": "The system has restarted and runs with the saved settings",
       "timeout": "The server has not answered in two minutes. Check the containers on the server."

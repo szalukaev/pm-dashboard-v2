@@ -25,6 +25,8 @@
           <div v-if="$slots.footer" class="modal-footer">
             <slot name="footer" />
           </div>
+          <!-- Идёт сохранение: окно закрыто заслонкой и не закрывается -->
+          <AppSavingOverlay cover :active="!!busy" />
         </div>
       </div>
     </Transition>
@@ -34,14 +36,17 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { X, Maximize2, Minimize2 } from 'lucide-vue-next'
+import AppSavingOverlay from './AppSavingOverlay.vue'
 
 // expandable: the window can be switched to the full screen and back; the
 // choice is kept while the page is open.
-defineProps<{
+// busy: идёт сохранение — содержимое закрыто заслонкой, окно не закрывается.
+const props = defineProps<{
   modelValue: boolean
   title: string
   width?: string
   expandable?: boolean
+  busy?: boolean
 }>()
 
 const fullscreen = ref(false)
@@ -49,6 +54,7 @@ const fullscreen = ref(false)
 const emit = defineEmits(['update:modelValue', 'close'])
 
 function close() {
+  if (props.busy) return
   emit('update:modelValue', false)
   emit('close')
 }
@@ -66,6 +72,7 @@ function close() {
 }
 
 .modal-content {
+  position: relative;
   background: var(--surface-1);
   border: 1px solid var(--hairline);
   border-radius: 12px;

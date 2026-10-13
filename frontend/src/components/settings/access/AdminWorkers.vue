@@ -60,7 +60,7 @@
     </div>
 
     <!-- Schedule of a worker -->
-    <AppModal v-model="scheduleOpen" :title="scheduleTitle" width="420px">
+    <AppModal v-model="scheduleOpen" :title="scheduleTitle" width="420px" :busy="savingSchedule">
       <form class="schedule-form" @submit.prevent="saveSchedule">
         <template v-if="scheduleKey === 'sync'">
           <label class="schedule-field">
@@ -160,6 +160,7 @@ async function act(w: Worker, action: 'run' | 'stop' | 'enable' | 'disable', bod
 // ─── Schedule ───
 
 const scheduleOpen = ref(false)
+const savingSchedule = ref(false)
 const scheduleKey = ref<Worker['key']>('sync')
 const schedule = reactive({ interval: '5', fullTime: '03:00', time: '02:00', mailInterval: '60' })
 const scheduleTitle = computed(() => t('workers.schedule_title', { name: t('workers.names.' + scheduleKey.value) }))
@@ -179,13 +180,17 @@ async function saveSchedule() {
     : scheduleKey.value === 'mail'
       ? { interval_minutes: Number(schedule.mailInterval) }
       : { time: schedule.time }
+  savingSchedule.value = true
   try {
     await axios.put(`/api/admin/workers/${scheduleKey.value}/schedule`, body)
+    // Окно с идущим сохранением не закрывается: сначала снимаем отметку
+    savingSchedule.value = false
     scheduleOpen.value = false
     toast(t('workers.schedule_saved'), 'success')
   } catch (e) {
     toast(errorMessage(e, 'workers.schedule_error'), 'error')
   } finally {
+    savingSchedule.value = false
     load()
   }
 }

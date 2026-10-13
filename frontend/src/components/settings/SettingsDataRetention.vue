@@ -43,6 +43,8 @@
         {{ $t('settings.retention.purge') }}
       </AppButton>
     </div>
+    <!-- Очистка большой истории идёт долго: блок закрыт, пока она не кончится -->
+    <AppSavingOverlay cover :active="busy" :text="$t('settings.retention.cleaning')" progress />
   </div>
 </template>
 
@@ -54,6 +56,7 @@ import { useI18n } from 'vue-i18n'
 import { useSwal } from '../../composables/useSwal'
 import { useWebSocket } from '../../composables/useWebSocket'
 import AppButton from '../ui/AppButton.vue'
+import AppSavingOverlay from '../ui/AppSavingOverlay.vue'
 
 interface Stats {
   daily_rows: number
@@ -162,6 +165,7 @@ onUnmounted(() => {
 
 <style scoped>
 .retention {
+  position: relative;
   margin-top: 32px;
   padding-top: 24px;
   border-top: 1px solid var(--hairline);

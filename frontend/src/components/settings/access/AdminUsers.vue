@@ -120,7 +120,7 @@
     />
 
     <!-- New user -->
-    <AppModal v-model="createOpen" :title="$t('access.users.new_title')" width="440px">
+    <AppModal v-model="createOpen" :title="$t('access.users.new_title')" width="440px" :busy="saving">
       <form class="adm-form" @submit.prevent="createUser">
         <div class="adm-field">
           <label>{{ $t('access.users.login') }}</label>
@@ -159,7 +159,7 @@
     </AppModal>
 
     <!-- Rights of a user -->
-    <AppModal v-model="rightsOpen" :title="$t('access.rights.title', { name: rightsUser?.username || '' })" width="900px">
+    <AppModal v-model="rightsOpen" :title="$t('access.rights.title', { name: rightsUser?.username || '' })" width="900px" :busy="saving">
       <div v-if="grants" class="rights">
         <!-- Where the rights come from -->
         <div class="rights-sources">
@@ -201,7 +201,7 @@
     </AppModal>
 
     <!-- Copy rights -->
-    <AppModal v-model="cloneOpen" :title="$t('access.clone.title', { name: cloneSource?.username || '' })" width="440px">
+    <AppModal v-model="cloneOpen" :title="$t('access.clone.title', { name: cloneSource?.username || '' })" width="440px" :busy="saving">
       <div class="adm-form">
         <div class="adm-field">
           <label>{{ $t('access.clone.target_type') }}</label>

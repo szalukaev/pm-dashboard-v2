@@ -35,6 +35,7 @@
     <button v-if="source.linked && allowUnlink" type="button" class="token-unlink" @click="unlink">
       {{ $t('source_token.unlink') }}
     </button>
+    <AppSavingOverlay cover :active="saving" />
   </form>
 </template>
 
@@ -43,6 +44,7 @@ import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { CheckCircle2 } from 'lucide-vue-next'
 import AppButton from '../ui/AppButton.vue'
+import AppSavingOverlay from '../ui/AppSavingOverlay.vue'
 import { useAuthStore } from '../../stores/auth'
 import { useSwal } from '../../composables/useSwal'
 
@@ -88,6 +90,7 @@ async function unlink() {
 
 <style scoped>
 .token-form {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 8px;

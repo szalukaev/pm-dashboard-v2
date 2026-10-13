@@ -95,7 +95,7 @@
     </div>
 
     <!-- Change password modal -->
-    <AppModal v-model="showChangePassword" title="Изменение пароля" width="400px">
+    <AppModal v-model="showChangePassword" title="Изменение пароля" width="400px" :busy="changingPassword">
       <form @submit.prevent="submitPasswordChange" class="pw-form">
         <div class="form-field">
           <label>Текущий пароль</label>

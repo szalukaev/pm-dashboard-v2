@@ -31,7 +31,7 @@
     </div>
 
     <!-- Projects dialog -->
-    <AppModal v-model="projectsOpen" title="Выбор проектов" width="700px">
+    <AppModal v-model="projectsOpen" title="Выбор проектов" width="700px" :busy="saving">
       <div class="picker-toolbar">
         <input v-model="projectQuery" class="picker-search" placeholder="Поиск проекта…" />
         <AppButton variant="ghost" size="sm" @click="draftProjects = projects.map(p => p.id)">Выбрать все</AppButton>
@@ -63,7 +63,7 @@
     </AppModal>
 
     <!-- Team dialog -->
-    <AppModal v-model="teamOpen" title="Выбор сотрудников" width="560px">
+    <AppModal v-model="teamOpen" title="Выбор сотрудников" width="560px" :busy="saving">
       <div class="picker-toolbar">
         <input v-model="teamQuery" class="picker-search" placeholder="Поиск сотрудника…" />
         <AppButton variant="ghost" size="sm" @click="draftTeam = members.map(m => m.id)">Выбрать все</AppButton>

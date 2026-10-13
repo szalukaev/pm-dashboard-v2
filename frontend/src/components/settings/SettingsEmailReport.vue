@@ -46,6 +46,7 @@
       <AppButton variant="primary" :loading="saving" test-id="report-save" @click="save">{{ $t('common.save') }}</AppButton>
       <AppButton variant="ghost" :loading="testing" test-id="report-test" @click="sendTest">{{ $t('email_report.test') }}</AppButton>
     </div>
+    <AppSavingOverlay cover :active="saving" />
   </div>
 </template>
 
@@ -57,6 +58,7 @@ import { useSettingsStore } from '../../stores/settings'
 import type { EmailReport } from '../../stores/settings'
 import { useAuthStore } from '../../stores/auth'
 import AppButton from '../ui/AppButton.vue'
+import AppSavingOverlay from '../ui/AppSavingOverlay.vue'
 
 // Разделы сводки в порядке письма
 const SECTIONS = ['stats', 'team_load', 'distribution', 'deadlines']
@@ -136,6 +138,10 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.email-report {
+  position: relative;
+}
+
 .block-title {
   margin: 32px 0 6px;
   font-size: 13px;

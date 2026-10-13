@@ -42,12 +42,14 @@
       </div>
 
       <!-- Сервер перезапускается: форма закрыта, страницу покидать нельзя -->
-      <div v-if="restarting" class="restart-overlay" data-testid="db-restarting">
-        <AppSpinner :size="28" />
-        <p class="restart-title">{{ $t('connections.restart.title') }}</p>
-        <div class="restart-bar"><span></span></div>
-        <p class="restart-hint">{{ $t('connections.restart.hint') }}</p>
-      </div>
+      <AppSavingOverlay
+        cover
+        :active="savingDb || restarting"
+        :text="restarting ? $t('common.restarting') : undefined"
+        :hint="restarting ? $t('connections.restart.hint') : undefined"
+        :progress="restarting"
+        guard
+      />
     </div>
 
     <!-- Система-источник -->
@@ -89,16 +91,17 @@
           {{ $t('common.save') }}
         </AppButton>
       </div>
+      <AppSavingOverlay cover :active="savingDs" :text="$t('common.restarting')" progress guard />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import axios from 'axios'
 import { useI18n } from 'vue-i18n'
 import AppButton from '../ui/AppButton.vue'
-import AppSpinner from '../ui/AppSpinner.vue'
+import AppSavingOverlay from '../ui/AppSavingOverlay.vue'
 import { useSwal } from '../../composables/useSwal'
 
 const { t, te } = useI18n()
@@ -186,17 +189,10 @@ function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-// Не даёт закрыть или обновить страницу, пока сервер перезапускается
-function warnBeforeLeave(e: BeforeUnloadEvent) {
-  e.preventDefault()
-  e.returnValue = ''
-}
-
 // Сервер завершается через секунду после ответа и поднимается заново:
-// спрашиваем его, пока не ответит
+// спрашиваем его, пока не ответит. Уйти со страницы не даёт заслонка.
 async function waitForRestart() {
   restarting.value = true
-  window.addEventListener('beforeunload', warnBeforeLeave)
   try {
     await sleep(RESTART_FIRST_CHECK_MS)
     const deadline = Date.now() + RESTART_TIMEOUT_MS
@@ -219,12 +215,9 @@ async function waitForRestart() {
       dbStatus.value = 'error'
     }
   } finally {
-    window.removeEventListener('beforeunload', warnBeforeLeave)
     restarting.value = false
   }
 }
-
-onBeforeUnmount(() => window.removeEventListener('beforeunload', warnBeforeLeave))
 
 // ─── Система-источник ───
 
@@ -418,55 +411,6 @@ onMounted(() => {
   width: 16px;
   height: 16px;
   accent-color: var(--accent);
-}
-
-.restart-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 20px;
-  text-align: center;
-  background: color-mix(in srgb, var(--surface-2) 92%, transparent);
-  border-radius: 12px;
-}
-
-.restart-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-bright);
-}
-
-.restart-hint {
-  max-width: 420px;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-/* Полоса без процентов: сколько займёт перезапуск, заранее неизвестно */
-.restart-bar {
-  width: 240px;
-  height: 4px;
-  overflow: hidden;
-  background: var(--hairline);
-  border-radius: 9999px;
-}
-
-.restart-bar span {
-  display: block;
-  width: 40%;
-  height: 100%;
-  background: var(--accent);
-  border-radius: 9999px;
-  animation: restart-slide 1.4s ease-in-out infinite;
-}
-
-@keyframes restart-slide {
-  from { transform: translateX(-100%); }
-  to { transform: translateX(250%); }
 }
 
 @media (max-width: 640px) {
