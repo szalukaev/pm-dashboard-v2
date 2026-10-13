@@ -210,7 +210,7 @@ onUnmounted(() => {
   color: var(--text);
 }
 
-.days-input:focus {
+.days-input:focus-visible {
   border-color: var(--accent);
 }
 

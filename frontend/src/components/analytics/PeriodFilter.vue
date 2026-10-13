@@ -116,7 +116,7 @@ function setDate(edge: 'from' | 'to', value: string) {
   border-radius: 8px;
 }
 
-.period-date:focus {
+.period-date:focus-visible {
   border-color: var(--accent);
 }
 

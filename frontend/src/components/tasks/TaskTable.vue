@@ -407,7 +407,7 @@ tr.overdue td:first-child {
   opacity: 1;
 }
 
-.cell-input:focus {
+.cell-input:focus-visible {
   outline: none;
   border-color: var(--accent);
   background: var(--surface-2);

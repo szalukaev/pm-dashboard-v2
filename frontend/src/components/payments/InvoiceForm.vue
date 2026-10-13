@@ -180,7 +180,7 @@ function submit() {
   color: var(--text);
 }
 
-.cell-input:focus {
+.cell-input:focus-visible {
   border-color: var(--accent);
 }
 

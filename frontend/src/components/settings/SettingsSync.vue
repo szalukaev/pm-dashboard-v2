@@ -243,7 +243,7 @@ onUnmounted(() => off('sync-status', loadLogs))
   color: var(--text-bright);
 }
 
-.interval-input:focus {
+.interval-input:focus-visible {
   border-color: var(--accent);
 }
 

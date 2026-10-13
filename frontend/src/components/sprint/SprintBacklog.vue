@@ -280,7 +280,7 @@ function mapToKanbanCard(task: SprintTask): KanbanCardType {
   color: var(--text);
 }
 
-.backlog-filter input:focus {
+.backlog-filter input:focus-visible {
   border-color: var(--accent);
 }
 

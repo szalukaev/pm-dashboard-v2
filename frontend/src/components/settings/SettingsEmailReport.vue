@@ -205,8 +205,8 @@ onMounted(async () => {
   color: var(--text);
 }
 
-.report-field input:focus,
-.report-field select:focus {
+.report-field input:focus-visible,
+.report-field select:focus-visible {
   border-color: var(--accent);
 }
 

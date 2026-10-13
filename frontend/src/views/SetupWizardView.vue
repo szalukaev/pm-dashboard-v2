@@ -381,8 +381,8 @@ const stepTitle = computed(() => {
   font-size: 13px;
 }
 
-.form-field input:focus,
-.form-field select:focus {
+.form-field input:focus-visible,
+.form-field select:focus-visible {
   border-color: var(--accent);
 }
 

@@ -147,7 +147,7 @@ async function handleLogin() {
   transition: border-color 0.15s;
 }
 
-.form-field input:focus {
+.form-field input:focus-visible {
   border-color: var(--accent);
 }
 

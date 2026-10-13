@@ -57,7 +57,7 @@ function show() {
 }
 
 .info-hint:hover,
-.info-hint:focus {
+.info-hint:focus-visible {
   color: var(--accent);
 }
 

@@ -77,7 +77,7 @@ function submit() {
   color: var(--text);
 }
 
-.form-input:focus {
+.form-input:focus-visible {
   border-color: var(--accent);
 }
 </style>

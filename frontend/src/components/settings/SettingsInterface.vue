@@ -238,7 +238,7 @@ async function changeLanguage() {
   min-width: 200px;
 }
 
-.lang-select:focus {
+.lang-select:focus-visible {
   border-color: var(--accent);
 }
 </style>

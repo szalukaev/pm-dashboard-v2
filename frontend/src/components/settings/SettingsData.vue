@@ -319,7 +319,7 @@ onMounted(loadData)
   outline: none;
 }
 
-.picker-search:focus {
+.picker-search:focus-visible {
   border-color: var(--accent);
 }
 

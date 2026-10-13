@@ -145,7 +145,7 @@ async function unlink() {
   color: var(--text);
 }
 
-.token-input:focus {
+.token-input:focus-visible {
   border-color: var(--accent);
 }
 

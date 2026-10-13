@@ -324,7 +324,7 @@ onMounted(load)
   resize: vertical;
 }
 
-.token-input:focus {
+.token-input:focus-visible {
   border-color: var(--accent);
 }
 

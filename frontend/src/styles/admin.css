@@ -92,8 +92,8 @@
   max-width: 200px;
 }
 
-.adm-select:focus,
-.adm-input:focus {
+.adm-select:focus-visible,
+.adm-input:focus-visible {
   border-color: var(--accent);
 }
 
@@ -181,9 +181,9 @@
   color: var(--text);
 }
 
-.adm-field input:focus,
-.adm-field select:focus,
-.adm-field textarea:focus {
+.adm-field input:focus-visible,
+.adm-field select:focus-visible,
+.adm-field textarea:focus-visible {
   border-color: var(--accent);
 }
 
@@ -254,7 +254,7 @@
   color: var(--text);
 }
 
-.adm-pick-search:focus {
+.adm-pick-search:focus-visible {
   border-color: var(--accent);
 }
 

@@ -222,9 +222,9 @@ function submit() {
   color: var(--text);
 }
 
-.form-field input:focus,
-.form-field select:focus,
-.form-field textarea:focus {
+.form-field input:focus-visible,
+.form-field select:focus-visible,
+.form-field textarea:focus-visible {
   border-color: var(--accent);
 }
 

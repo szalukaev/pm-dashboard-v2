@@ -428,7 +428,7 @@ async function submitPasswordChange() {
   color: var(--danger);
 }
 
-.name-input:focus {
+.name-input:focus-visible {
   border-color: var(--accent);
 }
 
@@ -442,7 +442,7 @@ async function submitPasswordChange() {
   color: var(--text);
 }
 
-.form-field input:focus {
+.form-field input:focus-visible {
   border-color: var(--accent);
 }
 

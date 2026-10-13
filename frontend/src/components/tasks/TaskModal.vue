@@ -639,7 +639,7 @@ function initials(name: string): string {
   border-color: var(--hairline-strong);
 }
 
-.field-input:focus {
+.field-input:focus-visible {
   outline: none;
   background: var(--surface-1);
   border-color: var(--accent);
@@ -1072,7 +1072,7 @@ button.related-row:hover {
   outline: none;
 }
 
-.comment-input:focus {
+.comment-input:focus-visible {
   border-color: var(--accent);
 }
 

@@ -239,7 +239,7 @@ watch(searchInput, (val) => {
   transition: border-color 0.1s;
 }
 
-.field:focus {
+.field:focus-visible {
   outline: none;
   border-color: var(--accent);
 }
