@@ -2,6 +2,8 @@ package access
 
 import (
 	"reflect"
+	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -359,6 +361,30 @@ func TestPermissionsRoundTrip(t *testing.T) {
 	want := Permissions{ProjectIDs: []int{1, 3}, TeamIDs: []int{}, VisibleTabs: keys("tasks", "kanban"), ReadOnly: true}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("round trip = %+v, want %+v", got, want)
+	}
+}
+
+// В запросе записи прав параметров столько же, сколько значений передаёт
+// Save: ключ и все столбцы Columns. Расхождение даёт ошибку базы при каждом
+// сохранении прав пользователя или группы.
+func TestSaveQueryPlaceholders(t *testing.T) {
+	args := 1 + len(Permissions{}.Values())
+	if len(columnNames()) != args-1 {
+		t.Fatalf("Columns lists %d columns, Values returns %d", len(columnNames()), args-1)
+	}
+	query := saveQuery("group_permissions", "group_id")
+	if !strings.Contains(query, "$"+strconv.Itoa(args)) {
+		t.Errorf("query has no $%d: %s", args, query)
+	}
+	if strings.Contains(query, "$"+strconv.Itoa(args+1)) {
+		t.Errorf("query has an extra $%d: %s", args+1, query)
+	}
+	values := query[strings.Index(query, "VALUES (")+len("VALUES (") : strings.Index(query, ")\n\t\tON CONFLICT")]
+	if got := len(strings.Split(values, ", ")); got != args {
+		t.Errorf("VALUES has %d placeholders, want %d", got, args)
+	}
+	if got := len(strings.Split(assignments(2), ", ")); got != args-1 {
+		t.Errorf("SET has %d assignments, want %d", got, args-1)
 	}
 }
 
