@@ -163,7 +163,7 @@ onMounted(async () => {
   width: 32px;
   height: 24px;
   border: 1px solid var(--hairline);
-  border-radius: 4px;
+  border-radius: 8px;
   cursor: pointer;
   padding: 0;
 }

@@ -64,7 +64,7 @@ const progressColor = computed(() => {
   flex: 1;
   height: 6px;
   background: var(--surface-3);
-  border-radius: 3px;
+  border-radius: 9999px;
   overflow: hidden;
   display: flex;
 }

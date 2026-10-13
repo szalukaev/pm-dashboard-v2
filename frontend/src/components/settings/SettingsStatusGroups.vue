@@ -221,7 +221,7 @@ onMounted(async () => {
 .group-column {
   background: var(--surface-1);
   border: 1px solid var(--hairline);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 12px;
   min-height: 120px;
   cursor: pointer;
@@ -275,7 +275,7 @@ onMounted(async () => {
 .bug-toggle {
   display: inline-flex;
   padding: 2px;
-  border-radius: 4px;
+  border-radius: 8px;
   color: var(--text-faintest);
   cursor: pointer;
   transition: color 0.15s, background 0.15s;

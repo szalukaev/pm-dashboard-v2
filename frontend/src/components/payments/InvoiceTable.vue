@@ -209,7 +209,7 @@ onMounted(async () => {
   justify-content: center;
   width: 24px;
   height: 24px;
-  border-radius: 4px;
+  border-radius: 8px;
   color: var(--text-muted);
   transition: all 0.15s;
 }

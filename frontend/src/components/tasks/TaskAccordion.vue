@@ -143,7 +143,7 @@ function formatTotal(h: number): string {
   min-width: 20px;
   height: 20px;
   padding: 0 6px;
-  border-radius: 4px;
+  border-radius: 9999px;
   background: var(--accent);
   color: #fff;
   font-size: 11px;

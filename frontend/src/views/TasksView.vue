@@ -142,7 +142,7 @@ onMounted(async () => {
 .skeleton-cell {
   height: 14px;
   background: var(--surface-2);
-  border-radius: 4px;
+  border-radius: 8px;
   animation: skeleton-pulse 1.2s ease-in-out infinite;
 }
 

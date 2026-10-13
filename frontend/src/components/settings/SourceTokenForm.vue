@@ -113,10 +113,11 @@ async function unlink() {
   color: var(--text);
 }
 
-.token-hint {
+/* Тот же вес, что у правила про текст связанной записи, но стоит ниже — поэтому побеждает */
+.token-status.linked .token-hint {
   margin-left: 6px;
   font-size: 12px;
-  color: var(--text-faint) !important;
+  color: var(--text-faint);
 }
 
 .token-label {

@@ -414,7 +414,7 @@ async function submitPasswordChange() {
 .name-input {
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--text);
   padding: 6px 10px;
   font-size: 13px;

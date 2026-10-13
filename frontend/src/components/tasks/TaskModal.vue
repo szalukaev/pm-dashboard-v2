@@ -761,7 +761,7 @@ function initials(name: string): string {
   font-size: 12.5px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   background: var(--surface-2);
-  border-radius: 4px;
+  border-radius: 8px;
 }
 
 .markup :deep(pre) {
@@ -823,7 +823,7 @@ function initials(name: string): string {
   padding: 8px 12px 8px 8px;
   background: var(--surface-2);
   border: 1px solid var(--hairline);
-  border-radius: 10px;
+  border-radius: 12px;
   text-decoration: none;
   transition: border-color 0.15s;
   min-width: 0;
@@ -838,7 +838,7 @@ function initials(name: string): string {
   flex-shrink: 0;
   width: 40px;
   height: 40px;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
 .file-thumb {
@@ -1024,7 +1024,7 @@ button.related-row:hover {
   padding: 10px 14px;
   background: var(--surface-2);
   border: 1px solid var(--hairline);
-  border-radius: 0 10px 10px 10px;
+  border-radius: 0 12px 12px 12px;
 }
 
 .comment-header {
@@ -1066,7 +1066,7 @@ button.related-row:hover {
   line-height: 1.5;
   background: var(--surface-2);
   border: 1px solid var(--hairline);
-  border-radius: 10px;
+  border-radius: 12px;
   color: var(--text);
   resize: vertical;
   outline: none;

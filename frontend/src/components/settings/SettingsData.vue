@@ -283,7 +283,7 @@ onMounted(loadData)
   gap: 4px;
   padding: 4px 10px;
   font-size: 12px;
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--accent-bg);
   color: var(--accent);
   border: 1px solid var(--border-accent);
@@ -344,7 +344,7 @@ onMounted(loadData)
   padding: 7px 10px;
   font-size: 13px;
   color: var(--text-dim);
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   transition: background 0.1s;
 }

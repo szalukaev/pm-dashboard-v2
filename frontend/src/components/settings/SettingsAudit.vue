@@ -165,7 +165,7 @@ onMounted(loadLogs)
   font-size: 12px;
   background: var(--surface-2);
   border: 1px solid var(--hairline);
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--text);
 }
 
@@ -227,7 +227,7 @@ onMounted(loadLogs)
   justify-content: center;
   width: 24px;
   height: 24px;
-  border-radius: 4px;
+  border-radius: 8px;
   color: var(--text-muted);
 }
 
@@ -252,7 +252,7 @@ onMounted(loadLogs)
   font-size: 11px;
   background: var(--surface-2);
   padding: 12px;
-  border-radius: 6px;
+  border-radius: 8px;
   overflow-x: auto;
   color: var(--text-dim);
   white-space: pre-wrap;

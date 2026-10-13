@@ -391,7 +391,7 @@ tr.overdue td:first-child {
   font-family: inherit;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--text-bright);
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;

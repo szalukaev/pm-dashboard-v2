@@ -176,7 +176,7 @@ function submit() {
   font-size: 13px;
   background: var(--surface-2);
   border: 1px solid var(--hairline);
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--text);
 }
 
@@ -213,7 +213,7 @@ function submit() {
   justify-content: center;
   width: 24px;
   height: 24px;
-  border-radius: 4px;
+  border-radius: 8px;
   color: var(--text-muted);
 }
 
@@ -230,7 +230,7 @@ function submit() {
   font-size: 12px;
   color: var(--accent);
   border: 1px dashed var(--hairline);
-  border-radius: 6px;
+  border-radius: 8px;
   width: 100%;
   justify-content: center;
   transition: all 0.15s;

@@ -295,7 +295,7 @@ function formatDate(d: string | null): string {
   justify-content: center;
   width: 28px;
   height: 28px;
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--text-muted);
   transition: all 0.15s;
 }

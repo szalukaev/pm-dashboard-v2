@@ -182,7 +182,7 @@ async function changeLanguage() {
   text-align: left;
   background: var(--surface-2);
   border: 2px solid var(--hairline);
-  border-radius: 10px;
+  border-radius: 12px;
   cursor: pointer;
   transition: all 0.15s;
 }

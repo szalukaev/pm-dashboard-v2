@@ -103,7 +103,7 @@ button {
 
 ::-webkit-scrollbar-thumb {
   background: var(--hairline-strong);
-  border-radius: 3px;
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
