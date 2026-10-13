@@ -92,6 +92,16 @@ function close() {
   border-radius: 0;
 }
 
+/* На телефоне окно занимает всю ширину экрана, какой бы ни была заданная */
+@media (max-width: 640px) {
+  .modal-content:not(.fullscreen) {
+    /* override: ширина окна приходит инлайн-стилем из свойства width */
+    width: calc(100vw - 16px) !important;
+    max-width: none;
+    max-height: 92vh;
+  }
+}
+
 .modal-header h3 {
   flex: 1;
   min-width: 0;
@@ -155,5 +165,20 @@ function close() {
 .modal-enter-from,
 .modal-leave-to {
   opacity: 0;
+}
+
+@media (max-width: 640px) {
+  .modal-header {
+    padding: 16px 16px 12px;
+  }
+
+  .modal-body {
+    padding: 16px;
+  }
+
+  .modal-footer {
+    flex-wrap: wrap;
+    padding: 12px 16px 16px;
+  }
 }
 </style>

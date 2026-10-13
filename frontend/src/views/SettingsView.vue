@@ -154,5 +154,10 @@ const visibleTabs = computed(() => tabs.filter(tab => !tab.adminOnly || isAdmin.
     flex-direction: row;
     overflow-x: auto;
   }
+  /* Пункты меню в строке не сжимаются и не переносят подпись */
+  .menu-item {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
 }
 </style>

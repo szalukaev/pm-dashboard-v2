@@ -1095,10 +1095,20 @@ button.related-row:hover {
 
 @media (max-width: 900px) {
   .params {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .params-col + .params-col {
     border-top: 1px solid var(--border-light);
+  }
+}
+
+/* На телефоне подписи параметров уже, значение не выходит за рамку блока */
+@media (max-width: 480px) {
+  .params {
+    padding: 12px;
+  }
+  .param {
+    grid-template-columns: 96px minmax(0, 1fr);
   }
 }
 </style>

@@ -28,8 +28,9 @@ function formatValue(stat: PaymentStat): string {
 <style scoped>
 .payment-stats {
   display: grid;
-  /* The cards share the whole width; on a narrow screen they wrap evenly */
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  /* Карточки делят всю ширину и на узком экране переносятся поровну. Меньше
+     260 px нельзя: девятизначная сумма с копейками упирается в рамку */
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
   gap: 12px;
   margin-bottom: 24px;
 }
