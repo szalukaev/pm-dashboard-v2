@@ -13,7 +13,7 @@ import (
 const docHead = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>`
 const docTail = `</w:body></w:document>`
 
-// docx builds a document from its parts; body is the content of w:body.
+// docx собирает документ из частей; body — содержимое w:body.
 func docx(t *testing.T, body string, extra map[string]string) []byte {
 	t.Helper()
 	var buf bytes.Buffer
@@ -38,7 +38,7 @@ func docx(t *testing.T, body string, extra map[string]string) []byte {
 	return buf.Bytes()
 }
 
-// part reads one file of a rendered document.
+// part читает один файл готового документа.
 func part(t *testing.T, document []byte, name string) string {
 	t.Helper()
 	archive, err := zip.NewReader(bytes.NewReader(document), int64(len(document)))
@@ -99,7 +99,7 @@ func TestRenderVariableSplitByWord(t *testing.T) {
 	if text := paragraphText(doc); text != "Итого: 110 251,05 руб." {
 		t.Errorf("text = %q, want the variable filled", text)
 	}
-	// The markup around the pieces is kept: the document stays well formed
+	// Разметка вокруг кусков сохранена: документ остаётся корректным XML
 	if strings.Count(doc, "<w:r>") != 4 || !strings.Contains(doc, `<w:proofErr w:type="spellEnd"/>`) {
 		t.Errorf("the markup of the paragraph was damaged: %s", doc)
 	}
@@ -117,9 +117,9 @@ func TestRenderRepeatsItemRow(t *testing.T) {
 	}
 	doc := part(t, out, "word/document.xml")
 
-	// Header, three lines, totals
+	// Шапка, три позиции, итоги
 	if rows := strings.Count(doc, "<w:tr>") + strings.Count(doc, "<w:tr><w:trPr>"); rows != 5+3 {
-		// each item row matches both patterns, hence 3 more
+		// каждая строка позиции подходит под оба шаблона, отсюда ещё 3
 		t.Errorf("rows counted %d", rows)
 	}
 	if got := strings.Count(doc, "<w:cantSplit/>"); got != 3 {
@@ -135,7 +135,7 @@ func TestRenderRepeatsItemRow(t *testing.T) {
 			t.Errorf("the document lacks %q", want)
 		}
 	}
-	// The lines keep their order, the header is above and the totals below
+	// Позиции идут в своём порядке, шапка выше, итоги ниже
 	order := []string{"Наименование", "Сопровождение системы", "Доработка отчётов", "Выезд специалиста", "Итого"}
 	last := -1
 	for _, text := range order {
@@ -160,8 +160,8 @@ func TestRenderItemsTable(t *testing.T) {
 	if strings.Count(doc, "<w:tbl>") != 1 || strings.Count(doc, "</w:tbl>") != 1 {
 		t.Fatalf("expected one table: %s", doc)
 	}
-	// A header, three lines of five columns, and three rows of totals of
-	// three cells each: an empty one, the label, the amount
+	// Шапка, три позиции по пять колонок и три строки итогов по три ячейки:
+	// пустая, подпись, сумма
 	if rows := strings.Count(doc, "</w:tr>"); rows != 7 {
 		t.Errorf("the table has %d rows, want 7", rows)
 	}
@@ -175,14 +175,14 @@ func TestRenderItemsTable(t *testing.T) {
 			t.Errorf("the document lacks %q", want)
 		}
 	}
-	// The amount to pay closes the table
+	// Сумма к оплате завершает таблицу
 	if strings.LastIndex(doc[:strings.Index(doc, "</w:tbl>")], "110 251,05") < strings.Index(doc, "Всего (в том числе НДС):") {
 		t.Error("the amount to pay must stand in the last row, after its label")
 	}
-	// Every cell carries its own frame. A cell of the lines has all four
-	// sides; in a row of totals only the amount is framed, the label keeps
-	// the side it shares with the amount, and the first of these rows keeps
-	// the line that closes the lines of the invoice.
+	// Рамка задана у каждой ячейки отдельно. У ячейки позиции есть все
+	// четыре стороны; в строке итогов обведена только сумма, у подписи
+	// остаётся сторона, общая с суммой, а у первой из этих строк — линия,
+	// закрывающая позиции счёта.
 	line := func(side string) string {
 		return `<w:` + side + ` w:val="single" w:sz="4" w:space="0" w:color="4A85B0"/>`
 	}
@@ -205,13 +205,12 @@ func TestRenderItemsTable(t *testing.T) {
 			t.Errorf("%s: %d, want %d", name, got, c.want)
 		}
 	}
-	// No frame is set for the table as a whole: it would draw lines through
-	// the totals
+	// Рамки на всю таблицу нет: она провела бы линии через итоги
 	if strings.Contains(doc, "<w:tblBorders>") {
 		t.Error("the frame must be set cell by cell, not for the table")
 	}
-	// The columns have the widths of the sample invoice and do not stretch:
-	// a long name wraps inside its column
+	// Колонки имеют ширины счёта-образца и не растягиваются: длинное
+	// название переносится внутри своей колонки
 	if !strings.Contains(doc, `<w:tblW w:w="9669" w:type="dxa"/>`) || !strings.Contains(doc, `<w:tblLayout w:type="fixed"/>`) {
 		t.Error("the table must have a fixed layout of the full width")
 	}
@@ -220,27 +219,27 @@ func TestRenderItemsTable(t *testing.T) {
 			t.Errorf("a column of width %s is missing", width)
 		}
 	}
-	// The label of a total takes the two columns before the amount
+	// Подпись итога занимает две колонки перед суммой
 	if got := strings.Count(doc, `<w:tcW w:w="2269" w:type="dxa"/><w:gridSpan w:val="2"/>`); got != 3 {
 		t.Errorf("%d labels of totals have the width of two columns, want 3", got)
 	}
-	// Rows are compact, and a long name stays at the top of its row
+	// Строки компактные, длинное название остаётся вверху своей строки
 	if got := strings.Count(doc, `<w:spacing w:after="0"/>`); got != 29 {
 		t.Errorf("%d cells have no space after the text, want all 29", got)
 	}
 	if got := strings.Count(doc, `<w:vAlign w:val="center"/>`); got != 29-3-3 {
 		t.Errorf("%d cells are centered vertically, want all but the 3 names and the 3 empty cells", got)
 	}
-	// The text of the table takes the font of the place it stands in
+	// Текст таблицы берёт шрифт того места, где она стоит
 	if got := strings.Count(doc, `w:ascii="Arial"`); got != 29 {
 		t.Errorf("the font of the placeholder is used in %d cells, want all 29", got)
 	}
-	// Bold — the labels of the totals and the amount to pay — goes after the
-	// fonts, as the schema of Word wants
+	// Полужирное начертание — подписи итогов и сумма к оплате — идёт после
+	// шрифтов, как требует схема Word
 	if got := strings.Count(doc, `<w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:b/><w:sz w:val="20"/>`); got != 4 {
 		t.Errorf("bold is used %d times, want 4: three labels and the amount to pay", got)
 	}
-	// A paragraph follows the table
+	// За таблицей идёт абзац
 	if !strings.Contains(doc, "</w:tbl><w:p/>") {
 		t.Error("a table must be followed by a paragraph")
 	}
@@ -284,7 +283,7 @@ func TestRenderHeadersFootersAndEscaping(t *testing.T) {
 	if got := part(t, out, "word/header1.xml"); !strings.Contains(got, "Счёт 202610-09") {
 		t.Errorf("the header was not filled: %s", got)
 	}
-	// Only the parts that hold text of the document are touched
+	// Затрагиваются только части с текстом документа
 	if got := part(t, out, "word/styles.xml"); got != `<w:styles>{{company}}</w:styles>` {
 		t.Errorf("a part that is not text was changed: %s", got)
 	}
@@ -292,7 +291,7 @@ func TestRenderHeadersFootersAndEscaping(t *testing.T) {
 	if !strings.Contains(doc, `ООО &#34;Рога &amp; Копыта&#34; &lt;тест&gt;`) {
 		t.Errorf("special characters are not escaped: %s", doc)
 	}
-	// What is not a variable stays, so that the mistake is seen
+	// То, что переменной не является, остаётся, чтобы ошибка была видна
 	if !strings.Contains(doc, "{{mistake}}") {
 		t.Error("an unknown variable must stay as it is")
 	}
@@ -313,7 +312,7 @@ func TestRenderWithoutItems(t *testing.T) {
 }
 
 func TestRenderNestedTable(t *testing.T) {
-	// The items table sits in a cell of a layout table: only its own row is repeated
+	// Таблица позиций стоит в ячейке таблицы-макета: повторяется только её собственная строка
 	inner := `<w:tbl><w:tr>` + cell("{{item_name}}") + `</w:tr></w:tbl>`
 	outer := `<w:tbl><w:tr><w:tc>` + para("Шапка") + inner + `<w:p/></w:tc></w:tr></w:tbl>`
 	out, err := Render(docx(t, outer, nil), Sample())
@@ -343,7 +342,7 @@ func TestInspect(t *testing.T) {
 		t.Errorf("a good template gives unknown %v and warnings %v", report.Unknown, report.Warnings)
 	}
 
-	// Typos, no place for the lines, no amount to pay
+	// Опечатки, нет места для позиций, нет суммы к оплате
 	report, _ = Inspect(docx(t, para("{{compani}} {{сумма}} {{company}}"), nil))
 	if strings.Join(report.Unknown, ",") != "{{compani}},{{сумма}}" {
 		t.Errorf("unknown = %v", report.Unknown)
@@ -352,19 +351,19 @@ func TestInspect(t *testing.T) {
 		t.Errorf("warnings = %v", report.Warnings)
 	}
 
-	// The table variable shares its line with other text
+	// Переменная таблицы стоит в одной строке с другим текстом
 	report, _ = Inspect(docx(t, para("Позиции: {{items_table}}")+para("{{total}}"), nil))
 	if strings.Join(report.Warnings, ",") != WarnNoItems+","+WarnItemsTableNotAlone {
 		t.Errorf("warnings = %v", report.Warnings)
 	}
 
-	// Item variables outside a table: only one line would be shown
+	// Переменные позиции вне таблицы: показана была бы только одна позиция
 	report, _ = Inspect(docx(t, para("{{item_name}} {{total}}"), nil))
 	if strings.Join(report.Warnings, ",") != WarnNoItems+","+WarnItemsOutsideTable {
 		t.Errorf("warnings = %v", report.Warnings)
 	}
 
-	// The table variable alone on its line is all the lines need
+	// Переменной таблицы, стоящей в строке одной, позициям достаточно
 	report, _ = Inspect(docx(t, para("{{items_table}}"), nil))
 	if len(report.Warnings) != 0 {
 		t.Errorf("warnings = %v", report.Warnings)
@@ -376,7 +375,7 @@ func TestRefusedFiles(t *testing.T) {
 		t.Errorf("plain text: err = %v, want ErrNotDocx", err)
 	}
 
-	// An archive that is not a Word document
+	// Архив, который не является документом Word
 	var buf bytes.Buffer
 	w := zip.NewWriter(&buf)
 	f, _ := w.Create("readme.txt")
@@ -420,7 +419,7 @@ func TestBuiltInTemplate(t *testing.T) {
 	if strings.Contains(doc, "{{") {
 		t.Error("the built-in template has a variable that was not filled")
 	}
-	// Every line of the invoice is there, not only the first
+	// В счёте есть все позиции, а не только первая
 	for _, want := range []string{"Сопровождение системы, октябрь 2026", "Доработка отчётов", "Выезд специалиста", "110 251,05"} {
 		if !strings.Contains(doc, want) {
 			t.Errorf("the invoice lacks %q", want)
@@ -428,7 +427,7 @@ func TestBuiltInTemplate(t *testing.T) {
 	}
 }
 
-// wellFormed fails the test when the XML cannot be read to its end.
+// wellFormed проваливает тест, если XML не читается до конца.
 func wellFormed(t *testing.T, name, content string) {
 	t.Helper()
 	decoder := xml.NewDecoder(strings.NewReader(content))

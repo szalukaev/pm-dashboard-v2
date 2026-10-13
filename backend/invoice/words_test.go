@@ -23,7 +23,7 @@ func TestAmountInWords(t *testing.T) {
 		1234567.89: "Один миллион двести тридцать четыре тысячи пятьсот шестьдесят семь рублей 89 копеек",
 		3000000000: "Три миллиарда рублей 00 копеек",
 		0.99:       "Ноль рублей 99 копеек",
-		// Rounding to kopecks may carry over to rubles
+		// Округление до копеек может перейти в рубли
 		9.999: "Десять рублей 00 копеек",
 	}
 	for amount, want := range cases {
@@ -56,7 +56,7 @@ func TestFormatting(t *testing.T) {
 
 func TestSampleValues(t *testing.T) {
 	d := Sample()
-	// 80 000 + 12,5 × 1 600 + 2 × 2 500,50 = 105 001; VAT 5 % = 5 250,05
+	// 80 000 + 12,5 × 1 600 + 2 × 2 500,50 = 105 001; НДС 5 % = 5 250,05
 	if d.Subtotal() != 105001 || d.VAT() != 5250.05 || d.Total() != 110251.05 {
 		t.Fatalf("subtotal %v, vat %v, total %v", d.Subtotal(), d.VAT(), d.Total())
 	}
@@ -79,7 +79,7 @@ func TestSampleValues(t *testing.T) {
 			t.Errorf("{{%s}} = %q, want %q", name, values[name], value)
 		}
 	}
-	// Every variable of the list has a value: none is forgotten
+	// У каждой переменной из списка есть значение: ни одна не забыта
 	for _, v := range Variables() {
 		if v.Name != ItemsTable && v.Example == "" {
 			t.Errorf("{{%s}} has no value for the sample invoice", v.Name)

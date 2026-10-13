@@ -31,7 +31,7 @@ func plural(n int64, one, few, many string) string {
 	return many
 }
 
-// triad writes a number below a thousand in words.
+// triad записывает прописью число меньше тысячи.
 func triad(n int, feminine bool) []string {
 	var words []string
 	if h := n / 100; h > 0 {
@@ -56,7 +56,7 @@ func triad(n int, feminine bool) []string {
 	return words
 }
 
-// integerInWords writes a whole number of rubles in words, without the noun.
+// integerInWords записывает прописью целое число рублей, без самого слова.
 func integerInWords(n int64) string {
 	if n == 0 {
 		return "ноль"
@@ -90,8 +90,8 @@ func integerInWords(n int64) string {
 	return strings.Join(all, " ")
 }
 
-// AmountInWords writes an amount of money the way invoices do:
-// "Сто пять тысяч рублей 50 копеек". Kopecks stay in digits.
+// AmountInWords записывает сумму так, как принято в счетах:
+// "Сто пять тысяч рублей 50 копеек". Копейки остаются цифрами.
 func AmountInWords(amount float64) string {
 	if amount < 0 {
 		amount = -amount

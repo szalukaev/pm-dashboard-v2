@@ -1,10 +1,10 @@
-// Package invoice fills a .docx template with the data of an invoice.
+// Package invoice заполняет шаблон .docx данными счёта.
 //
-// The template is an ordinary Word document. What changes from invoice to
-// invoice is written in it as variables — {{company}}, {{total}} — and the
-// lines of the invoice go either into a table the template draws itself
-// (one row with item variables, repeated for every line) or into a table
-// built here in place of {{items_table}}.
+// Шаблон — обычный документ Word. То, что меняется от счёта к счёту,
+// записано в нём переменными — {{company}}, {{total}}, — а позиции счёта
+// попадают либо в таблицу, которую рисует сам шаблон (одна строка с
+// переменными позиции, повторяемая для каждой позиции), либо в таблицу,
+// которая строится здесь на месте {{items_table}}.
 package invoice
 
 import (
@@ -14,38 +14,38 @@ import (
 	"time"
 )
 
-// Item is a line of an invoice.
+// Item — позиция счёта.
 type Item struct {
 	Name     string
 	Quantity float64
 	Price    float64
 }
 
-// Amount is the sum of the line.
+// Amount — сумма позиции.
 func (i Item) Amount() float64 {
 	return round2(i.Quantity * i.Price)
 }
 
-// Data is everything an invoice is made of.
+// Data — всё, из чего состоит счёт.
 type Data struct {
-	// The customer
+	// Заказчик
 	Company string
 	Address string
 	INN     string
 	Contact string
 	Phone   string
-	// The contract the invoice is issued on; the dates are YYYY-MM-DD or empty
+	// Договор, по которому выставлен счёт; даты — YYYY-MM-DD или пусто
 	ContractName  string
 	ContractStart string
 	ContractEnd   string
-	// VatRate: "none" or "5"
+	// VatRate: "none" или "5"
 	VatRate string
-	// IssuedAt: the day the invoice is issued on
+	// IssuedAt: день выставления счёта
 	IssuedAt time.Time
 	Items    []Item
 }
 
-// Groups of variables, in the order the screen shows them.
+// Группы переменных в том порядке, в каком их показывает экран.
 const (
 	GroupInvoice  = "invoice"
 	GroupTotals   = "totals"
@@ -54,23 +54,23 @@ const (
 	GroupItems    = "items"
 )
 
-// Variable is something a template may contain as {{name}}.
+// Variable — то, что шаблон может содержать в виде {{name}}.
 type Variable struct {
 	Name  string `json:"name"`
 	Group string `json:"group"`
-	// Example is what the variable turns into for the sample invoice.
+	// Example — во что переменная превращается в счёте-образце.
 	Example string `json:"example"`
 }
 
-// ItemsTable is the variable replaced by a whole table of the lines.
+// ItemsTable — переменная, на месте которой строится вся таблица позиций.
 const ItemsTable = "items_table"
 
-// itemVariables are filled from a line of the invoice: the table row that
-// holds them is repeated for every line.
+// itemVariables заполняются из позиции счёта: строка таблицы, в которой
+// они стоят, повторяется для каждой позиции.
 var itemVariables = []string{"item_no", "item_name", "item_qty", "item_price", "item_amount"}
 
-// variableOrder lists every variable with its group. It is the single list
-// both the substitution and the screen of the administrator work from.
+// variableOrder перечисляет все переменные с их группами. Это единый
+// список, по которому работают и подстановка, и экран администратора.
 var variableOrder = []struct{ name, group string }{
 	{"invoice_num", GroupInvoice},
 	{"date", GroupInvoice},
@@ -98,7 +98,7 @@ var variableOrder = []struct{ name, group string }{
 	{"item_amount", GroupItems},
 }
 
-// Variables returns every variable with what it gives for the sample invoice.
+// Variables возвращает все переменные с их значениями для счёта-образца.
 func Variables() []Variable {
 	sample := Sample()
 	values := sample.Values()
@@ -132,8 +132,8 @@ func isItemVariable(name string) bool {
 	return false
 }
 
-// Sample is an invented invoice: for the preview of a template and for the
-// examples of the variables.
+// Sample — вымышленный счёт: для предпросмотра шаблона и для примеров
+// значений переменных.
 func Sample() Data {
 	return Data{
 		Company:       "ООО «Ромашка»",
@@ -161,7 +161,7 @@ func (d Data) vatFraction() float64 {
 	return 0
 }
 
-// Subtotal is the sum of the lines, without VAT.
+// Subtotal — сумма позиций без НДС.
 func (d Data) Subtotal() float64 {
 	sum := 0.0
 	for _, item := range d.Items {
@@ -170,27 +170,27 @@ func (d Data) Subtotal() float64 {
 	return round2(sum)
 }
 
-// VAT is the tax on the subtotal.
+// VAT — НДС с суммы позиций.
 func (d Data) VAT() float64 {
 	return round2(d.Subtotal() * d.vatFraction())
 }
 
-// Total is what is to be paid.
+// Total — сумма к оплате.
 func (d Data) Total() float64 {
 	return round2(d.Subtotal() + d.VAT())
 }
 
-// Number is the number of the invoice: the day it is issued on as YYYYMM-DD.
+// Number — номер счёта: день выставления в виде YYYYMM-DD.
 func (d Data) Number() string {
 	return d.IssuedAt.Format("200601-02")
 }
 
-// FileName is the name the invoice is downloaded under.
+// FileName — имя, под которым счёт скачивается.
 func (d Data) FileName() string {
 	return fmt.Sprintf("Счет на оплату %s от %s.docx", d.Company, d.IssuedAt.Format("2006.01.02"))
 }
 
-// Values returns what every variable that does not depend on a line turns into.
+// Values возвращает значения всех переменных, не зависящих от позиции.
 func (d Data) Values() map[string]string {
 	vatLabel := "Без НДС"
 	if d.VatRate == "5" {
@@ -218,7 +218,7 @@ func (d Data) Values() map[string]string {
 	}
 }
 
-// itemValues returns what the item variables turn into for one line.
+// itemValues возвращает значения переменных позиции для одной позиции.
 func itemValues(number int, item Item) map[string]string {
 	return map[string]string{
 		"item_no":     strconv.Itoa(number),
@@ -237,8 +237,8 @@ func dateText(t time.Time) string {
 	return fmt.Sprintf("%d %s %d г.", t.Day(), monthsGenitive[t.Month()-1], t.Year())
 }
 
-// dayRu turns YYYY-MM-DD (possibly with a time part) into DD.MM.YYYY; what is
-// not a date gives an empty string.
+// dayRu переводит YYYY-MM-DD (возможно, со временем) в DD.MM.YYYY; то, что
+// датой не является, даёт пустую строку.
 func dayRu(value string) string {
 	if len(value) > 10 {
 		value = value[:10]
@@ -250,7 +250,7 @@ func dayRu(value string) string {
 	return t.Format("02.01.2006")
 }
 
-// fmtMoney writes an amount the Russian way: "150 000,00".
+// fmtMoney записывает сумму так, как принято в России: "150 000,00".
 func fmtMoney(v float64) string {
 	s := fmt.Sprintf("%.2f", v)
 	negative := strings.HasPrefix(s, "-")
@@ -273,7 +273,7 @@ func fmtMoney(v float64) string {
 	return intPart + "," + decPart
 }
 
-// fmtQuantity writes a quantity without needless zeros: "2", "12,5".
+// fmtQuantity записывает количество без лишних нулей: "2", "12,5".
 func fmtQuantity(v float64) string {
 	return strings.Replace(strconv.FormatFloat(round2(v), 'f', -1, 64), ".", ",", 1)
 }

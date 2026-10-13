@@ -5,34 +5,34 @@ import (
 	"strings"
 )
 
-// Warnings of a template: it can be used, but something in it looks wrong.
+// Предупреждения по шаблону: пользоваться им можно, но что-то в нём выглядит не так.
 const (
-	// WarnNoItems: the lines of the invoice have nowhere to go — neither
-	// {{items_table}} nor a row with item variables.
+	// WarnNoItems: позициям счёта некуда попасть — нет ни {{items_table}},
+	// ни строки с переменными позиции.
 	WarnNoItems = "no_items"
-	// WarnNoTotal: the amount to pay is not in the document.
+	// WarnNoTotal: в документе нет суммы к оплате.
 	WarnNoTotal = "no_total"
-	// WarnItemsTableNotAlone: {{items_table}} shares its line with other
-	// text, so no table can be put in its place.
+	// WarnItemsTableNotAlone: {{items_table}} стоит в одной строке с другим
+	// текстом, поэтому таблицу на её место поставить нельзя.
 	WarnItemsTableNotAlone = "items_table_not_alone"
-	// WarnItemsOutsideTable: item variables stand outside a table row, so
-	// only the first line of the invoice would be shown.
+	// WarnItemsOutsideTable: переменные позиции стоят вне строки таблицы,
+	// поэтому в счёте оказалась бы только первая позиция.
 	WarnItemsOutsideTable = "items_outside_table"
 )
 
-// Report is what a look at a template finds.
+// Report — что нашла проверка шаблона.
 type Report struct {
-	// Found: the known variables the template uses.
+	// Found: известные переменные, которые использует шаблон.
 	Found []string `json:"found"`
-	// Unknown: what is written as a variable but is not one — a typo, most
-	// likely. It would stay in the invoice as it is.
+	// Unknown: то, что записано как переменная, но ею не является, — скорее
+	// всего, опечатка. В счёте это осталось бы как есть.
 	Unknown []string `json:"unknown"`
-	// Warnings: see the Warn* constants.
+	// Warnings: см. константы Warn*.
 	Warnings []string `json:"warnings"`
 }
 
-// Inspect checks that the file can serve as a template and reports what
-// variables it holds. An error means the file is refused.
+// Inspect проверяет, что файл годится в шаблоны, и сообщает, какие в нём
+// переменные. Ошибка значит, что файл не принят.
 func Inspect(template []byte) (*Report, error) {
 	archive, err := openTemplate(template)
 	if err != nil {
@@ -53,7 +53,7 @@ func Inspect(template []byte) (*Report, error) {
 		}
 		content := joinSplitVariables(string(raw))
 
-		// Where the item variables stand: in a table row or not
+		// Где стоят переменные позиции: в строке таблицы или нет
 		rows := elementSpans(content, "w:tr")
 		inRow := func(at int) bool {
 			for _, r := range rows {
@@ -89,7 +89,7 @@ func Inspect(template []byte) (*Report, error) {
 	}
 
 	report := &Report{Found: []string{}, Unknown: []string{}, Warnings: []string{}}
-	// In the order of the list of variables, not of the alphabet
+	// В порядке списка переменных, а не по алфавиту
 	for _, v := range variableOrder {
 		if found[v.name] {
 			report.Found = append(report.Found, v.name)
@@ -103,7 +103,7 @@ func Inspect(template []byte) (*Report, error) {
 	if !tableAlone && !itemsInRow {
 		report.Warnings = append(report.Warnings, WarnNoItems)
 	}
-	// The built table ends with the amount to pay
+	// Построенная таблица заканчивается суммой к оплате
 	if !found["total"] && !found["total_words"] && !tableAlone {
 		report.Warnings = append(report.Warnings, WarnNoTotal)
 	}

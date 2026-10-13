@@ -12,30 +12,29 @@ import (
 	"strings"
 )
 
-// Limits of a template: a document of a page or two is tens of kilobytes;
-// whatever is far above is not a template of an invoice.
+// Пределы для шаблона: документ на страницу-две занимает десятки килобайт;
+// то, что намного больше, шаблоном счёта не является.
 const (
-	MaxTemplateSize  = 5 << 20  // the .docx file
-	maxUnpackedSize  = 60 << 20 // everything in it, unpacked
-	maxDocumentParts = 2000     // files in the archive
+	MaxTemplateSize  = 5 << 20  // файл .docx
+	maxUnpackedSize  = 60 << 20 // всё его содержимое в распакованном виде
+	maxDocumentParts = 2000     // файлов в архиве
 )
 
-// What can be wrong with a file offered as a template.
+// Что может быть не так с файлом, предложенным в качестве шаблона.
 var (
 	ErrNotDocx  = errors.New("the file is not a .docx document")
 	ErrMacros   = errors.New("documents with macros are not accepted")
 	ErrTooLarge = errors.New("the document is too large")
 )
 
-// Render fills the template with the data of an invoice and returns the
-// resulting .docx.
+// Render заполняет шаблон данными счёта и возвращает готовый .docx.
 func Render(template []byte, data Data) ([]byte, error) {
 	archive, err := openTemplate(template)
 	if err != nil {
 		return nil, err
 	}
 	if len(data.Items) == 0 {
-		// An invoice without lines is still an invoice for something
+		// Счёт без позиций — всё равно счёт за что-то
 		data.Items = []Item{{Name: data.ContractName, Quantity: 1}}
 	}
 
@@ -63,8 +62,7 @@ func Render(template []byte, data Data) ([]byte, error) {
 	return out.Bytes(), nil
 }
 
-// openTemplate checks that the bytes are a Word document that may serve as
-// a template.
+// openTemplate проверяет, что байты — документ Word, пригодный в шаблоны.
 func openTemplate(template []byte) (*zip.Reader, error) {
 	if len(template) > MaxTemplateSize {
 		return nil, ErrTooLarge
@@ -103,7 +101,7 @@ func readPart(file *zip.File) ([]byte, error) {
 		return nil, ErrNotDocx
 	}
 	defer rc.Close()
-	// The size in the header may lie: never read more than the limit
+	// Размер в заголовке может быть ложным: больше предела не читается
 	content, err := io.ReadAll(io.LimitReader(rc, maxUnpackedSize+1))
 	if err != nil {
 		return nil, ErrNotDocx
@@ -116,13 +114,13 @@ func readPart(file *zip.File) ([]byte, error) {
 
 var textPartName = regexp.MustCompile(`^word/(document|header\d*|footer\d*|footnotes|endnotes)\.xml$`)
 
-// textPart reports whether a file of the document holds text a variable may
-// stand in: the body, the headers and footers, the notes.
+// textPart сообщает, содержит ли файл документа текст, в котором может
+// стоять переменная: основной текст, колонтитулы, сноски.
 func textPart(name string) bool {
 	return textPartName.MatchString(name)
 }
 
-// fillPart substitutes the variables in one XML part of the document.
+// fillPart подставляет переменные в одной XML-части документа.
 func fillPart(content string, data Data) string {
 	content = joinSplitVariables(content)
 	content = insertItemsTable(content, data)
@@ -130,22 +128,22 @@ func fillPart(content string, data Data) string {
 	return substitute(content, data.Values())
 }
 
-// ─── Finding elements ───
+// ─── Поиск элементов ───
 
-// span is an element of the XML text: [start, end) covers it with its tags.
+// span — элемент XML-текста: [start, end) покрывает его вместе с тегами.
 type span struct {
 	start, end int
-	// nested: there is an element of the same kind inside it.
+	// nested: внутри есть элемент того же вида.
 	nested bool
 }
 
-// elementSpans finds every <tag …>…</tag> in the text, however they are
-// nested. Self-closing elements have no content and are skipped.
+// elementSpans находит в тексте все <tag …>…</tag>, как бы они ни были
+// вложены. У самозакрывающихся элементов содержимого нет, они пропускаются.
 func elementSpans(content, tag string) []span {
-	// \b keeps "w:p" from matching "w:pPr", and "w:tr" from "w:trPr"
+	// \b не даёт "w:p" совпасть с "w:pPr", а "w:tr" — с "w:trPr"
 	re := regexp.MustCompile(`<(/?)` + regexp.QuoteMeta(tag) + `\b[^>]*?(/?)>`)
 	var spans []span
-	var open []int // indexes into spans of the elements that are not closed yet
+	var open []int // номера в spans у элементов, которые ещё не закрыты
 	for _, m := range re.FindAllStringSubmatchIndex(content, -1) {
 		closing := m[2] != m[3]
 		selfClosing := m[4] != m[5]
@@ -163,7 +161,7 @@ func elementSpans(content, tag string) []span {
 			}
 		}
 	}
-	// What was never closed is not an element
+	// То, что так и не закрылось, элементом не считается
 	closed := spans[:0]
 	for _, s := range spans {
 		if s.end > 0 {
@@ -173,8 +171,8 @@ func elementSpans(content, tag string) []span {
 	return closed
 }
 
-// rewrite replaces the given spans of the text with what replace returns
-// for each. The spans must not overlap.
+// rewrite заменяет заданные участки текста тем, что возвращает для каждого
+// replace. Участки не должны пересекаться.
 func rewrite(content string, spans []span, replace func(element string) string) string {
 	if len(spans) == 0 {
 		return content
@@ -191,7 +189,7 @@ func rewrite(content string, spans []span, replace func(element string) string) 
 	return b.String()
 }
 
-// leafSpans keeps the elements that hold no element of the same kind.
+// leafSpans оставляет элементы, внутри которых нет элемента того же вида.
 func leafSpans(spans []span) []span {
 	var leaves []span
 	for _, s := range spans {
@@ -202,7 +200,7 @@ func leafSpans(spans []span) []span {
 	return leaves
 }
 
-// ─── Variables split by Word ───
+// ─── Переменные, разбитые Word ───
 
 var (
 	textRun     = regexp.MustCompile(`<w:t\b([^>]*)>([^<]*)</w:t>`)
@@ -210,12 +208,12 @@ var (
 	anyBracesRe = regexp.MustCompile(`\{\{([^{}]*)\}\}`)
 )
 
-// joinSplitVariables puts back together the variables Word has split.
+// joinSplitVariables собирает обратно переменные, которые разбил Word.
 //
-// Word keeps a paragraph as pieces of text ("runs") and cuts them wherever
-// it likes: after a spelling check or a change of font, "{{total}}" may be
-// stored as "{{", "total" and "}}". Such a variable is moved whole into the
-// piece it begins in; the formatting of that piece applies to it.
+// Word хранит абзац кусками текста («runs») и режет их где угодно: после
+// проверки орфографии или смены шрифта "{{total}}" может храниться как
+// "{{", "total" и "}}". Такая переменная целиком переносится в кусок, в
+// котором начинается; к ней применяется оформление этого куска.
 func joinSplitVariables(content string) string {
 	return rewrite(content, leafSpans(elementSpans(content, "w:p")), joinInParagraph)
 }
@@ -225,7 +223,7 @@ func joinInParagraph(paragraph string) string {
 	if len(runs) < 2 {
 		return paragraph
 	}
-	// The text of the paragraph, and which piece every byte of it is in
+	// Текст абзаца и то, в каком куске лежит каждый его байт
 	var text strings.Builder
 	var owner []int
 	for i, m := range runs {
@@ -237,8 +235,8 @@ func joinInParagraph(paragraph string) string {
 	}
 	whole := text.String()
 
-	// A variable that begins in one piece and ends in another goes whole to
-	// the piece it begins in
+	// Переменная, которая начинается в одном куске и кончается в другом,
+	// целиком уходит в тот, где начинается
 	changed := false
 	for _, m := range anyBracesRe.FindAllStringIndex(whole, -1) {
 		first := owner[m[0]]
@@ -264,7 +262,7 @@ func joinInParagraph(paragraph string) string {
 		b.WriteString(paragraph[last:m[0]])
 		attrs := paragraph[m[2]:m[3]]
 		if !strings.Contains(attrs, "xml:space") {
-			// Without it Word drops the spaces at the ends of the piece
+			// Без этого Word отбрасывает пробелы на концах куска
 			attrs += ` xml:space="preserve"`
 		}
 		b.WriteString("<w:t" + attrs + ">" + pieces[i].String() + "</w:t>")
@@ -274,7 +272,7 @@ func joinInParagraph(paragraph string) string {
 	return b.String()
 }
 
-// paragraphText returns the text of a paragraph without its markup.
+// paragraphText возвращает текст абзаца без разметки.
 func paragraphText(paragraph string) string {
 	var b strings.Builder
 	for _, m := range textRun.FindAllStringSubmatch(paragraph, -1) {
@@ -283,10 +281,10 @@ func paragraphText(paragraph string) string {
 	return b.String()
 }
 
-// ─── Substitution ───
+// ─── Подстановка ───
 
-// substitute replaces every known variable by its value. A variable that is
-// not known stays as it is: it is easier to notice than a blank.
+// substitute заменяет каждую известную переменную её значением. Неизвестная
+// остаётся как есть: её заметить проще, чем пустое место.
 func substitute(content string, values map[string]string) string {
 	return variableRe.ReplaceAllStringFunc(content, func(match string) string {
 		name := strings.ToLower(variableRe.FindStringSubmatch(match)[1])
@@ -298,8 +296,8 @@ func substitute(content string, values map[string]string) string {
 	})
 }
 
-// escape makes a value safe to put into the XML of the document. Line
-// breaks become spaces: a value is one line of text.
+// escape делает значение безопасным для вставки в XML документа. Переносы
+// строк становятся пробелами: значение — это одна строка текста.
 func escape(value string) string {
 	value = strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ", "\t", " ").Replace(value)
 	var b bytes.Buffer
@@ -307,7 +305,7 @@ func escape(value string) string {
 	return b.String()
 }
 
-// ─── Lines of the invoice ───
+// ─── Позиции счёта ───
 
 func hasItemVariable(element string) bool {
 	for _, m := range variableRe.FindAllStringSubmatch(element, -1) {
@@ -318,9 +316,9 @@ func hasItemVariable(element string) bool {
 	return false
 }
 
-// repeatItemRows repeats, for every line of the invoice, each table row
-// that holds item variables. The row keeps its formatting; the rows around
-// it — the header, the totals — stay where they are.
+// repeatItemRows повторяет для каждой позиции счёта каждую строку таблицы,
+// в которой стоят переменные позиции. Строка сохраняет оформление; строки
+// вокруг неё — шапка, итоги — остаются на месте.
 func repeatItemRows(content string, items []Item) string {
 	var rows []span
 	for _, row := range elementSpans(content, "w:tr") {
@@ -329,7 +327,7 @@ func repeatItemRows(content string, items []Item) string {
 		}
 		rows = append(rows, row)
 	}
-	// Of nested tables the innermost row with the variables is the one meant
+	// Во вложенных таблицах имеется в виду самая внутренняя строка с переменными
 	var innermost []span
 	for _, row := range rows {
 		holdsAnother := false
@@ -354,16 +352,15 @@ func repeatItemRows(content string, items []Item) string {
 
 var runProperties = regexp.MustCompile(`(?s)<w:rPr>.*?</w:rPr>`)
 
-// isItemsTablePlaceholder reports whether the paragraph is {{items_table}}
-// and nothing else.
+// isItemsTablePlaceholder сообщает, состоит ли абзац из одной только
+// {{items_table}}.
 func isItemsTablePlaceholder(paragraph string) bool {
 	m := variableRe.FindStringSubmatch(strings.TrimSpace(paragraphText(paragraph)))
 	return m != nil && strings.ToLower(m[1]) == ItemsTable && m[0] == strings.TrimSpace(paragraphText(paragraph))
 }
 
-// insertItemsTable puts the table of the invoice — its lines and totals —
-// in place of the paragraph that is {{items_table}}. The text of the table
-// takes the font of that paragraph.
+// insertItemsTable ставит таблицу счёта — позиции и итоги — на место
+// абзаца с {{items_table}}. Текст таблицы берёт шрифт этого абзаца.
 func insertItemsTable(content string, data Data) string {
 	var placeholders []span
 	for _, p := range leafSpans(elementSpans(content, "w:p")) {
@@ -372,15 +369,15 @@ func insertItemsTable(content string, data Data) string {
 		}
 	}
 	return rewrite(content, placeholders, func(paragraph string) string {
-		// A table may not be the last thing in a cell or in the document:
-		// an empty paragraph follows it
+		// Таблица не может быть последней в ячейке или в документе: за
+		// ней идёт пустой абзац
 		return itemsTable(data, runProperties.FindString(paragraph)) + "<w:p/>"
 	})
 }
 
-// Columns of the built table: title, width in twentieths of a point, how
-// the title and the values are aligned, and whether the values stand in the
-// middle of the row (a long name wraps and stays at the top).
+// Колонки построенной таблицы: заголовок, ширина в двадцатых долях пункта,
+// выравнивание заголовка и значений и то, стоят ли значения посередине
+// строки (длинное название переносится и остаётся вверху).
 var tableColumns = []struct {
 	title      string
 	width      int
@@ -396,17 +393,17 @@ var tableColumns = []struct {
 }
 
 const (
-	// tableBorderColor is the color of the frame of the built table.
+	// tableBorderColor — цвет рамки построенной таблицы.
 	tableBorderColor = "4A85B0"
-	// tableIndent moves the table so that its frame lines up with the text
-	// of the page (the padding of the first cell would shift it left).
+	// tableIndent сдвигает таблицу, чтобы её рамка совпала с краем текста
+	// страницы (отступ первой ячейки увёл бы её влево).
 	tableIndent = 113
-	// totalsLabelColumns: the labels of the totals take this many columns
-	// before the last one; a long label wraps inside them.
+	// totalsLabelColumns: подписи итогов занимают столько колонок перед
+	// последней; длинная подпись переносится внутри них.
 	totalsLabelColumns = 2
 )
 
-// cellBorders describes the frame of a cell: which of its sides have a line.
+// cellBorders описывает рамку ячейки: у каких её сторон есть линия.
 type cellBorders struct{ top, left, bottom, right bool }
 
 var framed = cellBorders{true, true, true, true}
@@ -421,8 +418,9 @@ func (c cellBorders) xml() string {
 	return `<w:tcBorders>` + side("top", c.top) + side("left", c.left) + side("bottom", c.bottom) + side("right", c.right) + `</w:tcBorders>`
 }
 
-// bold returns run properties with bold added in the place the schema of
-// Word documents wants it: after the style and the fonts.
+// bold возвращает свойства куска текста с полужирным начертанием,
+// добавленным там, где его требует схема документов Word: после стиля и
+// шрифтов.
 func bold(rPr string) string {
 	if rPr == "" {
 		return "<w:rPr><w:b/></w:rPr>"
@@ -441,16 +439,16 @@ func bold(rPr string) string {
 	return rPr[:at] + "<w:b/>" + rPr[at:]
 }
 
-// itemsTable builds the whole table of an invoice: the header, a row for
-// every line, and the totals under the last column — the subtotal, the VAT
-// and the amount to pay. Of the totals only the amounts are framed.
+// itemsTable строит всю таблицу счёта: шапку, строку на каждую позицию и
+// итоги под последней колонкой — сумму без НДС, НДС и сумму к оплате. Из
+// итогов рамкой обведены только суммы.
 //
-// Every cell carries its own frame: the totals must have none, and a frame
-// set for the whole table would draw lines through them.
+// Рамка задаётся у каждой ячейки отдельно: у итогов её быть не должно, а
+// рамка на всю таблицу провела бы линии и через них.
 func itemsTable(data Data, rPr string) string {
 	var b strings.Builder
-	// The widths of the columns are fixed: whatever the length of a name,
-	// the table keeps its shape and the name wraps inside its column.
+	// Ширины колонок зафиксированы: какой бы длины ни было название,
+	// таблица сохраняет форму, а название переносится внутри своей колонки.
 	tableWidth := 0
 	for _, col := range tableColumns {
 		tableWidth += col.width
@@ -463,7 +461,7 @@ func itemsTable(data Data, rPr string) string {
 	}
 	b.WriteString(`</w:tblGrid>`)
 
-	// cell writes a cell over span columns starting at column.
+	// cell записывает ячейку шириной span колонок начиная с column.
 	cell := func(column, span int, borders cellBorders, middle bool, text, align, properties string) {
 		width := 0
 		for _, col := range tableColumns[column : column+span] {
@@ -481,7 +479,7 @@ func itemsTable(data Data, rPr string) string {
 			align, properties, escape(text))
 	}
 
-	// The header is repeated when the table goes on to another page
+	// Шапка повторяется, когда таблица переходит на другую страницу
 	b.WriteString(`<w:tr><w:trPr><w:tblHeader/></w:trPr>`)
 	for i, col := range tableColumns {
 		cell(i, 1, framed, true, col.title, col.titleAlign, rPr)
@@ -498,9 +496,9 @@ func itemsTable(data Data, rPr string) string {
 		b.WriteString(`</w:tr>`)
 	}
 
-	// The totals: nothing under the first columns, a bold label before the
-	// last column and the amount in it. The first of these rows keeps the
-	// line that closes the lines of the invoice.
+	// Итоги: под первыми колонками пусто, перед последней — полужирная
+	// подпись, в последней — сумма. У первой из этих строк остаётся линия,
+	// закрывающая позиции счёта.
 	last := len(tableColumns) - 1
 	labelAt := last - totalsLabelColumns
 	values := data.Values()

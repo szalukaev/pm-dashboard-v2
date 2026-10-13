@@ -36,7 +36,7 @@ func main() {
 	utils.InitLogger(logLevel)
 	slog.Info("Starting PM Dashboard V3...")
 
-	// Init SQLite config store
+	// Хранилище конфигурации в SQLite
 	dataDir := "/data"
 	if d := os.Getenv("DATA_DIR"); d != "" {
 		dataDir = d
@@ -50,7 +50,7 @@ func main() {
 
 	cfg := sqliteStore.LoadAppConfig()
 
-	// Connect to PostgreSQL if configured
+	// Подключение к PostgreSQL, если оно настроено
 	var pgDB *sql.DB
 	if cfg.DSN != "" {
 		pgDB, err = db.Connect(cfg.DSN)
@@ -73,7 +73,7 @@ func main() {
 			slog.Warn("PostgreSQL not available", "error", err)
 		} else {
 			defer pgDB.Close()
-			// Never serve traffic on top of an incompatible schema.
+			// На несовместимой схеме запросы не обслуживаются.
 			if err := db.RunMigrations(pgDB); err != nil {
 				slog.Error("Migrations failed, refusing to start", "error", err)
 				os.Exit(1)
@@ -81,13 +81,13 @@ func main() {
 		}
 	}
 
-	// Session store (Redis or in-memory fallback)
+	// Хранилище сессий (Redis или запасное в памяти)
 	redisURL := os.Getenv("REDIS_URL")
 	sessionStore := db.NewSessionStore(redisURL)
 	defer sessionStore.Close()
 
-	// License: one service owns its state — checked at start and every hour.
-	// The hardware fingerprint comes from a file collected on the host.
+	// Лицензия: её состоянием владеет один сервис — проверка при запуске и
+	// каждый час. Аппаратный отпечаток берётся из файла, собранного на хосте.
 	hwidPath := license.DefaultHWIDPath
 	if p := os.Getenv("HWID_SOURCE"); p != "" {
 		hwidPath = p
@@ -95,13 +95,13 @@ func main() {
 	licenseSvc := license.New(&pgDB, hwidPath)
 	go licenseSvc.Run(context.Background())
 
-	// Audit middleware
+	// Журнал аудита
 	var auditMW *middleware.AuditMiddleware
 	if pgDB != nil {
 		auditMW = &middleware.AuditMiddleware{DB: &pgDB}
 	}
 
-	// Handlers
+	// Обработчики
 	setupH := &handlers.SetupHandler{SQLite: sqliteStore, PGDB: &pgDB}
 	authH := &handlers.AuthHandler{DB: &pgDB, Sessions: sessionStore, Audit: auditMW}
 	settingsH := &handlers.SettingsHandler{DB: &pgDB, SQLite: sqliteStore}
@@ -109,8 +109,8 @@ func main() {
 	analyticsH := &handlers.AnalyticsHandler{DB: &pgDB}
 	kanbanH := &handlers.KanbanHandler{DB: &pgDB}
 	sprintH := &handlers.SprintHandler{DB: &pgDB}
-	// Invoices are made from the template the administrator uploaded, or
-	// from the one that ships with the application
+	// Счета формируются по шаблону, загруженному администратором, или по
+	// шаблону из поставки
 	invoiceTemplates := &handlers.InvoiceTemplates{DB: &pgDB, Dir: dataDir, BuiltIn: "invoice/invoice_template.docx"}
 	paymentsH := &handlers.PaymentsHandler{DB: &pgDB, Templates: invoiceTemplates}
 	invoiceTemplateH := &handlers.InvoiceTemplateHandler{DB: &pgDB, Templates: invoiceTemplates}
@@ -118,11 +118,11 @@ func main() {
 	licenseH := &handlers.LicenseHandler{License: licenseSvc}
 	wsHub := handlers.NewWSHub()
 
-	// Data source client and background sync. The manager re-reads connection
-	// settings and the interval on the fly, so the loop runs even while the
-	// source or the database is not configured yet (setup wizard).
-	// Data is collected only under a working license: not before activation
-	// and not in read-only mode.
+	// Клиент источника данных и фоновая синхронизация. Менеджер на ходу
+	// перечитывает параметры подключения и интервал, поэтому цикл работает,
+	// даже пока источник или база ещё не настроены (мастер настройки).
+	// Данные собираются только при действующей лицензии: не до активации
+	// и не в режиме «только чтение».
 	source := manager.New(sqliteStore, &pgDB, func() bool {
 		return !licenseSvc.Usable() || licenseSvc.IsReadOnly()
 	})
@@ -141,11 +141,11 @@ func main() {
 	setupH.Source = source
 	settingsH.Source = source
 	authH.Source = source
-	// Data collection starts right after the license is activated
+	// Сбор данных начинается сразу после активации лицензии
 	licenseH.OnActivated = func() { source.TriggerSync() }
 
-	// Personal API keys of the data source are stored encrypted; with them
-	// changes go to the source under the user's own name.
+	// Личные ключи API источника данных хранятся зашифрованными; с ними
+	// изменения уходят в источник от имени самого пользователя.
 	secretBox, err := secrets.Open(sqliteStore)
 	if err != nil {
 		slog.Error("Failed to open the secret store", "error", err)
@@ -156,19 +156,19 @@ func main() {
 	taskH.Keys = userKeys
 	kanbanH.Keys = userKeys
 	authH.Keys = userKeys
-	// "Rights as in the data source": what projects each user is a member
-	// of there is re-read before every sync
+	// «Права как в источнике данных»: в каких проектах там состоит каждый
+	// пользователь, перечитывается перед каждой синхронизацией
 	source.SetBeforeSync(userKeys.RefreshAllProjects)
 	syncStatusH := &handlers.SyncStatusHandler{DB: &pgDB, Source: source}
 	accessH := &handlers.AccessHandler{DB: &pgDB, Source: source, Sessions: sessionStore}
-	// Issues are synced for the projects the users are shown within their rights
+	// Задачи синхронизируются по проектам, показанным пользователям в пределах их прав
 	source.SetProjectSource((&access.Resolver{DB: &pgDB}).SyncProjects)
 
-	// Real-time: the sync and user edits report changes to open pages
+	// Обновление в реальном времени: синхронизация и правки пользователей сообщают об изменениях открытым страницам
 	source.SetNotifier(wsHub.BroadcastEvent)
 
-	// The history: a snapshot of the day after every sync, and the daily
-	// cleanup of what is older than the retention.
+	// История: снимок дня после каждой синхронизации и ежедневная очистка
+	// того, что старше срока хранения.
 	jobSettings := &jobs.Settings{DB: &pgDB}
 	cleaner := jobs.NewCleaner(&pgDB, jobSettings, jobs.NewStore(redisURL))
 	cleaner.ReadOnly = func() bool { return !licenseSvc.Usable() || licenseSvc.IsReadOnly() }
@@ -222,19 +222,19 @@ func main() {
 	kanbanH.Events = wsHub.BroadcastEvent
 	go source.Run(context.Background())
 
-	// Router
+	// Маршрутизатор
 	r := mux.NewRouter()
 
 	// CORS
 	r.Use(middleware.CORSMiddleware)
 
-	// Security headers (after CORS so ACAO is not overwritten)
+	// Защитные заголовки (после CORS, чтобы не перезаписать ACAO)
 	r.Use(middleware.SecurityHeaders)
 
-	// Cap JSON request bodies (1 MiB)
+	// Предел размера тела JSON-запроса (1 МиБ)
 	r.Use(middleware.LimitJSONBody)
 
-	// Setup endpoints (no auth required)
+	// Мастер настройки (без входа)
 	r.HandleFunc("/api/setup/status", setupH.Status).Methods("GET")
 	r.HandleFunc("/api/setup/database/test", setupH.TestDatabase).Methods("POST")
 	r.HandleFunc("/api/setup/database", setupH.SaveDatabase).Methods("POST")
@@ -242,7 +242,7 @@ func main() {
 	r.HandleFunc("/api/setup/datasource", setupH.SaveDataSource).Methods("POST")
 	r.HandleFunc("/api/setup/admin", setupH.CreateAdmin).Methods("POST")
 
-	// Status endpoint (public, version info)
+	// Состояние сервера (открыто всем, сведения о версии)
 	r.HandleFunc("/api/status", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -253,13 +253,13 @@ func main() {
 		})
 	}).Methods("GET")
 
-	// License status is public (banner for every user); activation is admin-only, see below
+	// Состояние лицензии открыто всем (плашка у каждого пользователя); активация — только администратору, см. ниже
 	r.HandleFunc("/api/license/status", licenseH.GetStatus).Methods("GET")
 
-	// Auth endpoints (no auth required for login)
+	// Вход и выход (для входа сессия не нужна)
 	r.HandleFunc("/api/auth/login", authH.Login).Methods("POST")
 
-	// Protected routes
+	// Маршруты, требующие входа
 	api := r.PathPrefix("/api").Subrouter()
 	api.Use(middleware.RequireAuth(sessionStore, &pgDB))
 
@@ -269,18 +269,18 @@ func main() {
 	api.Use(debugLog.Log)
 	debugH := &handlers.DebugHandler{DB: &pgDB, Log: debugLog}
 
-	// Wire audit middleware — logs all mutating requests
+	// Аудит — записывает все изменяющие запросы
 	if auditMW != nil {
 		api.Use(auditMW.Log)
 	}
 
-	// License state: nothing but the activation screen before activation,
-	// no writes in read-only mode
+	// Состояние лицензии: до активации — только экран активации, в режиме
+	// «только чтение» — никаких изменений
 	api.Use(licenseSvc.Guard)
 
-	// A tab hidden from a user by the administrator is closed here as well,
-	// not only in the menu. Task cards and reference lists stay open: other
-	// tabs use them.
+	// Вкладка, скрытая администратором от пользователя, закрыта и здесь, а
+	// не только в меню. Карточки задач и справочники остаются открытыми:
+	// ими пользуются другие вкладки.
 	api.Use(middleware.RequireTabs([]middleware.TabRule{
 		{Path: "/api/tasks", Exact: true, Tab: "tasks"},
 		{Path: "/api/analytics", Tab: "analytics"},
@@ -300,7 +300,7 @@ func main() {
 	api.HandleFunc("/auth/change-password", authH.ChangePassword).Methods("POST")
 	api.HandleFunc("/auth/avatar", authH.UploadAvatar).Methods("POST")
 	api.HandleFunc("/auth/avatar", authH.DeleteAvatar).Methods("DELETE")
-	// The link to the user's account in the data source: own only, no admin route
+	// Привязка к учётной записи пользователя в источнике данных: только своя, маршрута для администратора нет
 	api.HandleFunc("/auth/source-token", authH.SetSourceToken).Methods("PUT")
 	api.HandleFunc("/auth/source-token", authH.ClearSourceToken).Methods("DELETE")
 	api.HandleFunc("/sync/status", syncStatusH.GetStatus).Methods("GET")
@@ -309,7 +309,7 @@ func main() {
 	// Пробная сводка на почту — по настройке из запроса, до сохранения
 	api.HandleFunc("/settings/email-report/test", reportH.SendTest).Methods("POST")
 
-	// Tasks
+	// Задачи
 	api.HandleFunc("/tasks", taskH.ListTasks).Methods("GET")
 	api.HandleFunc("/tasks/categories", taskH.GetCategories).Methods("GET")
 	api.HandleFunc("/tasks/project-categories", taskH.GetProjectCategories).Methods("GET")
@@ -324,7 +324,7 @@ func main() {
 	api.HandleFunc("/tasks/{id}", taskH.GetTask).Methods("GET")
 	api.Handle("/tasks/{id}", middleware.RequireWrite(http.HandlerFunc(taskH.UpdateTask))).Methods("PUT")
 
-	// Analytics
+	// Аналитика
 	api.HandleFunc("/analytics/stats", analyticsH.GetStats).Methods("GET")
 	api.HandleFunc("/analytics/team-load", analyticsH.GetTeamLoad).Methods("GET")
 	api.HandleFunc("/analytics/distribution", analyticsH.GetDistribution).Methods("GET")
@@ -341,11 +341,11 @@ func main() {
 	api.Handle("/kanban/move", middleware.RequireWrite(http.HandlerFunc(kanbanH.MoveCard))).Methods("PUT")
 	api.HandleFunc("/kanban/column-order", kanbanH.SaveColumnOrder).Methods("PUT")
 
-	// Sprints
+	// Спринты
 	api.HandleFunc("/sprints", sprintH.ListSprints).Methods("GET")
-	// Each action with sprints is a right of its own. Updating a sprint is
-	// checked inside the handler: it is "edit" or "close" depending on what
-	// is being changed.
+	// Каждое действие со спринтами — отдельное право. Изменение спринта
+	// проверяется внутри обработчика: это «edit» или «close» в зависимости
+	// от того, что меняется.
 	api.Handle("/sprints", middleware.RequireSprint(access.SprintCreate, sprintH.CreateSprint)).Methods("POST")
 	api.HandleFunc("/sprints/backlog", sprintH.GetBacklog).Methods("GET")
 	api.HandleFunc("/sprints/{id}", sprintH.GetSprint).Methods("GET")
@@ -360,7 +360,7 @@ func main() {
 	api.HandleFunc("/notifications/read-all", notificationsH.MarkAllRead).Methods("POST")
 	api.HandleFunc("/notifications/{id}/read", notificationsH.MarkRead).Methods("POST")
 
-	// Payments
+	// Оплаты
 	api.HandleFunc("/organizations", paymentsH.ListOrganizations).Methods("GET")
 	api.HandleFunc("/organizations", paymentsH.CreateOrganization).Methods("POST")
 	api.HandleFunc("/organizations/{id}", paymentsH.UpdateOrganization).Methods("PUT")
@@ -378,10 +378,10 @@ func main() {
 	api.HandleFunc("/contracts/export/csv", paymentsH.ExportCSV).Methods("GET")
 	api.HandleFunc("/payments/stats", paymentsH.GetStats).Methods("GET")
 
-	// Admin (admin role required)
+	// Администрирование (нужна роль администратора)
 	admin := api.PathPrefix("/admin").Subrouter()
 	admin.Use(middleware.RequireAdmin)
-	// Access control: users, their rights, groups, role templates
+	// Права доступа: пользователи, их права, группы, шаблоны ролей
 	admin.HandleFunc("/users", accessH.ListUsers).Methods("GET")
 	admin.HandleFunc("/users", accessH.CreateUser).Methods("POST")
 	admin.HandleFunc("/users/{id}", accessH.UpdateUser).Methods("PUT")
@@ -419,13 +419,13 @@ func main() {
 	admin.HandleFunc("/debug-logs", debugH.List).Methods("GET")
 	admin.HandleFunc("/debug-logs", debugH.Clear).Methods("DELETE")
 	admin.HandleFunc("/debug-logs/{id}", debugH.Get).Methods("GET")
-	// The template of invoices
+	// Шаблон счёта
 	admin.HandleFunc("/invoice-template", invoiceTemplateH.Get).Methods("GET")
 	admin.HandleFunc("/invoice-template", invoiceTemplateH.Upload).Methods("POST")
 	admin.HandleFunc("/invoice-template", invoiceTemplateH.Reset).Methods("DELETE")
 	admin.HandleFunc("/invoice-template/file", invoiceTemplateH.File).Methods("GET")
 	admin.HandleFunc("/invoice-template/preview", invoiceTemplateH.Preview).Methods("GET")
-	// Background workers and the history they collect
+	// Фоновые воркеры и история, которую они собирают
 	admin.HandleFunc("/workers", workersH.ListWorkers).Methods("GET")
 	admin.HandleFunc("/workers/{key}/run", workersH.RunWorker).Methods("POST")
 	admin.HandleFunc("/workers/{key}/stop", workersH.StopWorker).Methods("POST")
@@ -441,10 +441,10 @@ func main() {
 	admin.HandleFunc("/snapshots/cleanup", workersH.CleanupSnapshots).Methods("POST")
 	admin.HandleFunc("/snapshots/purge", workersH.PurgeSnapshots).Methods("POST")
 
-	// WebSocket (session cookie required — not public)
+	// WebSocket (нужна кука сессии — не открыт всем)
 	r.HandleFunc("/ws", middleware.RequireWSSession(sessionStore, wsHub.HandleWebSocket))
 
-	// Serve static files (frontend build)
+	// Статические файлы (сборка фронтенда)
 	frontendDir := "../frontend/dist"
 	if d := os.Getenv("FRONTEND_DIR"); d != "" {
 		frontendDir = d
@@ -453,7 +453,7 @@ func main() {
 		r.PathPrefix("/").Handler(http.FileServer(http.Dir(frontendDir)))
 	}
 
-	// HTTP Server
+	// HTTP-сервер
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
 		Handler:      r,
@@ -462,7 +462,7 @@ func main() {
 		IdleTimeout:  120 * time.Second,
 	}
 
-	// Graceful shutdown
+	// Плавная остановка
 	go func() {
 		sigCh := make(chan os.Signal, 1)
 		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
