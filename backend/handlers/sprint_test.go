@@ -160,3 +160,50 @@ func TestIDList(t *testing.T) {
 		t.Errorf("idList пустого списка = %q", got)
 	}
 }
+
+func TestSprintDatesInOrder(t *testing.T) {
+	cases := []struct {
+		name       string
+		start, due *string
+		want       bool
+	}{
+		{"срок позже начала", strPtr("2026-10-01"), strPtr("2026-10-14"), true},
+		{"срок в день начала", strPtr("2026-10-01"), strPtr("2026-10-01"), true},
+		{"срок раньше начала", strPtr("2026-10-13"), strPtr("2026-10-01"), false},
+		{"срок не задан", strPtr("2026-10-13"), nil, true},
+		{"дата с временем из базы", strPtr("2026-10-13T00:00:00Z"), strPtr("2026-10-01"), false},
+	}
+	for _, c := range cases {
+		if got := sprintDatesInOrder(c.start, c.due); got != c.want {
+			t.Errorf("%s: получили %v, ожидали %v", c.name, got, c.want)
+		}
+	}
+}
+
+func TestSprintUpdateDates(t *testing.T) {
+	current := &Sprint{StartDate: strPtr("2026-10-13T00:00:00Z"), DueDate: strPtr("2026-10-20T00:00:00Z")}
+
+	// Прислана только дата окончания: начало берётся из спринта
+	start, due := sprintUpdateDates(map[string]interface{}{"due_date": "2026-10-01"}, current)
+	if sprintDatesInOrder(start, due) {
+		t.Error("срок раньше сохранённого начала должен быть отклонён")
+	}
+
+	// Прислано только начало: срок берётся из спринта
+	start, due = sprintUpdateDates(map[string]interface{}{"start_date": "2026-10-25"}, current)
+	if sprintDatesInOrder(start, due) {
+		t.Error("начало позже сохранённого срока должно быть отклонено")
+	}
+
+	// Срок снят — сравнивать не с чем
+	start, due = sprintUpdateDates(map[string]interface{}{"start_date": "2026-10-25", "due_date": nil}, current)
+	if !sprintDatesInOrder(start, due) {
+		t.Error("спринт без срока допустим при любом начале")
+	}
+
+	// Даты не трогали
+	start, due = sprintUpdateDates(map[string]interface{}{"name": "Спринт"}, current)
+	if !sprintDatesInOrder(start, due) {
+		t.Error("правка названия не должна упираться в даты")
+	}
+}

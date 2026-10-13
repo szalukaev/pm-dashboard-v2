@@ -281,6 +281,10 @@ func (h *SprintHandler) CreateSprint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body.DueDate = emptyToNil(body.DueDate)
+	if !sprintDatesInOrder(body.StartDate, body.DueDate) {
+		utils.Error(w, http.StatusBadRequest, "DUE_BEFORE_START")
+		return
+	}
 	body.ProjectName = emptyToNil(body.ProjectName)
 	body.CategoryName = emptyToNil(body.CategoryName)
 	body.Description = emptyToNil(body.Description)
@@ -375,6 +379,11 @@ func (h *SprintHandler) UpdateSprint(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if !sprintDatesInOrder(sprintUpdateDates(body, current)) {
+		utils.Error(w, http.StatusBadRequest, "DUE_BEFORE_START")
+		return
+	}
+
 	sets := []string{}
 	args := []interface{}{}
 	for k, v := range body {
@@ -408,6 +417,32 @@ func (h *SprintHandler) UpdateSprint(w http.ResponseWriter, r *http.Request) {
 }
 
 // validSprintStatus сообщает, можно ли сохранить такое значение статуса.
+// sprintDatesInOrder сообщает, что срок спринта не раньше его начала. Без
+// одной из дат сравнивать не с чем.
+func sprintDatesInOrder(start, due *string) bool {
+	s, d := dateOnly(start), dateOnly(due)
+	return s == "" || d == "" || d >= s
+}
+
+// sprintUpdateDates возвращает даты спринта, какими они станут после правки:
+// форма может прислать только одну из них, вторая остаётся прежней.
+func sprintUpdateDates(body map[string]interface{}, current *Sprint) (start, due *string) {
+	start, due = current.StartDate, current.DueDate
+	if v, sent := body["start_date"]; sent {
+		start = nil
+		if text, isText := v.(string); isText {
+			start = &text
+		}
+	}
+	if v, sent := body["due_date"]; sent {
+		due = nil
+		if text, isText := v.(string); isText {
+			due = &text
+		}
+	}
+	return start, due
+}
+
 func validSprintStatus(v interface{}) bool {
 	status, isText := v.(string)
 	return isText && (status == SprintOpen || status == SprintClosed)

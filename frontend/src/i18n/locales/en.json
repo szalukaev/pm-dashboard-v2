@@ -399,6 +399,7 @@
       "auto_fill": "Auto-fill by category",
       "start_date": "Start Date",
       "due_date": "Due Date",
+      "due_before_start": "The due date cannot be earlier than the start date",
       "description": "Description"
     },
     "backlog_filter": {

@@ -62,9 +62,10 @@
         </div>
         <div class="form-field">
           <label>{{ $t('sprint.form.due_date') }}</label>
-          <input v-model="form.due_date" type="date" />
+          <input v-model="form.due_date" type="date" :min="form.start_date" />
         </div>
       </div>
+      <div v-if="!datesInOrder" class="date-error">{{ $t('sprint.form.due_before_start') }}</div>
 
       <div class="form-field">
         <label>{{ $t('sprint.form.description') }}</label>
@@ -167,8 +168,11 @@ watch([() => props.visible, () => props.sprint], ([visible, s]) => {
   loadCategories()
 }, { immediate: true })
 
+// Срок не раньше начала; без срока сравнивать не с чем
+const datesInOrder = computed(() => !form.start_date || !form.due_date || form.due_date >= form.start_date)
+
 // The name and the start date are required
-const canSubmit = computed(() => form.name.trim() !== '' && form.start_date !== '')
+const canSubmit = computed(() => form.name.trim() !== '' && form.start_date !== '' && datesInOrder.value)
 
 function submit() {
   if (!canSubmit.value) return
@@ -232,6 +236,12 @@ function submit() {
 .form-field textarea {
   resize: vertical;
   min-height: 60px;
+}
+
+.date-error {
+  margin-top: -8px;
+  font-size: 12px;
+  color: var(--danger);
 }
 
 .checkbox-field label {
