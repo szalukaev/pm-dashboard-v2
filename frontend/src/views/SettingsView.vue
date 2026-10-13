@@ -140,6 +140,9 @@ const visibleTabs = computed(() => tabs.filter(tab => !tab.adminOnly || isAdmin.
   border: 1px solid var(--hairline);
   border-radius: 12px;
   padding: 24px;
+  /* Без этого широкая таблица растягивает блок за край окна вместо того,
+     чтобы прокручиваться внутри себя */
+  min-width: 0;
 }
 
 @media (max-width: 768px) {
