@@ -8,17 +8,23 @@
         <span class="unit">{{ $t('auth.countdown.' + part.unit) }}</span>
       </template>
     </div>
-    <div class="caption">{{ $t('auth.countdown.caption') }}</div>
+    <div class="caption">{{ $t(mode === 'sprint' ? 'auth.countdown.caption_sprint' : 'auth.countdown.caption_week') }}</div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
-// Отсчёт до конца рабочей недели (пятница, 18:00 по местному времени).
-// До входа неизвестно, в каком спринте пользователь, поэтому берём неделю.
+// Отсчёт до конца рабочей недели или до конца спринта — выбирается случайно
+// при каждом открытии экрана. До входа неизвестно, в каком спринте
+// пользователь, поэтому «спринт» здесь условный: двухнедельный цикл,
+// который заканчивается в пятницу в 18:00 по местному времени.
 
 const now = ref(Date.now())
+const mode: 'week' | 'sprint' = Math.random() < 0.5 ? 'week' : 'sprint'
+// Пятница, от которой отсчитываются двухнедельные спринты
+const SPRINT_ANCHOR = new Date(2026, 0, 2, 18, 0, 0, 0).getTime()
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
 function weekEnd(from: Date): Date {
   const end = new Date(from)
@@ -28,8 +34,16 @@ function weekEnd(from: Date): Date {
   return end
 }
 
+function sprintEnd(from: Date): Date {
+  const end = weekEnd(from)
+  const weeks = Math.round((end.getTime() - SPRINT_ANCHOR) / WEEK_MS)
+  // Нечётная неделя от опорной пятницы — середина спринта, конец через неделю
+  if (Math.abs(weeks) % 2 === 1) end.setDate(end.getDate() + 7)
+  return end
+}
+
 const parts = computed(() => {
-  const left = Math.max(0, weekEnd(new Date(now.value)).getTime() - now.value)
+  const left = Math.max(0, (mode === 'sprint' ? sprintEnd : weekEnd)(new Date(now.value)).getTime() - now.value)
   const minutes = Math.floor(left / 60000)
   const pad = (n: number) => String(n).padStart(2, '0')
   return [

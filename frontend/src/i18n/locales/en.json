@@ -49,13 +49,14 @@
     "username": "Username",
     "password": "Password",
     "greeting": {
-      "night": "Good night.",
-      "morning": "Good morning.",
+      "night": "Good night! Can't sleep again?)",
+      "morning": "Good morning!",
       "day": "Good afternoon.",
-      "evening": "Good evening."
+      "evening": "Good evening!"
     },
     "countdown": {
-      "caption": "until the end of the work week",
+      "caption_week": "until the end of the work week",
+      "caption_sprint": "until the end of the sprint",
       "days": "d",
       "hours": "h",
       "minutes": "min"
