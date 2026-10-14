@@ -8,12 +8,13 @@
         <span class="unit">{{ $t('auth.countdown.' + part.unit) }}</span>
       </template>
     </div>
-    <div class="caption">{{ $t(mode === 'sprint' ? 'auth.countdown.caption_sprint' : 'auth.countdown.caption_week') }}</div>
+    <div class="caption">{{ mode === 'sprint' ? $t('auth.countdown.caption_sprint', { name: sprintName }) : $t('auth.countdown.caption_week') }}</div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 // Отсчёт до конца рабочей недели или до конца спринта — выбирается случайно
 // при каждом открытии экрана. До входа неизвестно, в каком спринте
@@ -22,6 +23,10 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 const now = ref(Date.now())
 const mode: 'week' | 'sprint' = Math.random() < 0.5 ? 'week' : 'sprint'
+// Название условного спринта — случайное из списка в словаре
+const { tm, rt } = useI18n()
+const sprintNames = (tm('auth.countdown.sprint_names') as unknown[]).map(n => rt(n as any))
+const sprintName = sprintNames[Math.floor(Math.random() * sprintNames.length)]
 // Пятница, от которой отсчитываются двухнедельные спринты
 const SPRINT_ANCHOR = new Date(2026, 0, 2, 18, 0, 0, 0).getTime()
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
@@ -63,7 +68,7 @@ onBeforeUnmount(() => clearInterval(timer))
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 14px;
 }
 
 .flap {
@@ -73,24 +78,24 @@ onBeforeUnmount(() => clearInterval(timer))
 
 .digits {
   display: flex;
-  gap: 5px;
-  perspective: 400px;
+  gap: 8px;
+  perspective: 600px;
 }
 
 .digit {
   position: relative;
-  width: 46px;
-  height: 64px;
+  width: 92px;
+  height: 128px;
   display: grid;
   place-items: center;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  font-size: 42px;
+  border-radius: 14px;
+  font-size: 84px;
   font-weight: 800;
   color: var(--text-bright);
   font-variant-numeric: tabular-nums;
-  box-shadow: 0 8px 16px -8px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 14px 28px -12px rgba(0, 0, 0, 0.45);
   animation: flip 0.5s;
 }
 
@@ -101,7 +106,7 @@ onBeforeUnmount(() => clearInterval(timer))
   left: 0;
   right: 0;
   top: 50%;
-  height: 2px;
+  height: 3px;
   background: var(--bg);
 }
 
@@ -111,8 +116,8 @@ onBeforeUnmount(() => clearInterval(timer))
 }
 
 .unit {
-  margin: 0 14px 6px 6px;
-  font-size: 11px;
+  margin: 0 24px 10px 10px;
+  font-size: 14px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -123,8 +128,16 @@ onBeforeUnmount(() => clearInterval(timer))
 }
 
 .caption {
-  font-size: 12px;
+  font-size: 15px;
   color: var(--text-muted);
+}
+
+/* На узком экране табло возвращается к прежнему размеру */
+@media (max-width: 760px) {
+  .digits { gap: 5px; }
+  .digit { width: 46px; height: 64px; font-size: 42px; border-radius: 8px; }
+  .unit { margin: 0 12px 6px 6px; font-size: 11px; }
+  .caption { font-size: 12px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

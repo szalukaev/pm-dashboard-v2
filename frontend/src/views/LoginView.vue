@@ -131,7 +131,7 @@ async function handleLogin() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 28px;
+  gap: 72px;
   width: 400px;
   max-width: 90vw;
 }
