@@ -32,7 +32,7 @@
     </select>
 
     <span class="total-count">
-      {{ total }} {{ $t('kanban.total_tasks') }}
+      {{ $t('kanban.total_tasks') }}: {{ total }}
     </span>
   </div>
 </template>
