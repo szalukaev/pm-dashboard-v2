@@ -191,14 +191,24 @@ type Limit struct {
 	Team     *[]int
 }
 
-func limitOf(groups []Permissions) Limit {
-	side := func(all func(Permissions) bool, list func(Permissions) []int) *[]int {
+// limitOf собирает предел групп (см. Limit). Группа «как в источнике» разрешает ровно проекты, в которых пользователь
+// состоит в источнике (sourceProjects); свои списки проектов у неё не действуют.
+func limitOf(groups []Permissions, sourceProjects []int) Limit {
+	projectsOf := func(p Permissions) []int {
+		if p.FromSource {
+			// Пустой список здесь — «ни одного проекта», а не «без ограничения»
+			return append([]int{}, sourceProjects...)
+		}
+		return p.ProjectIDs
+	}
+	// open сообщает, что группа с этой стороны не ограничивает
+	side := func(open func(Permissions) bool, list func(Permissions) []int) *[]int {
 		if len(groups) == 0 {
 			return nil
 		}
-		var ids []int
+		ids := []int{}
 		for _, g := range groups {
-			if all(g) || len(list(g)) == 0 {
+			if open(g) {
 				return nil
 			}
 			ids = append(ids, list(g)...)
@@ -207,8 +217,8 @@ func limitOf(groups []Permissions) Limit {
 		return &ids
 	}
 	return Limit{
-		Projects: side(func(p Permissions) bool { return p.AllProjects }, func(p Permissions) []int { return p.ProjectIDs }),
-		Team:     side(func(p Permissions) bool { return p.AllTeam }, func(p Permissions) []int { return p.TeamIDs }),
+		Projects: side(func(p Permissions) bool { return !p.FromSource && (p.AllProjects || len(p.ProjectIDs) == 0) }, projectsOf),
+		Team:     side(func(p Permissions) bool { return p.AllTeam || len(p.TeamIDs) == 0 }, func(p Permissions) []int { return p.TeamIDs }),
 	}
 }
 

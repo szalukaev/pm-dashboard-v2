@@ -45,6 +45,17 @@
 
       <!-- Проекты -->
       <template v-else-if="active === 'projects'">
+        <label class="pe-row">
+          <span class="pe-row-text">
+            <span class="pe-row-title">{{ $t('access.editor.from_source') }}</span>
+            <span class="pe-row-hint">{{ $t('access.editor.from_source_hint') }}</span>
+          </span>
+          <span class="pe-switch"><input type="checkbox" v-model="model.from_source" data-testid="perm-from-source" /><span class="pe-slider"></span></span>
+        </label>
+
+        <!-- Проекты как в источнике — ровно его проекты: свой выбор не действует и закрыт -->
+        <p v-if="model.from_source" class="pe-note" data-testid="perm-projects-locked">{{ $t('access.editor.projects_from_source') }}</p>
+        <fieldset class="pe-fieldset" :disabled="model.from_source" :class="{ locked: model.from_source }">
         <div class="pe-scope" role="radiogroup">
           <label class="pe-scope-option" :class="{ active: model.all_projects }">
             <input type="radio" :checked="model.all_projects" data-testid="perm-all-projects" @change="model.all_projects = true" />
@@ -86,14 +97,7 @@
           </div>
           <p class="pe-note">{{ $t('access.editor.projects_note') }}</p>
         </template>
-
-        <label class="pe-row">
-          <span class="pe-row-text">
-            <span class="pe-row-title">{{ $t('access.editor.from_source') }}</span>
-            <span class="pe-row-hint">{{ $t('access.editor.from_source_hint') }}</span>
-          </span>
-          <span class="pe-switch"><input type="checkbox" v-model="model.from_source" data-testid="perm-from-source" /><span class="pe-slider"></span></span>
-        </label>
+        </fieldset>
       </template>
 
       <!-- Команда -->
@@ -252,8 +256,9 @@ const sections = computed(() => {
       status: t(m.read_only ? 'access.editor.status_read_only' : 'access.editor.status_write'),
     },
     {
-      id: 'projects', icon: FolderTree, limited: !m.all_projects,
-      status: m.all_projects ? t('access.editor.status_all') : t('access.editor.selected', { n: m.project_ids.length }),
+      id: 'projects', icon: FolderTree, limited: m.from_source || !m.all_projects,
+      status: m.from_source ? t('access.editor.status_from_source')
+        : m.all_projects ? t('access.editor.status_all') : t('access.editor.selected', { n: m.project_ids.length }),
     },
     {
       id: 'team', icon: Users, limited: !m.all_team,
@@ -610,6 +615,22 @@ function toggleProject(id: number, checked: boolean) {
 .pe-note {
   font-size: 12px;
   color: var(--text-muted);
+}
+
+/* Выбор проектов: обёртка без своей рамки, закрытая при «как в источнике» */
+.pe-fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: inherit;
+}
+
+.pe-fieldset.locked {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 .pe-warning {

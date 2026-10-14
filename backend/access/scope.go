@@ -171,9 +171,10 @@ func newScope(userID int, admin bool, perms Permissions, facts userFacts) *Scope
 		s.PaymentsOwnOnly = perms.PaymentsOwnOnly == nil || *perms.PaymentsOwnOnly
 		s.AllowedAllProjects, s.AllowedProjects = perms.AllProjects, perms.ProjectIDs
 		if perms.FromSource {
-			// Ровно проекты источника: участие там задаётся по каждому
-			// проекту и на подпроекты здесь не распространяется.
-			s.AllowedProjects = uniqueInts(append(append([]int{}, perms.ProjectIDs...), facts.sourceProjects...))
+			// Ровно проекты источника: выбор проектов при этом заблокирован,
+			// а участие в источнике задаётся по каждому проекту и на
+			// подпроекты здесь не распространяется.
+			s.AllowedAllProjects, s.AllowedProjects = false, uniqueInts(facts.sourceProjects)
 		}
 		s.AllowedAllTeam, s.AllowedTeam = perms.AllTeam, perms.TeamIDs
 		if perms.FromSource {

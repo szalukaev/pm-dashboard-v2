@@ -95,22 +95,36 @@ func (r *Resolver) Grants(userID int) (*Grants, error) {
 	if g.Template != nil {
 		templateSet = &g.Template.Permissions
 	}
+	// Проекты, в которых пользователь состоит в источнике: их дают права и
+	// группы «как в источнике»
+	var sourceJSON []byte
+	if err := db.QueryRow("SELECT source_projects FROM users WHERE id = $1", userID).Scan(&sourceJSON); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
+	}
+	var sourceProjects []int
+	json.Unmarshal(sourceJSON, &sourceProjects)
+
 	g.own = effective(g.Individual, templateSet, groupSets)
-	g.limit = limitOf(groupSets)
 	// Право на проект покрывает все его подпроекты, включая созданные
 	// позже: списки раскрываются при каждом чтении, а не при сохранении, —
-	// и до того, как сравниваются друг с другом.
+	// и до того, как сравниваются друг с другом. Проекты источника не
+	// раскрываются: участие там задаётся по каждому проекту.
 	if g.own.ProjectIDs, err = expand(db, g.own.ProjectIDs); err != nil {
 		return nil, err
 	}
-	if g.limit.Projects != nil {
-		expanded, err := expand(db, *g.limit.Projects)
-		if err != nil {
+	expandedGroups := make([]Permissions, len(groupSets))
+	for i, set := range groupSets {
+		if set.ProjectIDs, err = expand(db, set.ProjectIDs); err != nil {
 			return nil, err
 		}
-		g.limit.Projects = &expanded
+		expandedGroups[i] = set
 	}
+	g.limit = limitOf(expandedGroups, sourceProjects)
 
+	if g.own.FromSource {
+		// Итог для экрана прав — ровно проекты источника, как в newScope
+		g.own.AllProjects, g.own.ProjectIDs = false, uniqueInts(sourceProjects)
+	}
 	g.Effective = g.own
 	g.Effective.AllProjects, g.Effective.ProjectIDs = restrict(g.own.AllProjects, g.own.ProjectIDs, g.limit.Projects)
 	g.Effective.AllTeam, g.Effective.TeamIDs = restrict(g.own.AllTeam, g.own.TeamIDs, g.limit.Team)

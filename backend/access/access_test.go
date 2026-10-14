@@ -79,11 +79,11 @@ func TestEffective(t *testing.T) {
 	})
 
 	t.Run("groups add up for projects: one without a restriction lifts it", func(t *testing.T) {
-		limit := limitOf([]Permissions{{ProjectIDs: []int{1}}, {TeamIDs: []int{5}}})
+		limit := limitOf([]Permissions{{ProjectIDs: []int{1}}, {TeamIDs: []int{5}}}, nil)
 		if limit.Projects != nil || limit.Team != nil {
 			t.Errorf("limit = %+v, want none", limit)
 		}
-		limit = limitOf([]Permissions{{ProjectIDs: []int{1}}, {ProjectIDs: []int{2}}})
+		limit = limitOf([]Permissions{{ProjectIDs: []int{1}}, {ProjectIDs: []int{2}}}, nil)
 		if limit.Projects == nil || !reflect.DeepEqual(*limit.Projects, []int{1, 2}) {
 			t.Errorf("projects = %v, want [1 2]", limit.Projects)
 		}
@@ -151,7 +151,7 @@ func TestEffective(t *testing.T) {
 
 func TestGroupsNarrow(t *testing.T) {
 	scope := func(own Permissions, facts userFacts, groups ...Permissions) *Scope {
-		facts.limit = limitOf(groups)
+		facts.limit = limitOf(groups, nil)
 		return newScope(1, false, effective(&own, nil, groups), facts)
 	}
 	own := Permissions{ProjectIDs: []int{1, 2, 3, 4, 5}, TeamIDs: []int{10, 11, 12, 13}}
@@ -170,7 +170,7 @@ func TestGroupsNarrow(t *testing.T) {
 		}
 		// Даже пользователю без собственных прав
 		none := newScope(1, false, effective(nil, nil, []Permissions{{AllProjects: true, AllTeam: true}}),
-			userFacts{limit: limitOf([]Permissions{{AllProjects: true, AllTeam: true}})})
+			userFacts{limit: limitOf([]Permissions{{AllProjects: true, AllTeam: true}}, nil)})
 		if none.AllowedAllProjects || len(none.AllowedProjects) != 0 || none.AllowedAllTeam {
 			t.Errorf("no own rights: %+v", none)
 		}
@@ -339,7 +339,7 @@ func TestScope(t *testing.T) {
 		// Группа их сужает и не может открыть проект, которого источник не даёт
 		group := []Permissions{{ProjectIDs: []int{20, 30}}}
 		withGroup := facts
-		withGroup.limit = limitOf(group)
+		withGroup.limit = limitOf(group, facts.sourceProjects)
 		s = newScope(5, false, effective(nil, &template, group), withGroup)
 		if !reflect.DeepEqual(s.AllowedProjects, []int{20}) {
 			t.Errorf("with a group: projects = %v", s.AllowedProjects)
@@ -350,7 +350,7 @@ func TestScope(t *testing.T) {
 		visible := []int{7}
 		group = []Permissions{{TeamIDs: []int{7, 8}}}
 		s = newScope(5, false, effective(nil, &template, group),
-			userFacts{sourceProjects: []int{10}, sourceMembers: &visible, limit: limitOf(group)})
+			userFacts{sourceProjects: []int{10}, sourceMembers: &visible, limit: limitOf(group, []int{10})})
 		if s.AllowedAllTeam || !reflect.DeepEqual(s.AllowedTeam, []int{7}) {
 			t.Errorf("team = %v (all: %v), want [7]", s.AllowedTeam, s.AllowedAllTeam)
 		}
@@ -358,6 +358,24 @@ func TestScope(t *testing.T) {
 		s = newScope(5, false, effective(nil, &template, nil), userFacts{sourceProjects: []int{10}})
 		if !s.AllowedAllTeam {
 			t.Error("members not read yet: the template's own team must apply")
+		}
+
+		// С флагом — ровно проекты источника: отмеченные вручную и «все
+		// проекты» не действуют, выбор проектов в редакторе заблокирован
+		mixed := Permissions{FromSource: true, AllProjects: true, ProjectIDs: []int{30}}
+		s = newScope(5, false, effective(&mixed, nil, nil), facts)
+		if s.AllowedAllProjects || !reflect.DeepEqual(s.AllowedProjects, []int{10, 20}) {
+			t.Errorf("from source with other projects: all = %v, projects = %v", s.AllowedAllProjects, s.AllowedProjects)
+		}
+
+		// Группа «как в Redmine» ограничивает участника его проектами там
+		open := Permissions{AllProjects: true}
+		sourceGroup := []Permissions{{FromSource: true, ProjectIDs: []int{30}}}
+		withSourceGroup := facts
+		withSourceGroup.limit = limitOf(sourceGroup, facts.sourceProjects)
+		s = newScope(5, false, effective(&open, nil, sourceGroup), withSourceGroup)
+		if s.AllowedAllProjects || !reflect.DeepEqual(s.AllowedProjects, []int{10, 20}) {
+			t.Errorf("source group: all = %v, projects = %v", s.AllowedAllProjects, s.AllowedProjects)
 		}
 
 		// Без флага участие в проектах источника ничего не даёт
