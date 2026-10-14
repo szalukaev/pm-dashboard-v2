@@ -281,4 +281,23 @@ function submit() {
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
+
+/* Поле даты на iOS шире половины экрана — иначе оно распирает форму */
+.form-row .form-field {
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  /* 16px — меньше iOS увеличивает страницу при фокусе в поле */
+  .form-field input[type="text"],
+  .form-field input[type="date"],
+  .form-field select,
+  .form-field textarea {
+    font-size: 16px;
+  }
+}
 </style>

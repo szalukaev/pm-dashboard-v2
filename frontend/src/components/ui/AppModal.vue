@@ -99,6 +99,8 @@ function close() {
     width: calc(100vw - 16px) !important;
     max-width: none;
     max-height: 92vh;
+    /* dvh — видимая высота: на iPhone 92vh включает область под панелью браузера */
+    max-height: 92dvh;
   }
 }
 
@@ -146,6 +148,8 @@ function close() {
   padding: 20px 24px;
   overflow-y: auto;
   flex: 1;
+  /* Без этого высокое содержимое не сжимается и выталкивает кнопки за экран */
+  min-height: 0;
 }
 
 .modal-footer {
