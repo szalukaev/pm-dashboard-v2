@@ -9,7 +9,66 @@
       {{ $t('sprint.edit_sprint') }}
       <SprintStateBadge :sprint="sprint" class="title-state" />
     </template>
-    <form class="sprint-form" @submit.prevent="submit">
+    <!-- Телефон: поля строками в блоках, как в настройках телефона; значение справа -->
+    <form v-if="isMobile" class="ios-form" data-testid="sprint-form-mobile" @submit.prevent="submit">
+      <div class="ios-title">{{ $t('sprint.form.group_sprint') }}</div>
+      <div class="ios-group">
+        <label class="ios-cell">
+          <span class="ios-name">{{ $t('sprint.form.name') }}</span>
+          <input v-model="form.name" type="text" required :placeholder="$t('sprint.form.name_placeholder')" />
+        </label>
+        <label class="ios-cell ios-pick">
+          <span class="ios-name">{{ $t('sprint.form.kind') }}</span>
+          <select v-model="form.is_shared" :disabled="!canChangeKind">
+            <option :value="false">{{ $t('sprint.kind.personal') }}</option>
+            <option :value="true">{{ $t('sprint.kind.shared') }}</option>
+          </select>
+        </label>
+      </div>
+      <div class="ios-footnote">{{ $t(form.is_shared ? 'sprint.kind.shared_hint' : 'sprint.kind.personal_hint') }}</div>
+
+      <div class="ios-title">{{ $t('sprint.form.group_dates') }}</div>
+      <div class="ios-group">
+        <label class="ios-cell ios-pick">
+          <span class="ios-name">{{ $t('sprint.form.start_date') }}</span>
+          <input v-model="form.start_date" type="date" required />
+        </label>
+        <label class="ios-cell ios-pick">
+          <span class="ios-name">{{ $t('sprint.form.due_date') }}</span>
+          <input v-model="form.due_date" type="date" :min="form.start_date" />
+        </label>
+      </div>
+      <div v-if="!datesInOrder" class="ios-footnote ios-error">{{ $t('sprint.form.due_before_start') }}</div>
+
+      <div class="ios-title">{{ $t('sprint.form.group_tasks') }}</div>
+      <div class="ios-group">
+        <label class="ios-cell ios-pick">
+          <span class="ios-name">{{ $t('sprint.form.project') }}</span>
+          <select v-model="form.project_name" @change="onProjectChange">
+            <option value="">—</option>
+            <option v-for="name in projectOptions" :key="name" :value="name">{{ name }}</option>
+          </select>
+        </label>
+        <label class="ios-cell ios-pick" :class="{ disabled: !projectId }">
+          <span class="ios-name">{{ $t('sprint.form.category') }}</span>
+          <select v-model="form.category_name" :disabled="!projectId">
+            <option value="">{{ projectId ? '—' : $t('sprint.form.category_pick_project') }}</option>
+            <option v-for="c in categoryOptions" :key="c" :value="c">{{ c }}</option>
+          </select>
+        </label>
+        <label class="ios-cell">
+          <span class="ios-name">{{ $t('sprint.form.auto_fill') }}</span>
+          <input v-model="form.auto_fill_category" type="checkbox" class="ios-switch" />
+        </label>
+      </div>
+
+      <div class="ios-title">{{ $t('sprint.form.description') }}</div>
+      <div class="ios-group">
+        <textarea v-model="form.description" rows="3" class="ios-text" :placeholder="$t('sprint.form.description_placeholder')"></textarea>
+      </div>
+    </form>
+
+    <form v-else class="sprint-form" @submit.prevent="submit">
       <div class="form-field">
         <label>{{ $t('sprint.form.name') }} *</label>
         <input v-model="form.name" type="text" required />
@@ -91,8 +150,10 @@ import AppButton from '../ui/AppButton.vue'
 import type { Sprint } from '../../stores/sprint'
 import SprintStateBadge from './SprintStateBadge.vue'
 import { useTasksStore } from '../../stores/tasks'
+import { useMobileTasks } from '../../composables/useMobileTasks'
 
 const tasksStore = useTasksStore()
+const { isMobile } = useMobileTasks()
 
 const props = defineProps<{
   visible: boolean
@@ -299,5 +360,142 @@ function submit() {
   .form-field textarea {
     font-size: 16px;
   }
+}
+
+/* Телефон: форма в стиле настроек телефона */
+.ios-title {
+  margin: 0 4px 7px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.ios-group {
+  margin-bottom: 18px;
+  overflow: hidden;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 13px;
+}
+
+.ios-footnote {
+  margin: -11px 6px 18px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.ios-error {
+  color: var(--danger);
+}
+
+.ios-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 16px;
+  color: var(--text-bright);
+  cursor: pointer;
+}
+
+.ios-cell:last-child {
+  border-bottom: 0;
+}
+
+.ios-cell.disabled {
+  opacity: 0.55;
+}
+
+.ios-name {
+  flex: none;
+  max-width: 60%;
+}
+
+/* Значение справа, без рамки; 16px — меньше iOS увеличивает страницу при фокусе */
+.ios-cell input[type="text"],
+.ios-cell input[type="date"],
+.ios-cell select {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 0;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  text-align: right;
+  text-align-last: right;
+  appearance: none;
+  -webkit-appearance: none;
+  outline: none;
+}
+
+.ios-cell input[type="text"] {
+  color: var(--text-bright);
+}
+
+.ios-cell input[type="date"]::-webkit-date-and-time-value {
+  text-align: right;
+}
+
+/* Стрелка у строк с выбором */
+.ios-pick::after {
+  content: '›';
+  flex: none;
+  margin-left: -4px;
+  font-size: 20px;
+  color: var(--text-faint);
+}
+
+/* Переключатель вместо галочки */
+.ios-switch {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: none;
+  width: 46px;
+  height: 28px;
+  margin-left: auto;
+  border-radius: 14px;
+  background: var(--surface-4);
+  transition: background 0.2s;
+  cursor: pointer;
+}
+
+.ios-switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s;
+}
+
+.ios-switch:checked {
+  background: var(--accent);
+}
+
+.ios-switch:checked::after {
+  transform: translateX(18px);
+}
+
+.ios-text {
+  display: block;
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  background: none;
+  color: var(--text-bright);
+  font-size: 16px;
+  resize: vertical;
+  outline: none;
 }
 </style>

@@ -468,6 +468,11 @@
       "shared_hint": "Visible to you and the members of the team you selected. Tasks of a shared sprint leave the backlog."
     },
     "form": {
+      "group_sprint": "Sprint",
+      "group_dates": "Dates",
+      "group_tasks": "Tasks",
+      "name_placeholder": "Sprint name",
+      "description_placeholder": "Sprint goal…",
       "kind": "Sprint kind",
       "name": "Name",
       "project": "Project",
