@@ -171,6 +171,18 @@
   },
   "tasks": {
     "title": "Задачи",
+    "mobile": {
+      "view_cards": "Карточки",
+      "view_deadlines": "Сроки",
+      "buckets": {
+        "overdue": "Просрочено",
+        "today": "Сегодня",
+        "week": "На неделе",
+        "later": "Позже",
+        "none": "Без срока",
+        "closed": "Закрытые"
+      }
+    },
     "filters": {
       "open": "Открытые",
       "testing": "Тестирование",

@@ -171,6 +171,18 @@
   },
   "tasks": {
     "title": "Tasks",
+    "mobile": {
+      "view_cards": "Cards",
+      "view_deadlines": "Deadlines",
+      "buckets": {
+        "overdue": "Overdue",
+        "today": "Today",
+        "week": "This week",
+        "later": "Later",
+        "none": "No due date",
+        "closed": "Closed"
+      }
+    },
     "filters": {
       "open": "Open",
       "testing": "Testing",

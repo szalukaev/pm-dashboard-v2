@@ -1,5 +1,7 @@
 <template>
-  <div class="table-card" :class="{ flat }">
+  <!-- Телефон: вместо таблицы карточки или лента сроков -->
+  <TaskMobileList v-if="isMobile" :tasks="tasks" @open-task="$emit('open-task', $event)" />
+  <div v-else class="table-card" :class="{ flat }">
     <div class="table-scroll">
       <table class="task-table" data-testid="task-table">
         <thead>
@@ -143,6 +145,8 @@ import { useTasksStore } from '../../stores/tasks'
 import { isFlashing } from '../../composables/useFlash'
 import { TASK_COLUMNS, TASKS_TABLE } from './taskColumns'
 import { statusColor, priorityColor } from '../../utils/statusColor'
+import { useMobileTasks } from '../../composables/useMobileTasks'
+import TaskMobileList from './TaskMobileList.vue'
 
 const settingsStore = useSettingsStore()
 const tasksStore = useTasksStore()
@@ -150,6 +154,7 @@ const { showChange, toast } = useSwal()
 const auth = useAuthStore()
 const { t } = useI18n()
 const { settings } = storeToRefs(settingsStore)
+const { isMobile } = useMobileTasks()
 
 // flat: без своей рамки (таблица стоит внутри группы с рамкой)
 defineProps<{ tasks: Task[]; flat?: boolean }>()

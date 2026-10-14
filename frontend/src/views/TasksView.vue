@@ -4,6 +4,22 @@
 
     <TaskFilters />
 
+    <!-- Телефон: переключатель вида списка -->
+    <div v-if="isMobile" class="mobile-mode" role="tablist" data-testid="tasks-mobile-mode">
+      <button
+        v-for="m in MOBILE_MODES"
+        :key="m.value"
+        role="tab"
+        :aria-selected="mode === m.value"
+        :class="{ active: mode === m.value }"
+        :data-testid="'tasks-mode-' + m.value"
+        @click="setMode(m.value)"
+      >
+        <component :is="m.icon" :size="15" />
+        {{ $t(m.label) }}
+      </button>
+    </div>
+
     <!-- Загрузка -->
     <template v-if="loading">
       <div class="skeleton-list">
@@ -71,6 +87,8 @@ import { ref, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTasksStore } from '../stores/tasks'
 import { useLiveRefresh } from '../composables/useLiveRefresh'
+import { useMobileTasks, type TaskMobileMode } from '../composables/useMobileTasks'
+import { LayoutList, CalendarClock } from 'lucide-vue-next'
 import TaskFilters from '../components/tasks/TaskFilters.vue'
 import TaskAccordion from '../components/tasks/TaskAccordion.vue'
 import TaskTable from '../components/tasks/TaskTable.vue'
@@ -83,6 +101,12 @@ const { tasks, groups, loading, error, total, useGrouping, filters, offset, page
 const { fetchTasks, resetFilters, hasActiveFilters } = store
 
 const selectedTaskId = ref<number | null>(null)
+
+const { isMobile, mode, setMode } = useMobileTasks()
+const MOBILE_MODES: { value: TaskMobileMode; label: string; icon: unknown }[] = [
+  { value: 'cards', label: 'tasks.mobile.view_cards', icon: LayoutList },
+  { value: 'deadlines', label: 'tasks.mobile.view_deadlines', icon: CalendarClock },
+]
 
 function openTask(id: number) {
   selectedTaskId.value = id
@@ -122,6 +146,39 @@ onMounted(async () => {
   color: var(--text-bright);
   letter-spacing: -0.4px;
   margin-bottom: 16px;
+}
+
+.mobile-mode {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.mobile-mode button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.mobile-mode button.active {
+  background: var(--bg-card);
+  color: var(--text-bright);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
 }
 
 .skeleton-list {
