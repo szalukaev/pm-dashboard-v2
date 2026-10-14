@@ -9,6 +9,7 @@
         <ChevronDown :size="16" class="chevron" :class="{ collapsed: !isOpen(org.id) }" />
         <Building2 :size="16" class="org-icon" />
         <span class="org-name">{{ org.name }}</span>
+        <span v-if="org.owner" class="org-stat org-owner" :title="$t('payments.owner')">{{ org.owner }}</span>
         <span class="org-stat">{{ $t('payments.org.contracts', { count: orgContracts(org.id).length }) }}</span>
         <span class="org-stat" :title="$t('payments.stats.total_amount')">{{ formatMoney(orgSum(org.id, 'total_amount')) }}</span>
         <span class="org-stat" :title="$t('payments.stats.invoiced')">{{ $t('payments.org.invoiced', { amount: formatMoney(orgSum(org.id, 'invoiced_amount')) }) }}</span>
@@ -17,13 +18,13 @@
         </span>
 
         <div class="org-actions" @click.stop>
-          <button class="action-btn" @click="$emit('add-contract', org.id)" :title="$t('payments.add_contract')" data-testid="org-add-contract">
+          <button v-if="auth.canPayment('contract_create')" class="action-btn" @click="$emit('add-contract', org.id)" :title="$t('payments.add_contract')" data-testid="org-add-contract">
             <Plus :size="14" />
           </button>
-          <button class="action-btn" @click="$emit('edit-org', org)" :title="$t('common.edit')">
+          <button v-if="auth.canPayment('org_edit')" class="action-btn" @click="$emit('edit-org', org)" :title="$t('common.edit')">
             <Pencil :size="14" />
           </button>
-          <button class="action-btn danger-btn" @click="$emit('delete-org', org.id)" :title="$t('common.delete')">
+          <button v-if="auth.canPayment('org_delete')" class="action-btn danger-btn" @click="$emit('delete-org', org.id)" :title="$t('common.delete')">
             <Trash2 :size="14" />
           </button>
         </div>
@@ -69,6 +70,9 @@ import { ChevronDown, Building2, Plus, Pencil, Trash2 } from 'lucide-vue-next'
 import ContractRow from './ContractRow.vue'
 import { formatMoney } from '../../utils/format'
 import type { Organization, Contract } from '../../stores/payments'
+import { useAuthStore } from '../../stores/auth'
+
+const auth = useAuthStore()
 
 const props = defineProps<{
   organizations: Organization[]

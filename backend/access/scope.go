@@ -13,10 +13,11 @@ import (
 // берётся только из него: группы ничего не дают, они сужают (см. limitOf и
 // newScope).
 //
-// Для вкладок, виджетов и действий со спринтами правило другое: группа,
-// которая их задаёт, важнее — так группа может скрыть вкладку от своих
-// участников, что бы ни говорили их собственные права. Несколько таких
-// групп складываются; группа, оставившая «всё», на результат не влияет.
+// Для вкладок, виджетов, действий со спринтами и оплатами, видов Kanban
+// правило другое: если у пользователя есть группы, решают они — так группа
+// может скрыть вкладку от своих участников, что бы ни говорили их
+// собственные права. Несколько групп складываются: разрешено то, что
+// разрешает хотя бы одна, а группа без ограничения открывает всё.
 func effective(individual, template *Permissions, groups []Permissions) Permissions {
 	own := Permissions{OwnTasksOnly: true}
 	switch {
@@ -41,6 +42,20 @@ func effective(individual, template *Permissions, groups []Permissions) Permissi
 	result.SprintActions = groupKeys(groups, func(p Permissions) *[]string { return p.SprintActions }, own.SprintActions)
 	// Виды доски Kanban — по тому же правилу
 	result.KanbanModes = groupKeys(groups, func(p Permissions) *[]string { return p.KanbanModes }, own.KanbanModes)
+	// Действия с оплатами — по тому же правилу
+	result.PaymentActions = groupKeys(groups, func(p Permissions) *[]string { return p.PaymentActions }, own.PaymentActions)
+	// «Только свои оплаты» — по тому же правилу: при группах действует, только
+	// если его ввели все группы, — хватает одной, открывшей все записи. Без
+	// групп решают личные права; не задано и там — только свои, как было до
+	// этой настройки.
+	ownOnly := own.PaymentsOwnOnly == nil || *own.PaymentsOwnOnly
+	if len(groups) > 0 {
+		ownOnly = true
+		for _, g := range groups {
+			ownOnly = ownOnly && g.PaymentsOwnOnly != nil && *g.PaymentsOwnOnly
+		}
+	}
+	result.PaymentsOwnOnly = &ownOnly
 	result.OwnTasksOnly = own.OwnTasksOnly
 	result.ReadOnly = own.ReadOnly
 	result.FromSource = own.FromSource
@@ -48,23 +63,21 @@ func effective(individual, template *Permissions, groups []Permissions) Permissi
 }
 
 // groupKeys возвращает вкладки или виджеты (их выбирает get), заданные
-// группами: сумму по группам, которые их задают, либо own, если таких нет.
+// группами. Права групп складываются: группа без ограничения (nil) открывает
+// всё, иначе разрешено то, что разрешает хотя бы одна. Без групп — own.
 func groupKeys(groups []Permissions, get func(Permissions) *[]string, own *[]string) *[]string {
-	var result *[]string
+	if len(groups) == 0 {
+		return own
+	}
+	result := []string{}
 	for _, g := range groups {
 		keys := get(g)
 		if keys == nil {
-			continue
+			return nil
 		}
-		if result == nil {
-			result = &[]string{}
-		}
-		*result = append(*result, *keys...)
+		result = append(result, *keys...)
 	}
-	if result == nil {
-		return own
-	}
-	return result
+	return &result
 }
 
 // Scope — то, что пользователь видит прямо сейчас: предел, заданный
@@ -81,6 +94,10 @@ type Scope struct {
 	SprintActions *[]string
 	// KanbanModes: nil = доступны оба вида доски Kanban.
 	KanbanModes *[]string
+	// PaymentActions: nil — разрешены все действия с оплатами.
+	PaymentActions *[]string
+	// PaymentsOwnOnly: в «Оплатах» видны только свои записи.
+	PaymentsOwnOnly bool
 
 	// Предел, заданный администратором.
 	AllowedAllProjects bool
@@ -136,6 +153,8 @@ func newScope(userID int, admin bool, perms Permissions, facts userFacts) *Scope
 		s.VisibleTabs, s.Widgets = perms.VisibleTabs, perms.Widgets
 		s.SprintActions = perms.SprintActions
 		s.KanbanModes = perms.KanbanModes
+		s.PaymentActions = perms.PaymentActions
+		s.PaymentsOwnOnly = perms.PaymentsOwnOnly == nil || *perms.PaymentsOwnOnly
 		s.AllowedAllProjects, s.AllowedProjects = perms.AllProjects, perms.ProjectIDs
 		if perms.FromSource {
 			// Ровно проекты источника: участие там задаётся по каждому
@@ -289,6 +308,30 @@ func (s *Scope) CanKanban(mode string) bool {
 		}
 	}
 	return false
+}
+
+// CanPayment сообщает, разрешено ли пользователю действие с оплатами (одна
+// из констант Payment*).
+func (s *Scope) CanPayment(action string) bool {
+	if s.Admin || s.PaymentActions == nil {
+		return true
+	}
+	for _, a := range *s.PaymentActions {
+		if a == action {
+			return true
+		}
+	}
+	return false
+}
+
+// PaymentsOwner возвращает автора, которым ограничены записи «Оплат», или
+// nil, если пользователю видны все записи.
+func (s *Scope) PaymentsOwner() *int {
+	if s.Admin || !s.PaymentsOwnOnly {
+		return nil
+	}
+	id := s.UserID
+	return &id
 }
 
 // FilterProjects оставляет проекты, разрешённые администратором.

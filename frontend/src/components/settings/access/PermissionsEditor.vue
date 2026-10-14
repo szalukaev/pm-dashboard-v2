@@ -141,6 +141,15 @@
           {{ $t('access.editor.tab_hidden', { tab: $t('navigation.' + keys.tab) }) }}
         </p>
 
+        <!-- Оплаты: кроме действий — чьи записи видны -->
+        <label v-if="active === 'payments'" class="pe-row">
+          <span class="pe-row-text">
+            <span class="pe-row-title">{{ $t('access.editor.payments_own') }}</span>
+            <span class="pe-row-hint">{{ $t('access.editor.payments_own_hint') }}</span>
+          </span>
+          <span class="pe-switch"><input type="checkbox" v-model="paymentsOwnOnly" data-testid="perm-payments-own" /><span class="pe-slider"></span></span>
+        </label>
+
         <div class="pe-scope" role="radiogroup">
           <label class="pe-scope-option" :class="{ active: model[keys.field] === null }">
             <input type="radio" :checked="model[keys.field] === null" :data-testid="'perm-all-' + active" @change="setAll(true)" />
@@ -180,9 +189,9 @@
 <script setup lang="ts">
 import { ref, computed, watch, type Component } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { SlidersHorizontal, FolderTree, Users, LayoutGrid, BarChart3, Flag, KanbanSquare } from 'lucide-vue-next'
+import { SlidersHorizontal, FolderTree, Users, LayoutGrid, BarChart3, Flag, KanbanSquare, Wallet } from 'lucide-vue-next'
 import {
-  TABS, WIDGETS, SPRINT_ACTIONS, KANBAN_MODES, projectTree, withDescendants, coveredByParents,
+  TABS, WIDGETS, SPRINT_ACTIONS, KANBAN_MODES, PAYMENT_ACTIONS, projectTree, withDescendants, coveredByParents,
   type Permissions, type ProjectItem, type MemberItem,
 } from '../../../utils/access'
 
@@ -193,12 +202,15 @@ const model = defineModel<Permissions>({ required: true })
 const props = defineProps<{
   projects: ProjectItem[]
   members: MemberItem[]
+  // Права группы: незаданное в ней не ограничивает, в личных правах и
+  // шаблоне незаданное «только свои оплаты» включено
+  group?: boolean
 }>()
 
 const { t } = useI18n()
 
-type SectionId = 'general' | 'projects' | 'team' | 'tabs' | 'widgets' | 'sprints' | 'kanban'
-type KeyField = 'visible_tabs' | 'widgets' | 'sprint_actions' | 'kanban_modes'
+type SectionId = 'general' | 'projects' | 'team' | 'tabs' | 'widgets' | 'sprints' | 'kanban' | 'payments'
+type KeyField = 'visible_tabs' | 'widgets' | 'sprint_actions' | 'kanban_modes' | 'payment_actions'
 
 // Разделы со списком ключей устроены одинаково. tab — вкладка, без которой
 // раздел не действует; min — сколько ключей самое меньшее должно остаться.
@@ -208,7 +220,14 @@ const KEY_SECTIONS: Partial<Record<SectionId, { field: KeyField; all: string[]; 
   sprints: { field: 'sprint_actions', all: SPRINT_ACTIONS, label: 'access.sprint.', tab: 'sprint' },
   // Без единого вида доски вкладка Kanban была бы пустой: один остаётся всегда
   kanban: { field: 'kanban_modes', all: KANBAN_MODES, label: 'access.kanban.', hint: 'access.kanban_hint.', tab: 'kanban', min: 1 },
+  payments: { field: 'payment_actions', all: PAYMENT_ACTIONS, label: 'access.payment.', tab: 'payments' },
 }
+
+// «Только свои оплаты» с учётом незаданного значения (см. group)
+const paymentsOwnOnly = computed({
+  get: () => model.value.payments_own_only ?? !props.group,
+  set: (v: boolean) => { model.value.payments_own_only = v },
+})
 
 const active = ref<SectionId>('general')
 const keys = computed(() => KEY_SECTIONS[active.value])
@@ -245,6 +264,11 @@ const sections = computed(() => {
   if (tabShown('analytics')) list.push({ id: 'widgets', icon: BarChart3, ...keysStatus('widgets', WIDGETS) })
   list.push({ id: 'sprints', icon: Flag, ...keysStatus('sprint_actions', SPRINT_ACTIONS) })
   list.push({ id: 'kanban', icon: KanbanSquare, ...keysStatus('kanban_modes', KANBAN_MODES) })
+  const payments = keysStatus('payment_actions', PAYMENT_ACTIONS)
+  list.push({
+    id: 'payments', icon: Wallet, limited: payments.limited || paymentsOwnOnly.value,
+    status: paymentsOwnOnly.value ? payments.status + ' · ' + t('access.editor.payments_own_short') : payments.status,
+  })
   return list
 })
 

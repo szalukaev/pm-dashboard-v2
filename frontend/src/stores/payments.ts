@@ -11,6 +11,8 @@ export interface Organization {
   inn: string | null
   contact_name: string | null
   contact_phone: string | null
+  // Кто создал запись
+  owner?: string
 }
 
 export interface Contract {
@@ -27,6 +29,8 @@ export interface Contract {
   start_date: string | null
   end_date: string | null
   org_name: string
+  // Кто создал договор
+  owner?: string
   // Сумма договора с НДС
   total_amount: number
   // Сумма счетов с НДС

@@ -273,7 +273,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) accessInfo(userID int) map[string]interface{} {
 	scope, err := (&access.Resolver{DB: h.DB}).Scope(userID)
 	if err != nil {
-		return map[string]interface{}{"visible_tabs": []string{}, "widgets": []string{}, "read_only": true, "sprint_actions": []string{}, "kanban_modes": []string{}}
+		return map[string]interface{}{"visible_tabs": []string{}, "widgets": []string{}, "read_only": true, "sprint_actions": []string{}, "kanban_modes": []string{}, "payment_actions": []string{}, "payments_own_only": true}
 	}
 	return scopeInfo(scope)
 }
@@ -294,12 +294,18 @@ func scopeInfo(scope *access.Scope) map[string]interface{} {
 	if !scope.Admin && scope.KanbanModes != nil {
 		kanbanModes = *scope.KanbanModes
 	}
+	paymentActions := access.PaymentActions
+	if !scope.Admin && scope.PaymentActions != nil {
+		paymentActions = *scope.PaymentActions
+	}
 	return map[string]interface{}{
-		"visible_tabs":   tabs,
-		"widgets":        widgets,
-		"read_only":      scope.ReadOnly,
-		"sprint_actions": sprintActions,
-		"kanban_modes":   kanbanModes,
+		"visible_tabs":      tabs,
+		"widgets":           widgets,
+		"read_only":         scope.ReadOnly,
+		"sprint_actions":    sprintActions,
+		"kanban_modes":      kanbanModes,
+		"payment_actions":   paymentActions,
+		"payments_own_only": scope.PaymentsOwner() != nil,
 	}
 }
 

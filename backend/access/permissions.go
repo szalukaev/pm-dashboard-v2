@@ -1,13 +1,15 @@
 // Package access решает, какие данные пользователь видит и может менять.
 //
 // Права администратор выдаёт лично или через шаблон роли; группы пользователя
-// никогда их не добавляют, а только сужают. Сам пользователь может сузить
+// не добавляют к ним проектов и сотрудников, а только сужают; несколько групп
+// при этом складываются — что разрешает одна, то разрешено. Сам пользователь может сузить
 // итог ещё сильнее в настройках (выбранные проекты и команда), но расширить
 // не может. Каждый обработчик, отдающий данные, получает здесь Scope и
 // фильтрует по нему в SQL.
 package access
 
 import (
+	"database/sql"
 	"encoding/json"
 	"sort"
 )
@@ -39,6 +41,28 @@ const (
 // KanbanModes — виды доски в том порядке, в каком они показаны.
 var KanbanModes = []string{KanbanUsers, KanbanStatuses}
 
+// Действия во вкладке «Оплаты»; каждое разрешается отдельно. Права на счёт
+// проверяются вместе с правом видеть его договор.
+const (
+	PaymentOrgCreate      = "org_create"      // добавить организацию
+	PaymentOrgEdit        = "org_edit"        // изменить организацию
+	PaymentOrgDelete      = "org_delete"      // удалить организацию
+	PaymentContractCreate = "contract_create" // добавить договор
+	PaymentContractEdit   = "contract_edit"   // изменить договор
+	PaymentContractDelete = "contract_delete" // удалить договор
+	PaymentInvoiceCreate  = "invoice_create"  // выставить счёт
+	PaymentInvoiceDelete  = "invoice_delete"  // удалить счёт
+	PaymentInvoicePay     = "invoice_pay"     // отметить оплату
+	PaymentDownload       = "download"        // скачать счёт и выгрузить CSV
+)
+
+// PaymentActions — действия с оплатами в том порядке, в каком они показаны.
+var PaymentActions = []string{
+	PaymentOrgCreate, PaymentOrgEdit, PaymentOrgDelete,
+	PaymentContractCreate, PaymentContractEdit, PaymentContractDelete,
+	PaymentInvoiceCreate, PaymentInvoiceDelete, PaymentInvoicePay, PaymentDownload,
+}
+
 // Permissions — один набор прав: пользователя, группы или шаблона роли.
 type Permissions struct {
 	ProjectIDs []int `json:"project_ids"`
@@ -62,16 +86,23 @@ type Permissions struct {
 	SprintActions *[]string `json:"sprint_actions"`
 	// KanbanModes: nil = оба вида доски, иначе разрешённые.
 	KanbanModes *[]string `json:"kanban_modes"`
+	// PaymentActions: nil — все действия с оплатами, иначе разрешённые.
+	PaymentActions *[]string `json:"payment_actions"`
+	// PaymentsOwnOnly: в «Оплатах» видны только записи, созданные самим
+	// пользователем; false — видны все; nil — не задано (в личных правах и
+	// шаблоне это «только свои», как было до настройки, в группе — все).
+	PaymentsOwnOnly *bool `json:"payments_own_only"`
 }
 
 // Columns — столбцы прав, общие для user_permissions, group_permissions и
 // role_templates, в том порядке, в каком их читает Scan и отдаёт Values.
-const Columns = "project_ids, team_ids, visible_tabs, widgets, all_projects, all_team, own_tasks_only, read_only, from_source, show_unassigned, sprint_actions, kanban_modes"
+const Columns = "project_ids, team_ids, visible_tabs, widgets, all_projects, all_team, own_tasks_only, read_only, from_source, show_unassigned, sprint_actions, kanban_modes, payment_actions, payments_own_only"
 
 // rawPermissions принимает столбцы прав одной строки.
 type rawPermissions struct {
-	projects, team, tabs, widgets, sprint, kanban []byte
-	p                                             Permissions
+	projects, team, tabs, widgets, sprint, kanban, payment []byte
+	ownPayments                                            sql.NullBool
+	p                                                      Permissions
 }
 
 // keyList разбирает JSON-список ключей из столбца, допускающего NULL; NULL — «всё».
@@ -95,11 +126,19 @@ func keyValue(keys *[]string) interface{} {
 	return data
 }
 
+// boolValue готовит флаг к записи в столбец, допускающий NULL.
+func boolValue(v *bool) interface{} {
+	if v == nil {
+		return nil
+	}
+	return *v
+}
+
 // dest возвращает приёмники Scan для столбцов Columns.
 func (r *rawPermissions) dest() []interface{} {
 	return []interface{}{&r.projects, &r.team, &r.tabs, &r.widgets,
 		&r.p.AllProjects, &r.p.AllTeam, &r.p.OwnTasksOnly, &r.p.ReadOnly, &r.p.FromSource, &r.p.ShowUnassigned,
-		&r.sprint, &r.kanban}
+		&r.sprint, &r.kanban, &r.payment, &r.ownPayments}
 }
 
 func (r *rawPermissions) permissions() Permissions {
@@ -110,6 +149,11 @@ func (r *rawPermissions) permissions() Permissions {
 	p.Widgets = keyList(r.widgets)
 	p.SprintActions = keyList(r.sprint)
 	p.KanbanModes = keyList(r.kanban)
+	p.PaymentActions = keyList(r.payment)
+	if r.ownPayments.Valid {
+		own := r.ownPayments.Bool
+		p.PaymentsOwnOnly = &own
+	}
 	return p.Normalized()
 }
 
@@ -120,7 +164,7 @@ func (p Permissions) Values() []interface{} {
 	team, _ := json.Marshal(p.TeamIDs)
 	return []interface{}{projects, team, keyValue(p.VisibleTabs), keyValue(p.Widgets),
 		p.AllProjects, p.AllTeam, p.OwnTasksOnly, p.ReadOnly, p.FromSource, p.ShowUnassigned,
-		keyValue(p.SprintActions), keyValue(p.KanbanModes)}
+		keyValue(p.SprintActions), keyValue(p.KanbanModes), keyValue(p.PaymentActions), boolValue(p.PaymentsOwnOnly)}
 }
 
 // Normalized возвращает набор с отсортированными списками без повторов, с
@@ -132,6 +176,7 @@ func (p Permissions) Normalized() Permissions {
 	p.Widgets = knownKeys(p.Widgets, Widgets)
 	p.SprintActions = knownKeys(p.SprintActions, SprintActions)
 	p.KanbanModes = knownKeys(p.KanbanModes, KanbanModes)
+	p.PaymentActions = knownKeys(p.PaymentActions, PaymentActions)
 	return p
 }
 
@@ -139,9 +184,8 @@ func (p Permissions) Normalized() Permissions {
 // и для команды. Список nil значит, что с этой стороны группы не ограничивают.
 //
 // Несколько групп складываются: разрешено то, что разрешает хотя бы одна.
-// Группа, в которой не названы проекты (или сотрудники), на них не влияет —
-// она может существовать только ради скрытия вкладок, — а группа, которая
-// разрешает все, снимает ограничение.
+// Группа, в которой проекты (или сотрудники) не ограничены — не названы или
+// разрешены все, — снимает ограничение с этой стороны.
 type Limit struct {
 	Projects *[]int
 	Team     *[]int
@@ -149,19 +193,15 @@ type Limit struct {
 
 func limitOf(groups []Permissions) Limit {
 	side := func(all func(Permissions) bool, list func(Permissions) []int) *[]int {
+		if len(groups) == 0 {
+			return nil
+		}
 		var ids []int
-		restricted := false
 		for _, g := range groups {
-			if all(g) {
+			if all(g) || len(list(g)) == 0 {
 				return nil
 			}
-			if len(list(g)) > 0 {
-				restricted = true
-				ids = append(ids, list(g)...)
-			}
-		}
-		if !restricted {
-			return nil
+			ids = append(ids, list(g)...)
 		}
 		ids = uniqueInts(ids)
 		return &ids

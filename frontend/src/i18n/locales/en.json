@@ -444,6 +444,7 @@
       "search_placeholder": "Search by contract or organization…"
     },
     "export_csv": "Export CSV",
+    "owner": "Created by",
     "add_organization": "Add Organization",
     "add_contract": "Add Contract",
     "issue_invoice": "Issue Invoice",
@@ -541,7 +542,9 @@
       "CONTRACT_NOT_FOUND": "The contract is not found",
       "INVOICE_NOT_FOUND": "The invoice is not found",
       "ORGANIZATION_NOT_FOUND": "The organization is not found",
-      "READ_ONLY_MODE": "The system is in read-only mode"
+      "READ_ONLY_MODE": "The system is in read-only mode",
+      "READ_ONLY_USER": "You may only view the data",
+      "PAYMENT_ACTION_FORBIDDEN": "You are not allowed this payment action"
     }
   },
   "notifications": {
@@ -815,6 +818,18 @@
       "close": "Close a sprint",
       "delete": "Delete"
     },
+    "payment": {
+      "org_create": "Organizations: add",
+      "org_edit": "Organizations: edit",
+      "org_delete": "Organizations: delete",
+      "contract_create": "Contracts: add",
+      "contract_edit": "Contracts: edit",
+      "contract_delete": "Contracts: delete",
+      "invoice_create": "Invoices: issue",
+      "invoice_delete": "Invoices: delete",
+      "invoice_pay": "Invoices: record a payment",
+      "download": "Download invoices and export CSV"
+    },
     "errors": {
       "USER_EXISTS": "A user with this login already exists",
       "INVALID_INPUT": "Check the fields",
@@ -887,7 +902,7 @@
       "from_group": "Inherited from group \"{name}\"",
       "effective": "Effective rights",
       "inherited_hint": "The user's own rights come from the role template. They can be set individually — then changes of the template no longer affect this user.",
-      "individual_hint": "Individual rights replace the role template. The user's groups add no access, they only narrow it: what remains is the projects and members allowed both here and in the groups. If tabs, widgets or sprint actions are set in a group of the user, the group's settings apply.",
+      "individual_hint": "Individual rights replace the role template. Groups add no projects or members beyond those allowed here, they only narrow them. When the user has groups, tabs, widgets, sprint and payment actions and Kanban board kinds come from the groups. The rights of several groups add up: whatever at least one allows is available, and a group that does not restrict a section opens it entirely.",
       "set_individually": "Set individually",
       "save_as_template": "Create a template from current rights",
       "reset": "Back to the template",
@@ -899,7 +914,10 @@
       "own_tasks": "Own tasks",
       "own_tasks_hint": "Tasks assigned to the user are always visible, in any project",
       "read_only": "Read only",
-      "read_only_hint": "Data can be viewed, but tasks cannot be changed and comments cannot be written",
+      "read_only_hint": "Data can be viewed, but tasks and payments cannot be changed and comments cannot be written",
+      "payments_own": "Own records only",
+      "payments_own_hint": "Only organizations and contracts created by the user are visible and editable. Otherwise all are visible",
+      "payments_own_short": "own only",
       "from_source": "Projects as in the source system",
       "from_source_hint": "The user gets the projects they are a member of in Redmine and sees only the members Redmine shows them in these projects. The lists are read with their personal API key: projects on every synchronization, members once an hour; until the key is entered there are no such projects.",
       "covered_by_parent": "Covered by the ticked parent project",
@@ -921,7 +939,8 @@
         "tabs": "Tabs",
         "widgets": "Analytics widgets",
         "sprints": "Sprints",
-        "kanban": "Kanban"
+        "kanban": "Kanban",
+        "payments": "Payments"
       },
       "desc": {
         "general": "What the user may do with the data they see.",
@@ -930,7 +949,8 @@
         "tabs": "Which tabs of the dashboard are available. A hidden tab is closed by a direct link as well.",
         "widgets": "Which widgets are shown on the Analytics tab.",
         "sprints": "What the user may do with sprints. Sprints can be viewed without these rights.",
-        "kanban": "Which kinds of the Kanban board the user may open. At least one kind always remains."
+        "kanban": "Which kinds of the Kanban board the user may open. At least one kind always remains.",
+        "payments": "Whose records are visible on the Payments tab and what may be done with them. Payments can be viewed without these rights."
       },
       "all_projects_hint": "including the ones created later",
       "some_projects": "Selected projects",
@@ -940,7 +960,8 @@
         "tabs": "All tabs",
         "widgets": "All widgets",
         "sprints": "All actions",
-        "kanban": "All board kinds"
+        "kanban": "All board kinds",
+        "payments": "All actions"
       },
       "all_hint": "including the ones that appear later",
       "some": "Selected",

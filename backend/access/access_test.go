@@ -62,18 +62,30 @@ func TestEffective(t *testing.T) {
 		}
 	})
 
-	t.Run("a group that sets no tabs or widgets has no say in them", func(t *testing.T) {
-		individual := Permissions{VisibleTabs: keys("analytics"), Widgets: keys("stats")}
-		silent := Permissions{ProjectIDs: []int{1}}
-		got := effective(&individual, nil, []Permissions{silent})
-		if !reflect.DeepEqual(*got.VisibleTabs, []string{"analytics"}) || !reflect.DeepEqual(*got.Widgets, []string{"stats"}) {
-			t.Errorf("tabs = %v, widgets = %v, want the user's own", *got.VisibleTabs, *got.Widgets)
+	t.Run("groups add up: a group without a restriction opens everything", func(t *testing.T) {
+		// В одной группе «Аналитика» скрыта, в другой разрешена — вкладка видна
+		hidden := Permissions{VisibleTabs: keys("tasks")}
+		shown := Permissions{VisibleTabs: keys("tasks", "analytics")}
+		got := effective(nil, nil, []Permissions{hidden, shown})
+		if got.VisibleTabs == nil || !reflect.DeepEqual(*got.VisibleTabs, []string{"tasks", "analytics"}) {
+			t.Errorf("tabs = %v, want tasks and analytics", got.VisibleTabs)
 		}
-		// Виджеты определяет только та группа, которая их задаёт
-		withWidgets := Permissions{Widgets: keys("deadlines")}
-		got = effective(&individual, nil, []Permissions{silent, withWidgets})
-		if !reflect.DeepEqual(*got.Widgets, []string{"deadlines"}) || !reflect.DeepEqual(*got.VisibleTabs, []string{"analytics"}) {
-			t.Errorf("tabs = %v, widgets = %v", *got.VisibleTabs, *got.Widgets)
+		// Группа, где вкладки и виджеты не ограничены, открывает их все
+		open := Permissions{ProjectIDs: []int{1}}
+		got = effective(nil, nil, []Permissions{hidden, open})
+		if got.VisibleTabs != nil || got.Widgets != nil {
+			t.Errorf("tabs = %v, widgets = %v, want every one", got.VisibleTabs, got.Widgets)
+		}
+	})
+
+	t.Run("groups add up for projects: one without a restriction lifts it", func(t *testing.T) {
+		limit := limitOf([]Permissions{{ProjectIDs: []int{1}}, {TeamIDs: []int{5}}})
+		if limit.Projects != nil || limit.Team != nil {
+			t.Errorf("limit = %+v, want none", limit)
+		}
+		limit = limitOf([]Permissions{{ProjectIDs: []int{1}}, {ProjectIDs: []int{2}}})
+		if limit.Projects == nil || !reflect.DeepEqual(*limit.Projects, []int{1, 2}) {
+			t.Errorf("projects = %v, want [1 2]", limit.Projects)
 		}
 	})
 

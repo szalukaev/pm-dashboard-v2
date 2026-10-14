@@ -22,6 +22,10 @@ interface User {
     sprint_actions?: string[]
     // Доступные виды доски Kanban: users, statuses
     kanban_modes?: string[]
+    // Разрешённые действия с оплатами (см. PAYMENT_ACTIONS)
+    payment_actions?: string[]
+    // В «Оплатах» видны только свои записи
+    payments_own_only?: boolean
   }
   // Учётная запись пользователя в источнике данных, привязанная личным
   // ключом API. type — вид источника ('redmine'); needs_token просит ввести ключ.
@@ -112,6 +116,15 @@ export const useAuthStore = defineStore('auth', () => {
     return isAdmin.value || !modes || modes.includes(mode)
   }
 
+  // Пользователю разрешено действие с оплатами (см. PAYMENT_ACTIONS). При
+  // «только чтении» изменения закрыты, скачивание остаётся.
+  function canPayment(action: string): boolean {
+    if (isAdmin.value) return true
+    if (action !== 'download' && !canWrite.value) return false
+    const actions = user.value?.access?.payment_actions
+    return !actions || actions.includes(action)
+  }
+
   // Привязывает пользователя к владельцу личного ключа API источника
   // данных. Сделать это может только сам пользователь и только для себя.
   async function setSourceToken(token: string) {
@@ -125,7 +138,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   return {
-    user, isAuthenticated, isAdmin, canWrite, tabVisible, widgetVisible, canSprint, canKanban,
+    user, isAuthenticated, isAdmin, canWrite, tabVisible, widgetVisible, canSprint, canKanban, canPayment,
     login, logout, fetchMe, changePassword, updateMe, setSourceToken, clearSourceToken,
   }
 })

@@ -13,6 +13,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"pm-dashboard/access"
 	"pm-dashboard/invoice"
 	"pm-dashboard/middleware"
 	"pm-dashboard/utils"
@@ -34,9 +35,10 @@ func (h *PaymentsHandler) ListOrganizations(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	userID := middleware.GetUserID(r)
-	rows, err := (*h.DB).Query(`SELECT id, name, address, inn, contact_name, contact_phone
-		FROM organizations WHERE user_id = $1 ORDER BY name`, userID)
+	rows, err := (*h.DB).Query(`SELECT o.id, o.name, o.address, o.inn, o.contact_name, o.contact_phone,
+		COALESCE(NULLIF(u.display_name, ''), u.username, '')
+		FROM organizations o LEFT JOIN users u ON u.id = o.user_id
+		WHERE `+ownedBy("o.user_id", 1)+` ORDER BY o.name`, paymentsOwner(r))
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
@@ -50,11 +52,13 @@ func (h *PaymentsHandler) ListOrganizations(w http.ResponseWriter, r *http.Reque
 		INN          *string `json:"inn"`
 		ContactName  *string `json:"contact_name"`
 		ContactPhone *string `json:"contact_phone"`
+		// Owner: кто создал запись
+		Owner string `json:"owner"`
 	}
 	var orgs []Org
 	for rows.Next() {
 		var o Org
-		if rows.Scan(&o.ID, &o.Name, &o.Address, &o.INN, &o.ContactName, &o.ContactPhone) == nil {
+		if rows.Scan(&o.ID, &o.Name, &o.Address, &o.INN, &o.ContactName, &o.ContactPhone, &o.Owner) == nil {
 			orgs = append(orgs, o)
 		}
 	}
@@ -67,6 +71,9 @@ func (h *PaymentsHandler) ListOrganizations(w http.ResponseWriter, r *http.Reque
 func (h *PaymentsHandler) CreateOrganization(w http.ResponseWriter, r *http.Request) {
 	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+	if !allowPayment(w, r, access.PaymentOrgCreate) {
 		return
 	}
 
@@ -98,8 +105,10 @@ func (h *PaymentsHandler) UpdateOrganization(w http.ResponseWriter, r *http.Requ
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
 		return
 	}
+	if !allowPayment(w, r, access.PaymentOrgEdit) {
+		return
+	}
 
-	userID := middleware.GetUserID(r)
 	orgID, err := strconv.Atoi(mux.Vars(r)["id"])
 	if err != nil {
 		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
@@ -115,8 +124,8 @@ func (h *PaymentsHandler) UpdateOrganization(w http.ResponseWriter, r *http.Requ
 		utils.Error(w, http.StatusBadRequest, "NO_FIELDS")
 		return
 	}
-	args = append(args, orgID, userID)
-	res, err := (*h.DB).Exec("UPDATE organizations SET "+utils.JoinStrings(sets, ",")+" WHERE id=$"+utils.Itoa(idx)+" AND user_id=$"+utils.Itoa(idx+1), args...)
+	args = append(args, orgID, paymentsOwner(r))
+	res, err := (*h.DB).Exec("UPDATE organizations SET "+utils.JoinStrings(sets, ",")+" WHERE id=$"+utils.Itoa(idx)+" AND "+ownedBy("user_id", idx+1), args...)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 		return
@@ -134,18 +143,17 @@ func (h *PaymentsHandler) DeleteOrganization(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	userID := middleware.GetUserID(r)
+	if !allowPayment(w, r, access.PaymentOrgDelete) {
+		return
+	}
 	orgID, err := strconv.Atoi(mux.Vars(r)["id"])
 	if err != nil {
 		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
 		return
 	}
-	// Договоры не удаляются, а отвязываются от организации
-	if _, err := (*h.DB).Exec("UPDATE contracts SET organization_id = NULL WHERE organization_id = $1 AND user_id = $2", orgID, userID); err != nil {
-		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
-		return
-	}
-	res, err := (*h.DB).Exec("DELETE FROM organizations WHERE id = $1 AND user_id = $2", orgID, userID)
+	// Договоры не удаляются, а отвязываются от организации: так задан
+	// внешний ключ (ON DELETE SET NULL)
+	res, err := (*h.DB).Exec("DELETE FROM organizations WHERE id = $1 AND "+ownedBy("user_id", 2), orgID, paymentsOwner(r))
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "DELETE_FAILED")
 		return
@@ -174,6 +182,8 @@ type paymentContract struct {
 	StartDate      *string `json:"start_date"`
 	EndDate        *string `json:"end_date"`
 	OrgName        string  `json:"org_name"`
+	// Owner: кто создал договор
+	Owner string `json:"owner"`
 	// TotalAmount: сумма договора с НДС.
 	TotalAmount float64 `json:"total_amount"`
 	// InvoicedAmount: сумма счетов с НДС.
@@ -204,11 +214,11 @@ func contractFilterOf(r *http.Request) contractFilter {
 	}
 }
 
-// loadContracts возвращает договоры пользователя с их посчитанным
-// состоянием. Фильтр nil даёт все договоры.
-func (h *PaymentsHandler) loadContracts(userID int, filter *contractFilter) ([]paymentContract, error) {
-	where := []string{"c.user_id = $1"}
-	args := []interface{}{userID}
+// loadContracts возвращает видимые пользователю договоры с их посчитанным
+// состоянием; owner — значение paymentsOwner. Фильтр nil даёт все договоры.
+func (h *PaymentsHandler) loadContracts(owner interface{}, filter *contractFilter) ([]paymentContract, error) {
+	where := []string{ownedBy("c.user_id", 1)}
+	args := []interface{}{owner}
 	if filter != nil && filter.Type != "" {
 		args = append(args, filter.Type)
 		where = append(where, "c.contract_type = $"+utils.Itoa(len(args)))
@@ -223,11 +233,13 @@ func (h *PaymentsHandler) loadContracts(userID int, filter *contractFilter) ([]p
 	rows, err := (*h.DB).Query(`SELECT c.id, c.organization_id, c.contract_type, c.name, c.company_name, c.company_address,
 		c.amount, c.vat_rate, c.contact_name, c.contact_phone, c.start_date, c.end_date,
 		COALESCE(o.name, '') AS org_name,
+		COALESCE(NULLIF(u.display_name, ''), u.username, '') AS owner,
 		COALESCE((SELECT SUM(i.amount * CASE WHEN i.vat_rate = '5' THEN 1.05 ELSE 1 END)
 			FROM invoices i WHERE i.contract_id = c.id), 0) AS invoiced_amount,
 		COALESCE((SELECT SUM(p.amount) FROM contract_payments p
 			JOIN invoices i ON p.invoice_id = i.id WHERE i.contract_id = c.id), 0) AS total_paid
 		FROM contracts c LEFT JOIN organizations o ON c.organization_id = o.id
+		LEFT JOIN users u ON u.id = c.user_id
 		WHERE `+utils.JoinStrings(where, " AND ")+` ORDER BY c.created_at DESC`, args...)
 	if err != nil {
 		return nil, err
@@ -240,7 +252,7 @@ func (h *PaymentsHandler) loadContracts(userID int, filter *contractFilter) ([]p
 		var c paymentContract
 		if err := rows.Scan(&c.ID, &c.OrganizationID, &c.ContractType, &c.Name, &c.CompanyName, &c.CompanyAddress,
 			&c.Amount, &c.VatRate, &c.ContactName, &c.ContactPhone, &c.StartDate, &c.EndDate,
-			&c.OrgName, &c.InvoicedAmount, &c.TotalPaid); err != nil {
+			&c.OrgName, &c.Owner, &c.InvoicedAmount, &c.TotalPaid); err != nil {
 			return nil, err
 		}
 		c.InvoicedAmount = utils.Round2(c.InvoicedAmount)
@@ -266,7 +278,7 @@ func (h *PaymentsHandler) ListContracts(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	filter := contractFilterOf(r)
-	contracts, err := h.loadContracts(middleware.GetUserID(r), &filter)
+	contracts, err := h.loadContracts(paymentsOwner(r), &filter)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
@@ -277,6 +289,9 @@ func (h *PaymentsHandler) ListContracts(w http.ResponseWriter, r *http.Request) 
 func (h *PaymentsHandler) CreateContract(w http.ResponseWriter, r *http.Request) {
 	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+	if !allowPayment(w, r, access.PaymentContractCreate) {
 		return
 	}
 
@@ -299,12 +314,12 @@ func (h *PaymentsHandler) CreateContract(w http.ResponseWriter, r *http.Request)
 		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
 		return
 	}
-	// Данные берутся из организации, если она указана (только своя)
+	// Данные берутся из организации, если она указана (только видимая)
 	if body.OrganizationID != nil {
 		var orgName, orgAddr, orgContact, orgPhone sql.NullString
-		err := (*h.DB).QueryRow("SELECT name, address, contact_name, contact_phone FROM organizations WHERE id=$1 AND user_id=$2", *body.OrganizationID, userID).Scan(&orgName, &orgAddr, &orgContact, &orgPhone)
+		err := (*h.DB).QueryRow("SELECT name, address, contact_name, contact_phone FROM organizations WHERE id=$1 AND "+ownedBy("user_id", 2), *body.OrganizationID, paymentsOwner(r)).Scan(&orgName, &orgAddr, &orgContact, &orgPhone)
 		if err != nil {
-			// Чужая или несуществующая организация — отказ, а не привязка к чужому.
+			// Невидимая или несуществующая организация — отказ, а не привязка к чужому.
 			utils.Error(w, http.StatusNotFound, "ORGANIZATION_NOT_FOUND")
 			return
 		}
@@ -351,8 +366,10 @@ func (h *PaymentsHandler) UpdateContract(w http.ResponseWriter, r *http.Request)
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
 		return
 	}
+	if !allowPayment(w, r, access.PaymentContractEdit) {
+		return
+	}
 
-	userID := middleware.GetUserID(r)
 	contractID, err := strconv.Atoi(mux.Vars(r)["id"])
 	if err != nil {
 		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
@@ -375,8 +392,8 @@ func (h *PaymentsHandler) UpdateContract(w http.ResponseWriter, r *http.Request)
 		utils.Error(w, http.StatusBadRequest, "NO_FIELDS")
 		return
 	}
-	args = append(args, contractID, userID)
-	res, err := (*h.DB).Exec("UPDATE contracts SET "+utils.JoinStrings(sets, ",")+" WHERE id=$"+utils.Itoa(idx)+" AND user_id=$"+utils.Itoa(idx+1), args...)
+	args = append(args, contractID, paymentsOwner(r))
+	res, err := (*h.DB).Exec("UPDATE contracts SET "+utils.JoinStrings(sets, ",")+" WHERE id=$"+utils.Itoa(idx)+" AND "+ownedBy("user_id", idx+1), args...)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 		return
@@ -394,13 +411,15 @@ func (h *PaymentsHandler) DeleteContract(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	userID := middleware.GetUserID(r)
+	if !allowPayment(w, r, access.PaymentContractDelete) {
+		return
+	}
 	contractID, err := strconv.Atoi(mux.Vars(r)["id"])
 	if err != nil {
 		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
 		return
 	}
-	res, err := (*h.DB).Exec("DELETE FROM contracts WHERE id=$1 AND user_id=$2", contractID, userID)
+	res, err := (*h.DB).Exec("DELETE FROM contracts WHERE id=$1 AND "+ownedBy("user_id", 2), contractID, paymentsOwner(r))
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "DELETE_FAILED")
 		return
@@ -420,24 +439,24 @@ func (h *PaymentsHandler) ListInvoices(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID := middleware.GetUserID(r)
 	contractID, err := strconv.Atoi(mux.Vars(r)["id"])
 	if err != nil {
 		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
 		return
 	}
-	// Принадлежность: счета видны только через договор самого пользователя.
+	// Счета видны только через видимый пользователю договор.
+	owner := paymentsOwner(r)
 	limit, offset := pageOf(r)
 	total := 0
 	if err := (*h.DB).QueryRow(`SELECT COUNT(*) FROM invoices i JOIN contracts c ON i.contract_id = c.id
-		WHERE i.contract_id=$1 AND c.user_id=$2`, contractID, userID).Scan(&total); err != nil {
+		WHERE i.contract_id=$1 AND `+ownedBy("c.user_id", 2), contractID, owner).Scan(&total); err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
 	}
 	rows, err := (*h.DB).Query(`SELECT i.id, i.amount, i.vat_rate, i.issued_at, i.paid_amount, i.status,
 			(SELECT MAX(p.paid_at)::text FROM contract_payments p WHERE p.invoice_id = i.id)
 		FROM invoices i JOIN contracts c ON i.contract_id = c.id
-		WHERE i.contract_id=$1 AND c.user_id=$2 ORDER BY i.issued_at DESC, i.id DESC`+pageClause(limit, offset), contractID, userID)
+		WHERE i.contract_id=$1 AND `+ownedBy("c.user_id", 2)+` ORDER BY i.issued_at DESC, i.id DESC`+pageClause(limit, offset), contractID, owner)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
@@ -488,7 +507,9 @@ func (h *PaymentsHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	userID := middleware.GetUserID(r)
+	if !allowPayment(w, r, access.PaymentInvoiceCreate) {
+		return
+	}
 	contractID, err := strconv.Atoi(mux.Vars(r)["id"])
 	if err != nil {
 		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
@@ -500,7 +521,7 @@ func (h *PaymentsHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 		VatRate string
 		Name    string
 	}
-	err = (*h.DB).QueryRow("SELECT amount, vat_rate, name FROM contracts WHERE id=$1 AND user_id=$2", contractID, userID).Scan(&contract.Amount, &contract.VatRate, &contract.Name)
+	err = (*h.DB).QueryRow("SELECT amount, vat_rate, name FROM contracts WHERE id=$1 AND "+ownedBy("user_id", 2), contractID, paymentsOwner(r)).Scan(&contract.Amount, &contract.VatRate, &contract.Name)
 	if err != nil {
 		utils.Error(w, http.StatusNotFound, "CONTRACT_NOT_FOUND")
 		return
@@ -589,11 +610,11 @@ func (h *PaymentsHandler) GetInvoiceItems(w http.ResponseWriter, r *http.Request
 		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
 		return
 	}
-	// Принадлежность: только счёт по договору самого пользователя
+	// Только счёт по видимому пользователю договору
 	var amount float64
 	var contractName string
 	err = (*h.DB).QueryRow(`SELECT i.amount, c.name FROM invoices i JOIN contracts c ON i.contract_id = c.id
-		WHERE i.id=$1 AND c.user_id=$2`, invoiceID, middleware.GetUserID(r)).Scan(&amount, &contractName)
+		WHERE i.id=$1 AND `+ownedBy("c.user_id", 2), invoiceID, paymentsOwner(r)).Scan(&amount, &contractName)
 	if err != nil {
 		utils.Error(w, http.StatusNotFound, "INVOICE_NOT_FOUND")
 		return
@@ -630,15 +651,17 @@ func (h *PaymentsHandler) DeleteInvoice(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	userID := middleware.GetUserID(r)
+	if !allowPayment(w, r, access.PaymentInvoiceDelete) {
+		return
+	}
 	invoiceID, err := strconv.Atoi(mux.Vars(r)["invoiceId"])
 	if err != nil {
 		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
 		return
 	}
-	// Принадлежность: удалить можно только счёт по своему договору.
+	// Удалить можно только счёт по видимому договору.
 	res, err := (*h.DB).Exec(`DELETE FROM invoices WHERE id=$1 AND contract_id IN
-		(SELECT id FROM contracts WHERE user_id=$2)`, invoiceID, userID)
+		(SELECT id FROM contracts WHERE `+ownedBy("user_id", 2)+`)`, invoiceID, paymentsOwner(r))
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "DELETE_FAILED")
 		return
@@ -656,14 +679,16 @@ func (h *PaymentsHandler) PayInvoice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID := middleware.GetUserID(r)
+	if !allowPayment(w, r, access.PaymentInvoicePay) {
+		return
+	}
 	invoiceID, err := strconv.Atoi(mux.Vars(r)["invoiceId"])
 	if err != nil {
 		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
 		return
 	}
 
-	// Принадлежность: оплатить можно только счёт по своему договору.
+	// Оплатить можно только счёт по видимому договору.
 	var inv struct {
 		Amount     float64
 		VatRate    string
@@ -671,7 +696,7 @@ func (h *PaymentsHandler) PayInvoice(w http.ResponseWriter, r *http.Request) {
 	}
 	err = (*h.DB).QueryRow(`SELECT i.amount, i.vat_rate, i.paid_amount
 		FROM invoices i JOIN contracts c ON i.contract_id = c.id
-		WHERE i.id=$1 AND c.user_id=$2`, invoiceID, userID).Scan(&inv.Amount, &inv.VatRate, &inv.PaidAmount)
+		WHERE i.id=$1 AND `+ownedBy("c.user_id", 2), invoiceID, paymentsOwner(r)).Scan(&inv.Amount, &inv.VatRate, &inv.PaidAmount)
 	if err != nil {
 		utils.Error(w, http.StatusNotFound, "INVOICE_NOT_FOUND")
 		return
@@ -746,14 +771,16 @@ func (h *PaymentsHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	userID := middleware.GetUserID(r)
+	if !allowPayment(w, r, access.PaymentDownload) {
+		return
+	}
 	invoiceID, err := strconv.Atoi(mux.Vars(r)["invoiceId"])
 	if err != nil {
 		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
 		return
 	}
 
-	// Счёт с его договором и организацией (только свои)
+	// Счёт с его договором и организацией (только видимые)
 	var issuedAt string
 	var amount float64
 	data := invoice.Data{}
@@ -763,7 +790,7 @@ func (h *PaymentsHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request
 			COALESCE(c.start_date::text, ''), COALESCE(c.end_date::text, '')
 		FROM invoices i JOIN contracts c ON i.contract_id = c.id
 		LEFT JOIN organizations o ON o.id = c.organization_id
-		WHERE i.id=$1 AND c.user_id=$2`, invoiceID, userID).Scan(
+		WHERE i.id=$1 AND `+ownedBy("c.user_id", 2), invoiceID, paymentsOwner(r)).Scan(
 		&amount, &data.VatRate, &issuedAt,
 		&data.ContractName, &data.Company, &data.Address,
 		&data.Phone, &data.Contact, &data.INN,
@@ -812,13 +839,13 @@ func (h *PaymentsHandler) DownloadInvoice(w http.ResponseWriter, r *http.Request
 // ─── Статистика ───
 
 // GetStats возвращает цифры карточек над списком. Они всегда считаются по
-// всем договорам пользователя, что бы ни показывали фильтры.
+// всем видимым пользователю договорам, что бы ни показывали фильтры.
 func (h *PaymentsHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
 		return
 	}
-	contracts, err := h.loadContracts(middleware.GetUserID(r), nil)
+	contracts, err := h.loadContracts(paymentsOwner(r), nil)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
@@ -852,8 +879,11 @@ func (h *PaymentsHandler) ExportCSV(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
 		return
 	}
+	if !allowPayment(w, r, access.PaymentDownload) {
+		return
+	}
 	filter := contractFilterOf(r)
-	contracts, err := h.loadContracts(middleware.GetUserID(r), &filter)
+	contracts, err := h.loadContracts(paymentsOwner(r), &filter)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
@@ -911,6 +941,33 @@ func contractsCSV(contracts []paymentContract, today string) [][]string {
 }
 
 // ─── Вспомогательное ───
+
+// paymentsOwner возвращает параметр для ownedBy: автора, если пользователю
+// видны только свои записи, иначе NULL — видны все.
+func paymentsOwner(r *http.Request) interface{} {
+	if id := middleware.GetScope(r).PaymentsOwner(); id != nil {
+		return *id
+	}
+	return nil
+}
+
+// ownedBy — условие видимости записи «Оплат»: column — столбец автора, n —
+// номер параметра со значением paymentsOwner.
+func ownedBy(column string, n int) string {
+	p := "$" + utils.Itoa(n)
+	return "(" + p + "::int IS NULL OR " + column + " = " + p + ")"
+}
+
+// allowPayment проверяет действие с оплатами (одна из констант
+// access.Payment*) и отвечает 403, если оно запрещено.
+func allowPayment(w http.ResponseWriter, r *http.Request, action string) bool {
+	if middleware.GetScope(r).CanPayment(action) {
+		return true
+	}
+	slog.Warn("Payment action outside of user rights", "user", middleware.GetUserID(r), "action", action)
+	utils.Error(w, http.StatusForbidden, "PAYMENT_ACTION_FORBIDDEN")
+	return false
+}
 
 func buildUpdateSets(body map[string]interface{}, allowed map[string]bool, startIdx int) ([]string, []interface{}, int) {
 	sets := []string{}

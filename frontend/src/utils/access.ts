@@ -22,6 +22,11 @@ export interface Permissions {
   sprint_actions: string[] | null
   // Доступные виды доски Kanban; null = оба
   kanban_modes: string[] | null
+  // Разрешённые действия с оплатами; null — все действия
+  payment_actions: string[] | null
+  // В «Оплатах» только записи, созданные самим пользователем; null — не задано
+  // (в личных правах это «только свои», в группе ограничения нет)
+  payments_own_only: boolean | null
 }
 
 export interface NamedPermissions {
@@ -58,6 +63,12 @@ export const SPRINT_ACTIONS = ['create', 'edit', 'tasks', 'close', 'delete']
 // Виды доски Kanban: users — по сотрудникам, statuses — по проектам (статусы
 // одного проекта); подписи — access.kanban.<вид>
 export const KANBAN_MODES = ['users', 'statuses']
+// Действия с оплатами по сущностям; подписи — access.payment.<действие>
+export const PAYMENT_ACTIONS = [
+  'org_create', 'org_edit', 'org_delete',
+  'contract_create', 'contract_edit', 'contract_delete',
+  'invoice_create', 'invoice_delete', 'invoice_pay', 'download',
+]
 
 export function emptyPermissions(): Permissions {
   return {
@@ -73,6 +84,8 @@ export function emptyPermissions(): Permissions {
     widgets: null,
     sprint_actions: null,
     kanban_modes: null,
+    payment_actions: null,
+    payments_own_only: null,
   }
 }
 
@@ -85,6 +98,7 @@ export function clonePermissions(p: Permissions): Permissions {
     widgets: p.widgets ? [...p.widgets] : null,
     sprint_actions: p.sprint_actions ? [...p.sprint_actions] : null,
     kanban_modes: p.kanban_modes ? [...p.kanban_modes] : null,
+    payment_actions: p.payment_actions ? [...p.payment_actions] : null,
   }
 }
 

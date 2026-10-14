@@ -3,10 +3,10 @@
     <div class="view-header">
       <h1 class="page-title">{{ $t('payments.title') }}</h1>
       <div class="header-actions">
-        <AppButton variant="ghost" @click="exportCSV" data-testid="export-csv">
+        <AppButton v-if="auth.canPayment('download')" variant="ghost" @click="exportCSV" data-testid="export-csv">
           <Download :size="14" /> {{ $t('payments.export_csv') }}
         </AppButton>
-        <AppButton variant="primary" @click="showOrgForm = true" data-testid="add-org">
+        <AppButton v-if="auth.canPayment('org_create')" variant="primary" @click="showOrgForm = true" data-testid="add-org">
           + {{ $t('payments.add_organization') }}
         </AppButton>
       </div>
@@ -189,6 +189,7 @@ import { storeToRefs } from 'pinia'
 import { Download } from 'lucide-vue-next'
 import { usePaymentsStore, type Organization, type Contract, type Invoice, type InvoiceLine } from '../stores/payments'
 import { useSwal } from '../composables/useSwal'
+import { useAuthStore } from '../stores/auth'
 import { formatMoney } from '../utils/format'
 import { invoiceActionsKey } from '../components/payments/invoiceActions'
 import PaymentStats from '../components/payments/PaymentStats.vue'
@@ -202,6 +203,7 @@ import AppSpinner from '../components/ui/AppSpinner.vue'
 import AppConfirmDialog from '../components/ui/AppConfirmDialog.vue'
 
 const store = usePaymentsStore()
+const auth = useAuthStore()
 const { organizations, contracts, stats, loading, error, filterType } = storeToRefs(store)
 const { fetchAll } = store
 const { t, te } = useI18n()

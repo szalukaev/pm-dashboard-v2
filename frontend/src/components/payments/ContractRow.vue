@@ -5,7 +5,7 @@
       <span class="type-badge" :class="contract.contract_type" :title="$t('payments.contract_types.' + contract.contract_type)">
         {{ $t('payments.contract_types_short.' + contract.contract_type) }}
       </span>
-      <span class="contract-name" :title="contract.name">{{ contract.name }}</span>
+      <span class="contract-name" :title="contract.owner ? contract.name + ' — ' + contract.owner : contract.name">{{ contract.name }}</span>
       <span class="amount" :title="$t('payments.contract.amount_with_vat')">{{ formatMoney(contract.total_amount) }}</span>
       <span class="invoiced" :title="$t('payments.stats.invoiced')">{{ formatMoney(contract.invoiced_amount) }}</span>
       <span class="debt" :class="{ 'has-debt': contract.debt_amount > 0 }" :title="$t('payments.stats.debt')">
@@ -17,13 +17,13 @@
       </span>
 
       <div class="row-actions" @click.stop>
-        <button class="action-btn" @click="$emit('issue-invoice')" :title="$t('payments.issue_invoice')" data-testid="contract-issue-invoice">
+        <button v-if="auth.canPayment('invoice_create')" class="action-btn" @click="$emit('issue-invoice')" :title="$t('payments.issue_invoice')" data-testid="contract-issue-invoice">
           <Receipt :size="14" />
         </button>
-        <button class="action-btn" @click="$emit('edit')" :title="$t('common.edit')">
+        <button v-if="auth.canPayment('contract_edit')" class="action-btn" @click="$emit('edit')" :title="$t('common.edit')">
           <Pencil :size="14" />
         </button>
-        <button class="action-btn danger-btn" @click="$emit('delete')" :title="$t('common.delete')">
+        <button v-if="auth.canPayment('contract_delete')" class="action-btn danger-btn" @click="$emit('delete')" :title="$t('common.delete')">
           <Trash2 :size="14" />
         </button>
       </div>
@@ -41,6 +41,9 @@ import { ChevronDown, AlertCircle, Receipt, Pencil, Trash2 } from 'lucide-vue-ne
 import InvoiceTable from './InvoiceTable.vue'
 import { formatMoney, formatDate } from '../../utils/format'
 import type { Contract } from '../../stores/payments'
+import { useAuthStore } from '../../stores/auth'
+
+const auth = useAuthStore()
 
 defineProps<{ contract: Contract }>()
 defineEmits(['edit', 'delete', 'issue-invoice'])

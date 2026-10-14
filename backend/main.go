@@ -360,20 +360,22 @@ func main() {
 	api.HandleFunc("/notifications/read-all", notificationsH.MarkAllRead).Methods("POST")
 	api.HandleFunc("/notifications/{id}/read", notificationsH.MarkRead).Methods("POST")
 
-	// Оплаты
+	// Оплаты. Изменения закрыты для «только чтения», отдельные действия
+	// проверяют сами обработчики по правам на оплаты.
+	write := func(f http.HandlerFunc) http.Handler { return middleware.RequireWrite(f) }
 	api.HandleFunc("/organizations", paymentsH.ListOrganizations).Methods("GET")
-	api.HandleFunc("/organizations", paymentsH.CreateOrganization).Methods("POST")
-	api.HandleFunc("/organizations/{id}", paymentsH.UpdateOrganization).Methods("PUT")
-	api.HandleFunc("/organizations/{id}", paymentsH.DeleteOrganization).Methods("DELETE")
+	api.Handle("/organizations", write(paymentsH.CreateOrganization)).Methods("POST")
+	api.Handle("/organizations/{id}", write(paymentsH.UpdateOrganization)).Methods("PUT")
+	api.Handle("/organizations/{id}", write(paymentsH.DeleteOrganization)).Methods("DELETE")
 	api.HandleFunc("/contracts", paymentsH.ListContracts).Methods("GET")
-	api.HandleFunc("/contracts", paymentsH.CreateContract).Methods("POST")
-	api.HandleFunc("/contracts/{id}", paymentsH.UpdateContract).Methods("PUT")
-	api.HandleFunc("/contracts/{id}", paymentsH.DeleteContract).Methods("DELETE")
+	api.Handle("/contracts", write(paymentsH.CreateContract)).Methods("POST")
+	api.Handle("/contracts/{id}", write(paymentsH.UpdateContract)).Methods("PUT")
+	api.Handle("/contracts/{id}", write(paymentsH.DeleteContract)).Methods("DELETE")
 	api.HandleFunc("/contracts/{id}/invoices", paymentsH.ListInvoices).Methods("GET")
-	api.HandleFunc("/contracts/{id}/invoices", paymentsH.CreateInvoice).Methods("POST")
-	api.HandleFunc("/contracts/{id}/invoices/{invoiceId}", paymentsH.DeleteInvoice).Methods("DELETE")
+	api.Handle("/contracts/{id}/invoices", write(paymentsH.CreateInvoice)).Methods("POST")
+	api.Handle("/contracts/{id}/invoices/{invoiceId}", write(paymentsH.DeleteInvoice)).Methods("DELETE")
 	api.HandleFunc("/contracts/{id}/invoices/{invoiceId}/items", paymentsH.GetInvoiceItems).Methods("GET")
-	api.HandleFunc("/contracts/{id}/invoices/{invoiceId}/pay", paymentsH.PayInvoice).Methods("POST")
+	api.Handle("/contracts/{id}/invoices/{invoiceId}/pay", write(paymentsH.PayInvoice)).Methods("POST")
 	api.HandleFunc("/contracts/{id}/invoices/{invoiceId}/download", paymentsH.DownloadInvoice).Methods("GET")
 	api.HandleFunc("/contracts/export/csv", paymentsH.ExportCSV).Methods("GET")
 	api.HandleFunc("/payments/stats", paymentsH.GetStats).Methods("GET")

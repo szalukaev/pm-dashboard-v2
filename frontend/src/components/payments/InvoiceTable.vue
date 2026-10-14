@@ -29,16 +29,16 @@
             <span class="status-badge" :class="inv.status">{{ statusLabel(inv.status) }}</span>
           </td>
           <td class="actions-cell">
-            <button v-if="inv.status !== 'paid'" class="action-btn" :title="$t('payments.invoice.pay')" data-testid="invoice-pay" @click="actions?.pay(contractId, inv)">
+            <button v-if="inv.status !== 'paid' && auth.canPayment('invoice_pay')" class="action-btn" :title="$t('payments.invoice.pay')" data-testid="invoice-pay" @click="actions?.pay(contractId, inv)">
               <CreditCard :size="14" />
             </button>
-            <button class="action-btn" :title="$t('payments.invoice.download')" data-testid="invoice-download" @click="actions?.download(contractId, inv)">
+            <button v-if="auth.canPayment('download')" class="action-btn" :title="$t('payments.invoice.download')" data-testid="invoice-download" @click="actions?.download(contractId, inv)">
               <Download :size="14" />
             </button>
-            <button class="action-btn" :title="$t('payments.invoice.copy')" data-testid="invoice-copy" @click="actions?.copy(contractId, inv)">
+            <button v-if="auth.canPayment('invoice_create')" class="action-btn" :title="$t('payments.invoice.copy')" data-testid="invoice-copy" @click="actions?.copy(contractId, inv)">
               <Copy :size="14" />
             </button>
-            <button class="action-btn danger-btn" :title="$t('common.delete')" data-testid="invoice-delete" @click="actions?.remove(contractId, inv)">
+            <button v-if="auth.canPayment('invoice_delete')" class="action-btn danger-btn" :title="$t('common.delete')" data-testid="invoice-delete" @click="actions?.remove(contractId, inv)">
               <Trash2 :size="14" />
             </button>
           </td>
@@ -70,6 +70,7 @@ import { useSettingsStore } from '../../stores/settings'
 import { usePaymentsStore, type Invoice } from '../../stores/payments'
 import { formatMoney, formatDate } from '../../utils/format'
 import { invoiceActionsKey } from './invoiceActions'
+import { useAuthStore } from '../../stores/auth'
 
 const props = defineProps<{ contractId: number }>()
 
@@ -78,6 +79,7 @@ const { t, te } = useI18n()
 const actions = inject(invoiceActionsKey)
 
 const store = usePaymentsStore()
+const auth = useAuthStore()
 const settingsStore = useSettingsStore()
 const PAGE_TABLE = 'payments_table'
 const pageSize = computed(() => settingsStore.pageSize(PAGE_TABLE))

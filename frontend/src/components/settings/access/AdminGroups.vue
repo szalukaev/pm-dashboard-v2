@@ -84,7 +84,7 @@
 
       <div v-show="editTab === 'rights'">
         <p class="adm-hint">{{ $t('access.groups.rights_hint') }}</p>
-        <PermissionsEditor v-model="edit.permissions" :projects="projects" :members="members" />
+        <PermissionsEditor v-model="edit.permissions" :projects="projects" :members="members" group />
       </div>
 
       <div v-show="editTab === 'general'" class="adm-form">
