@@ -193,4 +193,35 @@ function orgSum(orgId: number, field: 'total_amount' | 'invoiced_amount' | 'debt
 .org-stat.has-debt {
   color: var(--danger);
 }
+
+/* Телефон: название и кнопки в первой строке, цифры организации — под ними */
+@media (max-width: 768px) {
+  .org-header {
+    flex-wrap: wrap;
+    row-gap: 4px;
+    padding: 12px 14px;
+  }
+
+  .org-name {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .org-stat {
+    order: 2;
+    margin-left: 0;
+    font-size: 11.5px;
+    white-space: nowrap;
+  }
+
+  /* Разрыв строки: цифры идут после него, кнопки остаются в первой строке */
+  .org-header::after {
+    content: '';
+    order: 1;
+    flex-basis: 100%;
+  }
+}
 </style>

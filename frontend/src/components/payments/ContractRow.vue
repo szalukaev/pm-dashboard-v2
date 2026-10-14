@@ -6,10 +6,13 @@
         {{ $t('payments.contract_types_short.' + contract.contract_type) }}
       </span>
       <span class="contract-name" :title="contract.owner ? contract.name + ' — ' + contract.owner : contract.name">{{ contract.name }}</span>
+      <!-- На компьютере обёртка не влияет на раскладку; на телефоне суммы — отдельной строкой в три колонки -->
+      <span class="amounts">
       <span class="amount" :title="$t('payments.contract.amount_with_vat')" :data-label="$t('payments.stats.total_amount')">{{ formatMoney(contract.total_amount) }}</span>
       <span class="invoiced" :title="$t('payments.stats.invoiced')" :data-label="$t('payments.stats.invoiced')">{{ formatMoney(contract.invoiced_amount) }}</span>
       <span class="debt" :class="{ 'has-debt': contract.debt_amount > 0 }" :title="$t('payments.stats.debt')" :data-label="$t('payments.stats.debt')">
         {{ formatMoney(contract.debt_amount) }}
+      </span>
       </span>
       <span class="end-date" v-if="contract.end_date">
         <span v-if="contract.is_overdue" class="overdue-icon" :title="$t('payments.contract.overdue')"><AlertCircle :size="12" /></span>
@@ -182,6 +185,10 @@ const expanded = ref(false)
   padding: 0 16px 12px 40px;
 }
 
+.amounts {
+  display: contents;
+}
+
 /* Телефон: название во всю ширину, под ним три суммы с подписями */
 @media (max-width: 768px) {
   .row-main {
@@ -190,17 +197,26 @@ const expanded = ref(false)
     padding: 12px 14px;
   }
   .contract-name {
-    flex: 1 1 calc(100% - 140px);
+    flex: 1 1 0;
     min-width: 0;
     white-space: normal;
     font-weight: 600;
     color: var(--text-bright);
   }
+  /* Суммы — своей строкой под названием, каждая в своей колонке */
+  .amounts {
+    order: 2;
+    flex: 1 1 100%;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
   .amount, .invoiced, .debt {
-    flex: 1 1 0;
     min-width: 0;
     text-align: left;
-    font-size: 13px;
+    font-size: 12.5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .amount::before, .invoiced::before, .debt::before {
     content: attr(data-label);
@@ -212,7 +228,8 @@ const expanded = ref(false)
     color: var(--text-muted);
   }
   .end-date {
-    order: 1;
+    order: 3;
+    min-width: 0;
   }
 }
 </style>
