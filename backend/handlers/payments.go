@@ -444,8 +444,19 @@ func (h *PaymentsHandler) ListInvoices(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
 		return
 	}
-	// Счета видны только через видимый пользователю договор.
+	// Счета видны только через видимый пользователю договор; невидимый или
+	// несуществующий договор — 404, как в остальных обработчиках оплат
 	owner := paymentsOwner(r)
+	var visible bool
+	if err := (*h.DB).QueryRow(`SELECT EXISTS(SELECT 1 FROM contracts c WHERE c.id = $1 AND `+ownedBy("c.user_id", 2)+`)`,
+		contractID, owner).Scan(&visible); err != nil {
+		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
+		return
+	}
+	if !visible {
+		utils.Error(w, http.StatusNotFound, "CONTRACT_NOT_FOUND")
+		return
+	}
 	limit, offset := pageOf(r)
 	total := 0
 	if err := (*h.DB).QueryRow(`SELECT COUNT(*) FROM invoices i JOIN contracts c ON i.contract_id = c.id
