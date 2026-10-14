@@ -988,7 +988,7 @@
       "own_tasks": "Own tasks",
       "own_tasks_hint": "Tasks assigned to the user are always visible, in any project",
       "read_only": "Read only",
-      "read_only_hint": "Data can be viewed, but tasks and payments cannot be changed and comments cannot be written",
+      "read_only_hint": "Data can be viewed, but tasks, payments and sprints cannot be changed and comments cannot be written",
       "payments_own": "Own records only",
       "payments_own_hint": "Only organizations and contracts created by the user are visible and editable. Otherwise all are visible",
       "payments_own_short": "own only",
