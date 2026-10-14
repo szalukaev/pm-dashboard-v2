@@ -51,6 +51,19 @@ func TestRequireTabs(t *testing.T) {
 	}
 }
 
+// «Только чтение» закрывает спринты, даже если действие разрешено
+func TestRequireSprintReadOnly(t *testing.T) {
+	ok := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
+	h := RequireSprint(access.SprintCreate, ok)
+
+	if got := serve(h, "POST", "/api/sprints", &access.Scope{}); got != http.StatusOK {
+		t.Errorf("writer: status = %d", got)
+	}
+	if got := serve(h, "POST", "/api/sprints", &access.Scope{ReadOnly: true}); got != http.StatusForbidden {
+		t.Errorf("read-only user: status = %d", got)
+	}
+}
+
 func TestRequireWrite(t *testing.T) {
 	ok := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
 	h := RequireWrite(ok)

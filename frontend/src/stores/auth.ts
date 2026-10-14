@@ -104,10 +104,13 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // Пользователю разрешено действие со спринтами (create | edit | tasks | close | delete)
+  // Пользователю разрешено действие со спринтами (create | edit | tasks | close | delete).
+  // «Только чтение» закрывает их все.
   function canSprint(action: string): boolean {
+    if (isAdmin.value) return true
+    if (!canWrite.value) return false
     const actions = user.value?.access?.sprint_actions
-    return isAdmin.value || !actions || actions.includes(action)
+    return !actions || actions.includes(action)
   }
 
   // Пользователю доступен вид доски Kanban (users | statuses)

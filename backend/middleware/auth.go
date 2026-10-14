@@ -154,6 +154,11 @@ func RequireTabs(rules []TabRule) func(http.Handler) http.Handler {
 // действие со спринтами (константы access.Sprint*).
 func RequireSprint(action string, next http.HandlerFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// «Только чтение» закрывает и спринты, какие бы действия ни были разрешены
+		if GetScope(r).ReadOnly {
+			http.Error(w, `{"error":"READ_ONLY_USER"}`, http.StatusForbidden)
+			return
+		}
 		if !GetScope(r).CanSprint(action) {
 			slog.Warn("Sprint action outside of user rights", "user", GetUserID(r), "action", action, "path", r.URL.Path)
 			http.Error(w, `{"error":"SPRINT_ACTION_FORBIDDEN"}`, http.StatusForbidden)

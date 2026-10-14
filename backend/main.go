@@ -345,11 +345,12 @@ func main() {
 	api.HandleFunc("/sprints", sprintH.ListSprints).Methods("GET")
 	// Каждое действие со спринтами — отдельное право. Изменение спринта
 	// проверяется внутри обработчика: это «edit» или «close» в зависимости
-	// от того, что меняется.
+	// от того, что меняется. «Только чтение» закрывает все изменения
+	// спринтов: RequireSprint отклоняет его сам, изменение — RequireWrite.
 	api.Handle("/sprints", middleware.RequireSprint(access.SprintCreate, sprintH.CreateSprint)).Methods("POST")
 	api.HandleFunc("/sprints/backlog", sprintH.GetBacklog).Methods("GET")
 	api.HandleFunc("/sprints/{id}", sprintH.GetSprint).Methods("GET")
-	api.HandleFunc("/sprints/{id}", sprintH.UpdateSprint).Methods("PUT")
+	api.Handle("/sprints/{id}", middleware.RequireWrite(http.HandlerFunc(sprintH.UpdateSprint))).Methods("PUT")
 	api.Handle("/sprints/{id}", middleware.RequireSprint(access.SprintDelete, sprintH.DeleteSprint)).Methods("DELETE")
 	api.Handle("/sprints/{id}/assign", middleware.RequireSprint(access.SprintTasks, sprintH.AssignTask)).Methods("POST")
 	api.Handle("/sprints/{id}/assign/{issueId}", middleware.RequireSprint(access.SprintTasks, sprintH.UnassignTask)).Methods("DELETE")
