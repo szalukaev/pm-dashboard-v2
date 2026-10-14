@@ -508,7 +508,7 @@ async function saveField(field: keyof typeof editFields) {
       return
     }
     t[field] = field === 'estimated_hours' && value !== null ? Number(value) : value
-    showChange(String(old ?? '—'), String(value ?? '—'), `#${task.value.external_id} — ${i18n.t(fieldLabels[field])}`)
+    showChange(String(old ?? '—'), String(value ?? '—'), i18n.t(fieldLabels[field]), task.value.external_id)
   } catch {
     editFields[field] = old ?? ''
     swalError(i18n.t('tasks.messages.save_error'))

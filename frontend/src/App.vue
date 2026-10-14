@@ -2,6 +2,9 @@
   <div id="app">
     <router-view />
 
+    <!-- Всплывающие уведомления (стопка в правом верхнем углу) -->
+    <AppToast />
+
     <!-- Окно обязательной смены пароля -->
     <AppModal
       :model-value="showForceChange"
@@ -58,6 +61,7 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from './stores/auth'
 import AppModal from './components/ui/AppModal.vue'
 import AppButton from './components/ui/AppButton.vue'
+import AppToast from './components/ui/AppToast.vue'
 import SourceTokenForm from './components/settings/SourceTokenForm.vue'
 
 const { t } = useI18n()

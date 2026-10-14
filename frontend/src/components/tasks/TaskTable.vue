@@ -183,7 +183,7 @@ async function saveInlineEdit(task: Task, field: string, value: string) {
       toast(t('tasks.messages.redmine_sync_error') + ': ' + (result.redmine_error || ''), 'error')
       return
     }
-    showChange(oldNormalized || '—', value || '—', `#${task.external_id} — ${fieldLabels[field] ? t(fieldLabels[field]) : field}`)
+    showChange(oldNormalized || '—', value || '—', fieldLabels[field] ? t(fieldLabels[field]) : field, task.external_id)
   } catch {
     ;(task as any)[field] = oldValue
     toast(t('tasks.messages.save_error'), 'error')

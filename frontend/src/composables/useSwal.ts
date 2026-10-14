@@ -1,5 +1,6 @@
 import Swal from 'sweetalert2'
 import i18n from '../i18n'
+import { useToast, type ToastType } from './useToast'
 
 // Настройки SweetAlert2 по умолчанию, соответствующие UI-гайду
 const swalDefaults = {
@@ -36,34 +37,16 @@ export function useSwal() {
     })
   }
 
-  function showChange(oldValue: string, newValue: string, header?: string) {
-    return Swal.fire({
-      toast: true,
-      position: 'top-end',
-      icon: 'success',
-      title: `${header ? `<div style="font-size:11px;color:#94a3b8;margin-bottom:2px">${header}</div>` : ''}<div style="font-size:13px"><span style="color:#999;text-decoration:line-through">${oldValue}</span> <span style="color:#fff;margin:0 4px">→</span> <span style="color:#4ade80;font-weight:600">${newValue}</span></div>`,
-      showConfirmButton: false,
-      timer: 3000,
-      timerProgressBar: true,
-      background: '#1e293b',
-      color: '#f1f5f9',
-      customClass: { popup: 'toast-beautiful' },
-    })
+  // Всплывающие уведомления показывает своя стопка (AppToast), а не SweetAlert2:
+  // она берёт цвета из токенов и меняется вместе с темой
+  const toasts = useToast()
+
+  function showChange(oldValue: string, newValue: string, field?: string, taskId?: string | number) {
+    toasts.showChange({ oldValue, newValue, field, taskId })
   }
 
-  function toast(message: string, type: 'success' | 'error' | 'info' = 'success') {
-    return Swal.fire({
-      toast: true,
-      position: 'top-end',
-      icon: type,
-      title: `<div style="font-size:13px">${message}</div>`,
-      showConfirmButton: false,
-      timer: 2500,
-      timerProgressBar: true,
-      background: type === 'error' ? '#7f1d1d' : '#1e293b',
-      color: '#f1f5f9',
-      customClass: { popup: 'toast-beautiful' },
-    })
+  function toast(message: string, type: ToastType = 'success') {
+    toasts.show(message, type)
   }
 
   return { fire, success, error, confirm, showChange, toast, Swal }

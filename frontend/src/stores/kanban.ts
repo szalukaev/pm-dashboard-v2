@@ -126,7 +126,8 @@ export const useKanbanStore = defineStore('kanban', () => {
       showChange(
         columnTitle(sourceCol),
         columnTitle(targetCol),
-        `#${issueId} — ${t(byStatuses ? 'tasks.fields.status' : 'tasks.fields.assignee')}`,
+        t(byStatuses ? 'tasks.fields.status' : 'tasks.fields.assignee'),
+        issueId,
       )
     } catch (e: any) {
       // Источник данных не принял изменение: на место возвращается только
