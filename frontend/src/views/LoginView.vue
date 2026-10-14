@@ -1,47 +1,51 @@
 <template>
   <div class="login-overlay">
-    <div class="login-card">
-      <h2 class="login-title">{{ $t('auth.login_title') }}</h2>
-      <p class="login-subtitle">{{ $t('auth.login_subtitle') }}</p>
+    <LoginBoard class="login-backdrop" />
+    <div class="login-veil"></div>
+    <div class="login-center">
+      <div class="login-card">
+        <h2 class="login-title">{{ greeting }}</h2>
 
-      <form @submit.prevent="handleLogin" class="login-form">
-        <div class="form-field">
-          <label>{{ $t('auth.username') }}</label>
-          <input
-            v-model="username"
-            type="text"
-            :placeholder="$t('auth.username')"
-            data-testid="login-username"
-            autocomplete="username"
-          />
-        </div>
+        <form @submit.prevent="handleLogin" class="login-form">
+          <div class="form-field">
+            <label>{{ $t('auth.username') }}</label>
+            <input
+              v-model="username"
+              type="text"
+              :placeholder="$t('auth.username')"
+              data-testid="login-username"
+              autocomplete="username"
+            />
+          </div>
 
-        <div class="form-field">
-          <label>{{ $t('auth.password') }}</label>
-          <input
-            v-model="password"
-            type="password"
-            :placeholder="$t('auth.password')"
-            data-testid="login-password"
-            autocomplete="current-password"
-          />
-        </div>
+          <div class="form-field">
+            <label>{{ $t('auth.password') }}</label>
+            <input
+              v-model="password"
+              type="password"
+              :placeholder="$t('auth.password')"
+              data-testid="login-password"
+              autocomplete="current-password"
+            />
+          </div>
 
-        <div class="error-slot" :class="{ visible: error }">
-          <span v-if="error">{{ error }}</span>
-        </div>
+          <div class="error-slot" :class="{ visible: error }">
+            <span v-if="error">{{ error }}</span>
+          </div>
 
-        <AppButton
-          variant="primary"
-          :loading="loading"
-          :disabled="!username || !password"
-          test-id="login-submit"
-          style="width: 100%"
-          @click="handleLogin"
-        >
-          {{ $t('auth.login') }}
-        </AppButton>
-      </form>
+          <AppButton
+            variant="primary"
+            :loading="loading"
+            :disabled="!username || !password"
+            test-id="login-submit"
+            style="width: 100%"
+            @click="handleLogin"
+          >
+            {{ $t('auth.login') }}
+          </AppButton>
+        </form>
+      </div>
+      <LoginCountdown />
     </div>
   </div>
 </template>
@@ -52,6 +56,16 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import i18n from '../i18n'
 import AppButton from '../components/ui/AppButton.vue'
+import LoginBoard from '../components/login/LoginBoard.vue'
+import LoginCountdown from '../components/login/LoginCountdown.vue'
+
+const hour = new Date().getHours()
+const greeting = i18n.global.t(
+  hour < 5 ? 'auth.greeting.night'
+    : hour < 12 ? 'auth.greeting.morning'
+      : hour < 18 ? 'auth.greeting.day'
+        : 'auth.greeting.evening',
+)
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -97,32 +111,52 @@ async function handleLogin() {
   align-items: center;
   justify-content: center;
   z-index: var(--z-login);
+  overflow: hidden;
+}
+
+/* Доска видна по краям и гаснет к центру, где стоит форма */
+.login-veil {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 34% 55% at 50% 50%,
+    var(--bg) 55%,
+    color-mix(in srgb, var(--bg) 55%, transparent) 100%
+  );
+}
+
+.login-center {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  width: 400px;
+  max-width: 90vw;
 }
 
 .login-card {
-  background: var(--surface-1);
-  border: 1px solid var(--hairline);
-  border-radius: 12px;
-  padding: 40px;
-  width: 380px;
-  max-width: 90vw;
-  box-shadow: var(--shadow);
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 30px 30px 26px;
+  box-shadow: 0 30px 70px -20px rgba(0, 0, 0, 0.55);
 }
 
 .login-title {
-  font-size: 20px;
-  font-weight: 600;
+  margin: 0 0 24px;
+  font-size: 28px;
+  font-weight: 700;
   color: var(--text-bright);
-  text-align: center;
-  letter-spacing: -0.4px;
+  letter-spacing: -0.8px;
 }
 
-.login-subtitle {
-  font-size: 13px;
-  color: var(--text-muted);
-  text-align: center;
-  margin-top: 8px;
-  margin-bottom: 32px;
+@media (max-width: 700px) {
+  .login-backdrop {
+    display: none;
+  }
 }
 
 .login-form {
@@ -136,15 +170,13 @@ async function handleLogin() {
   font-size: 12px;
   font-weight: 500;
   color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
   margin-bottom: 6px;
 }
 
 .form-field input {
   width: 100%;
-  padding: 10px 12px;
-  background: var(--surface-2);
+  padding: 11px 12px;
+  background: var(--bg);
   border: 1px solid var(--hairline);
   border-radius: 8px;
   color: var(--text);

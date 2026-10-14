@@ -48,8 +48,39 @@
     "logout": "Sign out",
     "username": "Username",
     "password": "Password",
-    "login_title": "Sign in",
-    "login_subtitle": "Enter your credentials to continue",
+    "greeting": {
+      "night": "Good night.",
+      "morning": "Good morning.",
+      "day": "Good afternoon.",
+      "evening": "Good evening."
+    },
+    "countdown": {
+      "caption": "until the end of the work week",
+      "days": "d",
+      "hours": "h",
+      "minutes": "min"
+    },
+    "board": {
+      "columns": ["New", "In progress", "Review", "Done", "On hold"],
+      "tasks": [
+        "Export report to PDF",
+        "Group permissions",
+        "Invoice printing",
+        "Invoice import",
+        "Redmine sync",
+        "Time report",
+        "Notifications",
+        "Kanban by project",
+        "Assignee filter",
+        "Sprint closing",
+        "Contract templates",
+        "Task avatars",
+        "Access limits",
+        "Time entry import",
+        "Export to Excel",
+        "Commit links"
+      ]
+    },
     "error_invalid_credentials": "Invalid username or password",
     "error_blocked": "The account is blocked. Contact the administrator.",
     "error_too_many_attempts": "Too many login attempts. Try again later.",
