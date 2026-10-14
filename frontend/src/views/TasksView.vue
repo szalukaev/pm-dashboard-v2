@@ -117,7 +117,7 @@ onMounted(async () => {
 
 <style scoped>
 .page-title {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 600;
   color: var(--text-bright);
   letter-spacing: -0.4px;
