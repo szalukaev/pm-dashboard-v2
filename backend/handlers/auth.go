@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -213,8 +214,14 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	// О блокировке пользователь узнаёт только после верного пароля, чтобы
 	// ответ не выдавал, какие учётные записи существуют.
+	// Не удалось прочитать признак — вход не пускается: заблокированный не
+	// должен проходить из-за сбоя базы
 	var blocked bool
-	(*h.DB).QueryRow("SELECT is_blocked FROM users WHERE id = $1", id).Scan(&blocked)
+	if err := (*h.DB).QueryRow("SELECT is_blocked FROM users WHERE id = $1", id).Scan(&blocked); err != nil {
+		slog.Error("Could not check whether the user is blocked", "user", id, "error", err)
+		utils.Error(w, http.StatusInternalServerError, "LOGIN_FAILED")
+		return
+	}
 	if blocked {
 		if h.Audit != nil {
 			h.Audit.LogLogin(id, req.Username, false, r)

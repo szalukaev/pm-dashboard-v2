@@ -78,6 +78,8 @@ async function handleLogin() {
     const code = e?.response?.data?.error
     const key = code === 'USER_BLOCKED' ? 'error_blocked'
       : code === 'TOO_MANY_ATTEMPTS' ? 'error_too_many_attempts'
+      // Сбой на сервере — не повод говорить, что пароль неверный
+      : (e?.response?.status ?? 500) >= 500 ? 'error_server'
       : 'error_invalid_credentials'
     error.value = i18n.global.t(`auth.${key}`)
   } finally {
