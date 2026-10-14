@@ -45,7 +45,7 @@
           </AppButton>
         </form>
       </div>
-      <LoginCountdown />
+      <LoginCountdown class="login-countdown-below" />
     </div>
   </div>
 </template>
@@ -131,7 +131,6 @@ async function handleLogin() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 72px;
   width: 400px;
   max-width: 90vw;
 }
@@ -151,6 +150,16 @@ async function handleLogin() {
   font-weight: 700;
   color: var(--text-bright);
   letter-spacing: -0.8px;
+}
+
+/* Табло стоит под формой и не участвует в центрировании —
+   форма остаётся ровно посередине экрана */
+.login-countdown-below {
+  position: absolute;
+  top: calc(100% + 72px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
 }
 
 @media (max-width: 700px) {
