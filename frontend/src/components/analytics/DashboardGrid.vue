@@ -212,6 +212,35 @@ onBeforeUnmount(() => {
   color: var(--text-bright);
 }
 
+/* Телефон: фильтры заголовка занимают всю строку, кнопки — отдельной строкой
+   под ними, иначе фильтры наезжают на кнопки */
+@media (max-width: 767px) {
+  .dash-toolbar {
+    margin-bottom: 16px;
+  }
+
+  .dash-toolbar-title {
+    flex: 1 1 100%;
+  }
+
+  .dash-add,
+  .dash-toolbar > .dash-tool {
+    flex: 1;
+  }
+
+  .dash-tool {
+    width: 100%;
+    justify-content: center;
+    height: 38px;
+  }
+
+  .dash-add-list {
+    left: 0;
+    right: auto;
+    min-width: min(240px, calc(100vw - 32px));
+  }
+}
+
 .dash-add {
   position: relative;
 }
