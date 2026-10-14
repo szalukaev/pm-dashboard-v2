@@ -496,6 +496,17 @@
     "delete_title": "Delete the sprint?",
     "no_open_sprints": "There are no open sprints. Create one with “New Sprint”.",
     "closed_section": "Completed",
+    "mobile": {
+      "backlog_hint": "Tasks without a sprint, projects: {n}",
+      "no_tasks": "No tasks in this sprint yet. Add them from the backlog via “⋯”.",
+      "move_to": "Move task",
+      "here_now": "here now",
+      "to_backlog": "To backlog",
+      "starts_in": "starts in {n} d",
+      "overdue_by": "overdue by {n} d",
+      "ends_today": "ends today",
+      "days_left": "{n} d left"
+    },
     "reopen": "Reopen",
     "closed_late_hint": "The sprint was closed after its due date",
     "counts_hint": "Open: {open}\nTesting: {testing}\nClosed: {closed}\nTotal: {total}",

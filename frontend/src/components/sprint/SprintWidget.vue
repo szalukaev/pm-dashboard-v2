@@ -82,7 +82,7 @@
         <KanbanCard
           v-for="task in sprint.tasks"
           :key="task.external_id"
-          :card="toKanbanCard(task)"
+          :card="sprintTaskToCard(task)"
           compact
           :class="'group-' + task.status_group"
           @dragstart="onTaskDragStart"
@@ -105,9 +105,9 @@ import SprintProgressBar from './SprintProgressBar.vue'
 import SprintStateBadge from './SprintStateBadge.vue'
 import InfoHint from '../ui/AppHint.vue'
 import KanbanCard from '../kanban/KanbanCard.vue'
-import type { Sprint, SprintTask } from '../../stores/sprint'
+import type { Sprint } from '../../stores/sprint'
 import { SPRINT_DRAG_TYPE } from '../../stores/sprint'
-import type { KanbanCard as KanbanCardType } from '../../stores/kanban'
+import { sprintTaskToCard } from './sprintCard'
 import { useAuthStore } from '../../stores/auth'
 
 const props = defineProps<{
@@ -118,24 +118,6 @@ const emit = defineEmits(['complete', 'reopen', 'edit', 'refresh', 'delete', 'op
 const auth = useAuthStore()
 
 const expanded = ref(props.sprint.status !== 'closed')
-
-function toKanbanCard(task: SprintTask): KanbanCardType {
-  return {
-    external_id: task.external_id,
-    subject: task.subject,
-    project_name: task.project_name,
-    status_name: task.status_name,
-    status_id: 0,
-    priority_name: task.priority_name,
-    priority_id: task.priority_id,
-    assigned_to_name: task.assigned_to_name,
-    assigned_to_id: null,
-    category_name: '',
-    due_date: task.due_date,
-    estimated_hours: task.estimated_hours,
-    is_overdue: task.is_overdue,
-  }
-}
 
 function toggleExpanded() {
   expanded.value = !expanded.value

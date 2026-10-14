@@ -15,6 +15,21 @@
     <!-- Ошибка -->
     <AppEmptyState v-else-if="error" state="error" @retry="fetchAll()" />
 
+    <!-- Телефон: карточки спринтов, спринт открывается на отдельном экране -->
+    <SprintMobileList
+      v-else-if="isMobile"
+      :sprints="sprints"
+      :backlog="backlog"
+      @complete="completeSprint"
+      @reopen="reopenSprint"
+      @edit="editSprint"
+      @refresh="handleRefresh"
+      @delete="confirmDelete"
+      @open-task="openTask"
+      @assign-task="handleAssignTask"
+      @unassign-task="handleUnassignTask"
+    />
+
     <!-- Содержимое -->
     <div v-else class="sprint-content">
       <!-- Спринты -->
@@ -110,6 +125,8 @@ import AppEmptyState from '../components/ui/AppEmptyState.vue'
 import AppSpinner from '../components/ui/AppSpinner.vue'
 import AppConfirmDialog from '../components/ui/AppConfirmDialog.vue'
 import TaskModal from '../components/tasks/TaskModal.vue'
+import SprintMobileList from '../components/sprint/SprintMobileList.vue'
+import { useMobileTasks } from '../composables/useMobileTasks'
 
 const sprintStore = useSprintStore()
 const tasksStore = useTasksStore()
@@ -131,6 +148,7 @@ const editingSprint = ref<Sprint | null>(null)
 const showDeleteConfirm = ref(false)
 const deletingSprintId = ref<number | null>(null)
 const selectedTaskId = ref<number | null>(null)
+const { isMobile } = useMobileTasks()
 // Проекты для формы спринта: те, что пользователь выбрал в настройках, вместе
 // с их подпроектами; если ничего не выбрано — все доступные, как и везде
 const projects = computed(() => trackedProjects(tasksStore.projects, settingsStore.settings.selected_projects || []))
