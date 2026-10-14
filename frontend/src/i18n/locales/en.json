@@ -197,7 +197,11 @@
       "reset": "Reset",
       "found": "Found",
       "grouping": "Grouping",
-      "category": "Category"
+      "category": "Category",
+      "title": "Filters",
+      "tasks": "Tasks",
+      "no_grouping": "No grouping",
+      "show_tasks": "Show tasks: {n}"
     },
     "table": {
       "name": "Name",
