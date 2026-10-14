@@ -327,6 +327,7 @@
       "completion": "Выполнение",
       "open": "Открытых",
       "in_test": "В тесте",
+      "closed": "Закрыто",
       "overdue": "Просрочено",
       "bugs": "Bugs",
       "no_estimate": "Без оценки",

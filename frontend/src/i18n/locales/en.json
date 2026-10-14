@@ -327,6 +327,7 @@
       "completion": "Completion",
       "open": "Open",
       "in_test": "In Test",
+      "closed": "Closed",
       "overdue": "Overdue",
       "bugs": "Bugs",
       "no_estimate": "No Estimate",

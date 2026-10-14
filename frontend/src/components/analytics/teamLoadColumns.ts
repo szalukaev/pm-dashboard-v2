@@ -6,7 +6,7 @@ export const TEAM_LOAD_COLUMNS = [
   { key: 'employee', label: 'tasks.table.assignee' },
   { key: 'open', label: 'analytics.stats.open' },
   { key: 'testing', label: 'analytics.stats.in_test' },
-  { key: 'closed', label: 'tasks.table.status' },
+  { key: 'closed', label: 'analytics.stats.closed' },
   { key: 'overdue', label: 'analytics.stats.overdue' },
   { key: 'bugs', label: 'analytics.stats.bugs' },
   { key: 'high', label: 'analytics.stats.high_priority' },
