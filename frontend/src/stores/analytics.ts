@@ -179,15 +179,21 @@ export const useAnalyticsStore = defineStore('analytics', () => {
   const loading = ref(false)
   const error = ref('')
 
-  // silent: обновление в фоне, без заглушки загрузки.
+  // Сколько запросов виджетов не удалось с начала последней загрузки. Сбой
+  // одного виджета дашборд не роняет — виджет просто остаётся прежним.
+  let failures = 0
+
+  // silent: обновление в фоне, без заглушки загрузки. Ошибка показывается,
+  // только если не ответил ни один запрос: иначе вместо неё были бы нули.
   async function fetchAll(opts: { silent?: boolean } = {}) {
     const silent = opts.silent === true
     if (!silent) {
       loading.value = true
       error.value = ''
     }
+    failures = 0
     try {
-      await Promise.all([
+      const requests = [
         fetchStats(),
         fetchTeamLoad(),
         fetchDistribution(),
@@ -197,9 +203,9 @@ export const useAnalyticsStore = defineStore('analytics', () => {
         fetchHealth(),
         fetchGantt(),
         fetchThresholds(),
-      ])
-    } catch {
-      if (!silent) error.value = i18n.global.t('common.error')
+      ]
+      await Promise.all(requests)
+      if (failures >= requests.length && !silent) error.value = i18n.global.t('common.error')
     } finally {
       if (!silent) loading.value = false
     }
@@ -209,42 +215,42 @@ export const useAnalyticsStore = defineStore('analytics', () => {
     try {
       const { data } = await axios.get('/api/analytics/stats', { params: periodParams() })
       stats.value = data.stats || []
-    } catch {}
+    } catch { failures++ }
   }
 
   async function fetchTeamLoad() {
     try {
       const { data } = await axios.get('/api/analytics/team-load', { params: periodParams() })
       teamLoad.value = data.team || []
-    } catch {}
+    } catch { failures++ }
   }
 
   async function fetchDistribution() {
     try {
       const { data } = await axios.get('/api/analytics/distribution')
       distribution.value = data.distribution || []
-    } catch {}
+    } catch { failures++ }
   }
 
   async function fetchDeadlines() {
     try {
       const { data } = await axios.get('/api/analytics/deadlines')
       deadlines.value = data.deadlines || []
-    } catch {}
+    } catch { failures++ }
   }
 
   async function fetchHours() {
     try {
       const { data } = await axios.get('/api/analytics/hours')
       hours.value = data.hours || []
-    } catch {}
+    } catch { failures++ }
   }
 
   async function fetchVelocity() {
     try {
       const { data } = await axios.get('/api/analytics/velocity', { params: periodParams() })
       velocity.value = data.weeks || []
-    } catch {}
+    } catch { failures++ }
   }
 
   // Какие индикаторы сейчас выше порогов пользователя
@@ -252,14 +258,14 @@ export const useAnalyticsStore = defineStore('analytics', () => {
     try {
       const { data } = await axios.get('/api/analytics/thresholds')
       exceeded.value = data.exceeded || []
-    } catch {}
+    } catch { failures++ }
   }
 
   async function fetchHealth() {
     try {
       const { data } = await axios.get('/api/analytics/health')
       health.value = data && Array.isArray(data.parts) ? data : null
-    } catch {}
+    } catch { failures++ }
   }
 
   async function fetchGantt(): Promise<void> {
@@ -282,7 +288,7 @@ export const useAnalyticsStore = defineStore('analytics', () => {
         return fetchGantt()
       }
       gantt.value = { tasks, projects, total }
-    } catch {}
+    } catch { failures++ }
   }
 
   function setGanttProject(id: number | null) {

@@ -93,11 +93,13 @@ export const usePaymentsStore = defineStore('payments', () => {
   const showClosed = ref(false)
   const searchQuery = ref('')
 
+  // Загрузка страницы: сбой показывается ошибкой с повтором, а не пустым
+  // списком, будто договоров нет
   async function fetchAll() {
     loading.value = true
     error.value = ''
     try {
-      await Promise.all([fetchOrganizations(), fetchContracts(), fetchStats()])
+      await Promise.all([loadOrganizations(), loadContracts(), loadStats()])
     } catch {
       error.value = i18n.global.t('common.error')
     } finally {
@@ -105,11 +107,15 @@ export const usePaymentsStore = defineStore('payments', () => {
     }
   }
 
+  async function loadOrganizations() {
+    const { data } = await axios.get('/api/organizations')
+    organizations.value = data.organizations || []
+  }
+
+  // fetch* обновляют данные после изменений; изменение уже сохранено,
+  // поэтому сбой обновления его не отменяет и не показывается
   async function fetchOrganizations() {
-    try {
-      const { data } = await axios.get('/api/organizations')
-      organizations.value = data.organizations || []
-    } catch {}
+    try { await loadOrganizations() } catch {}
   }
 
   function contractParams(): Record<string, string> {
@@ -120,18 +126,22 @@ export const usePaymentsStore = defineStore('payments', () => {
     return params
   }
 
+  async function loadContracts() {
+    const { data } = await axios.get('/api/contracts', { params: contractParams() })
+    contracts.value = data.contracts || []
+  }
+
   async function fetchContracts() {
-    try {
-      const { data } = await axios.get('/api/contracts', { params: contractParams() })
-      contracts.value = data.contracts || []
-    } catch {}
+    try { await loadContracts() } catch {}
+  }
+
+  async function loadStats() {
+    const { data } = await axios.get('/api/payments/stats')
+    stats.value = data.stats || []
   }
 
   async function fetchStats() {
-    try {
-      const { data } = await axios.get('/api/payments/stats')
-      stats.value = data.stats || []
-    } catch {}
+    try { await loadStats() } catch {}
   }
 
   async function createOrganization(org: Partial<Organization>) {

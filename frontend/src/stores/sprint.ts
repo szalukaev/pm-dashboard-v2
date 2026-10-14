@@ -70,8 +70,9 @@ export const useSprintStore = defineStore('sprint', () => {
       loading.value = true
       error.value = ''
     }
+    // Сбой показывается ошибкой с повтором, а не пустыми списками
     try {
-      await Promise.all([fetchSprints(), fetchBacklog()])
+      await Promise.all([loadSprints(), loadBacklog()])
     } catch {
       if (!silent) error.value = i18n.global.t('common.error')
     } finally {
@@ -79,34 +80,39 @@ export const useSprintStore = defineStore('sprint', () => {
     }
   }
 
+  async function loadSprints() {
+    const { data } = await axios.get('/api/sprints')
+    sprints.value = data.sprints || []
+  }
+
+  async function loadBacklog() {
+    const { data } = await axios.get('/api/sprints/backlog')
+    backlog.value = data.backlog || []
+  }
+
+  // Обновление после изменения: оно уже сохранено, сбой обновления не показывается
   async function fetchSprints() {
-    try {
-      const { data } = await axios.get('/api/sprints')
-      sprints.value = data.sprints || []
-    } catch {}
+    try { await loadSprints() } catch {}
   }
 
   async function fetchBacklog() {
-    try {
-      const { data } = await axios.get('/api/sprints/backlog')
-      backlog.value = data.backlog || []
-    } catch {}
+    try { await loadBacklog() } catch {}
   }
 
   async function createSprint(payload: Partial<Sprint>) {
     const { data } = await axios.post('/api/sprints', payload)
-    await fetchAll()
+    await fetchAll({ silent: true })
     return data
   }
 
   async function updateSprint(id: number, payload: Partial<Sprint>) {
     await axios.put(`/api/sprints/${id}`, payload)
-    await fetchAll()
+    await fetchAll({ silent: true })
   }
 
   async function deleteSprint(id: number) {
     await axios.delete(`/api/sprints/${id}`)
-    await fetchAll()
+    await fetchAll({ silent: true })
   }
 
   // Пересчитывает счётчики и готовность спринта по его задачам — так же, как
@@ -213,7 +219,7 @@ export const useSprintStore = defineStore('sprint', () => {
 
   async function refreshSprint(id: number) {
     await axios.post(`/api/sprints/${id}/refresh`)
-    await fetchAll()
+    await fetchAll({ silent: true })
   }
 
   return {
