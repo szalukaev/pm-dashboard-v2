@@ -121,6 +121,18 @@ watch(() => toasts.value.length, async () => {
   z-index: var(--z-toast);
 }
 
+/* Телефон: стопка привязана к обоим краям видимой области и не уходит
+   за экран, даже если страница шире экрана; сверху — отступ под вырез */
+@media (max-width: 768px) {
+  .toast-stack {
+    top: calc(8px + env(safe-area-inset-top));
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-width: none;
+  }
+}
+
 .toast {
   position: absolute;
   top: 0;
