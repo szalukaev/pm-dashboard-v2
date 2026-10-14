@@ -1,48 +1,49 @@
-const CACHE_NAME = 'pm-dashboard-v3.0.1'
-const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/favicon.svg',
-]
+// Service worker веб-приложения. Задача — чтобы установленное приложение
+// открывалось быстро и не застревало на старой версии после деплоя:
+// страница и файлы без хеша в имени всегда берутся из сети (кэш — только на
+// случай, когда сети нет), а файлы сборки с хешем в имени не меняются и
+// берутся из кэша.
+const CACHE_NAME = 'pm-dashboard-v3.1.0'
+const SHELL = ['/index.html', '/manifest.json', '/favicon.svg']
 
-// Install — cache static assets
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS)
-    })
-  )
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL)))
   self.skipWaiting()
 })
 
-// Activate — clean old caches
+// Кэши прежних версий удаляются
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
-      )
-    })
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
+    )
   )
   self.clients.claim()
 })
 
-// Fetch — network-first for API, cache-first for static
+// Файлы, имя которых меняется при каждой сборке (vite кладёт их в /assets/
+// с хешем), и шрифты — их содержимое под тем же адресом не меняется
+function immutable(url) {
+  return url.pathname.startsWith('/assets/') || url.pathname.startsWith('/fonts/')
+}
+
+function remember(request, response) {
+  if (response.ok && response.type === 'basic') {
+    const clone = response.clone()
+    caches.open(CACHE_NAME).then((cache) => cache.put(request, clone))
+  }
+  return response
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event
-  const url = new URL(request.url)
-
-  // Skip non-GET requests
   if (request.method !== 'GET') return
+  const url = new URL(request.url)
+  // Чужие адреса, API и WebSocket — мимо кэша
+  if (url.origin !== self.location.origin) return
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/ws')) return
 
-  // API requests — network only
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/ws')) {
-    return
-  }
-
-  // Page shell (index.html) — network-first: a fresh deploy must be picked up
-  // immediately; the cached copy is only an offline fallback.
+  // Страница: из сети, без сети — сохранённая копия
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
@@ -58,20 +59,18 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // Static assets — cache-first, then network
+  // Файлы сборки: из кэша, иначе из сети с сохранением
+  if (immutable(url)) {
+    event.respondWith(
+      caches.match(request).then((cached) => cached || fetch(request).then((response) => remember(request, response)))
+    )
+    return
+  }
+
+  // Остальное (манифест, иконки): из сети, без сети — из кэша
   event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) return cached
-      return fetch(request).then((response) => {
-        // Cache successful responses
-        if (response.ok && response.type === 'basic') {
-          const clone = response.clone()
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, clone)
-          })
-        }
-        return response
-      })
-    })
+    fetch(request)
+      .then((response) => remember(request, response))
+      .catch(() => caches.match(request))
   )
 })
