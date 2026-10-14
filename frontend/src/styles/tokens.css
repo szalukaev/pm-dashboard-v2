@@ -447,8 +447,20 @@
 }
 
 :root[data-mode="light"] .org-header {
-  background: var(--surface-2);
-  box-shadow: inset 3px 0 0 var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-card));
+  box-shadow: inset 4px 0 0 var(--accent);
+}
+
+:root[data-mode="light"] .org-header:hover {
+  background: color-mix(in srgb, var(--accent) 20%, var(--bg-card));
+}
+
+:root[data-mode="light"] .org-header .org-name {
+  font-weight: 700;
+}
+
+:root[data-mode="light"] .org-header .org-stat {
+  color: var(--text-dim);
 }
 
 :root[data-mode="light"] .org-body {
