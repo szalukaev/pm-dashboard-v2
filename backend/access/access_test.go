@@ -123,6 +123,23 @@ func TestEffective(t *testing.T) {
 		}
 	})
 
+	t.Run("read-only from groups: only when every group sets it", func(t *testing.T) {
+		readOnly := Permissions{ReadOnly: true}
+		if !effective(&Permissions{}, nil, []Permissions{readOnly}).ReadOnly {
+			t.Error("a read-only group must make its members read-only")
+		}
+		// Права групп складываются: хватает одной, где изменения разрешены
+		if effective(&Permissions{}, nil, []Permissions{readOnly, {}}).ReadOnly {
+			t.Error("one writer group is enough")
+		}
+	})
+
+	t.Run("own tasks: any source may add them", func(t *testing.T) {
+		if !effective(&Permissions{}, nil, []Permissions{{OwnTasksOnly: true}}).OwnTasksOnly {
+			t.Error("a group must be able to add the user's own tasks")
+		}
+	})
+
 	t.Run("a group cannot make a read-only user a writer", func(t *testing.T) {
 		individual := Permissions{ReadOnly: true}
 		got := effective(&individual, nil, []Permissions{{AllProjects: true}})

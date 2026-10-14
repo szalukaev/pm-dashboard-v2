@@ -56,8 +56,22 @@ func effective(individual, template *Permissions, groups []Permissions) Permissi
 		}
 	}
 	result.PaymentsOwnOnly = &ownOnly
+	// «Свои задачи» только добавляют видимое — их может дать любой источник
 	result.OwnTasksOnly = own.OwnTasksOnly
+	for _, g := range groups {
+		result.OwnTasksOnly = result.OwnTasksOnly || g.OwnTasksOnly
+	}
+	// «Только чтение»: личное действует всегда, а от групп — только если его
+	// ввели все группы: права групп складываются, хватает одной, где
+	// изменения разрешены
 	result.ReadOnly = own.ReadOnly
+	if len(groups) > 0 {
+		allReadOnly := true
+		for _, g := range groups {
+			allReadOnly = allReadOnly && g.ReadOnly
+		}
+		result.ReadOnly = result.ReadOnly || allReadOnly
+	}
 	result.FromSource = own.FromSource
 	return result.Normalized()
 }
