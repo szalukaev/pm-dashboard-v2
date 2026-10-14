@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import axios from 'axios'
+import i18n from '../i18n'
 
 const APP_VERSION = '3.0.0'
 // Вкладки, которые администратор может скрыть от пользователя (имена маршрутов)
@@ -71,7 +72,7 @@ router.beforeEach(async (to, _from, next) => {
         // Предупреждение показывается плашкой, а не только в консоли
         const banner = document.createElement('div')
         banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:var(--warning);color:#111;padding:8px 16px;text-align:center;font-size:13px;font-weight:500;z-index:99999;'
-        banner.textContent = `Версии фронтенда и бэкенда не совпадают (frontend: ${APP_VERSION}, backend: ${data.version}). Обновите страницу или обратитесь к администратору.`
+        banner.textContent = i18n.global.t('common.version_mismatch', { frontend: APP_VERSION, backend: data.version })
         banner.onclick = () => banner.remove()
         document.body.appendChild(banner)
       }

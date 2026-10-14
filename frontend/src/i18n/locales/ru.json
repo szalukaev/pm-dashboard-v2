@@ -1,5 +1,6 @@
 {
   "common": {
+    "version_mismatch": "Версии фронтенда и бэкенда не совпадают (frontend: {frontend}, backend: {backend}). Обновите страницу или обратитесь к администратору.",
     "save": "Сохранить",
     "cancel": "Отмена",
     "delete": "Удалить",

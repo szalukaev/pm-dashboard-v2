@@ -35,7 +35,7 @@
         {{ card.status_name }}
       </span>
       <span v-if="card.estimated_hours" class="badge estimate-badge">
-        {{ card.estimated_hours }}ч
+        {{ card.estimated_hours }}{{ $t('tasks.units.hours_short') }}
       </span>
       <span v-if="card.due_date" class="badge date-badge" :class="{ 'overdue-date': card.is_overdue }">
         {{ formatDate(card.due_date) }}

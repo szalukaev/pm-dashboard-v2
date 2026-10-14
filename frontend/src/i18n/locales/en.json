@@ -1,5 +1,6 @@
 {
   "common": {
+    "version_mismatch": "Frontend and backend versions differ (frontend: {frontend}, backend: {backend}). Reload the page or contact the administrator.",
     "save": "Save",
     "cancel": "Cancel",
     "delete": "Delete",

@@ -100,5 +100,5 @@ export function formatHours(hours: number | null): string {
   if (hours === null || hours === undefined) return '—'
   const h = Math.floor(hours)
   const m = Math.round((hours - h) * 60)
-  return `${h}:${m.toString().padStart(2, '0')} ч.`
+  return `${h}:${m.toString().padStart(2, '0')} ${i18n.global.t('tasks.units.hours')}`
 }
