@@ -688,23 +688,6 @@ func (h *PaymentsHandler) PayInvoice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Оплатить можно только счёт по видимому договору.
-	var inv struct {
-		Amount     float64
-		VatRate    string
-		PaidAmount float64
-	}
-	err = (*h.DB).QueryRow(`SELECT i.amount, i.vat_rate, i.paid_amount
-		FROM invoices i JOIN contracts c ON i.contract_id = c.id
-		WHERE i.id=$1 AND `+ownedBy("c.user_id", 2), invoiceID, paymentsOwner(r)).Scan(&inv.Amount, &inv.VatRate, &inv.PaidAmount)
-	if err != nil {
-		utils.Error(w, http.StatusNotFound, "INVOICE_NOT_FOUND")
-		return
-	}
-
-	totalObligation := utils.Round2(inv.Amount * vatMultiplier(inv.VatRate))
-	remainder := totalObligation - inv.PaidAmount
-
 	var body struct {
 		Amount *float64 `json:"amount"`
 		PaidAt *string  `json:"paid_at"`
@@ -713,6 +696,33 @@ func (h *PaymentsHandler) PayInvoice(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
 		return
 	}
+
+	// Остаток читается и меняется в одной транзакции под блокировкой строки
+	// счёта: одновременные оплаты идут по очереди, и каждая видит сумму,
+	// уже записанную предыдущей.
+	tx, err := (*h.DB).Begin()
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "TX_FAILED")
+		return
+	}
+	defer tx.Rollback()
+
+	// Оплатить можно только счёт по видимому договору.
+	var inv struct {
+		Amount     float64
+		VatRate    string
+		PaidAmount float64
+	}
+	err = tx.QueryRow(`SELECT i.amount, i.vat_rate, i.paid_amount
+		FROM invoices i JOIN contracts c ON i.contract_id = c.id
+		WHERE i.id=$1 AND `+ownedBy("c.user_id", 2)+` FOR UPDATE OF i`, invoiceID, paymentsOwner(r)).Scan(&inv.Amount, &inv.VatRate, &inv.PaidAmount)
+	if err != nil {
+		utils.Error(w, http.StatusNotFound, "INVOICE_NOT_FOUND")
+		return
+	}
+
+	totalObligation := utils.Round2(inv.Amount * vatMultiplier(inv.VatRate))
+	remainder := totalObligation - inv.PaidAmount
 
 	// Сумма больше остатка урезается до остатка; ответ об этом сообщает, и
 	// страница говорит пользователю, сколько принято.
@@ -736,21 +746,13 @@ func (h *PaymentsHandler) PayInvoice(w http.ResponseWriter, r *http.Request) {
 		status = "paid"
 	}
 
-	// Счёт и строка оплаты меняются одной транзакцией: при одновременных
-	// оплатах ничего не теряется, а при сбое одного запроса состояние не
-	// расходится.
-	tx, err := (*h.DB).Begin()
-	if err != nil {
-		utils.Error(w, http.StatusInternalServerError, "TX_FAILED")
-		return
-	}
+	// Счёт и строка оплаты меняются вместе: при сбое одного запроса
+	// состояние не расходится.
 	if _, err := tx.Exec("UPDATE invoices SET paid_amount=$1, status=$2 WHERE id=$3", newPaid, status, invoiceID); err != nil {
-		tx.Rollback()
 		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 		return
 	}
 	if _, err := tx.Exec("INSERT INTO contract_payments (invoice_id, amount, paid_at) VALUES ($1,$2,$3)", invoiceID, payAmount, payDate); err != nil {
-		tx.Rollback()
 		utils.Error(w, http.StatusInternalServerError, "INSERT_FAILED")
 		return
 	}
