@@ -163,12 +163,12 @@
 }
 
 [data-theme="nord"][data-mode="light"] {
-  --bg: #eceff4;
-  --bg-card: #e5e9f0;
-  --bg-card-alt: #dfe4ec;
-  --bg-hover: #d5dce6;
-  --border: #c8d0dc;
-  --border-light: #d2d9e3;
+  --bg: #eceff3;
+  --bg-card: #ffffff;
+  --bg-card-alt: #f4f6f8;
+  --bg-hover: #eef2f6;
+  --border: #cfd5dd;
+  --border-light: #e9ecf1;
   --border-accent: rgba(70,110,140,0.24);
   --text: #2e3440;
   --text-bright: #1a1f2b;
@@ -185,13 +185,13 @@
   --critical: #a94442;
   --modal-overlay: rgba(0,0,0,0.30);
   --shadow: 0 16px 48px rgba(0,0,0,0.08);
-  --tag-bg: #d5dce6;
-  --hairline: #c8d0dc;
-  --hairline-strong: #b0bac8;
-  --surface-1: #e5e9f0;
-  --surface-2: #dfe4ec;
-  --surface-3: #d5dce6;
-  --surface-4: #d0d8e2;
+  --tag-bg: #e3e7ed;
+  --hairline: #cfd5dd;
+  --hairline-strong: #b7c0cd;
+  --surface-1: #ffffff;
+  --surface-2: #e7ecf3;
+  --surface-3: #e3e7ed;
+  --surface-4: #dde2e9;
 }
 
 [data-theme="amber"][data-mode="dark"] {
@@ -227,12 +227,12 @@
 }
 
 [data-theme="amber"][data-mode="light"] {
-  --bg: #f8f4ee;
-  --bg-card: #f2ece2;
-  --bg-card-alt: #ede5d8;
-  --bg-hover: #e5ddd0;
-  --border: #d8ccb8;
-  --border-light: #e0d6c6;
+  --bg: #f6f1ea;
+  --bg-card: #ffffff;
+  --bg-card-alt: #f9f7f3;
+  --bg-hover: #f8f3ec;
+  --border: #e3d9ca;
+  --border-light: #f4efe6;
   --border-accent: rgba(150,100,30,0.22);
   --text: #3a3020;
   --text-bright: #2a2010;
@@ -249,13 +249,13 @@
   --critical: #a94442;
   --modal-overlay: rgba(0,0,0,0.30);
   --shadow: 0 16px 48px rgba(0,0,0,0.08);
-  --tag-bg: #e5ddd0;
-  --hairline: #d8ccb8;
-  --hairline-strong: #c0b498;
-  --surface-1: #f2ece2;
-  --surface-2: #ede5d8;
-  --surface-3: #e5ddd0;
-  --surface-4: #e0d6c8;
+  --tag-bg: #f1eadf;
+  --hairline: #e3d9ca;
+  --hairline-strong: #d4c6af;
+  --surface-1: #ffffff;
+  --surface-2: #f6efe5;
+  --surface-3: #f1eadf;
+  --surface-4: #eee5d8;
 }
 
 [data-theme="forest"][data-mode="dark"] {
@@ -291,12 +291,12 @@
 }
 
 [data-theme="forest"][data-mode="light"] {
-  --bg: #f0f4f1;
-  --bg-card: #e8ede9;
-  --bg-card-alt: #e2e8e4;
-  --bg-hover: #dce3de;
-  --border: #c8d4cb;
-  --border-light: #d4ded6;
+  --bg: #edf2ef;
+  --bg-card: #ffffff;
+  --bg-card-alt: #f5f8f6;
+  --bg-hover: #eff6f1;
+  --border: #d1dbd4;
+  --border-light: #eaf0ec;
   --border-accent: rgba(50,100,60,0.20);
   --text: #2a3830;
   --text-bright: #1a2820;
@@ -313,13 +313,13 @@
   --critical: #a94442;
   --modal-overlay: rgba(0,0,0,0.30);
   --shadow: 0 16px 48px rgba(0,0,0,0.08);
-  --tag-bg: #dce3de;
-  --hairline: #c8d4cb;
-  --hairline-strong: #b0bfb4;
-  --surface-1: #e8ede9;
-  --surface-2: #e2e8e4;
-  --surface-3: #dce3de;
-  --surface-4: #d6ded8;
+  --tag-bg: #e4ece7;
+  --hairline: #d1dbd4;
+  --hairline-strong: #bacabf;
+  --surface-1: #ffffff;
+  --surface-2: #e9f2ec;
+  --surface-3: #e4ece7;
+  --surface-4: #dee7e1;
 }
 
 [data-theme="dusk"][data-mode="dark"] {
@@ -355,12 +355,12 @@
 }
 
 [data-theme="dusk"][data-mode="light"] {
-  --bg: #f2f0f6;
-  --bg-card: #ebe8f0;
-  --bg-card-alt: #e5e2ec;
-  --bg-hover: #dedae6;
-  --border: #d0cbe0;
-  --border-light: #dbd7e4;
+  --bg: #efedf3;
+  --bg-card: #ffffff;
+  --bg-card-alt: #f5f4f8;
+  --bg-hover: #f1eef6;
+  --border: #d4d0dd;
+  --border-light: #eceaf1;
   --border-accent: rgba(100,70,140,0.20);
   --text: #302a40;
   --text-bright: #201a30;
@@ -377,11 +377,32 @@
   --critical: #a94442;
   --modal-overlay: rgba(0,0,0,0.30);
   --shadow: 0 16px 48px rgba(0,0,0,0.08);
-  --tag-bg: #dedae6;
-  --hairline: #d0cbe0;
-  --hairline-strong: #b8b0cc;
-  --surface-1: #ebe8f0;
-  --surface-2: #e5e2ec;
-  --surface-3: #dedae6;
-  --surface-4: #d8d4e0;
+  --tag-bg: #e7e3ed;
+  --hairline: #d4d0dd;
+  --hairline-strong: #bfb8cc;
+  --surface-1: #ffffff;
+  --surface-2: #ebe8f3;
+  --surface-3: #e7e3ed;
+  --surface-4: #e1dde9;
+}
+
+/* Светлый режим: белые карточки на тонированной подложке, акцентная кромка
+   у крупных блоков, белая шапка с подчёркнутым активным табом.
+   :root повышает вес селектора над scoped-стилями компонентов. */
+:root[data-mode="light"] .app-header {
+  background: var(--bg-card);
+}
+
+:root[data-mode="light"] .app-header .tab.active {
+  border-color: transparent;
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+:root[data-mode="light"] :is(.stat-card, .table-card, .sprint-widget, .chart-card, .task-tile) {
+  border-top: 3px solid var(--accent);
+}
+
+:root[data-mode="light"] .kanban-column {
+  background: var(--surface-4);
+  border-color: var(--border);
 }
