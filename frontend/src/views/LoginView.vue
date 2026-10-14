@@ -2,8 +2,10 @@
   <div class="login-overlay">
     <LoginBoard class="login-backdrop" />
     <div class="login-veil"></div>
+    <LoginLane class="login-lane-mobile" />
     <div class="login-center">
       <div class="login-card">
+        <div class="login-grab"></div>
         <h2 class="login-title">{{ greeting }}</h2>
 
         <form @submit.prevent="handleLogin" class="login-form">
@@ -58,6 +60,7 @@ import i18n from '../i18n'
 import AppButton from '../components/ui/AppButton.vue'
 import LoginBoard from '../components/login/LoginBoard.vue'
 import LoginCountdown from '../components/login/LoginCountdown.vue'
+import LoginLane from '../components/login/LoginLane.vue'
 
 const hour = new Date().getHours()
 const greeting = i18n.global.t(
@@ -162,10 +165,9 @@ async function handleLogin() {
   white-space: nowrap;
 }
 
-@media (max-width: 700px) {
-  .login-backdrop {
-    display: none;
-  }
+.login-lane-mobile,
+.login-grab {
+  display: none;
 }
 
 .login-form {
@@ -208,5 +210,67 @@ async function handleLogin() {
 
 .error-slot.visible {
   opacity: 1;
+}
+
+/* Телефон: сверху лента одной колонки, форма — нижняя шторка с табло внутри */
+@media (max-width: 700px) {
+  .login-overlay {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-end;
+  }
+
+  .login-backdrop,
+  .login-veil {
+    display: none;
+  }
+
+  .login-lane-mobile {
+    display: block;
+  }
+
+  .login-center {
+    width: 100%;
+    max-width: none;
+    padding: 12px 20px calc(20px + env(safe-area-inset-bottom));
+    background: var(--bg-card);
+    border-top: 1px solid var(--border);
+    border-radius: 26px 26px 0 0;
+    box-shadow: 0 -20px 40px -20px rgba(0, 0, 0, 0.5);
+  }
+
+  .login-card {
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .login-grab {
+    display: block;
+    width: 40px;
+    height: 5px;
+    margin: 0 auto 16px;
+    border-radius: 3px;
+    background: var(--border);
+  }
+
+  .login-title {
+    margin-bottom: 18px;
+    font-size: 26px;
+  }
+
+  .login-countdown-below {
+    position: static;
+    transform: none;
+    margin-top: 18px;
+  }
+
+  /* Шрифт 16px: при меньшем iOS увеличивает страницу при фокусе в поле */
+  .form-field input {
+    padding: 14px;
+    font-size: 16px;
+  }
 }
 </style>

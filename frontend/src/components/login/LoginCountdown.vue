@@ -140,6 +140,14 @@ onBeforeUnmount(() => clearInterval(timer))
   .caption { font-size: 12px; }
 }
 
+/* Телефон: табло внутри шторки, совсем компактное */
+@media (max-width: 700px) {
+  .login-countdown { gap: 6px; }
+  .digits { gap: 4px; }
+  .digit { width: 30px; height: 42px; font-size: 26px; border-radius: 7px; }
+  .unit { margin: 0 10px 5px 5px; font-size: 10px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .digit { animation: none; }
 }
