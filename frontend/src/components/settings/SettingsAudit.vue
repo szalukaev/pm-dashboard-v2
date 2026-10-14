@@ -35,7 +35,7 @@
           <td>
             <span class="action-badge" :class="log.action">{{ actionLabel(log.action) }}</span>
           </td>
-          <td>{{ log.entity_type || '—' }}</td>
+          <td>{{ log.entity_type ? entityLabel(log.entity_type) : '—' }}</td>
           <td>{{ log.entity_id || '—' }}</td>
           <td class="ip-cell">{{ log.ip_address || '—' }}</td>
           <td>
@@ -123,6 +123,12 @@ const ENTITIES = ['organization', 'contract', 'sprint', 'task', 'settings', 'aut
 function actionLabel(action: string): string {
   const key = 'audit.actions.' + action
   return i18n.global.te(key) ? i18n.global.t(key) : action
+}
+
+// Подпись сущности — та же, что в фильтре; неизвестная показывается как есть
+function entityLabel(entity: string): string {
+  const key = 'audit.entities.' + entity
+  return i18n.global.te(key) ? i18n.global.t(key) : entity
 }
 
 function showDetail(log: AuditEntry) {
