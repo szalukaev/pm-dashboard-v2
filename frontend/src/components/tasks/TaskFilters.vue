@@ -239,6 +239,11 @@ watch(searchInput, (val) => {
   transition: border-color 0.1s;
 }
 
+/* Подсказка «Поиск по названию или номеру…» должна помещаться целиком */
+.search-input {
+  min-width: 240px;
+}
+
 .field:focus-visible {
   outline: none;
   border-color: var(--accent);

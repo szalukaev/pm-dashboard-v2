@@ -521,7 +521,8 @@ onMounted(() => fetchAll())
   border: 1px solid var(--hairline);
   border-radius: 8px;
   color: var(--text);
-  min-width: 200px;
+  /* Подсказка «Поиск по договору или организации…» должна помещаться целиком */
+  min-width: 260px;
   margin-left: auto;
 }
 
