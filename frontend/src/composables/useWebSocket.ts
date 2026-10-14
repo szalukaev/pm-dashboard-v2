@@ -1,65 +1,58 @@
-import { ref, onUnmounted } from 'vue'
-
 type EventCallback = (data: any) => void
 
-const connected = ref(false)
-const reconnecting = ref(false)
-const reconnectAttempts = ref(0)
-const MAX_RECONNECT_ATTEMPTS = 50
+// Задержка переподключения растёт с каждой неудачей, но не больше минуты.
+// Попытки не кончаются: вкладка может простоять открытой, пока сервер
+// перезапускают, и после этого должна снова получать события.
+const RECONNECT_BASE_MS = 5000
+const RECONNECT_MAX_MS = 60000
+
 const listeners = new Map<string, Set<EventCallback>>()
 let ws: WebSocket | null = null
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+let attempts = 0
 
 function connect() {
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
   const url = `${protocol}//${location.host}/ws`
 
+  let socket: WebSocket
   try {
-    ws = new WebSocket(url)
+    socket = new WebSocket(url)
   } catch {
     scheduleReconnect()
     return
   }
+  ws = socket
 
-  ws.onopen = () => {
-    connected.value = true
-    reconnecting.value = false
-    reconnectAttempts.value = 0
-    if (reconnectTimer) {
-      clearTimeout(reconnectTimer)
-      reconnectTimer = null
-    }
+  socket.onopen = () => {
+    attempts = 0
   }
 
-  ws.onmessage = (event) => {
+  socket.onmessage = (event) => {
     try {
       const msg = JSON.parse(event.data)
-      const cbs = listeners.get(msg.event)
-      if (cbs) {
-        cbs.forEach(cb => cb(msg.data))
-      }
+      listeners.get(msg.event)?.forEach(cb => cb(msg.data))
     } catch {}
   }
 
-  ws.onclose = () => {
-    connected.value = false
+  socket.onclose = () => {
+    // Закрылось прежнее соединение, а новое уже открыто — переподключаться не нужно
+    if (ws !== socket) return
+    ws = null
     scheduleReconnect()
   }
 
-  ws.onerror = () => {
-    ws?.close()
+  socket.onerror = () => {
+    socket.close()
   }
 }
 
 function scheduleReconnect() {
-  if (reconnectAttempts.value >= MAX_RECONNECT_ATTEMPTS) {
-    reconnecting.value = false
-    return
-  }
-  reconnecting.value = true
-  const delay = Math.min(5000 * Math.pow(1.5, reconnectAttempts.value), 60000)
+  if (reconnectTimer) return
+  const delay = Math.min(RECONNECT_BASE_MS * Math.pow(1.5, attempts), RECONNECT_MAX_MS)
   reconnectTimer = setTimeout(() => {
-    reconnectAttempts.value++
+    reconnectTimer = null
+    attempts++
     connect()
   }, delay)
 }
@@ -75,23 +68,13 @@ function off(event: string, callback: EventCallback) {
   listeners.get(event)?.delete(callback)
 }
 
-function manualReconnect() {
-  reconnectAttempts.value = 0
-  if (reconnectTimer) clearTimeout(reconnectTimer)
-  connect()
-}
-
 let initialized = false
 
+// Одно соединение на вкладку, общее для всех, кто подписан на события.
 export function useWebSocket() {
   if (!initialized) {
     initialized = true
     connect()
   }
-
-  onUnmounted(() => {
-    // Соединение не закрывается — оно общее
-  })
-
-  return { connected, reconnecting, reconnectAttempts, on, off, manualReconnect }
+  return { on, off }
 }
