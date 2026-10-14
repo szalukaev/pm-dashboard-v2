@@ -192,6 +192,7 @@
       "search_placeholder": "Поиск по названию или номеру…",
       "group_by_project": "По проектам",
       "group_by_assignee": "По исполнителям",
+      "group_by_status": "По статусу",
       "categories": "Категории",
       "all_projects": "Все проекты",
       "reset": "Сбросить",
@@ -223,7 +224,8 @@
     "accordions": {
       "estimate": "Оценка",
       "fact": "Факт",
-      "no_assignee": "Без исполнителя"
+      "no_assignee": "Без исполнителя",
+      "no_status": "Без статуса"
     },
     "empty": {
       "filtered_title": "Нет задач по текущим фильтрам",

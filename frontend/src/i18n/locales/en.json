@@ -192,6 +192,7 @@
       "search_placeholder": "Search by name or number…",
       "group_by_project": "By Projects",
       "group_by_assignee": "By Assignees",
+      "group_by_status": "By Status",
       "categories": "Categories",
       "all_projects": "All projects",
       "reset": "Reset",
@@ -223,7 +224,8 @@
     "accordions": {
       "estimate": "Estimate",
       "fact": "Actual",
-      "no_assignee": "Unassigned"
+      "no_assignee": "Unassigned",
+      "no_status": "No status"
     },
     "empty": {
       "filtered_title": "No tasks match the current filters",

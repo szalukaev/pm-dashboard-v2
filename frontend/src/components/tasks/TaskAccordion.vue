@@ -10,6 +10,7 @@
         >
           <ChevronDown :size="18" class="chevron" :class="{ collapsed: !isOpen(group.name) }" />
           <Folder v-if="groupBy === 'project'" :size="18" class="person" />
+          <CircleDot v-else-if="groupBy === 'status'" :size="18" class="person" />
           <User v-else :size="18" class="person" />
           <span class="assignee-name">{{ groupTitle(group.name) }}</span>
           <span class="count-badge">{{ group.task_count }}</span>
@@ -45,7 +46,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ChevronDown, Folder, User } from 'lucide-vue-next'
+import { ChevronDown, Folder, User, CircleDot } from 'lucide-vue-next'
 import TaskTable from './TaskTable.vue'
 import AppPagination from '../ui/AppPagination.vue'
 import { useTasksStore, type TaskGroup } from '../../stores/tasks'
@@ -55,15 +56,20 @@ defineEmits(['open-task', 'sort-change'])
 
 const { t } = useI18n()
 
-// Имя группы, которое сервер даёт задачам без исполнителя
+// Имена групп, которые сервер даёт задачам без исполнителя и без статуса
 const NO_ASSIGNEE = 'Без исполнителя'
+const NO_STATUS = 'Без статуса'
 
 function groupTitle(name: string): string {
-  return name === NO_ASSIGNEE ? t('tasks.accordions.no_assignee') : name
+  if (name === NO_ASSIGNEE) return t('tasks.accordions.no_assignee')
+  if (name === NO_STATUS) return t('tasks.accordions.no_status')
+  return name
 }
 
+// Статусы сервер отдаёт в рабочем порядке (открытые, в тестировании,
+// закрытые) — его не меняем; остальные группы — по алфавиту
 const sortedGroups = computed(() =>
-  [...props.groups].sort((a, b) => {
+  props.groupBy === 'status' ? props.groups : [...props.groups].sort((a, b) => {
     if (a.name === NO_ASSIGNEE) return 1
     if (b.name === NO_ASSIGNEE) return -1
     return a.name.localeCompare(b.name, 'ru')

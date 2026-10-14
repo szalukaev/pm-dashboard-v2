@@ -81,6 +81,7 @@
             <div class="m-pills">
               <button :class="{ active: useGrouping && filters.group_by === 'project' }" data-testid="filter-group-project" @click="setGrouping('project')">{{ $t('tasks.filters.group_by_project') }}</button>
               <button :class="{ active: useGrouping && filters.group_by === 'assignee' }" data-testid="filter-group-assignee" @click="setGrouping('assignee')">{{ $t('tasks.filters.group_by_assignee') }}</button>
+              <button :class="{ active: useGrouping && filters.group_by === 'status' }" data-testid="filter-group-status-mobile" @click="setGrouping('status')">{{ $t('tasks.filters.group_by_status') }}</button>
               <button :class="{ active: !useGrouping }" data-testid="filter-no-group" @click="setGrouping('')">{{ $t('tasks.filters.no_grouping') }}</button>
             </div>
           </div>
@@ -154,6 +155,14 @@
           data-testid="filter-group-assignee"
         >
           {{ $t('tasks.filters.group_by_assignee') }}
+        </button>
+        <button
+          class="pill-btn compact"
+          :class="{ active: useGrouping && filters.group_by === 'status' }"
+          @click="setGrouping('status')"
+          data-testid="filter-group-status"
+        >
+          {{ $t('tasks.filters.group_by_status') }}
         </button>
         <button
           class="pill-btn compact"

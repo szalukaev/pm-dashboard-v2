@@ -72,7 +72,7 @@ func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 	taskType := r.URL.Query().Get("type") // "open", "testing", "closed", "all"
 	projectID := r.URL.Query().Get("project_id")
 	search := r.URL.Query().Get("search")
-	groupBy := r.URL.Query().Get("group_by") // "project", "assignee"
+	groupBy := r.URL.Query().Get("group_by") // "project", "assignee", "status"
 	sortBy := r.URL.Query().Get("sort_by")
 	sortDir := r.URL.Query().Get("sort_dir")
 	category := r.URL.Query().Get("category")
@@ -117,16 +117,9 @@ func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 
 	// Вид с группировкой: без группы ответ — заголовки групп (название,
 	// число задач, итоги), с группой — задачи этой группы.
-	groupExpr := ""
-	switch groupBy {
-	case "":
-	case "assignee":
-		groupExpr = "COALESCE(NULLIF(assigned_to_name, ''), 'Без исполнителя')"
-	default:
-		groupExpr = "COALESCE(NULLIF(project_name, ''), 'Без проекта')"
-	}
+	groupExpr, groupOrder := taskGrouping(groupBy)
 	if groupExpr != "" && !r.URL.Query().Has("group") {
-		h.listTaskGroups(w, groupExpr, strings.Join(where, " AND "), args)
+		h.listTaskGroups(w, groupExpr, groupOrder, strings.Join(where, " AND "), args)
 		return
 	}
 	if groupExpr != "" {
@@ -224,11 +217,31 @@ func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 
 // listTaskGroups отвечает на вид с группировкой заголовками групп; задачи
 // группы запрашиваются отдельно, постранично.
-func (h *TaskHandler) listTaskGroups(w http.ResponseWriter, groupExpr, condition string, args []interface{}) {
+// taskGrouping возвращает выражение группы для group_by и порядок групп
+// (окончание ORDER BY); пустое выражение — без группировки. Неизвестное
+// значение группирует по проекту, как раньше.
+func taskGrouping(groupBy string) (expr, order string) {
+	switch groupBy {
+	case "":
+		return "", ""
+	case "assignee":
+		return "COALESCE(NULLIF(assigned_to_name, ''), 'Без исполнителя')", "1"
+	case "status":
+		// Статусы идут в рабочем порядке, а не по алфавиту: открытые, в
+		// тестировании, закрытые, внутри группы — по номеру статуса
+		stage := "CASE WHEN " + statusIn("status_id", GroupClosed) + " THEN 2 WHEN " +
+			statusIn("status_id", GroupTesting) + " THEN 1 ELSE 0 END"
+		return "COALESCE(NULLIF(status_name, ''), 'Без статуса')", "MIN(" + stage + "), MIN(status_id), 1"
+	default:
+		return "COALESCE(NULLIF(project_name, ''), 'Без проекта')", "1"
+	}
+}
+
+func (h *TaskHandler) listTaskGroups(w http.ResponseWriter, groupExpr, order, condition string, args []interface{}) {
 	rows, err := (*h.DB).Query(`SELECT `+groupExpr+` AS name, COUNT(*),
 		COALESCE(SUM(estimated_hours), 0), COALESCE(SUM(spent_hours), 0)
 		FROM issues WHERE `+condition+`
-		GROUP BY 1 ORDER BY 1`, args...)
+		GROUP BY 1 ORDER BY `+order, args...)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
