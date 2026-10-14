@@ -499,10 +499,11 @@ onMounted(() => fetchAll())
   color: var(--text-bright);
 }
 
+/* Активный фильтр — заливка акцентом, как в фильтрах задач */
 .pill-btn.active {
-  background: var(--accent-bg);
+  background: var(--accent);
   border-color: var(--accent);
-  color: var(--accent);
+  color: #fff;
 }
 
 .toggle-label {
