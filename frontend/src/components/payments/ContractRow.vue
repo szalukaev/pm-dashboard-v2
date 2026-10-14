@@ -6,9 +6,9 @@
         {{ $t('payments.contract_types_short.' + contract.contract_type) }}
       </span>
       <span class="contract-name" :title="contract.owner ? contract.name + ' — ' + contract.owner : contract.name">{{ contract.name }}</span>
-      <span class="amount" :title="$t('payments.contract.amount_with_vat')">{{ formatMoney(contract.total_amount) }}</span>
-      <span class="invoiced" :title="$t('payments.stats.invoiced')">{{ formatMoney(contract.invoiced_amount) }}</span>
-      <span class="debt" :class="{ 'has-debt': contract.debt_amount > 0 }" :title="$t('payments.stats.debt')">
+      <span class="amount" :title="$t('payments.contract.amount_with_vat')" :data-label="$t('payments.stats.total_amount')">{{ formatMoney(contract.total_amount) }}</span>
+      <span class="invoiced" :title="$t('payments.stats.invoiced')" :data-label="$t('payments.stats.invoiced')">{{ formatMoney(contract.invoiced_amount) }}</span>
+      <span class="debt" :class="{ 'has-debt': contract.debt_amount > 0 }" :title="$t('payments.stats.debt')" :data-label="$t('payments.stats.debt')">
         {{ formatMoney(contract.debt_amount) }}
       </span>
       <span class="end-date" v-if="contract.end_date">
@@ -182,13 +182,37 @@ const expanded = ref(false)
   padding: 0 16px 12px 40px;
 }
 
+/* Телефон: название во всю ширину, под ним три суммы с подписями */
 @media (max-width: 768px) {
   .row-main {
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 6px 10px;
+    padding: 12px 14px;
+  }
+  .contract-name {
+    flex: 1 1 calc(100% - 140px);
+    min-width: 0;
+    white-space: normal;
+    font-weight: 600;
+    color: var(--text-bright);
   }
   .amount, .invoiced, .debt {
-    min-width: auto;
+    flex: 1 1 0;
+    min-width: 0;
+    text-align: left;
+    font-size: 13px;
+  }
+  .amount::before, .invoiced::before, .debt::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .end-date {
+    order: 1;
   }
 }
 </style>

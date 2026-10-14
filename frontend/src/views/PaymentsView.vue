@@ -527,6 +527,36 @@ onMounted(() => fetchAll())
   margin-left: auto;
 }
 
+/* Телефон: поиск во всю ширину, кнопки шапки делят строку */
+@media (max-width: 768px) {
+  .view-header {
+    margin-bottom: 14px;
+  }
+
+  .header-actions {
+    width: 100%;
+  }
+
+  .header-actions > * {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .filter-row {
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .search-input {
+    order: -1;
+    width: 100%;
+    min-width: 0;
+    margin-left: 0;
+    padding: 10px 12px;
+    font-size: 16px;
+  }
+}
+
 .loading {
   display: flex;
   justify-content: center;
