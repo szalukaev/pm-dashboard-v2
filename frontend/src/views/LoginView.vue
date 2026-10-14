@@ -120,9 +120,9 @@ async function handleLogin() {
   inset: 0;
   pointer-events: none;
   background: radial-gradient(
-    ellipse 34% 55% at 50% 50%,
-    var(--bg) 55%,
-    color-mix(in srgb, var(--bg) 55%, transparent) 100%
+    ellipse 30% 46% at 50% 50%,
+    var(--bg) 60%,
+    transparent 100%
   );
 }
 
