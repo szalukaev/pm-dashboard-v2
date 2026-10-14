@@ -73,8 +73,10 @@ services:
     build:
       context: ./frontend
       dockerfile: ../Dockerfile.frontend
+    # FRONTEND_BIND=127.0.0.1 — порт 82 только для обратного прокси на этом
+    # же хосте (HTTPS); по умолчанию открыт наружу, как раньше
     ports:
-      - "82:82"
+      - "${FRONTEND_BIND:-0.0.0.0}:82:82"
     networks:
       - backend
     depends_on:
