@@ -443,6 +443,8 @@
     "move_no_source": "The data source is not configured — the change was not saved",
     "move_forbidden": "No access to the project of this task",
     "read_only": "You have read-only access — tasks cannot be moved",
+    "move_to": "Move to column",
+    "current_column": "here now",
     "card": {
       "overdue": "Overdue"
     }

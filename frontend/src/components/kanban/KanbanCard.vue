@@ -21,6 +21,16 @@
       <span v-if="card.is_overdue" class="overdue-icon" :title="$t('kanban.card.overdue')">
         <AlertCircle :size="14" />
       </span>
+      <!-- Телефон: меню переноса вместо перетаскивания -->
+      <button
+        v-if="menu"
+        class="card-menu"
+        :aria-label="$t('kanban.move_to')"
+        :data-testid="'kanban-card-menu-' + card.external_id"
+        @click.stop="$emit('menu', card)"
+      >
+        <MoreHorizontal :size="18" />
+      </button>
     </div>
 
     <div class="card-subject" :title="card.subject">
@@ -54,7 +64,7 @@ import { computed, ref } from 'vue'
 import { formatDate as formatDay } from '../../utils/format'
 import { priorityColor as priorityColorOf } from '../../utils/statusColor'
 import { storeToRefs } from 'pinia'
-import { AlertCircle } from 'lucide-vue-next'
+import { AlertCircle, MoreHorizontal } from 'lucide-vue-next'
 import type { KanbanCard } from '../../stores/kanban'
 import { useSettingsStore } from '../../stores/settings'
 import { isFlashing } from '../../composables/useFlash'
@@ -63,7 +73,8 @@ const settingsStore = useSettingsStore()
 const { settings } = storeToRefs(settingsStore)
 
 // compact: плитка шириной по своей теме, по несколько в строке (спринты, бэклог)
-const props = defineProps<{ card: KanbanCard; compact?: boolean }>()
+// menu: кнопка «⋯» для переноса задачи на телефоне
+const props = defineProps<{ card: KanbanCard; compact?: boolean; menu?: boolean }>()
 
 const COMPACT_SUBJECT_MAX = 150
 
@@ -72,7 +83,7 @@ const subject = computed(() => {
   if (!props.compact || text.length <= COMPACT_SUBJECT_MAX) return text
   return text.slice(0, COMPACT_SUBJECT_MAX).trimEnd() + '…'
 })
-defineEmits(['open-task'])
+defineEmits(['open-task', 'menu'])
 
 const issueLink = computed(() => {
   const base = settings.value.data_source_url || ''
@@ -106,6 +117,32 @@ function formatDate(d: string): string {
 </script>
 
 <style scoped>
+.card-menu {
+  margin: -6px -6px -6px auto;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.card-menu:active {
+  background: var(--bg-hover);
+}
+
+/* С кнопкой меню значок просрочки стоит справа, рядом с ней */
+.card-header:has(.card-menu) .overdue-icon {
+  margin-left: auto;
+}
+
+.overdue-icon + .card-menu {
+  margin-left: 2px;
+}
+
 .kanban-card {
   background: var(--surface-1);
   border: 1px solid var(--hairline);

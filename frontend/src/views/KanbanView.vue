@@ -25,6 +25,14 @@
       <p class="placeholder-hint">{{ $t('kanban.select_project') }}</p>
     </div>
 
+    <!-- Телефон: колонки стопкой -->
+    <KanbanMobileBoard
+      v-else-if="isMobile"
+      :columns="columns"
+      @open-task="openTask"
+      @move="moveFromMenu"
+    />
+
     <!-- Доска -->
     <div
       v-else
@@ -60,6 +68,8 @@ import KanbanColumn from '../components/kanban/KanbanColumn.vue'
 import AppEmptyState from '../components/ui/AppEmptyState.vue'
 import AppSpinner from '../components/ui/AppSpinner.vue'
 import TaskModal from '../components/tasks/TaskModal.vue'
+import KanbanMobileBoard from '../components/kanban/KanbanMobileBoard.vue'
+import { useMobileTasks } from '../composables/useMobileTasks'
 
 const kanbanStore = useKanbanStore()
 const auth = useAuthStore()
@@ -71,6 +81,7 @@ const { fetchBoard, moveCard, moveColumn, setMode, setProject } = kanbanStore
 
 const projects = ref<{ id: number; name: string }[]>([])
 const selectedTaskId = ref<number | null>(null)
+const { isMobile } = useMobileTasks()
 
 function openTask(id: number) {
   selectedTaskId.value = id
@@ -86,6 +97,15 @@ function handleDrop(e: Event) {
   if (issueId && columnId) {
     moveCard(issueId, columnId)
   }
+}
+
+// Перенос из меню карточки на телефоне — те же проверки, что у перетаскивания
+function moveFromMenu({ issueId, columnId }: { issueId: number; columnId: string }) {
+  if (!auth.canWrite) {
+    toast(t('kanban.read_only'), 'info')
+    return
+  }
+  moveCard(issueId, columnId)
 }
 
 function handleColumnDrop(e: Event) {
