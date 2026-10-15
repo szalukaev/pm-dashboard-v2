@@ -61,7 +61,7 @@
                 :class="{ none: !task.assigned_to_name }"
                 :style="task.assigned_to_name ? { background: avatarColor(task.assigned_to_name) } : undefined"
                 aria-hidden="true"
-              >{{ task.assigned_to_name ? initials(task.assigned_to_name) : '?' }}</span>
+              ><img v-if="avatarSrc(task.assigned_to_id, task.assigned_to_name)" :src="avatarSrc(task.assigned_to_id, task.assigned_to_name)" alt="" /><template v-else>{{ task.assigned_to_name ? initials(task.assigned_to_name) : '?' }}</template></span>
               <select
                 :disabled="!auth.canWrite"
                 class="cell-input assignee"
@@ -169,6 +169,7 @@ import { statusColor, priorityColor } from '../../utils/statusColor'
 import { useMobileTasks } from '../../composables/useMobileTasks'
 import TaskMobileList from './TaskMobileList.vue'
 import { initials, avatarColor } from '../../utils/avatar'
+import { useMemberAvatars } from '../../composables/useMemberAvatars'
 
 const settingsStore = useSettingsStore()
 const tasksStore = useTasksStore()
@@ -177,6 +178,7 @@ const auth = useAuthStore()
 const { t } = useI18n()
 const { settings } = storeToRefs(settingsStore)
 const { isMobile } = useMobileTasks()
+const { avatarSrc } = useMemberAvatars()
 
 // flat: без своей рамки (таблица стоит внутри группы с рамкой)
 defineProps<{ tasks: Task[]; flat?: boolean }>()
@@ -435,6 +437,14 @@ tr.attention td:first-child {
   color: #fff;
   font-size: 9px;
   font-weight: 600;
+}
+
+/* Фото пользователя вместо инициалов */
+.avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
 }
 
 .avatar.none {

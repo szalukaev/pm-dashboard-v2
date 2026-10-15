@@ -583,3 +583,37 @@ func (h *AuthHandler) DeleteAvatar(w http.ResponseWriter, r *http.Request) {
 	}
 	utils.Success(w)
 }
+
+// MemberAvatar — аватар пользователя системы, привязанного к сотруднику источника
+type MemberAvatar struct {
+	ExternalID int    `json:"external_id"`
+	Name       string `json:"name"`
+	Avatar     string `json:"avatar"`
+}
+
+// MemberAvatars отдаёт аватары сотрудников источника, у которых есть
+// пользователь системы с загруженным фото. Остальным интерфейс рисует инициалы.
+func (h *AuthHandler) MemberAvatars(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+	rows, err := (*h.DB).Query(`SELECT m.external_id, m.name, u.avatar
+		FROM users u JOIN members m ON m.id = u.member_id
+		WHERE COALESCE(u.avatar, '') <> ''`)
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
+		return
+	}
+	defer rows.Close()
+	list := []MemberAvatar{}
+	for rows.Next() {
+		var a MemberAvatar
+		if err := rows.Scan(&a.ExternalID, &a.Name, &a.Avatar); err != nil {
+			utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
+			return
+		}
+		list = append(list, a)
+	}
+	utils.JSON(w, http.StatusOK, list)
+}

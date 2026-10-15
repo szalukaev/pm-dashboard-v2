@@ -30,7 +30,7 @@
             class="avatar"
             :style="{ background: avatarColor(task.assigned_to_name) }"
             :title="task.assigned_to_name || $t('tasks.table.unassigned')"
-          >{{ initials(task.assigned_to_name) }}</span>
+          ><img v-if="avatarSrc(task.assigned_to_id, task.assigned_to_name)" :src="avatarSrc(task.assigned_to_id, task.assigned_to_name)" alt="" /><template v-else>{{ initials(task.assigned_to_name) }}</template></span>
         </span>
       </div>
     </div>
@@ -67,7 +67,7 @@
               class="avatar small"
               :style="{ background: avatarColor(task.assigned_to_name) }"
               :title="task.assigned_to_name || $t('tasks.table.unassigned')"
-            >{{ initials(task.assigned_to_name) }}</span>
+            ><img v-if="avatarSrc(task.assigned_to_id, task.assigned_to_name)" :src="avatarSrc(task.assigned_to_id, task.assigned_to_name)" alt="" /><template v-else>{{ initials(task.assigned_to_name) }}</template></span>
           </div>
         </div>
       </div>
@@ -84,9 +84,11 @@ import { useMobileTasks } from '../../composables/useMobileTasks'
 import { isFlashing } from '../../composables/useFlash'
 import { statusColor, priorityColor } from '../../utils/statusColor'
 import { initials, avatarColor } from '../../utils/avatar'
+import { useMemberAvatars } from '../../composables/useMemberAvatars'
 
 const props = defineProps<{ tasks: Task[] }>()
 defineEmits(['open-task'])
+const { avatarSrc } = useMemberAvatars()
 
 const { locale } = useI18n()
 const { mode } = useMobileTasks()
@@ -266,6 +268,14 @@ function chipStyle(color: string) {
   font-size: 10px;
   font-weight: 700;
   color: #fff;
+}
+
+/* Фото пользователя вместо инициалов */
+.avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
 }
 
 .avatar.small {

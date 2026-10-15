@@ -300,6 +300,7 @@ func main() {
 	api.HandleFunc("/auth/change-password", authH.ChangePassword).Methods("POST")
 	api.HandleFunc("/auth/avatar", authH.UploadAvatar).Methods("POST")
 	api.HandleFunc("/auth/avatar", authH.DeleteAvatar).Methods("DELETE")
+	api.HandleFunc("/member-avatars", authH.MemberAvatars).Methods("GET")
 	// Привязка к учётной записи пользователя в источнике данных: только своя, маршрута для администратора нет
 	api.HandleFunc("/auth/source-token", authH.SetSourceToken).Methods("PUT")
 	api.HandleFunc("/auth/source-token", authH.ClearSourceToken).Methods("DELETE")

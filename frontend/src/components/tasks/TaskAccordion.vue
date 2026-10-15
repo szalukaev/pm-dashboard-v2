@@ -16,7 +16,7 @@
             v-else-if="group.name !== NO_ASSIGNEE && !isMobile"
             class="avatar"
             :style="{ background: avatarColor(group.name) }"
-          >{{ initials(group.name) }}</span>
+          ><img v-if="avatarSrc(null, group.name)" :src="avatarSrc(null, group.name)" alt="" /><template v-else>{{ initials(group.name) }}</template></span>
           <User v-else :size="18" class="person" />
           <span class="assignee-name">{{ groupTitle(group.name) }}</span>
           <span class="count-badge">{{ group.task_count }}</span>
@@ -72,6 +72,7 @@ import { statusColor } from '../../utils/statusColor'
 import { initials, avatarColor } from '../../utils/avatar'
 import TaskTable from './TaskTable.vue'
 import { useMobileTasks } from '../../composables/useMobileTasks'
+import { useMemberAvatars } from '../../composables/useMemberAvatars'
 import AppPagination from '../ui/AppPagination.vue'
 import { useTasksStore, type TaskGroup } from '../../stores/tasks'
 
@@ -94,6 +95,7 @@ function groupTitle(name: string): string {
 // закрытые) — его не меняем. Остальные группы: сначала те, где больше
 // задач с проблемами, затем по алфавиту; «Без исполнителя» — первой
 const { isMobile } = useMobileTasks()
+const { avatarSrc } = useMemberAvatars()
 
 const sortedGroups = computed(() =>
   props.groupBy === 'status' ? props.groups : [...props.groups].sort((a, b) => {
@@ -204,6 +206,13 @@ function formatTotal(h: number): string {
   font-weight: 700;
 }
 
+/* Списки телефона (карточки и сроки) внутри группы — с отступом от рамки,
+   как у шапки группы */
+.assignee-group :deep(.mobile-cards),
+.assignee-group :deep(.mobile-deadlines) {
+  padding: 10px 14px;
+}
+
 .group-loading {
   padding: 12px 14px;
   font-size: 13px;
@@ -252,6 +261,14 @@ function formatTotal(h: number): string {
   color: #fff;
   font-size: 9px;
   font-weight: 600;
+}
+
+/* Фото пользователя вместо инициалов */
+.avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
 }
 
 /* Метки проблем и загрузка — у правого края заголовка */
