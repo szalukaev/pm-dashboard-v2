@@ -2,7 +2,7 @@
   <AppModal
     :model-value="!!taskId"
     :title="task ? `#${task.external_id} ${task.subject}` : ''"
-    width="70vw"
+    width="1040px"
     expandable
     :page="isMobile"
     @update:model-value="!$event && $emit('close')"
@@ -18,11 +18,156 @@
       <AppSpinner :size="32" />
     </div>
 
-    <div v-else-if="task" class="task-card" :class="{ mobile: isMobile }">
-      <!-- Телефон: суть задачи, срок и часы крупно, исполнитель, вкладки -->
+    <div v-else-if="task" class="task-card carded" :class="isMobile ? 'mobile' : 'split'">
+      <!-- Телефон: проект и название над сводкой (на компьютере название — в заголовке окна) -->
       <template v-if="isMobile">
         <div class="m-project">{{ task.project_name }}</div>
         <div class="m-subject">{{ task.subject }}</div>
+      </template>
+
+      <!-- Слева — вкладки и разделы; справа — сводка и свойства. На телефоне
+           обёртки не влияют на раскладку: всё идёт одной колонкой -->
+      <div class="tc-main">
+        <nav class="m-tabs">
+          <button v-for="tab in mobileTabs" :key="tab.key" type="button" :class="{ on: mobileTab === tab.key }" :data-testid="'task-tab-' + tab.key" @click="setMobileTab(tab.key)">
+            {{ $t(tab.label) }}<i v-if="tab.count">{{ tab.count }}</i>
+          </button>
+        </nav>
+
+
+      <!-- Описание -->
+      <section v-show="mobileTab === 'over'" class="section">
+        <h4 class="section-title">{{ $t('tasks.modal.description') }}</h4>
+        <div v-if="detailsLoading" class="section-loading"><AppSpinner :size="20" /></div>
+        <div v-else-if="descriptionHtml" class="markup" v-html="descriptionHtml"></div>
+        <div v-else class="empty">{{ $t('tasks.modal.description_empty') }}</div>
+      </section>
+
+      <!-- Файлы -->
+      <section v-show="mobileTab === 'files'" class="section">
+        <h4 class="section-title">
+          {{ $t('tasks.modal.files') }}
+          <span v-if="attachments.length" class="section-count">{{ attachments.length }}</span>
+        </h4>
+        <div v-if="detailsLoading" class="section-loading"><AppSpinner :size="20" /></div>
+        <div v-else-if="attachments.length" class="files">
+          <a
+            v-for="a in attachments"
+            :key="a.id"
+            :href="attachmentUrl(a.id)"
+            target="_blank"
+            rel="noopener"
+            class="file"
+            :title="a.description || a.filename"
+          >
+            <img v-if="isImage(a)" :src="attachmentUrl(a.id)" :alt="a.filename" class="file-thumb" loading="lazy" />
+            <span v-else class="file-icon"><FileText :size="18" /></span>
+            <span class="file-info">
+              <span class="file-name">{{ a.filename }}</span>
+              <span class="file-meta">{{ formatSize(a.filesize) }} · {{ a.author }} · {{ formatDate(a.created_on) }}</span>
+            </span>
+          </a>
+        </div>
+        <div v-else class="empty">{{ $t('tasks.modal.files_empty') }}</div>
+      </section>
+
+      <!-- Связанные задачи -->
+      <section v-if="related.length" v-show="mobileTab === 'over'" class="section" data-testid="task-related">
+        <h4 class="section-title">
+          {{ $t('tasks.related.title') }}
+          <span class="section-count">{{ related.length }}</span>
+        </h4>
+        <div class="related">
+          <component
+            :is="r.accessible ? 'button' : 'div'"
+            v-for="r in related"
+            :key="r.relation + r.id"
+            class="related-row"
+            :class="{ locked: !r.accessible }"
+            :type="r.accessible ? 'button' : undefined"
+            @click="r.accessible && openRelated(r.id)"
+          >
+            <span class="related-type">{{ relationName(r.relation) }}</span>
+            <span class="related-id">#{{ r.id }}</span>
+            <span class="related-subject">{{ r.accessible ? r.subject : $t('tasks.related.hidden') }}</span>
+            <span v-if="r.accessible && r.status" class="related-status" :style="statusBadge(r.status)">{{ r.status }}</span>
+          </component>
+        </div>
+      </section>
+
+      <!-- Комментарии или вся история задачи; на телефоне — вкладки «Обсуждение» и «История» -->
+      <section v-show="mobileTab === 'talk' || mobileTab === 'history'" class="section">
+        <div v-if="detailsLoading" class="section-loading"><AppSpinner :size="20" /></div>
+        <template v-else-if="historyMode === 'history'">
+          <div v-if="history.length" class="comments">
+            <div v-for="e in history" :key="e.id" class="comment">
+              <span class="avatar">{{ initials(e.author) }}</span>
+              <div class="comment-body">
+                <div class="comment-header">
+                  <span class="comment-author">{{ e.author }}</span>
+                  <span class="comment-date">{{ formatDate(e.created_on) }}</span>
+                </div>
+                <ul v-if="e.changes.length" class="changes">
+                  <li v-for="(change, i) in e.changes" :key="i">
+                    <span class="change-field">{{ fieldName(change.field) }}:</span>
+                    <template v-if="change.field === 'description'">{{ $t('tasks.history.changed') }}</template>
+                    <template v-else>
+                      <span class="change-old">{{ change.old || '—' }}</span>
+                      <span class="change-arrow">→</span>
+                      <span class="change-new">{{ change.new || '—' }}</span>
+                    </template>
+                  </li>
+                </ul>
+                <div v-if="e.html" class="markup comment-text" v-html="e.html"></div>
+              </div>
+            </div>
+          </div>
+          <div v-else class="empty">{{ $t('tasks.history.empty') }}</div>
+        </template>
+        <div v-else-if="comments.length" class="comments">
+          <div v-for="c in comments" :key="c.id" class="comment">
+            <span class="avatar">{{ initials(c.author) }}</span>
+            <div class="comment-body">
+              <div class="comment-header">
+                <span class="comment-author">{{ c.author }}</span>
+                <span class="comment-date">{{ formatDate(c.created_on) }}</span>
+              </div>
+              <div class="markup comment-text" v-html="c.html"></div>
+            </div>
+          </div>
+        </div>
+        <div v-else class="empty">{{ $t('tasks.modal.comments_empty') }}</div>
+        <div v-if="detailsError" class="empty error-text">{{ detailsError }}</div>
+      </section>
+
+      <!-- Новый комментарий -->
+      <section v-if="auth.canWrite" v-show="mobileTab === 'talk'" class="section new-comment">
+        <h4 class="section-title">{{ $t('tasks.modal.new_comment') }}</h4>
+        <textarea
+          v-model="newComment"
+          class="comment-input"
+          :placeholder="$t('tasks.modal.comment_placeholder')"
+          rows="3"
+          @keydown.ctrl.enter="submitComment"
+          @keydown.meta.enter="submitComment"
+        ></textarea>
+        <div class="comment-actions">
+          <span class="comment-hint">{{ $t('tasks.modal.comment_hint') }}</span>
+          <AppButton
+            variant="primary"
+            size="sm"
+            :disabled="!newComment.trim()"
+            :loading="sendingComment"
+            @click="submitComment"
+          >
+            {{ $t('common.save') }}
+          </AppButton>
+        </div>
+      </section>
+      </div>
+
+      <aside class="tc-side">
+        <div class="tc-summary">
         <div class="m-chips">
           <!-- Чип — это и есть выбор: поверх него прозрачный список, телефон показывает свой выбор значения -->
           <label class="m-chip" :style="chipColors(statusColor(editFields.status_name))">
@@ -72,12 +217,7 @@
           </select>
         </label>
 
-        <nav class="m-tabs">
-          <button v-for="tab in mobileTabs" :key="tab.key" type="button" :class="{ on: mobileTab === tab.key }" :data-testid="'task-tab-' + tab.key" @click="setMobileTab(tab.key)">
-            {{ $t(tab.label) }}<i v-if="tab.count">{{ tab.count }}</i>
-          </button>
-        </nav>
-      </template>
+        </div>
 
       <!-- Параметры -->
       <section v-show="!isMobile || mobileTab === 'over'" class="params">
@@ -105,39 +245,9 @@
               <span class="unit">{{ $t('tasks.units.hours') }}</span>
             </div>
           </div>
-          <div v-if="!isMobile" class="param">
-            <span class="param-label">{{ $t('tasks.modal.fact') }}</span>
-            <span class="param-value num">{{ formatHours(task.spent_hours) }}</span>
-          </div>
-          <div v-if="!isMobile" class="param">
-            <span class="param-label">{{ $t('tasks.modal.bug_fix') }}</span>
-            <span class="param-value num">
-              {{ formatHours(task.bug_fix_hours) }}
-              <span v-if="bugFixPct" class="param-hint">{{ bugFixPct }}</span>
-            </span>
-          </div>
         </div>
 
         <div class="params-col">
-          <div v-if="!isMobile" class="param">
-            <span class="param-label">{{ $t('tasks.table.status') }}</span>
-            <select v-model="editFields.status_name" :disabled="!auth.canWrite" class="field-input" @change="saveField('status_name')">
-              <option v-for="s in statuses" :key="s.id" :value="s.name">{{ s.name }}</option>
-            </select>
-          </div>
-          <div v-if="!isMobile" class="param">
-            <span class="param-label">{{ $t('tasks.table.priority') }}</span>
-            <select v-model="editFields.priority_name" :disabled="!auth.canWrite" class="field-input" @change="saveField('priority_name')">
-              <option v-for="p in priorityNames" :key="p" :value="p">{{ p }}</option>
-            </select>
-          </div>
-          <div v-if="!isMobile" class="param">
-            <span class="param-label">{{ $t('tasks.table.assignee') }}</span>
-            <select v-model="editFields.assigned_to_name" :disabled="!auth.canWrite" class="field-input" @change="saveField('assigned_to_name')">
-              <option value="">{{ $t('tasks.modal.no_assignee') }}</option>
-              <option v-for="m in memberNames" :key="m" :value="m">{{ m }}</option>
-            </select>
-          </div>
           <div class="param">
             <span class="param-label">{{ $t('tasks.modal.category') }}</span>
             <select v-model="editFields.category_name" :disabled="!auth.canWrite" class="field-input" @change="saveField('category_name')">
@@ -149,152 +259,9 @@
             <span class="param-label">{{ $t('tasks.modal.start_date') }}</span>
             <span class="param-value">{{ formatDay(task.start_date) }}</span>
           </div>
-          <div v-if="!isMobile" class="param">
-            <span class="param-label">{{ $t('tasks.modal.deadline') }}</span>
-            <input type="date" v-model="editFields.due_date" :disabled="!auth.canWrite" class="field-input" @change="saveField('due_date')" />
-          </div>
         </div>
       </section>
-
-      <!-- Описание -->
-      <section v-show="!isMobile || mobileTab === 'over'" class="section">
-        <h4 class="section-title">{{ $t('tasks.modal.description') }}</h4>
-        <div v-if="detailsLoading" class="section-loading"><AppSpinner :size="20" /></div>
-        <div v-else-if="descriptionHtml" class="markup" v-html="descriptionHtml"></div>
-        <div v-else class="empty">{{ $t('tasks.modal.description_empty') }}</div>
-      </section>
-
-      <!-- Файлы -->
-      <section v-show="!isMobile || mobileTab === 'files'" class="section">
-        <h4 class="section-title">
-          {{ $t('tasks.modal.files') }}
-          <span v-if="attachments.length" class="section-count">{{ attachments.length }}</span>
-        </h4>
-        <div v-if="detailsLoading" class="section-loading"><AppSpinner :size="20" /></div>
-        <div v-else-if="attachments.length" class="files">
-          <a
-            v-for="a in attachments"
-            :key="a.id"
-            :href="attachmentUrl(a.id)"
-            target="_blank"
-            rel="noopener"
-            class="file"
-            :title="a.description || a.filename"
-          >
-            <img v-if="isImage(a)" :src="attachmentUrl(a.id)" :alt="a.filename" class="file-thumb" loading="lazy" />
-            <span v-else class="file-icon"><FileText :size="18" /></span>
-            <span class="file-info">
-              <span class="file-name">{{ a.filename }}</span>
-              <span class="file-meta">{{ formatSize(a.filesize) }} · {{ a.author }} · {{ formatDate(a.created_on) }}</span>
-            </span>
-          </a>
-        </div>
-        <div v-else class="empty">{{ $t('tasks.modal.files_empty') }}</div>
-      </section>
-
-      <!-- Связанные задачи -->
-      <section v-if="related.length" v-show="!isMobile || mobileTab === 'over'" class="section" data-testid="task-related">
-        <h4 class="section-title">
-          {{ $t('tasks.related.title') }}
-          <span class="section-count">{{ related.length }}</span>
-        </h4>
-        <div class="related">
-          <component
-            :is="r.accessible ? 'button' : 'div'"
-            v-for="r in related"
-            :key="r.relation + r.id"
-            class="related-row"
-            :class="{ locked: !r.accessible }"
-            :type="r.accessible ? 'button' : undefined"
-            @click="r.accessible && openRelated(r.id)"
-          >
-            <span class="related-type">{{ relationName(r.relation) }}</span>
-            <span class="related-id">#{{ r.id }}</span>
-            <span class="related-subject">{{ r.accessible ? r.subject : $t('tasks.related.hidden') }}</span>
-            <span v-if="r.accessible && r.status" class="related-status" :style="statusBadge(r.status)">{{ r.status }}</span>
-          </component>
-        </div>
-      </section>
-
-      <!-- Комментарии или вся история задачи; на телефоне — вкладки «Обсуждение» и «История» -->
-      <section v-show="!isMobile || mobileTab === 'talk' || mobileTab === 'history'" class="section">
-        <h4 v-if="!isMobile" class="section-title">
-          <button type="button" class="mode-pill" :class="{ active: historyMode === 'comments' }" data-testid="mode-comments" @click="historyMode = 'comments'">
-            {{ $t('tasks.modal.comments') }}
-            <span v-if="comments.length" class="section-count">{{ comments.length }}</span>
-          </button>
-          <button type="button" class="mode-pill" :class="{ active: historyMode === 'history' }" data-testid="mode-history" @click="historyMode = 'history'">
-            {{ $t('tasks.history.title') }}
-            <span v-if="history.length" class="section-count">{{ history.length }}</span>
-          </button>
-        </h4>
-        <div v-if="detailsLoading" class="section-loading"><AppSpinner :size="20" /></div>
-        <template v-else-if="historyMode === 'history'">
-          <div v-if="history.length" class="comments">
-            <div v-for="e in history" :key="e.id" class="comment">
-              <span class="avatar">{{ initials(e.author) }}</span>
-              <div class="comment-body">
-                <div class="comment-header">
-                  <span class="comment-author">{{ e.author }}</span>
-                  <span class="comment-date">{{ formatDate(e.created_on) }}</span>
-                </div>
-                <ul v-if="e.changes.length" class="changes">
-                  <li v-for="(change, i) in e.changes" :key="i">
-                    <span class="change-field">{{ fieldName(change.field) }}:</span>
-                    <template v-if="change.field === 'description'">{{ $t('tasks.history.changed') }}</template>
-                    <template v-else>
-                      <span class="change-old">{{ change.old || '—' }}</span>
-                      <span class="change-arrow">→</span>
-                      <span class="change-new">{{ change.new || '—' }}</span>
-                    </template>
-                  </li>
-                </ul>
-                <div v-if="e.html" class="markup comment-text" v-html="e.html"></div>
-              </div>
-            </div>
-          </div>
-          <div v-else class="empty">{{ $t('tasks.history.empty') }}</div>
-        </template>
-        <div v-else-if="comments.length" class="comments">
-          <div v-for="c in comments" :key="c.id" class="comment">
-            <span class="avatar">{{ initials(c.author) }}</span>
-            <div class="comment-body">
-              <div class="comment-header">
-                <span class="comment-author">{{ c.author }}</span>
-                <span class="comment-date">{{ formatDate(c.created_on) }}</span>
-              </div>
-              <div class="markup comment-text" v-html="c.html"></div>
-            </div>
-          </div>
-        </div>
-        <div v-else class="empty">{{ $t('tasks.modal.comments_empty') }}</div>
-        <div v-if="detailsError" class="empty error-text">{{ detailsError }}</div>
-      </section>
-
-      <!-- Новый комментарий -->
-      <section v-if="auth.canWrite" v-show="!isMobile || mobileTab === 'talk'" class="section new-comment">
-        <h4 class="section-title">{{ $t('tasks.modal.new_comment') }}</h4>
-        <textarea
-          v-model="newComment"
-          class="comment-input"
-          :placeholder="$t('tasks.modal.comment_placeholder')"
-          rows="3"
-          @keydown.ctrl.enter="submitComment"
-          @keydown.meta.enter="submitComment"
-        ></textarea>
-        <div class="comment-actions">
-          <span class="comment-hint">{{ $t('tasks.modal.comment_hint') }}</span>
-          <AppButton
-            variant="primary"
-            size="sm"
-            :disabled="!newComment.trim()"
-            :loading="sendingComment"
-            @click="submitComment"
-          >
-            {{ $t('common.save') }}
-          </AppButton>
-        </div>
-      </section>
+      </aside>
     </div>
   </AppModal>
 </template>
@@ -392,7 +359,7 @@ const { isMobile } = useMobileTasks()
 const { avatarSrc } = useMemberAvatars()
 const mobileTab = ref<'over' | 'talk' | 'files' | 'history'>('over')
 const mobileTabs = computed(() => [
-  { key: 'over' as const, label: 'tasks.mobile.card.tab_over', count: 0 },
+  { key: 'over' as const, label: isMobile.value ? 'tasks.mobile.card.tab_over' : 'tasks.modal.description', count: 0 },
   { key: 'talk' as const, label: 'tasks.modal.comments', count: comments.value.length },
   { key: 'files' as const, label: 'tasks.modal.files', count: attachments.value.length },
   { key: 'history' as const, label: 'tasks.history.title', count: history.value.length },
@@ -1449,7 +1416,7 @@ button.related-row:hover {
 }
 
 /* Свойства на «Обзоре» — список в карточке: название слева, значение справа */
-.task-card.mobile .params {
+.task-card.carded .params {
   display: block;
   padding: 0;
   overflow: hidden;
@@ -1458,11 +1425,11 @@ button.related-row:hover {
   border-radius: 14px;
 }
 
-.task-card.mobile .params-col {
+.task-card.carded .params-col {
   display: contents;
 }
 
-.task-card.mobile .param {
+.task-card.carded .param {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1471,34 +1438,34 @@ button.related-row:hover {
   border-bottom: 1px solid var(--border-light);
 }
 
-.task-card.mobile .param:last-child {
+.task-card.carded .param:last-child {
   border-bottom: 1px solid var(--border-light);
 }
 
-.task-card.mobile .params-col:last-child .param:last-child {
+.task-card.carded .params-col:last-child .param:last-child {
   border-bottom: none;
 }
 
-.task-card.mobile .param-label {
+.task-card.carded .param-label {
   flex: 1;
   font-size: 14px;
   color: var(--text-muted);
 }
 
-.task-card.mobile .param-value {
+.task-card.carded .param-value {
   padding: 0;
   font-size: 15px;
   color: var(--text-bright);
   text-align: right;
 }
 
-.task-card.mobile .param-control {
+.task-card.carded .param-control {
   justify-content: flex-end;
   gap: 4px;
 }
 
 /* Поля без рамок: значение справа, как обычный текст */
-.task-card.mobile .field-input {
+.task-card.carded .field-input {
   width: auto;
   max-width: 60vw;
   padding: 6px 0;
@@ -1511,16 +1478,88 @@ button.related-row:hover {
   -webkit-appearance: none;
 }
 
-.task-card.mobile .num-input {
+.task-card.carded .num-input {
   width: 64px;
 }
 
 /* У изменяемых значений справа «›» */
-.task-card.mobile .param:has(select:not(:disabled))::after,
-.task-card.mobile .param:has(input:not(:disabled))::after {
+.task-card.carded .param:has(select:not(:disabled))::after,
+.task-card.carded .param:has(input:not(:disabled))::after {
   content: '›';
   font-size: 18px;
   color: var(--text-faint);
+}
+
+/* ── Компьютер: две колонки — вкладки слева, сводка и свойства справа ── */
+.task-card.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  align-items: start;
+  gap: 24px;
+}
+
+.task-card.split .tc-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.task-card.split .m-tabs {
+  position: static;
+  margin: 0;
+  padding: 0;
+}
+
+.task-card.split .tc-side {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.task-card.split .tc-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.task-card.split .m-kpi {
+  margin: 0;
+}
+
+.task-card.split .m-assignee {
+  margin: 0;
+}
+
+.task-card.split .field-input {
+  max-width: 180px;
+}
+
+/* ── Телефон: обёртки не участвуют в раскладке, порядок — как раньше ── */
+.task-card.mobile .tc-main,
+.task-card.mobile .tc-side,
+.task-card.mobile .tc-summary {
+  display: contents;
+}
+
+.task-card.mobile .m-chips,
+.task-card.mobile .m-kpi,
+.task-card.mobile .m-assignee { order: 1; }
+.task-card.mobile .m-tabs { order: 2; }
+.task-card.mobile .params { order: 3; }
+.task-card.mobile .section { order: 4; }
+
+/* Окно уже — колонки друг под другом */
+@media (max-width: 900px) {
+  .task-card.split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .task-card.split .tc-side {
+    position: static;
+    order: -1;
+  }
 }
 </style>
 
