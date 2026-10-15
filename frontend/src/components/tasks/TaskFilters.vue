@@ -346,6 +346,8 @@ function onProjectChange() {
 const TASK_NUMBER = /^#?\s*(\d+)$/
 
 function doSearch() {
+  // Телефон: после поиска клавиатура убирается
+  if (isMobile.value) (document.activeElement as HTMLElement | null)?.blur()
   const number = TASK_NUMBER.exec(searchInput.value.trim())
   if (number) {
     router.replace({ path: route.path, query: { ...route.query, task: number[1] } })
