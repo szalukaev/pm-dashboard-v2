@@ -133,6 +133,11 @@ onUnmounted(() => {
     padding-bottom: calc(92px + env(safe-area-inset-bottom));
   }
 
+  /* Название раздела уже стоит в шапке — заголовок страницы не повторяется */
+  .app-content :deep(.page-title) {
+    display: none;
+  }
+
   .license-banner {
     padding: 8px 16px;
   }
