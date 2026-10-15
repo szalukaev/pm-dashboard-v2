@@ -18,7 +18,7 @@
       <AppSpinner :size="32" />
     </div>
 
-    <div v-else-if="task" class="task-card carded" :class="isMobile ? 'mobile' : 'split'">
+    <div v-else-if="task" ref="cardEl" class="task-card carded" :class="isMobile ? 'mobile' : 'split'" @click="onCardClick">
       <!-- Телефон: проект и название над сводкой (на компьютере название — в заголовке окна) -->
       <template v-if="isMobile">
         <div class="m-project">{{ task.project_name }}</div>
@@ -263,6 +263,9 @@
       </section>
       </aside>
     </div>
+
+    <!-- Картинки задачи на весь экран -->
+    <AppImageViewer v-model:index="viewerIndex" :images="viewerImages" />
   </AppModal>
 </template>
 
@@ -274,6 +277,7 @@ import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import { FileText } from 'lucide-vue-next'
 import AppModal from '../ui/AppModal.vue'
+import AppImageViewer, { type ViewerImage } from '../ui/AppImageViewer.vue'
 import AppSpinner from '../ui/AppSpinner.vue'
 import AppButton from '../ui/AppButton.vue'
 import { useTasksStore, type Task } from '../../stores/tasks'
@@ -353,6 +357,28 @@ const rawComments = ref<Comment[]>([])
 const rawHistory = ref<HistoryEntry[]>([])
 const related = ref<RelatedIssue[]>([])
 const historyMode = ref<'comments' | 'history'>('comments')
+
+// Просмотр картинок: нажатие на картинку в описании, комментарии или на
+// превью файла открывает её на весь экран; листаются все картинки задачи
+const cardEl = ref<HTMLElement | null>(null)
+const viewerImages = ref<ViewerImage[]>([])
+const viewerIndex = ref<number | null>(null)
+
+function onCardClick(e: MouseEvent) {
+  const img = (e.target as HTMLElement).closest('img')
+  if (!img || !cardEl.value || !(img.closest('.markup') || img.classList.contains('file-thumb'))) return
+  e.preventDefault()
+  const all = [...cardEl.value.querySelectorAll<HTMLImageElement>('.markup img, img.file-thumb')]
+  const seen = new Set<string>()
+  const list: ViewerImage[] = []
+  for (const el of all) {
+    if (!el.src || seen.has(el.src)) continue
+    seen.add(el.src)
+    list.push({ src: el.src, alt: el.alt || '' })
+  }
+  viewerImages.value = list
+  viewerIndex.value = Math.max(0, list.findIndex(item => item.src === img.src))
+}
 
 // Телефон: карточка — отдельный экран с вкладками
 const { isMobile } = useMobileTasks()
@@ -819,6 +845,11 @@ function initials(name: string): string {
 
 .markup :deep(a:hover) {
   text-decoration: underline;
+}
+
+.markup :deep(img),
+.file-thumb {
+  cursor: zoom-in;
 }
 
 .markup :deep(img) {

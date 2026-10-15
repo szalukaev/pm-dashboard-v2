@@ -52,7 +52,10 @@
       "notifications": "Собираем уведомления"
     },
     "app_updated": "Приложение обновлено",
-    "app_update": "Обновить"
+    "app_update": "Обновить",
+    "image": "Картинка",
+    "open_original": "Открыть оригинал",
+    "previous": "Предыдущая"
   },
   "auth": {
     "login": "Войти",

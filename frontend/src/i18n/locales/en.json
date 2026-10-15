@@ -52,7 +52,10 @@
       "notifications": "Collecting notifications"
     },
     "app_updated": "The app has been updated",
-    "app_update": "Reload"
+    "app_update": "Reload",
+    "image": "Image",
+    "open_original": "Open original",
+    "previous": "Previous"
   },
   "auth": {
     "login": "Sign in",
