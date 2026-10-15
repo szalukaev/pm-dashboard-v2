@@ -14,8 +14,12 @@
           :ref="el => setRef(toast.id, el as HTMLElement | null)"
           class="toast"
           :class="toast.type"
-          :style="itemStyle(i)"
+          :style="itemStyle(i, toast.id)"
           role="status"
+          @pointerdown="startDrag($event, toast.id)"
+          @pointermove="moveDrag"
+          @pointerup="endDrag"
+          @pointercancel="cancelDrag"
         >
           <CheckCircle2 v-if="toast.type === 'success'" class="toast-icon" :size="16" />
           <AlertCircle v-else-if="toast.type === 'error'" class="toast-icon" :size="16" />
@@ -35,6 +39,9 @@
               </div>
             </template>
             <template v-else>{{ toast.message }}</template>
+            <button v-if="toast.action" type="button" class="toast-action" data-testid="toast-action" @click="toast.action.run()">
+              {{ toast.action.label }}
+            </button>
           </div>
 
           <button class="toast-close" :aria-label="t('common.close')" @click="dismiss(toast.id)">
@@ -47,7 +54,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, watch } from 'vue'
+import { ref, reactive, nextTick, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-vue-next'
 import { useToast } from '../../composables/useToast'
@@ -80,8 +87,13 @@ function measure() {
   stackHeight.value = y
 }
 
-function itemStyle(i: number) {
+function itemStyle(i: number, id: number) {
   const z = { zIndex: toasts.value.length - i }
+  // Тост, который тянут вверх, едет за пальцем и становится прозрачнее
+  if (drag.id === id && drag.dy < 0) {
+    const base = open.value ? offsets.value[i] ?? 0 : i * 9
+    return { ...z, transform: `translateY(${base + drag.dy}px)`, opacity: Math.max(0, 1 + drag.dy / 120), transition: 'none' }
+  }
   if (open.value) return { ...z, transform: `translateY(${offsets.value[i] ?? 0}px)` }
   // Свёрнутая: каждая следующая чуть ниже и мельче, лишние скрыты
   return {
@@ -89,6 +101,43 @@ function itemStyle(i: number) {
     transform: `translateY(${i * 9}px) scale(${1 - i * 0.05})`,
     opacity: i < VISIBLE_COLLAPSED ? 1 : 0,
   }
+}
+
+// Смахивание вверх: больше 40 px или резкий рывок — тост закрыт, иначе он
+// возвращается на место. Пока тост тянут, таймеры стоят
+const SWIPE_DISTANCE = 40
+const SWIPE_SPEED = 0.5 // px/мс
+const drag = reactive({ id: -1, y0: 0, dy: 0, t0: 0 })
+
+function startDrag(e: PointerEvent, id: number) {
+  // Кнопки внутри тоста нажимаются как обычно
+  if ((e.target as HTMLElement).closest('button')) return
+  drag.id = id
+  drag.y0 = e.clientY
+  drag.dy = 0
+  drag.t0 = Date.now()
+  ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+  pauseAll()
+}
+
+function moveDrag(e: PointerEvent) {
+  if (drag.id < 0) return
+  drag.dy = Math.min(0, e.clientY - drag.y0)
+}
+
+function endDrag() {
+  if (drag.id < 0) return
+  const speed = -drag.dy / Math.max(1, Date.now() - drag.t0)
+  const id = drag.id
+  const swiped = drag.dy < -SWIPE_DISTANCE || speed > SWIPE_SPEED
+  cancelDrag()
+  if (swiped) dismiss(id)
+}
+
+function cancelDrag() {
+  drag.id = -1
+  drag.dy = 0
+  if (!open.value) resumeAll()
 }
 
 function expand() {
@@ -112,6 +161,25 @@ watch(() => toasts.value.length, async () => {
 </script>
 
 <style scoped>
+.toast-action {
+  display: block;
+  margin-top: 8px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toast {
+  /* Тост тянут пальцем вверх — страница при этом не прокручивается */
+  touch-action: none;
+  user-select: none;
+}
+
 .toast-stack {
   position: fixed;
   top: 16px;

@@ -10,3 +10,6 @@ declare module 'textile-js' {
   const textile: (source: string, options?: { breaks?: boolean }) => string
   export default textile
 }
+
+// Номер сборки (vite.config.ts)
+declare const __BUILD_ID__: string

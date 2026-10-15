@@ -50,7 +50,9 @@
       "sprint": "Gathering sprints",
       "payments": "Checking payments",
       "notifications": "Collecting notifications"
-    }
+    },
+    "app_updated": "The app has been updated",
+    "app_update": "Reload"
   },
   "auth": {
     "login": "Sign in",

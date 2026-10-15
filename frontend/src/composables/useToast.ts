@@ -15,7 +15,10 @@ export interface ToastItem {
   type: ToastType
   message?: string
   change?: ToastChange
+  // 0 — тост без таймера: закрывается только крестиком или смахиванием
   duration: number
+  // Кнопка в тосте, например «Обновить»
+  action?: { label: string; run: () => void }
 }
 
 // Больше пяти уведомлений в стопке не держим — самые старые уходят
@@ -42,7 +45,7 @@ function push(item: Omit<ToastItem, 'id'>) {
   // Новые — в начало: они лежат сверху стопки
   toasts.value = [{ ...item, id }, ...toasts.value]
   toasts.value.slice(MAX_TOASTS).forEach(t => dismiss(t.id))
-  startTimer(id, item.duration)
+  if (item.duration > 0) startTimer(id, item.duration)
   return id
 }
 
@@ -68,5 +71,10 @@ export function useToast() {
     return push({ type: 'success', change, duration: 4000 })
   }
 
-  return { toasts, show, showChange, dismiss, pauseAll, resumeAll }
+  // Тост без таймера с кнопкой действия
+  function showPersistent(message: string, action: ToastItem['action'], type: ToastType = 'info') {
+    return push({ type, message, action, duration: 0 })
+  }
+
+  return { toasts, show, showChange, showPersistent, dismiss, pauseAll, resumeAll }
 }
