@@ -148,4 +148,11 @@ function pct(amount: number): string {
     font-size: 24px;
   }
 }
+
+/* Узкий телефон: в половину ширины сумма не помещается — каждая карточка в свою строку */
+@media (max-width: 480px) {
+  .payment-summary {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

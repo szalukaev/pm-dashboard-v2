@@ -126,4 +126,32 @@ function setDate(edge: 'from' | 'to', value: string) {
 .period-dash {
   color: var(--text-muted);
 }
+
+/* На телефоне переключатель — во всю ширину, кнопки поровну и выше под палец;
+   длинная подпись переносится, а не уходит за край */
+@media (max-width: 767px) {
+  .period,
+  .period-modes {
+    width: 100%;
+  }
+
+  .period-mode {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 36px;
+    padding: 4px 6px;
+    white-space: normal;
+    line-height: 1.2;
+  }
+
+  .period-range {
+    width: 100%;
+  }
+
+  .period-date {
+    flex: 1;
+    min-width: 0;
+    min-height: 36px;
+  }
+}
 </style>

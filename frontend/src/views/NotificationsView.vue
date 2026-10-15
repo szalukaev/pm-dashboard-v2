@@ -238,6 +238,7 @@ onBeforeUnmount(() => observer?.disconnect())
 }
 
 .n-readall button {
+  min-height: 36px;
   padding: 4px 2px;
   border: 0;
   background: none;

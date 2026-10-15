@@ -168,7 +168,7 @@ function ringDash(pct: number) {
 <style scoped>
 .org-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr));
   gap: 10px;
   align-items: start;
 }
@@ -251,9 +251,13 @@ function ringDash(pct: number) {
   font-size: 14px;
   font-weight: 600;
   color: var(--text-bright);
-  white-space: nowrap;
+  /* Длинное название — в две строки, дальше многоточие */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 .org-meta {

@@ -2,8 +2,7 @@
   <section
     ref="root"
     class="dash-widget"
-    :class="[dropSide ? 'drop-' + dropSide : '', { dragging, collapsed }]"
-    :style="{ gridColumn: movable ? 'span ' + cols : '1 / -1' }"
+    :class="[dropSide ? 'drop-' + dropSide : '', movable ? 'w' + cols : 'w12', { dragging, collapsed }]"
     :data-testid="'widget-' + id"
     @dragover="$emit('over', $event)"
     @drop="$emit('drop-on', $event)"
@@ -150,6 +149,18 @@ function onResizeEnd(e: PointerEvent) {
   background: var(--bg);
 }
 
+/* Ширина в колонках сетки из 12 */
+.dash-widget.w4 { grid-column: span 4; }
+.dash-widget.w6 { grid-column: span 6; }
+.dash-widget.w8 { grid-column: span 8; }
+.dash-widget.w12 { grid-column: 1 / -1; }
+
+/* На планшете треть слишком узка: треть и две трети встают по половине */
+@media (max-width: 1100px) {
+  .dash-widget.w4,
+  .dash-widget.w8 { grid-column: span 6; }
+}
+
 .dash-widget.dragging {
   opacity: 0.4;
 }
@@ -226,6 +237,14 @@ function onResizeEnd(e: PointerEvent) {
   background: var(--surface-2);
   color: var(--text-muted);
   cursor: pointer;
+}
+
+/* На телефоне кнопки виджета крупнее — под палец */
+@media (max-width: 767px) {
+  .dash-btn {
+    width: 36px;
+    height: 36px;
+  }
 }
 
 .dash-size:hover,

@@ -283,6 +283,8 @@ async function logout() {
 }
 
 .p-link {
+  min-height: 36px;
+  padding: 0;
   margin-top: 2px;
   border: 0;
   background: none;

@@ -37,7 +37,7 @@
           <span class="ios-name">{{ $t('sprint.form.due_date') }}</span>
           <input v-model="form.due_date" type="date" :min="form.start_date" @change="onDatesChange" />
         </label>
-        <div class="ios-cell">
+        <div class="ios-cell ios-cell-wrap">
           <span class="ios-name">{{ $t('sprint.form.duration') }}</span>
           <span class="duration-fields">
             <input v-model.number="form.duration" type="number" min="1" step="1" inputmode="numeric" class="duration-input" data-testid="sprint-duration" @input="onDurationInput" />
@@ -574,6 +574,22 @@ function submit() {
 .duration-input {
   width: 80px;
   flex: none;
+}
+
+/* В окне на телефоне: не помещаются рядом с подписью — уходят под неё, а не за край */
+.ios-cell-wrap {
+  flex-wrap: wrap;
+  row-gap: 0;
+}
+
+.ios-cell-wrap .duration-fields {
+  flex: 1 1 200px;
+  min-width: 0;
+  justify-content: flex-end;
+}
+
+.ios-cell-wrap .duration-fields select {
+  flex: 0 1 auto;
 }
 
 .date-hint {
