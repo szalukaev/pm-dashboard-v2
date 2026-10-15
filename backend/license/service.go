@@ -233,14 +233,18 @@ func (s *Service) Check() Status {
 	db := *s.db
 	switch v.state {
 	case Active:
-		db.Exec(`UPDATE licenses SET last_check_ok_at = $1, grace_started_at = NULL WHERE license_blob = $2`, now, lic.token)
+		if _, err := db.Exec(`UPDATE licenses SET last_check_ok_at = $1, grace_started_at = NULL WHERE license_blob = $2`, now, lic.token); err != nil {
+			slog.Warn("Database write failed", "at", "Check", "error", err)
+		}
 		status.LastCheckOK = &now
 		if previous == Grace || previous == ReadOnly || lic.graceStarted != nil {
 			s.logEvent(EventRestored, "")
 		}
 	case Grace, ReadOnly:
 		if lic.graceStarted == nil {
-			db.Exec(`UPDATE licenses SET grace_started_at = $1 WHERE license_blob = $2`, *v.graceStarted, lic.token)
+			if _, err := db.Exec(`UPDATE licenses SET grace_started_at = $1 WHERE license_blob = $2`, *v.graceStarted, lic.token); err != nil {
+				slog.Warn("Database write failed", "at", "Check", "error", err)
+			}
 			s.logEvent(EventGraceStarted, v.reason)
 		}
 		ends := v.graceStarted.Add(time.Duration(v.payload.GraceDays()) * 24 * time.Hour)

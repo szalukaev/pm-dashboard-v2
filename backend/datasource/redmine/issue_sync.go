@@ -472,12 +472,12 @@ func (p pgStore) deleteMissing(projectID int, keep []int) ([]int, error) {
 	for rows.Next() {
 		var id int
 		if err := rows.Scan(&id); err != nil {
-			rows.Close()
+			_ = rows.Close()
 			return nil, err
 		}
 		gone = append(gone, id)
 	}
-	rows.Close()
+	_ = rows.Close()
 	if err := rows.Err(); err != nil || len(gone) == 0 {
 		return nil, err
 	}

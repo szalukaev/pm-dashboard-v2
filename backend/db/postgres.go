@@ -60,7 +60,7 @@ func RunMigrations(db *sql.DB) error {
 			continue
 		}
 		var version int
-		fmt.Sscanf(parts[0], "%d", &version)
+		_, _ = fmt.Sscanf(parts[0], "%d", &version)
 		if version == 0 {
 			continue
 		}
@@ -88,11 +88,11 @@ func RunMigrations(db *sql.DB) error {
 			return fmt.Errorf("begin migration %d: %w", version, err)
 		}
 		if _, err := tx.Exec(string(sqlBytes)); err != nil {
-			tx.Rollback()
+			_ = tx.Rollback()
 			return fmt.Errorf("apply migration %d: %w", version, err)
 		}
 		if _, err := tx.Exec("INSERT INTO schema_migrations (version) VALUES ($1)", version); err != nil {
-			tx.Rollback()
+			_ = tx.Rollback()
 			return fmt.Errorf("record migration %d: %w", version, err)
 		}
 		if err := tx.Commit(); err != nil {

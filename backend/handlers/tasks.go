@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"mime"
@@ -540,7 +541,9 @@ func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	oldValues := make(map[string]interface{})
 	for _, field := range editable {
 		var oldVal sql.NullString
-		(*h.DB).QueryRow("SELECT "+field+"::text FROM issues WHERE external_id = $1", externalID).Scan(&oldVal)
+		if err := (*h.DB).QueryRow("SELECT "+field+"::text FROM issues WHERE external_id = $1", externalID).Scan(&oldVal); err != nil && !errors.Is(err, sql.ErrNoRows) {
+			slog.Warn("Database query failed", "at", "UpdateTask", "error", err)
+		}
 		if oldVal.Valid {
 			oldValues[field] = oldVal.String
 		} else {
@@ -772,7 +775,7 @@ func (h *TaskHandler) GetTaskAttachment(w http.ResponseWriter, r *http.Request) 
 	if att.Filesize > 0 {
 		w.Header().Set("Content-Length", strconv.FormatInt(att.Filesize, 10))
 	}
-	io.Copy(w, body)
+	_, _ = io.Copy(w, body)
 }
 
 func (h *TaskHandler) AddComment(w http.ResponseWriter, r *http.Request) {

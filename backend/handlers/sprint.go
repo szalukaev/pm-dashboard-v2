@@ -115,7 +115,7 @@ func (h *SprintHandler) visibleSprints(userID, sprintID int) ([]Sprint, error) {
 			&s.ownerID, &s.OwnerName, &team) != nil {
 			continue
 		}
-		json.Unmarshal(team, &s.ownerTeam)
+		_ = json.Unmarshal(team, &s.ownerTeam)
 		// Кому виден спринт, решает access.SprintVisibleTo
 		if !access.SprintVisibleTo(userID, member, s.ownerID, s.IsShared, s.ownerTeam) {
 			continue
@@ -801,11 +801,13 @@ func (h *SprintHandler) autoFill(userID, sprintID int, shared bool, projectName,
 			issues = append(issues, issueID)
 		}
 	}
-	rows.Close()
+	_ = rows.Close()
 
 	for _, issueID := range issues {
-		(*h.DB).Exec(`INSERT INTO sprint_issues (sprint_id, issue_external_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-			sprintID, issueID)
+		if _, err := (*h.DB).Exec(`INSERT INTO sprint_issues (sprint_id, issue_external_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+			sprintID, issueID); err != nil {
+			slog.Warn("Database write failed", "at", "autoFill", "error", err)
+		}
 	}
 }
 

@@ -91,7 +91,7 @@ func (t *InvoiceTemplates) Save(content []byte, info templateInfo) error {
 	}
 	defer os.Remove(tmp.Name())
 	if _, err := tmp.Write(content); err != nil {
-		tmp.Close()
+		_ = tmp.Close()
 		return err
 	}
 	if err := tmp.Close(); err != nil {
@@ -116,7 +116,9 @@ func (t *InvoiceTemplates) Reset() error {
 		return err
 	}
 	if *t.DB != nil {
-		(*t.DB).Exec(`DELETE FROM settings WHERE key = $1`, templateSettingsKey)
+		if _, err := (*t.DB).Exec(`DELETE FROM settings WHERE key = $1`, templateSettingsKey); err != nil {
+			slog.Warn("Database write failed", "at", "Reset", "error", err)
+		}
 	}
 	return nil
 }
@@ -204,7 +206,9 @@ func (h *InvoiceTemplateHandler) Upload(w http.ResponseWriter, r *http.Request) 
 
 	info := templateInfo{FileName: filepath.Base(header.Filename), UploadedAt: time.Now(), Size: len(content)}
 	if *h.DB != nil {
-		(*h.DB).QueryRow(`SELECT username FROM users WHERE id = $1`, middleware.GetUserID(r)).Scan(&info.UploadedBy)
+		if err := (*h.DB).QueryRow(`SELECT username FROM users WHERE id = $1`, middleware.GetUserID(r)).Scan(&info.UploadedBy); err != nil && !errors.Is(err, sql.ErrNoRows) {
+			slog.Warn("Database query failed", "at", "Upload", "error", err)
+		}
 	}
 	if err := h.Templates.Save(content, info); err != nil {
 		slog.Error("Could not save the invoice template", "error", err)
@@ -266,5 +270,5 @@ func serveDocx(w http.ResponseWriter, name string, content []byte) {
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"document.docx\"; filename*=UTF-8''%s", url.PathEscape(name)))
 	w.Header().Set("Access-Control-Expose-Headers", "Content-Disposition")
 	w.Header().Set("Cache-Control", "no-store")
-	w.Write(content)
+	_, _ = w.Write(content)
 }

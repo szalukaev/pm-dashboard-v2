@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -70,13 +71,19 @@ func (h *AnalyticsHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusBadRequest, "INVALID_PERIOD")
 		return
 	}
-	utils.JSON(w, http.StatusOK, map[string]interface{}{"stats": h.stats(middleware.GetScope(r), now, period)})
+	stats, err := h.stats(middleware.GetScope(r), now, period)
+	if err != nil {
+		slog.Error("Analytics stats failed", "error", err)
+		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
+		return
+	}
+	utils.JSON(w, http.StatusOK, map[string]interface{}{"stats": stats})
 }
 
 // stats считает карточки статистики по проектам пользователя в пределах его
 // прав. Этим же расчётом пользуется письмо со сводкой. period оставляет
 // задачи, изменённые в периоде.
-func (h *AnalyticsHandler) stats(scope *access.Scope, now time.Time, period Period) []StatCard {
+func (h *AnalyticsHandler) stats(scope *access.Scope, now time.Time, period Period) ([]StatCard, error) {
 	args := []interface{}{}
 	projectFilter := scope.ProjectIssueCond("", &args)
 	projectFilter += period.updatedCond(&args)
@@ -88,7 +95,9 @@ func (h *AnalyticsHandler) stats(scope *access.Scope, now time.Time, period Peri
 	var activeProjects int
 	q := `SELECT COUNT(DISTINCT project_id) FROM issues WHERE ` + projectFilter + `
 		AND ` + statusIn("status_id", GroupOpen, GroupTesting)
-	(*h.DB).QueryRow(q, args...).Scan(&activeProjects)
+	if err := (*h.DB).QueryRow(q, args...).Scan(&activeProjects); err != nil {
+		return nil, err
+	}
 	stats = append(stats, StatCard{Label: "active_projects", Value: float64(activeProjects)})
 
 	// Выполнение: закрытые / (открытые + в тестировании × 0,5 + закрытые)
@@ -98,7 +107,9 @@ func (h *AnalyticsHandler) stats(scope *access.Scope, now time.Time, period Peri
 		COUNT(CASE WHEN ` + statusIn("status_id", GroupOpen) + ` THEN 1 END),
 		COUNT(CASE WHEN ` + statusIn("status_id", GroupTesting) + ` THEN 1 END)
 		FROM issues WHERE ` + projectFilter
-	(*h.DB).QueryRow(q, args...).Scan(&closed, &open, &testing)
+	if err := (*h.DB).QueryRow(q, args...).Scan(&closed, &open, &testing); err != nil {
+		return nil, err
+	}
 	denom := float64(open) + float64(testing)*0.5 + float64(closed)
 	completion := 0.0
 	if denom > 0 {
@@ -118,14 +129,18 @@ func (h *AnalyticsHandler) stats(scope *access.Scope, now time.Time, period Peri
 		AND due_date IS NOT NULL AND due_date < $` + itoa(len(args)+1) + `
 		AND ` + statusIn("status_id", GroupOpen, GroupTesting)
 	overdueArgs := append(args, today)
-	(*h.DB).QueryRow(q, overdueArgs...).Scan(&overdue)
+	if err := (*h.DB).QueryRow(q, overdueArgs...).Scan(&overdue); err != nil {
+		return nil, err
+	}
 	stats = append(stats, StatCard{Label: "overdue", Value: float64(overdue), Variant: "danger"})
 
 	// Bugs
 	var bugs int
 	q = `SELECT COUNT(*) FROM issues WHERE ` + projectFilter + `
 		AND ` + bugStatus("status_id")
-	(*h.DB).QueryRow(q, args...).Scan(&bugs)
+	if err := (*h.DB).QueryRow(q, args...).Scan(&bugs); err != nil {
+		return nil, err
+	}
 	stats = append(stats, StatCard{Label: "bugs", Value: float64(bugs)})
 
 	// Без оценки
@@ -133,10 +148,12 @@ func (h *AnalyticsHandler) stats(scope *access.Scope, now time.Time, period Peri
 	q = `SELECT COUNT(*) FROM issues WHERE ` + projectFilter + `
 		AND (estimated_hours IS NULL OR estimated_hours = 0)
 		AND ` + statusIn("status_id", GroupOpen)
-	(*h.DB).QueryRow(q, args...).Scan(&noEstimate)
+	if err := (*h.DB).QueryRow(q, args...).Scan(&noEstimate); err != nil {
+		return nil, err
+	}
 	stats = append(stats, StatCard{Label: "no_estimate", Value: float64(noEstimate)})
 
-	return stats
+	return stats, nil
 }
 
 func (h *AnalyticsHandler) GetTeamLoad(w http.ResponseWriter, r *http.Request) {
@@ -274,7 +291,7 @@ func (h *AnalyticsHandler) distribution(scope *access.Scope, period Period) ([]P
 				names[id] = name
 			}
 		}
-		tree.Close()
+		_ = tree.Close()
 	}
 	shown := make(map[int]bool, len(dist))
 	for _, d := range dist {

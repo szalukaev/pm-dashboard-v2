@@ -70,7 +70,7 @@ func (c *wsClient) close() {
 	c.closeOnce.Do(func() {
 		close(c.send)
 		if c.conn != nil {
-			c.conn.Close()
+			_ = c.conn.Close()
 		}
 	})
 }
@@ -215,17 +215,17 @@ func (c *wsClient) writePump() {
 	for {
 		select {
 		case msg, ok := <-c.send:
-			c.conn.SetWriteDeadline(time.Now().Add(wsWriteWait))
+			_ = c.conn.SetWriteDeadline(time.Now().Add(wsWriteWait))
 			if !ok {
 				// Хаб закрыл канал — клиента убирают.
-				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				_ = c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
 			if err := c.conn.WriteMessage(websocket.TextMessage, msg); err != nil {
 				return
 			}
 		case <-ticker.C:
-			c.conn.SetWriteDeadline(time.Now().Add(wsWriteWait))
+			_ = c.conn.SetWriteDeadline(time.Now().Add(wsWriteWait))
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}
@@ -237,9 +237,9 @@ func (c *wsClient) writePump() {
 func (c *wsClient) readPump(h *WSHub) {
 	defer func() { h.unregister <- c }()
 	c.conn.SetReadLimit(wsMaxMsgSize)
-	c.conn.SetReadDeadline(time.Now().Add(wsPongWait))
+	_ = c.conn.SetReadDeadline(time.Now().Add(wsPongWait))
 	c.conn.SetPongHandler(func(string) error {
-		c.conn.SetReadDeadline(time.Now().Add(wsPongWait))
+		_ = c.conn.SetReadDeadline(time.Now().Add(wsPongWait))
 		return nil
 	})
 	for {

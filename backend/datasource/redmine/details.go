@@ -265,7 +265,7 @@ func (c *Client) DownloadAttachment(id int) (io.ReadCloser, error) {
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		return nil, fmt.Errorf("redmine returned %d for attachment %d", resp.StatusCode, id)
 	}
 	return resp.Body, nil

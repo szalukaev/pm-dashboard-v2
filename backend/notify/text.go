@@ -102,7 +102,7 @@ func orDash(text string) string {
 func Title(n Notification, lang string) string {
 	lang = language(lang)
 	var p params
-	json.Unmarshal(n.Params, &p)
+	_ = json.Unmarshal(n.Params, &p)
 	format, known := titles[lang][n.Rule]
 	switch {
 	case !known:
@@ -121,7 +121,7 @@ func Lines(n Notification, lang string) []string {
 	lang = language(lang)
 	w := words[lang]
 	var p params
-	json.Unmarshal(n.Params, &p)
+	_ = json.Unmarshal(n.Params, &p)
 
 	var lines []string
 	if p.IssueID != 0 {
@@ -152,7 +152,7 @@ func Lines(n Notification, lang string) []string {
 // issueID возвращает номер задачи, о которой уведомление, или 0.
 func issueID(n Notification) int {
 	var p params
-	json.Unmarshal(n.Params, &p)
+	_ = json.Unmarshal(n.Params, &p)
 	return p.IssueID
 }
 

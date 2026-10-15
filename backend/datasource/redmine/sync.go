@@ -3,6 +3,7 @@ package redmine
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -60,8 +61,10 @@ func (s *Syncer) SyncAll(ctx context.Context, db **sql.DB) error {
 
 	// Запись о начале синхронизации
 	var logID int
-	(*db).QueryRow(`INSERT INTO collection_log (started_at, status, data_source)
-		VALUES ($1, 'running', 'redmine') RETURNING id`, startTime).Scan(&logID)
+	if err := (*db).QueryRow(`INSERT INTO collection_log (started_at, status, data_source)
+		VALUES ($1, 'running', 'redmine') RETURNING id`, startTime).Scan(&logID); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		slog.Warn("Database query failed", "at", "SyncAll", "error", err)
+	}
 
 	var stats syncStats
 	var syncErr error
@@ -110,14 +113,18 @@ func (s *Syncer) SyncAll(ctx context.Context, db **sql.DB) error {
 
 	// Итог — в журнал синхронизации
 	if ctx.Err() != nil {
-		(*db).Exec(`UPDATE collection_log SET finished_at=$1, duration_ms=$2, status=$3 WHERE id=$4`,
-			time.Now(), durationMs, StatusStopped, logID)
+		if _, err := (*db).Exec(`UPDATE collection_log SET finished_at=$1, duration_ms=$2, status=$3 WHERE id=$4`,
+			time.Now(), durationMs, StatusStopped, logID); err != nil {
+			slog.Warn("Database write failed", "at", "SyncAll", "error", err)
+		}
 		slog.Info("Sync stopped", "duration", duration)
 		return ctx.Err()
 	}
 	if syncErr != nil {
-		(*db).Exec(`UPDATE collection_log SET finished_at=$1, duration_ms=$2, status=$3, error_text=$4 WHERE id=$5`,
-			time.Now(), durationMs, StatusError, syncErr.Error(), logID)
+		if _, err := (*db).Exec(`UPDATE collection_log SET finished_at=$1, duration_ms=$2, status=$3, error_text=$4 WHERE id=$5`,
+			time.Now(), durationMs, StatusError, syncErr.Error(), logID); err != nil {
+			slog.Warn("Database write failed", "at", "SyncAll", "error", err)
+		}
 		slog.Error("Sync failed", "duration", duration, "error", syncErr)
 		return syncErr
 	}
@@ -127,8 +134,10 @@ func (s *Syncer) SyncAll(ctx context.Context, db **sql.DB) error {
 	if stats.failed > 0 {
 		status, note = StatusPartial, fmt.Sprintf("%d/%d", stats.failed, stats.projects)
 	}
-	(*db).Exec(`UPDATE collection_log SET finished_at=$1, duration_ms=$2, issues_collected=$3, status=$4, error_text=NULLIF($5, '') WHERE id=$6`,
-		time.Now(), durationMs, stats.issues, status, note, logID)
+	if _, err := (*db).Exec(`UPDATE collection_log SET finished_at=$1, duration_ms=$2, issues_collected=$3, status=$4, error_text=NULLIF($5, '') WHERE id=$6`,
+		time.Now(), durationMs, stats.issues, status, note, logID); err != nil {
+		slog.Warn("Database write failed", "at", "SyncAll", "error", err)
+	}
 
 	slog.Info("Sync completed", "duration", duration, "issues", stats.issues, "status", status)
 	return nil
@@ -281,7 +290,7 @@ func (s *Syncer) syncIssues(ctx context.Context, db **sql.DB) (syncStats, error)
 				projectIDs = append(projectIDs, pid)
 			}
 		}
-		rows.Close()
+		_ = rows.Close()
 	}
 
 	if len(projectIDs) == 0 {

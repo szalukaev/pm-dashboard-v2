@@ -230,11 +230,11 @@ func Send(cfg Config, to, subject, html string) error {
 	if err != nil {
 		return fmt.Errorf("connect: %w", err)
 	}
-	conn.SetDeadline(time.Now().Add(sendTimeout))
+	_ = conn.SetDeadline(time.Now().Add(sendTimeout))
 
 	client, err := smtp.NewClient(conn, cfg.Host)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return fmt.Errorf("greeting: %w", err)
 	}
 	defer client.Close()

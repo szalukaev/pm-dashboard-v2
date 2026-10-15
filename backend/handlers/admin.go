@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -84,7 +85,10 @@ func (h *AdminHandler) UpdateStatusGroup(w http.ResponseWriter, r *http.Request)
 		Group *string `json:"group"` // "open", "testing", "closed"
 		IsBug *bool   `json:"is_bug"`
 	}
-	json.NewDecoder(r.Body).Decode(&body)
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
+		return
+	}
 
 	if body.Group == nil && body.IsBug == nil {
 		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
@@ -160,7 +164,10 @@ func (h *AdminHandler) UpdatePriority(w http.ResponseWriter, r *http.Request) {
 		SortOrder *int    `json:"sort_order"`
 		Color     *string `json:"color"`
 	}
-	json.NewDecoder(r.Body).Decode(&body)
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
+		return
+	}
 
 	if body.SortOrder != nil {
 		res, err := (*h.DB).Exec("UPDATE priorities SET sort_order=$1 WHERE external_id=$2", *body.SortOrder, priorityID)
@@ -316,22 +323,25 @@ func (h *AdminHandler) SaveDataSourceConfig(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	h.SQLite.Set("data_source_type", body.Type)
-	h.SQLite.Set("redmine_url", body.URL)
-	h.SQLite.Set("redmine_basic_login", body.BasicLogin)
+	settings := [][2]string{{"data_source_type", body.Type}, {"redmine_url", body.URL}, {"redmine_basic_login", body.BasicLogin}}
 	// Маска значит «не менялось» — настоящий секрет не перезаписывается.
 	if !isSecretMask(body.APIKey) {
-		h.SQLite.Set("redmine_api_key", body.APIKey)
+		settings = append(settings, [2]string{"redmine_api_key", body.APIKey})
 	}
 	if !isSecretMask(body.BasicPasswd) {
-		h.SQLite.Set("redmine_basic_password", body.BasicPasswd)
+		settings = append(settings, [2]string{"redmine_basic_password", body.BasicPasswd})
+	}
+	if !saveSettings(w, h.SQLite, settings...) {
+		return
 	}
 
 	// Применяется на ходу: обработчики сразу берут новое подключение, и
 	// синхронизация с ним начинается тут же.
 	if h.Source != nil {
 		h.Source.Reload()
-		h.Source.TriggerSync()
+		if err := h.Source.TriggerSync(); err != nil {
+			slog.Warn("Operation failed", "at", "SaveDataSourceConfig", "error", err)
+		}
 	}
 
 	utils.Success(w)
@@ -379,7 +389,9 @@ func (h *AdminHandler) GetSyncLog(w http.ResponseWriter, r *http.Request) {
 	// issues_collected записи — то, что принесла эта синхронизация; сколько
 	// задач всего — отдельная цифра
 	totalIssues := 0
-	(*h.DB).QueryRow("SELECT COUNT(*) FROM issues WHERE data_source = 'redmine'").Scan(&totalIssues)
+	if err := (*h.DB).QueryRow("SELECT COUNT(*) FROM issues WHERE data_source = 'redmine'").Scan(&totalIssues); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		slog.Warn("Database query failed", "at", "GetSyncLog", "error", err)
+	}
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"logs": logs, "total_issues": totalIssues})
 }
 

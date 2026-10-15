@@ -115,7 +115,10 @@ func (h *PaymentsHandler) UpdateOrganization(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	var body map[string]interface{}
-	json.NewDecoder(r.Body).Decode(&body)
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
+		return
+	}
 
 	sets, args, idx := buildUpdateSets(body, map[string]bool{
 		"name": true, "address": true, "inn": true, "contact_name": true, "contact_phone": true,
@@ -309,7 +312,10 @@ func (h *PaymentsHandler) CreateContract(w http.ResponseWriter, r *http.Request)
 		StartDate      *string  `json:"start_date"`
 		EndDate        *string  `json:"end_date"`
 	}
-	json.NewDecoder(r.Body).Decode(&body)
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
+		return
+	}
 	if body.Name == "" || body.ContractType == "" {
 		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
 		return
@@ -376,7 +382,10 @@ func (h *PaymentsHandler) UpdateContract(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	var body map[string]interface{}
-	json.NewDecoder(r.Body).Decode(&body)
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
+		return
+	}
 	// Дата, не заполненная в форме, — «не задана», а не пустая строка
 	for _, field := range []string{"start_date", "end_date"} {
 		if text, isText := body[field].(string); isText && strings.TrimSpace(text) == "" {
@@ -545,7 +554,10 @@ func (h *PaymentsHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 			Price    float64
 		} `json:"items"`
 	}
-	json.NewDecoder(r.Body).Decode(&body)
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
+		return
+	}
 
 	if len(body.Items) == 0 {
 		body.Items = []struct {
@@ -587,7 +599,7 @@ func (h *PaymentsHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 	err = tx.QueryRow(`INSERT INTO invoices (contract_id, amount, vat_rate, issued_at, paid_amount, status)
 		VALUES ($1,$2,$3,$4,0,'unpaid') RETURNING id`, contractID, totalAmount, contract.VatRate, today).Scan(&invoiceID)
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		slog.Error("Could not save the invoice", "contract", contractID, "error", err)
 		utils.Error(w, http.StatusInternalServerError, "CREATE_FAILED")
 		return
@@ -595,7 +607,7 @@ func (h *PaymentsHandler) CreateInvoice(w http.ResponseWriter, r *http.Request) 
 	for _, item := range body.Items {
 		if _, err := tx.Exec("INSERT INTO invoice_items (invoice_id, name, quantity, price) VALUES ($1,$2,$3,$4)",
 			invoiceID, item.Name, item.Quantity, item.Price); err != nil {
-			tx.Rollback()
+			_ = tx.Rollback()
 			slog.Error("Could not save a line of the invoice", "contract", contractID, "error", err)
 			utils.Error(w, http.StatusInternalServerError, "CREATE_FAILED")
 			return
@@ -908,12 +920,12 @@ func (h *PaymentsHandler) ExportCSV(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", "attachment; filename=contracts.csv")
 	// BOM — для Excel
-	w.Write([]byte{0xEF, 0xBB, 0xBF})
+	_, _ = w.Write([]byte{0xEF, 0xBB, 0xBF})
 
 	writer := csv.NewWriter(w)
 	writer.Comma = ';'
 	for _, row := range contractsCSV(contracts, time.Now().Format("2006-01-02")) {
-		writer.Write(row)
+		_ = writer.Write(row)
 	}
 	writer.Flush()
 }

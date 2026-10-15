@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -32,7 +33,9 @@ func requireIssue(w http.ResponseWriter, r *http.Request, db *sql.DB, issueID in
 		return true
 	}
 	var exists bool
-	db.QueryRow("SELECT EXISTS(SELECT 1 FROM issues WHERE external_id = $1)", issueID).Scan(&exists)
+	if err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM issues WHERE external_id = $1)", issueID).Scan(&exists); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		slog.Warn("Database query failed", "at", "requireIssue", "error", err)
+	}
 	if exists {
 		slog.Warn("Access to an issue outside of user rights", "user", scope.UserID, "issue", issueID, "path", r.URL.Path)
 	}

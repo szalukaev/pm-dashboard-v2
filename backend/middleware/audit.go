@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"strconv"
@@ -97,7 +98,7 @@ func (m *AuditMiddleware) Log(next http.Handler) http.Handler {
 		// заполняется и в базе равен NULL.
 		var afterState interface{}
 		if len(bodyBytes) > 0 {
-			json.Unmarshal(bodyBytes, &afterState)
+			_ = json.Unmarshal(bodyBytes, &afterState)
 			afterState = maskSecrets(afterState)
 		}
 		clientIP := ClientIP(r)
@@ -117,11 +118,13 @@ func (m *AuditMiddleware) Log(next http.Handler) http.Handler {
 		go func() {
 			afterJSON, _ := json.Marshal(afterState)
 
-			(*m.DB).Exec(`INSERT INTO audit_log
+			if _, err := (*m.DB).Exec(`INSERT INTO audit_log
 				(occurred_at, user_id, action, entity_type, entity_id, after_state, status_code, ip_address, user_agent)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
 				time.Now(), userID, action, entityType, entityIDArg,
-				string(afterJSON), statusCode, clientIP, userAgent)
+				string(afterJSON), statusCode, clientIP, userAgent); err != nil {
+				slog.Warn("Database write failed", "at", "Log", "error", err)
+			}
 		}()
 	})
 }
@@ -137,17 +140,21 @@ func (m *AuditMiddleware) LogLogin(userID int, username string, success bool, r 
 	if userID > 0 {
 		userIDArg = userID
 	}
-	(*m.DB).Exec(`INSERT INTO audit_log
+	if _, err := (*m.DB).Exec(`INSERT INTO audit_log
 		(occurred_at, user_id, action, entity_type, after_state, ip_address, user_agent)
 		VALUES ($1, $2, $3, 'auth', $4, $5, $6)`,
-		time.Now(), userIDArg, action, string(afterData), ClientIP(r), r.UserAgent())
+		time.Now(), userIDArg, action, string(afterData), ClientIP(r), r.UserAgent()); err != nil {
+		slog.Warn("Database write failed", "at", "LogLogin", "error", err)
+	}
 }
 
 func (m *AuditMiddleware) LogLogout(userID int, r *http.Request) {
-	(*m.DB).Exec(`INSERT INTO audit_log
+	if _, err := (*m.DB).Exec(`INSERT INTO audit_log
 		(occurred_at, user_id, action, entity_type, ip_address, user_agent)
 		VALUES ($1, $2, 'logout', 'auth', $3, $4)`,
-		time.Now(), userID, ClientIP(r), r.UserAgent())
+		time.Now(), userID, ClientIP(r), r.UserAgent()); err != nil {
+		slog.Warn("Database write failed", "at", "LogLogout", "error", err)
+	}
 }
 
 // auditSecretKeys — поля тела запроса, которые не должны попасть в audit_log.

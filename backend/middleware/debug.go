@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -117,13 +118,17 @@ func (d *DebugLog) write() {
 			if *d.DB == nil {
 				continue
 			}
-			(*d.DB).Exec(`INSERT INTO debug_logs
+			if _, err := (*d.DB).Exec(`INSERT INTO debug_logs
 				(user_id, occurred_at, method, path, query, status_code, duration_ms, request_body, response_body, ip_address)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-				e.userID, e.at, e.method, e.path, e.query, e.status, e.durationMs, e.requestBody, e.responseBody, e.ip)
+				e.userID, e.at, e.method, e.path, e.query, e.status, e.durationMs, e.requestBody, e.responseBody, e.ip); err != nil {
+				slog.Warn("Database write failed", "at", "write", "error", err)
+			}
 		case <-cleanup.C:
 			if *d.DB != nil {
-				(*d.DB).Exec(`DELETE FROM debug_logs WHERE occurred_at < NOW() - make_interval(days => $1)`, debugKeepDays)
+				if _, err := (*d.DB).Exec(`DELETE FROM debug_logs WHERE occurred_at < NOW() - make_interval(days => $1)`, debugKeepDays); err != nil {
+					slog.Warn("Database write failed", "at", "write", "error", err)
+				}
 			}
 		}
 	}

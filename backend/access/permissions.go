@@ -11,6 +11,7 @@ package access
 import (
 	"database/sql"
 	"encoding/json"
+	"log/slog"
 	"sort"
 )
 
@@ -143,8 +144,12 @@ func (r *rawPermissions) dest() []interface{} {
 
 func (r *rawPermissions) permissions() Permissions {
 	p := r.p
-	json.Unmarshal(r.projects, &p.ProjectIDs)
-	json.Unmarshal(r.team, &p.TeamIDs)
+	if err := json.Unmarshal(r.projects, &p.ProjectIDs); err != nil {
+		slog.Warn("Operation failed", "at", "permissions", "error", err)
+	}
+	if err := json.Unmarshal(r.team, &p.TeamIDs); err != nil {
+		slog.Warn("Operation failed", "at", "permissions", "error", err)
+	}
 	p.VisibleTabs = keyList(r.tabs)
 	p.Widgets = keyList(r.widgets)
 	p.SprintActions = keyList(r.sprint)

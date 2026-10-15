@@ -3,6 +3,7 @@ package notify
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"sync"
 	"time"
@@ -138,7 +139,9 @@ func (e *Engine) remember(where string, args ...interface{}) error {
 // seen сообщает, запоминалось ли состояние задач хоть раз.
 func (e *Engine) seen() bool {
 	var any bool
-	(*e.DB).QueryRow("SELECT EXISTS(SELECT 1 FROM issue_watch)").Scan(&any)
+	if err := (*e.DB).QueryRow("SELECT EXISTS(SELECT 1 FROM issue_watch)").Scan(&any); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		slog.Warn("Database query failed", "at", "seen", "error", err)
+	}
 	return any
 }
 
@@ -162,8 +165,10 @@ func (e *Engine) newPass(now time.Time, except int) (*pass, error) {
 		return nil, err
 	}
 	p := &pass{people: people, members: byMember(people), scopes: map[int]*access.Scope{}, except: except, now: now}
-	(*e.DB).QueryRow(`SELECT external_id FROM priorities WHERE data_source = 'redmine'
-		ORDER BY sort_order DESC, external_id DESC LIMIT 1`).Scan(&p.highPriority)
+	if err := (*e.DB).QueryRow(`SELECT external_id FROM priorities WHERE data_source = 'redmine'
+		ORDER BY sort_order DESC, external_id DESC LIMIT 1`).Scan(&p.highPriority); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		slog.Warn("Database query failed", "at", "newPass", "error", err)
+	}
 	return p, nil
 }
 
@@ -225,8 +230,12 @@ func (e *Engine) AfterSync(now time.Time) {
 	if err := e.remember(""); err != nil {
 		slog.Error("Notifications: failed to remember the state of the issues", "error", err)
 	}
-	(*e.DB).Exec("DELETE FROM issue_watch WHERE issue_id NOT IN (SELECT external_id FROM issues)")
-	(*e.DB).Exec("DELETE FROM notifications WHERE created_at < $1", now.Add(-retention))
+	if _, err := (*e.DB).Exec("DELETE FROM issue_watch WHERE issue_id NOT IN (SELECT external_id FROM issues)"); err != nil {
+		slog.Warn("Database write failed", "at", "AfterSync", "error", err)
+	}
+	if _, err := (*e.DB).Exec("DELETE FROM notifications WHERE created_at < $1", now.Add(-retention)); err != nil {
+		slog.Warn("Database write failed", "at", "AfterSync", "error", err)
+	}
 
 	if created > 0 {
 		slog.Info("Notifications created", "count", created)
@@ -261,7 +270,9 @@ func (e *Engine) IssueEdited(issueID, actorID int, now time.Time) {
 	}
 	prev, hasPrev := previous[issueID]
 	e.issueChanged(p, prev, hasPrev, cur)
-	e.remember("WHERE i.external_id = $1", issueID)
+	if err := e.remember("WHERE i.external_id = $1", issueID); err != nil {
+		slog.Warn("Operation failed", "at", "IssueEdited", "error", err)
+	}
 }
 
 // SyncFailed сообщает администраторам, что синхронизация с источником
@@ -503,7 +514,7 @@ func (e *Engine) sprints(p *pass) int {
 			continue
 		}
 		var ownerTeam []int
-		json.Unmarshal(team, &ownerTeam)
+		_ = json.Unmarshal(team, &ownerTeam)
 
 		for _, who := range p.people {
 			if !access.SprintVisibleTo(who.userID, who.member, ownerID, shared, ownerTeam) {

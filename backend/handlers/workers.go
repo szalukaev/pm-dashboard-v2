@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"time"
 
@@ -180,7 +181,10 @@ func (h *WorkersHandler) RunWorker(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			Full bool `json:"full"`
 		}
-		json.NewDecoder(r.Body).Decode(&body)
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+			utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
+			return
+		}
 		if h.Source == nil {
 			utils.Error(w, http.StatusServiceUnavailable, "SYNC_NOT_AVAILABLE")
 			return

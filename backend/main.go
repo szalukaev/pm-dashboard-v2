@@ -61,12 +61,16 @@ func main() {
 			if err != nil && prev != cfg.DSN {
 				if prevDB, prevErr := db.Connect(prev); prevErr == nil {
 					slog.Error("New database is not available, returned to the previous connection", "error", err)
-					sqliteStore.Set("db_dsn", prev)
+					if err := sqliteStore.Set("db_dsn", prev); err != nil {
+						slog.Warn("Operation failed", "at", "main", "error", err)
+					}
 					pgDB, err = prevDB, nil
 				}
 			}
 			if err == nil {
-				sqliteStore.Set("db_dsn_prev", "")
+				if err := sqliteStore.Set("db_dsn_prev", ""); err != nil {
+					slog.Warn("Operation failed", "at", "main", "error", err)
+				}
 			}
 		}
 		if err != nil {
@@ -142,7 +146,11 @@ func main() {
 	settingsH.Source = source
 	authH.Source = source
 	// Сбор данных начинается сразу после активации лицензии
-	licenseH.OnActivated = func() { source.TriggerSync() }
+	licenseH.OnActivated = func() {
+		if err := source.TriggerSync(); err != nil {
+			slog.Warn("Sync not started after license activation", "error", err)
+		}
+	}
 
 	// Личные ключи API источника данных хранятся зашифрованными; с ними
 	// изменения уходят в источник от имени самого пользователя.
@@ -245,7 +253,7 @@ func main() {
 	// Состояние сервера (открыто всем, сведения о версии)
 	r.HandleFunc("/api/status", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"version":     "3.0.0",
 			"status":      "ok",
 			"is_setup":    sqliteStore.IsSetupComplete(),
@@ -474,7 +482,7 @@ func main() {
 		slog.Info("Shutting down...")
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		srv.Shutdown(ctx)
+		_ = srv.Shutdown(ctx)
 	}()
 
 	slog.Info("Server listening", "port", cfg.Port)

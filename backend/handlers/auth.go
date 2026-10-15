@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
@@ -232,9 +233,13 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	// Вход успешен — счётчик попыток сбрасывается
 	clearAttempts(req.Username)
-	(*h.DB).Exec("UPDATE users SET last_login = NOW() WHERE id = $1", id)
+	if _, err := (*h.DB).Exec("UPDATE users SET last_login = NOW() WHERE id = $1", id); err != nil {
+		slog.Warn("Database write failed", "at", "Login", "error", err)
+	}
 	// last_login перечитывается, чтобы в ответе было свежее значение
-	(*h.DB).QueryRow("SELECT last_login FROM users WHERE id = $1", id).Scan(&lastLogin)
+	if err := (*h.DB).QueryRow("SELECT last_login FROM users WHERE id = $1", id).Scan(&lastLogin); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		slog.Warn("Database query failed", "at", "Login", "error", err)
+	}
 	if h.Audit != nil {
 		h.Audit.LogLogin(id, req.Username, true, r)
 	}
@@ -323,7 +328,9 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	}
 	cookie, err := r.Cookie("session_id")
 	if err == nil {
-		h.Sessions.Delete(r.Context(), cookie.Value)
+		if err := h.Sessions.Delete(r.Context(), cookie.Value); err != nil {
+			slog.Warn("Operation failed", "at", "Logout", "error", err)
+		}
 	}
 	if h.Audit != nil {
 		h.Audit.LogLogout(middleware.GetUserID(r), r)
@@ -377,7 +384,9 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 // userEmail возвращает адрес электронной почты пользователя или пустую строку.
 func (h *AuthHandler) userEmail(userID int) string {
 	var email string
-	(*h.DB).QueryRow("SELECT email FROM users WHERE id = $1", userID).Scan(&email)
+	if err := (*h.DB).QueryRow("SELECT email FROM users WHERE id = $1", userID).Scan(&email); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		slog.Warn("Database query failed", "at", "userEmail", "error", err)
+	}
 	return email
 }
 
@@ -473,7 +482,11 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 
 	// Если current_password передан, он проверяется (кроме случая force_password_change)
 	var forcePasswordChange bool
-	(*h.DB).QueryRow("SELECT COALESCE(force_password_change, false) FROM users WHERE id = $1", userID).Scan(&forcePasswordChange)
+	if err := (*h.DB).QueryRow("SELECT COALESCE(force_password_change, false) FROM users WHERE id = $1", userID).Scan(&forcePasswordChange); err != nil {
+		slog.Error("Database query failed", "at", "ChangePassword", "error", err)
+		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
+		return
+	}
 
 	if !forcePasswordChange {
 		if body.CurrentPassword == "" {

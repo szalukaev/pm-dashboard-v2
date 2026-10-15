@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -111,7 +112,7 @@ func (h *SetupHandler) TestDatabase(w http.ResponseWriter, r *http.Request) {
 	testDB, err := sql.Open("postgres", buildDSN(req))
 	if err == nil {
 		pingErr := testDB.Ping()
-		testDB.Close()
+		_ = testDB.Close()
 		if pingErr == nil {
 			utils.JSON(w, http.StatusOK, map[string]interface{}{
 				"success": true, "message": "Connection established", "db_exists": true,
@@ -164,7 +165,7 @@ func (h *SetupHandler) SaveDatabase(w http.ResponseWriter, r *http.Request) {
 		if testDB.Ping() == nil {
 			dbReachable = true
 		}
-		testDB.Close()
+		_ = testDB.Close()
 	}
 
 	// Если нет — база создаётся через служебное подключение
@@ -175,18 +176,18 @@ func (h *SetupHandler) SaveDatabase(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := maintDB.Ping(); err != nil {
-			maintDB.Close()
+			_ = maintDB.Close()
 			utils.Error(w, http.StatusBadRequest, "DB_CONNECTION_FAILED")
 			return
 		}
 		// CREATE DATABASE нельзя выполнять внутри транзакции
 		createSQL := fmt.Sprintf(`CREATE DATABASE "%s"`, req.DBName)
 		if _, err := maintDB.Exec(createSQL); err != nil {
-			maintDB.Close()
+			_ = maintDB.Close()
 			utils.Error(w, http.StatusInternalServerError, "DB_CREATE_FAILED")
 			return
 		}
-		maintDB.Close()
+		_ = maintDB.Close()
 	}
 
 	// Подключение к нужной базе
@@ -270,16 +271,18 @@ func (h *SetupHandler) SaveDataSource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.SQLite.Set("data_source_type", req.Type)
-	h.SQLite.Set("redmine_url", req.URL)
-	h.SQLite.Set("redmine_api_key", req.APIKey)
+	if !saveSettings(w, h.SQLite, [2]string{"data_source_type", req.Type}, [2]string{"redmine_url", req.URL},
+		[2]string{"redmine_api_key", req.APIKey}) {
+		return
+	}
 
-	if req.BasicLogin != "" {
-		h.SQLite.Set("redmine_basic_login", req.BasicLogin)
-		h.SQLite.Set("redmine_basic_password", req.BasicPasswd)
-	} else {
-		h.SQLite.Set("redmine_basic_login", "")
-		h.SQLite.Set("redmine_basic_password", "")
+	// Без логина Basic-авторизация выключается: прежние значения стираются
+	login, password := req.BasicLogin, req.BasicPasswd
+	if login == "" {
+		password = ""
+	}
+	if !saveSettings(w, h.SQLite, [2]string{"redmine_basic_login", login}, [2]string{"redmine_basic_password", password}) {
+		return
 	}
 
 	utils.Success(w)
@@ -335,18 +338,36 @@ func (h *SetupHandler) CreateAdmin(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusInternalServerError, "SECRET_GENERATION_FAILED")
 		return
 	}
-	h.SQLite.Set("session_secret", hex.EncodeToString(secret))
-	h.SQLite.Set("admin_created", "true")
+	settings := [][2]string{{"session_secret", hex.EncodeToString(secret)}, {"admin_created", "true"}}
 	if req.Language != "" {
-		h.SQLite.Set("default_language", req.Language)
+		settings = append(settings, [2]string{"default_language", req.Language})
+	}
+	if !saveSettings(w, h.SQLite, settings...) {
+		return
 	}
 
 	// Мастер завершён: синхронизация начинается без перезапуска, чтобы
 	// статусы и проекты уже были, когда администратор откроет настройки.
 	if h.Source != nil {
 		h.Source.Reload()
-		h.Source.TriggerSync()
+		if err := h.Source.TriggerSync(); err != nil {
+			slog.Warn("Operation failed", "at", "CreateAdmin", "error", err)
+		}
 	}
 
 	utils.Success(w)
+}
+
+// saveSettings записывает настройки по порядку. При первой ошибке отвечает
+// 500 и возвращает false: настройка, которая не записалась, не должна
+// выглядеть сохранённой.
+func saveSettings(w http.ResponseWriter, store *config.SQLiteStore, pairs ...[2]string) bool {
+	for _, p := range pairs {
+		if err := store.Set(p[0], p[1]); err != nil {
+			slog.Error("Setting not saved", "key", p[0], "error", err)
+			utils.Error(w, http.StatusInternalServerError, "CONFIG_SAVE_FAILED")
+			return false
+		}
+	}
+	return true
 }

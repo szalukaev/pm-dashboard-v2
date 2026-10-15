@@ -254,7 +254,7 @@ func joinInParagraph(paragraph string) string {
 
 	pieces := make([]strings.Builder, len(runs))
 	for i := 0; i < len(whole); i++ {
-		pieces[owner[i]].WriteByte(whole[i])
+		_ = pieces[owner[i]].WriteByte(whole[i])
 	}
 	var b strings.Builder
 	last := 0
@@ -301,7 +301,7 @@ func substitute(content string, values map[string]string) string {
 func escape(value string) string {
 	value = strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ", "\t", " ").Replace(value)
 	var b bytes.Buffer
-	xml.EscapeText(&b, []byte(value))
+	_ = xml.EscapeText(&b, []byte(value))
 	return b.String()
 }
 

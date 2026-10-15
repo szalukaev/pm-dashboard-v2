@@ -117,8 +117,10 @@ const sourceMembersMaxAge = time.Hour
 // «правах как в источнике» никто другой пользователю здесь не виден.
 func (k *UserKeys) refreshMembers(userID int, client *redmine.Client, projects []int) {
 	var fresh bool
-	(*k.DB).QueryRow(`SELECT source_members IS NOT NULL AND source_members_at > NOW() - $1 * INTERVAL '1 second'
-		FROM users WHERE id = $2`, int(sourceMembersMaxAge.Seconds()), userID).Scan(&fresh)
+	if err := (*k.DB).QueryRow(`SELECT source_members IS NOT NULL AND source_members_at > NOW() - $1 * INTERVAL '1 second'
+		FROM users WHERE id = $2`, int(sourceMembersMaxAge.Seconds()), userID).Scan(&fresh); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		slog.Warn("Database query failed", "at", "refreshMembers", "error", err)
+	}
 	if fresh {
 		return
 	}
@@ -127,7 +129,9 @@ func (k *UserKeys) refreshMembers(userID int, client *redmine.Client, projects [
 	seen := map[int]bool{}
 	// Себя пользователь видит всегда
 	var own *int
-	(*k.DB).QueryRow("SELECT member_id FROM users WHERE id = $1", userID).Scan(&own)
+	if err := (*k.DB).QueryRow("SELECT member_id FROM users WHERE id = $1", userID).Scan(&own); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		slog.Warn("Database query failed", "at", "refreshMembers", "error", err)
+	}
 	if own != nil {
 		seen[*own] = true
 		members = append(members, *own)
@@ -177,7 +181,9 @@ func (k *UserKeys) fillEmail(userID int, client *redmine.Client) {
 		return
 	}
 	if mail.ValidAddress(address) {
-		(*k.DB).Exec("UPDATE users SET email = $1 WHERE id = $2 AND email = ''", address, userID)
+		if _, err := (*k.DB).Exec("UPDATE users SET email = $1 WHERE id = $2 AND email = ''", address, userID); err != nil {
+			slog.Warn("Database write failed", "at", "fillEmail", "error", err)
+		}
 	}
 }
 
@@ -200,7 +206,7 @@ func (k *UserKeys) RefreshAllProjects() {
 			ids = append(ids, id)
 		}
 	}
-	rows.Close()
+	_ = rows.Close()
 	for _, id := range ids {
 		k.RefreshProjects(id)
 	}
@@ -283,7 +289,11 @@ func (h *AuthHandler) SetSourceToken(w http.ResponseWriter, r *http.Request) {
 
 	// Одна учётная запись источника — один пользователь дашборда.
 	var taken bool
-	(*h.DB).QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE member_id = $1 AND id <> $2)", member.ExternalID, userID).Scan(&taken)
+	if err := (*h.DB).QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE member_id = $1 AND id <> $2)", member.ExternalID, userID).Scan(&taken); err != nil {
+		slog.Error("Database query failed", "at", "SetSourceToken", "error", err)
+		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
+		return
+	}
 	if taken {
 		slog.Warn("Personal API key of an account already linked to another user", "user", userID, "member", member.ExternalID)
 		utils.Error(w, http.StatusConflict, "TOKEN_ALREADY_LINKED")
@@ -306,9 +316,11 @@ func (h *AuthHandler) SetSourceToken(w http.ResponseWriter, r *http.Request) {
 	}
 	// Сотрудник может быть ещё не синхронизирован (его нет в отслеживаемых
 	// проектах): берётся имя, которое только что дал источник.
-	(*h.DB).Exec(`INSERT INTO members (external_id, name, login, data_source, synced_at)
+	if _, err := (*h.DB).Exec(`INSERT INTO members (external_id, name, login, data_source, synced_at)
 		VALUES ($1, $2, $3, 'redmine', NOW())
-		ON CONFLICT (external_id, data_source) DO NOTHING`, member.ExternalID, member.Name, member.Login)
+		ON CONFLICT (external_id, data_source) DO NOTHING`, member.ExternalID, member.Name, member.Login); err != nil {
+		slog.Warn("Database write failed", "at", "SetSourceToken", "error", err)
+	}
 
 	// Проекты пользователя в источнике — для «прав как в Redmine»; затем
 	// синхронизация забирает задачи проектов, ставших видимыми.
@@ -318,7 +330,9 @@ func (h *AuthHandler) SetSourceToken(w http.ResponseWriter, r *http.Request) {
 		h.Keys.RefreshProjects(userID)
 	}
 	if h.Source != nil {
-		h.Source.TriggerSync()
+		if err := h.Source.TriggerSync(); err != nil {
+			slog.Warn("Operation failed", "at", "SetSourceToken", "error", err)
+		}
 	}
 
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"success": true, "source": h.sourceInfo(userID)})

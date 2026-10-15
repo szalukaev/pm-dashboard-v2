@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html"
 	"log/slog"
@@ -191,7 +192,7 @@ func (h *ReportHandler) SendDue(cfg mail.Config, now time.Time) (int, error) {
 			targets = append(targets, t)
 		}
 	}
-	rows.Close()
+	_ = rows.Close()
 
 	sent := 0
 	var firstErr error
@@ -203,7 +204,9 @@ func (h *ReportHandler) SendDue(cfg mail.Config, now time.Time) (int, error) {
 			}
 			continue
 		}
-		(*h.DB).Exec("UPDATE user_settings SET email_report_sent_at = $1 WHERE user_id = $2", now, t.userID)
+		if _, err := (*h.DB).Exec("UPDATE user_settings SET email_report_sent_at = $1 WHERE user_id = $2", now, t.userID); err != nil {
+			slog.Warn("Database write failed", "at", "SendDue", "error", err)
+		}
 		sent++
 	}
 	return sent, firstErr
@@ -236,8 +239,10 @@ func (h *ReportHandler) SendTest(w http.ResponseWriter, r *http.Request) {
 	}
 	userID := middleware.GetUserID(r)
 	var email, lang string
-	(*h.DB).QueryRow(`SELECT u.email, COALESCE(us.language, 'ru') FROM users u
-		LEFT JOIN user_settings us ON us.user_id = u.id WHERE u.id = $1`, userID).Scan(&email, &lang)
+	if err := (*h.DB).QueryRow(`SELECT u.email, COALESCE(us.language, 'ru') FROM users u
+		LEFT JOIN user_settings us ON us.user_id = u.id WHERE u.id = $1`, userID).Scan(&email, &lang); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		slog.Warn("Database query failed", "at", "SendTest", "error", err)
+	}
 	if settings.Email != "" {
 		email = settings.Email
 	}
@@ -353,7 +358,11 @@ func (h *ReportHandler) build(scope *access.Scope, settings ReportSettings, lang
 	if settings.has("stats") {
 		section("stats")
 		table()
-		for _, stat := range analytics.stats(scope, now, Period{}) {
+		stats, err := analytics.stats(scope, now, Period{})
+		if err != nil {
+			return "", "", err
+		}
+		for _, stat := range stats {
 			value := fmt.Sprintf("%d", int(math.Round(stat.Value)))
 			if stat.IsPct {
 				value = fmt.Sprintf("%.1f%%", stat.Value)

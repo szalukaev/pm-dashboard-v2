@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"sort"
@@ -234,10 +235,12 @@ func (h *KanbanHandler) loadCards(where string, args ...interface{}) ([]KanbanCa
 // columnOrder возвращает порядок колонок, сохранённый пользователем для вида доски.
 func (h *KanbanHandler) columnOrder(userID int, column string) []string {
 	var data []byte
-	(*h.DB).QueryRow("SELECT "+column+" FROM user_settings WHERE user_id = $1", userID).Scan(&data)
+	if err := (*h.DB).QueryRow("SELECT "+column+" FROM user_settings WHERE user_id = $1", userID).Scan(&data); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		slog.Warn("Database query failed", "at", "columnOrder", "error", err)
+	}
 	var order []string
 	if len(data) > 0 {
-		json.Unmarshal(data, &order)
+		_ = json.Unmarshal(data, &order)
 	}
 	return order
 }

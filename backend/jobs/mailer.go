@@ -58,7 +58,9 @@ func (m *Mailer) Run(ctx context.Context) {
 		if m.DB == nil || *m.DB == nil || !m.Settings.MailEnabled() {
 			continue
 		}
-		m.RunNow(false)
+		if _, err := m.RunNow(false); err != nil {
+			slog.Warn("Database write failed", "at", "Run", "error", err)
+		}
 	}
 }
 
@@ -174,7 +176,7 @@ func (m *Mailer) alerts(cfg mail.Config, now time.Time, force bool) (int, error)
 			targets = append(targets, t)
 		}
 	}
-	rows.Close()
+	_ = rows.Close()
 
 	send := m.Send
 	if send == nil {
@@ -195,7 +197,9 @@ func (m *Mailer) alerts(cfg mail.Config, now time.Time, force bool) (int, error)
 			}
 			continue
 		}
-		(*m.DB).Exec("UPDATE notifications SET emailed_at = $1 WHERE id = ANY($2)", now, pq.Array(ids))
+		if _, err := (*m.DB).Exec("UPDATE notifications SET emailed_at = $1 WHERE id = ANY($2)", now, pq.Array(ids)); err != nil {
+			slog.Warn("Database write failed", "at", "alerts", "error", err)
+		}
 		sent++
 	}
 	return sent, firstErr

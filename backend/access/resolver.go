@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"log/slog"
 
 	"pm-dashboard/datasource"
 )
@@ -102,7 +103,9 @@ func (r *Resolver) Grants(userID int) (*Grants, error) {
 		return nil, err
 	}
 	var sourceProjects []int
-	json.Unmarshal(sourceJSON, &sourceProjects)
+	if err := json.Unmarshal(sourceJSON, &sourceProjects); err != nil {
+		slog.Warn("Operation failed", "at", "Grants", "error", err)
+	}
 
 	g.own = effective(g.Individual, templateSet, groupSets)
 	// Право на проект покрывает все его подпроекты, включая созданные
@@ -151,18 +154,28 @@ func (r *Resolver) Scope(userID int) (*Scope, error) {
 	if err != nil || blocked {
 		return nil, ErrUserNotFound
 	}
-	json.Unmarshal(sourceProjectsJSON, &facts.sourceProjects)
+	if err := json.Unmarshal(sourceProjectsJSON, &facts.sourceProjects); err != nil {
+		slog.Warn("Operation failed", "at", "Scope", "error", err)
+	}
 	if len(sourceMembersJSON) > 0 && string(sourceMembersJSON) != "null" {
 		members := []int{}
-		json.Unmarshal(sourceMembersJSON, &members)
+		if err := json.Unmarshal(sourceMembersJSON, &members); err != nil {
+			slog.Warn("Operation failed", "at", "Scope", "error", err)
+		}
 		facts.sourceMembers = &members
 	}
 
 	var projectsJSON, teamJSON []byte
-	db.QueryRow("SELECT selected_projects, selected_team FROM user_settings WHERE user_id = $1", userID).Scan(&projectsJSON, &teamJSON)
+	if err := db.QueryRow("SELECT selected_projects, selected_team FROM user_settings WHERE user_id = $1", userID).Scan(&projectsJSON, &teamJSON); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		slog.Warn("Database query failed", "at", "Scope", "error", err)
+	}
 	var selectedProjects, selectedTeam []int
-	json.Unmarshal(projectsJSON, &selectedProjects)
-	json.Unmarshal(teamJSON, &selectedTeam)
+	if err := json.Unmarshal(projectsJSON, &selectedProjects); err != nil {
+		slog.Warn("Operation failed", "at", "Scope", "error", err)
+	}
+	if err := json.Unmarshal(teamJSON, &selectedTeam); err != nil {
+		slog.Warn("Operation failed", "at", "Scope", "error", err)
+	}
 	// Выбранный проект означает всё его поддерево.
 	if len(selectedProjects) > 0 {
 		if expanded, err := datasource.ExpandProjects(db, selectedProjects); err == nil {
@@ -206,7 +219,7 @@ func (r *Resolver) SyncProjects() ([]int, error) {
 			userIDs = append(userIDs, id)
 		}
 	}
-	rows.Close()
+	_ = rows.Close()
 
 	var projects []int
 	for _, id := range userIDs {

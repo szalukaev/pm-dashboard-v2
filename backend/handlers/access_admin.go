@@ -48,7 +48,9 @@ func (h *AccessHandler) resolver() *access.Resolver {
 // измениться набор синхронизируемых проектов.
 func (h *AccessHandler) rightsChanged() {
 	if h.Source != nil {
-		h.Source.TriggerSync()
+		if err := h.Source.TriggerSync(); err != nil {
+			slog.Warn("Operation failed", "at", "rightsChanged", "error", err)
+		}
 	}
 }
 
@@ -204,7 +206,11 @@ func (h *AccessHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	self := userID == middleware.GetUserID(r)
 
 	var exists bool
-	(*h.DB).QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)", userID).Scan(&exists)
+	if err := (*h.DB).QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)", userID).Scan(&exists); err != nil {
+		slog.Error("Database query failed", "at", "UpdateUser", "error", err)
+		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
+		return
+	}
 	if !exists {
 		utils.Error(w, http.StatusNotFound, "USER_NOT_FOUND")
 		return
@@ -611,7 +617,11 @@ func (h *AccessHandler) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var exists bool
-	(*h.DB).QueryRow("SELECT EXISTS(SELECT 1 FROM groups WHERE id = $1)", groupID).Scan(&exists)
+	if err := (*h.DB).QueryRow("SELECT EXISTS(SELECT 1 FROM groups WHERE id = $1)", groupID).Scan(&exists); err != nil {
+		slog.Error("Database query failed", "at", "UpdateGroup", "error", err)
+		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
+		return
+	}
 	if !exists {
 		utils.Error(w, http.StatusNotFound, "GROUP_NOT_FOUND")
 		return
@@ -785,7 +795,11 @@ func (h *AccessHandler) UpdateTemplate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var exists bool
-	(*h.DB).QueryRow("SELECT EXISTS(SELECT 1 FROM role_templates WHERE id = $1)", templateID).Scan(&exists)
+	if err := (*h.DB).QueryRow("SELECT EXISTS(SELECT 1 FROM role_templates WHERE id = $1)", templateID).Scan(&exists); err != nil {
+		slog.Error("Database query failed", "at", "UpdateTemplate", "error", err)
+		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
+		return
+	}
 	if !exists {
 		utils.Error(w, http.StatusNotFound, "TEMPLATE_NOT_FOUND")
 		return

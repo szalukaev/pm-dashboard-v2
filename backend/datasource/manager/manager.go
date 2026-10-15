@@ -368,8 +368,10 @@ func (m *Manager) issueFingerprints() (map[int]string, error) {
 func (m *Manager) Run(ctx context.Context) {
 	// Синхронизация, оборванная перезапуском, навсегда оставила в журнале запись «running».
 	if *m.db != nil {
-		(*m.db).Exec(`UPDATE collection_log SET status = 'error', finished_at = NOW(),
-			error_text = 'interrupted by a server restart' WHERE status = 'running'`)
+		if _, err := (*m.db).Exec(`UPDATE collection_log SET status = 'error', finished_at = NOW(),
+			error_text = 'interrupted by a server restart' WHERE status = 'running'`); err != nil {
+			slog.Warn("Database write failed", "at", "Run", "error", err)
+		}
 	}
 
 	wait := 2 * time.Second

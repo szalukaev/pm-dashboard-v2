@@ -1,7 +1,10 @@
 package handlers
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -128,7 +131,9 @@ func (h *AnalyticsHandler) GetThresholds(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	var raw []byte
-	(*h.DB).QueryRow("SELECT indicator_thresholds FROM user_settings WHERE user_id = $1", middleware.GetUserID(r)).Scan(&raw)
+	if err := (*h.DB).QueryRow("SELECT indicator_thresholds FROM user_settings WHERE user_id = $1", middleware.GetUserID(r)).Scan(&raw); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		slog.Warn("Database query failed", "at", "GetThresholds", "error", err)
+	}
 	limits := parseThresholds(raw)
 
 	counts, err := h.indicators(middleware.GetScope(r), time.Now(), limits.PerProject)

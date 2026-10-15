@@ -1,6 +1,9 @@
 package handlers
 
 import (
+	"database/sql"
+	"errors"
+	"log/slog"
 	"net/http"
 
 	"pm-dashboard/utils"
@@ -51,18 +54,28 @@ func (h *AdminHandler) GetSetupChecklist(w http.ResponseWriter, r *http.Request)
 	// Идущая синхронизация о связи ещё ничего не говорит: смотрим на
 	// последнюю завершённую. Прошедшая с ошибками по части проектов — тоже связь.
 	var status string
-	db.QueryRow(`SELECT status FROM collection_log WHERE status <> 'running' ORDER BY started_at DESC LIMIT 1`).Scan(&status)
+	if err := db.QueryRow(`SELECT status FROM collection_log WHERE status <> 'running' ORDER BY started_at DESC LIMIT 1`).Scan(&status); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		slog.Warn("Database query failed", "at", "GetSetupChecklist", "error", err)
+	}
 	facts.SourceOK = status == "success" || status == "partial"
 
-	db.QueryRow(`SELECT EXISTS(SELECT 1 FROM statuses)`).Scan(&facts.Statuses)
-	db.QueryRow(`SELECT EXISTS(SELECT 1 FROM projects)`).Scan(&facts.Projects)
-	db.QueryRow(`SELECT COUNT(*) > 1 FROM users`).Scan(&facts.Users)
+	if err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM statuses)`).Scan(&facts.Statuses); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		slog.Warn("Database query failed", "at", "GetSetupChecklist", "error", err)
+	}
+	if err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM projects)`).Scan(&facts.Projects); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		slog.Warn("Database query failed", "at", "GetSetupChecklist", "error", err)
+	}
+	if err := db.QueryRow(`SELECT COUNT(*) > 1 FROM users`).Scan(&facts.Users); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		slog.Warn("Database query failed", "at", "GetSetupChecklist", "error", err)
+	}
 	// Права назначены: у пользователя есть шаблон роли, своя настройка или группа
-	db.QueryRow(`SELECT EXISTS(
+	if err := db.QueryRow(`SELECT EXISTS(
 		SELECT 1 FROM users u WHERE u.role <> 'admin' AND (
 			u.role_template_id IS NOT NULL
 			OR EXISTS(SELECT 1 FROM user_permissions p WHERE p.user_id = u.id)
-			OR EXISTS(SELECT 1 FROM group_members gm WHERE gm.user_id = u.id)))`).Scan(&facts.Rights)
+			OR EXISTS(SELECT 1 FROM group_members gm WHERE gm.user_id = u.id)))`).Scan(&facts.Rights); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		slog.Warn("Database query failed", "at", "GetSetupChecklist", "error", err)
+	}
 
 	// Расписание считается настроенным, когда интервал или время полной
 	// синхронизации сохраняли: до этого действуют значения по умолчанию

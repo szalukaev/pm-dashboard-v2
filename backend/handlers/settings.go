@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -60,9 +61,11 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	settings.ServerTimezone = serverTimezone()
 	// Отдельным запросом: строки настроек у пользователя может ещё не быть
-	(*h.DB).QueryRow(`SELECT COALESCE(us.timezone, ''), COALESCE(u.default_timezone, '')
+	if err := (*h.DB).QueryRow(`SELECT COALESCE(us.timezone, ''), COALESCE(u.default_timezone, '')
 		FROM users u LEFT JOIN user_settings us ON us.user_id = u.id WHERE u.id = $1`, userID).
-		Scan(&settings.Timezone, &settings.DefaultTimezone)
+		Scan(&settings.Timezone, &settings.DefaultTimezone); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		slog.Warn("Database query failed", "at", "GetSettings", "error", err)
+	}
 	settings.AlertRules = notify.Defaults()
 	settings.EmailReport = defaultReportSettings()
 	settings.IndicatorThresholds = defaultThresholds()
@@ -109,13 +112,13 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.Unmarshal(selectedProjects, &settings.SelectedProjects)
-	json.Unmarshal(selectedTeam, &settings.SelectedTeam)
-	json.Unmarshal(tabOrder, &settings.TabOrder)
-	json.Unmarshal(kanbanStatuses, &settings.KanbanColumnOrderStatuses)
-	json.Unmarshal(kanbanUsers, &settings.KanbanColumnOrderUsers)
-	json.Unmarshal(lastFilters, &settings.LastFilters)
-	json.Unmarshal(pagination, &settings.Pagination)
+	_ = json.Unmarshal(selectedProjects, &settings.SelectedProjects)
+	_ = json.Unmarshal(selectedTeam, &settings.SelectedTeam)
+	_ = json.Unmarshal(tabOrder, &settings.TabOrder)
+	_ = json.Unmarshal(kanbanStatuses, &settings.KanbanColumnOrderStatuses)
+	_ = json.Unmarshal(kanbanUsers, &settings.KanbanColumnOrderUsers)
+	_ = json.Unmarshal(lastFilters, &settings.LastFilters)
+	_ = json.Unmarshal(pagination, &settings.Pagination)
 	if settings.Pagination == nil {
 		settings.Pagination = map[string]int{}
 	}
@@ -183,7 +186,9 @@ func (h *SettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request)
 		// Задачи синхронизируются только по выбранным проектам: новые
 		// забираются сейчас, не дожидаясь синхронизации по расписанию.
 		if h.Source != nil {
-			h.Source.TriggerSync()
+			if err := h.Source.TriggerSync(); err != nil {
+				slog.Warn("Operation failed", "at", "UpdateSettings", "error", err)
+			}
 		}
 	}
 	if v, ok := body["selected_team"]; ok {

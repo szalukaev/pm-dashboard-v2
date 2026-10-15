@@ -61,7 +61,7 @@ func (h *AnalyticsHandler) GetGantt(w http.ResponseWriter, r *http.Request) {
 			projects = append(projects, p)
 		}
 	}
-	rows.Close()
+	_ = rows.Close()
 
 	// Фильтр только сужает то, что пользователь и так вправе видеть
 	taskFilter := base
