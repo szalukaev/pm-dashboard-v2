@@ -3,7 +3,8 @@
 // страница и файлы без хеша в имени всегда берутся из сети (кэш — только на
 // случай, когда сети нет), а файлы сборки с хешем в имени не меняются и
 // берутся из кэша.
-const CACHE_NAME = 'pm-dashboard-v3.1.1'
+// Новое имя сбрасывает кэш, куда раньше могла попасть страница вместо JS-файла
+const CACHE_NAME = 'pm-dashboard-v3.1.2'
 // Сколько ждать сеть, прежде чем показать сохранённую страницу: на плохой
 // мобильной сети запрос иначе висит до тайм-аута телефона (минута и больше)
 const NAVIGATE_TIMEOUT_MS = 4000
@@ -31,7 +32,10 @@ function immutable(url) {
 }
 
 function remember(request, response) {
-  if (response.ok && response.type === 'basic') {
+  // HTML под адресом файла сборки — это страница-заглушка, а не сам файл;
+  // такое не сохраняем
+  const html = (response.headers.get('Content-Type') || '').includes('text/html')
+  if (response.ok && response.type === 'basic' && !(html && immutable(new URL(request.url)))) {
     const clone = response.clone()
     caches.open(CACHE_NAME).then((cache) => cache.put(request, clone))
   }

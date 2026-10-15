@@ -13,6 +13,27 @@ import './styles/admin.css'
 const app = createApp(App)
 app.use(createPinia())
 app.use(router)
+
+// Файл вкладки не загрузился — обычно страница из старой сборки после деплоя.
+// Один раз перезагружаем страницу целиком; флаг не даёт уйти в цикл, если
+// файл недоступен по другой причине
+const RELOAD_FLAG = 'pm-dashboard-chunk-reload'
+function reloadOnce() {
+  try {
+    if (sessionStorage.getItem(RELOAD_FLAG)) return
+    sessionStorage.setItem(RELOAD_FLAG, '1')
+  } catch {
+    return
+  }
+  window.location.reload()
+}
+window.addEventListener('vite:preloadError', reloadOnce)
+router.onError((err) => {
+  if (/dynamically imported module|Importing a module script failed|error loading dynamically/i.test(String(err?.message))) reloadOnce()
+})
+router.afterEach(() => {
+  try { sessionStorage.removeItem(RELOAD_FLAG) } catch {}
+})
 app.use(i18n)
 app.use(Quasar, { config: {} })
 app.mount('#app')
