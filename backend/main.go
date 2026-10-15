@@ -160,7 +160,7 @@ func main() {
 	// пользователь, перечитывается перед каждой синхронизацией
 	source.SetBeforeSync(userKeys.RefreshAllProjects)
 	syncStatusH := &handlers.SyncStatusHandler{DB: &pgDB, Source: source}
-	accessH := &handlers.AccessHandler{DB: &pgDB, Source: source, Sessions: sessionStore}
+	accessH := &handlers.AccessHandler{DB: &pgDB, Source: source, Sessions: sessionStore, Disconnect: wsHub.DisconnectUser}
 	// Задачи синхронизируются по проектам, показанным пользователям в пределах их прав
 	source.SetProjectSource((&access.Resolver{DB: &pgDB}).SyncProjects)
 

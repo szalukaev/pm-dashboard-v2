@@ -65,3 +65,21 @@ func TestWSClientCloseIdempotent(t *testing.T) {
 	c.close()
 	c.close() // повторное закрытие не должно вызывать панику
 }
+
+func TestDisconnectUserClosesOnlyThatUser(t *testing.T) {
+	hub := &WSHub{clients: make(map[*wsClient]bool)}
+	a1 := &wsClient{userID: 1, send: make(chan []byte, 1)}
+	a2 := &wsClient{userID: 1, send: make(chan []byte, 1)}
+	b := &wsClient{userID: 2, send: make(chan []byte, 1)}
+	hub.clients[a1], hub.clients[a2], hub.clients[b] = true, true, true
+
+	if n := hub.DisconnectUser(1); n != 2 {
+		t.Fatalf("закрыто %d соединений, ожидалось 2", n)
+	}
+	if len(hub.clients) != 1 || !hub.clients[b] {
+		t.Fatalf("у другого пользователя соединение должно остаться")
+	}
+	if _, open := <-a1.send; open {
+		t.Fatalf("канал отправки закрытого соединения должен быть закрыт")
+	}
+}

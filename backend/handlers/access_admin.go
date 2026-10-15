@@ -29,6 +29,15 @@ type AccessHandler struct {
 	Source *manager.Manager
 	// Sessions завершает сессии пользователя, которому сбросили пароль.
 	Sessions db.SessionStore
+	// Disconnect закрывает открытые WebSocket-соединения пользователя
+	Disconnect func(userID int) int
+}
+
+// disconnect закрывает соединения пользователя, если хаб подключён
+func (h *AccessHandler) disconnect(userID int) {
+	if h.Disconnect != nil {
+		h.Disconnect(userID)
+	}
 }
 
 func (h *AccessHandler) resolver() *access.Resolver {
@@ -203,6 +212,7 @@ func (h *AccessHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 
 	sets := []string{}
 	args := []interface{}{}
+	blockNow := false
 	set := func(column string, value interface{}) {
 		args = append(args, value)
 		sets = append(sets, column+" = $"+strconv.Itoa(len(args)))
@@ -244,6 +254,7 @@ func (h *AccessHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		set("is_blocked", blocked)
+		blockNow = blocked
 	}
 	if raw, ok := body["default_timezone"]; ok {
 		var name string
@@ -287,6 +298,10 @@ func (h *AccessHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// Заблокированный не должен получать события и по уже открытому соединению
+	if blockNow {
+		h.disconnect(userID)
+	}
 	h.rightsChanged()
 	utils.Success(w)
 }
@@ -310,6 +325,7 @@ func (h *AccessHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusNotFound, "USER_NOT_FOUND")
 		return
 	}
+	h.disconnect(userID)
 	h.rightsChanged()
 	utils.Success(w)
 }
@@ -364,6 +380,7 @@ func (h *AccessHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 			slog.Warn("Could not end the sessions after a password reset", "user", userID, "error", err)
 		}
 	}
+	h.disconnect(userID)
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"password": password})
 }
 

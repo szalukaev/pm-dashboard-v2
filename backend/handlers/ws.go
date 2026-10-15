@@ -186,6 +186,28 @@ func (h *WSHub) SendToUser(userID int, event string, data interface{}) {
 	}
 }
 
+// DisconnectUser закрывает все открытые соединения пользователя: после
+// блокировки, удаления или сброса пароля он не должен получать события.
+// Возвращает число закрытых соединений.
+func (h *WSHub) DisconnectUser(userID int) int {
+	h.mu.Lock()
+	var gone []*wsClient
+	for client := range h.clients {
+		if client.userID == userID {
+			gone = append(gone, client)
+			delete(h.clients, client)
+		}
+	}
+	h.mu.Unlock()
+	for _, client := range gone {
+		client.close()
+	}
+	if len(gone) > 0 {
+		slog.Info("WS user disconnected", "user", userID, "connections", len(gone))
+	}
+	return len(gone)
+}
+
 // writePump — единственный, кто пишет в соединение.
 func (c *wsClient) writePump() {
 	ticker := time.NewTicker(wsPingPeriod)
