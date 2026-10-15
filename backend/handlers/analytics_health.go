@@ -51,7 +51,11 @@ func (h *AnalyticsHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	projectFilter, args := projectIssues(r)
+	projectFilter, args, ok := periodIssues(r)
+	if !ok {
+		utils.Error(w, http.StatusBadRequest, "INVALID_PERIOD")
+		return
+	}
 	today := time.Now().Format("2006-01-02")
 
 	var active, overdue, bugs, noEstimate int
@@ -59,7 +63,7 @@ func (h *AnalyticsHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 		COUNT(*),
 		COUNT(CASE WHEN due_date IS NOT NULL AND due_date < $` + itoa(len(args)+1) + ` THEN 1 END),
 		COUNT(CASE WHEN ` + bugStatus("status_id") + ` THEN 1 END),
-		COUNT(CASE WHEN estimated_hours IS NULL OR estimated_hours = 0 THEN 1 END)
+		COUNT(CASE WHEN (estimated_hours IS NULL OR estimated_hours = 0) AND `+statusIn("status_id", GroupOpen)+` THEN 1 END)
 		FROM issues WHERE ` + projectFilter + `
 		AND ` + statusIn("status_id", GroupOpen, GroupTesting)
 	args = append(args, today)
