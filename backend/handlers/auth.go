@@ -599,7 +599,7 @@ func (h *AuthHandler) MemberAvatars(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rows, err := (*h.DB).Query(`SELECT m.external_id, m.name, u.avatar
-		FROM users u JOIN members m ON m.id = u.member_id
+		FROM users u JOIN members m ON m.external_id = u.member_id AND m.data_source = 'redmine'
 		WHERE COALESCE(u.avatar, '') <> ''`)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
