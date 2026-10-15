@@ -4,6 +4,7 @@
     :title="task ? `#${task.external_id} ${task.subject}` : ''"
     width="70vw"
     expandable
+    :page="isMobile"
     @update:model-value="!$event && $emit('close')"
   >
     <template #title>
@@ -17,9 +18,69 @@
       <AppSpinner :size="32" />
     </div>
 
-    <div v-else-if="task" class="task-card">
+    <div v-else-if="task" class="task-card" :class="{ mobile: isMobile }">
+      <!-- Телефон: суть задачи, срок и часы крупно, исполнитель, вкладки -->
+      <template v-if="isMobile">
+        <div class="m-project">{{ task.project_name }}</div>
+        <div class="m-subject">{{ task.subject }}</div>
+        <div class="m-chips">
+          <!-- Чип — это и есть выбор: поверх него прозрачный список, телефон показывает свой выбор значения -->
+          <label class="m-chip" :style="chipColors(statusColor(editFields.status_name))">
+            <span class="m-dot"></span>{{ editFields.status_name }} ▾
+            <select v-model="editFields.status_name" :disabled="!auth.canWrite" :aria-label="$t('tasks.table.status')" @change="saveField('status_name')">
+              <option v-for="s in statuses" :key="s.id" :value="s.name">{{ s.name }}</option>
+            </select>
+          </label>
+          <label v-if="editFields.priority_name" class="m-chip m-chip-priority">
+            {{ editFields.priority_name }} ▾
+            <select v-model="editFields.priority_name" :disabled="!auth.canWrite" :aria-label="$t('tasks.table.priority')" @change="saveField('priority_name')">
+              <option v-for="p in priorityNames" :key="p" :value="p">{{ p }}</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="m-kpi">
+          <label class="m-box" :class="dueState.kind">
+            <span class="m-label">{{ $t(dueState.label) }}</span>
+            <b class="m-big">{{ dueState.value }}</b>
+            <span class="m-small">{{ task.due_date ? formatDay(task.due_date) : $t('tasks.mobile.card.no_due') }}</span>
+            <input type="date" v-model="editFields.due_date" :disabled="!auth.canWrite" :aria-label="$t('tasks.modal.deadline')" class="m-overlay" @change="saveField('due_date')" />
+          </label>
+          <div class="m-box m-hours">
+            <svg viewBox="0 0 36 36" class="m-ring" :class="{ over: hoursPct > 100 }">
+              <circle cx="18" cy="18" r="15" class="m-ring-track" />
+              <circle cx="18" cy="18" r="15" class="m-ring-fill" :stroke-dasharray="`${Math.min(hoursPct, 100) * 0.9425} 94.25`" />
+            </svg>
+            <div>
+              <span class="m-label">{{ $t('tasks.mobile.card.hours') }}</span>
+              <b class="m-big">{{ formatHours(task.spent_hours) }}<small v-if="task.estimated_hours">/{{ formatHours(task.estimated_hours) }}</small></b>
+              <span v-if="task.bug_fix_hours" class="m-small">{{ $t('tasks.mobile.card.bug_fix', { h: formatHours(task.bug_fix_hours) }) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <label class="m-assignee">
+          <span class="m-avatar" :style="{ background: avatarColor(editFields.assigned_to_name) }">
+            <img v-if="avatarSrc(task.assigned_to_id, editFields.assigned_to_name)" :src="avatarSrc(task.assigned_to_id, editFields.assigned_to_name)" alt="" />
+            <template v-else>{{ initials(editFields.assigned_to_name || '?') }}</template>
+          </span>
+          <span class="m-assignee-name">{{ editFields.assigned_to_name || $t('tasks.modal.no_assignee') }}</span>
+          <span class="m-chev">›</span>
+          <select v-model="editFields.assigned_to_name" :disabled="!auth.canWrite" :aria-label="$t('tasks.table.assignee')" @change="saveField('assigned_to_name')">
+            <option value="">{{ $t('tasks.modal.no_assignee') }}</option>
+            <option v-for="m in memberNames" :key="m" :value="m">{{ m }}</option>
+          </select>
+        </label>
+
+        <nav class="m-tabs">
+          <button v-for="tab in mobileTabs" :key="tab.key" type="button" :class="{ on: mobileTab === tab.key }" :data-testid="'task-tab-' + tab.key" @click="setMobileTab(tab.key)">
+            {{ $t(tab.label) }}<i v-if="tab.count">{{ tab.count }}</i>
+          </button>
+        </nav>
+      </template>
+
       <!-- Параметры -->
-      <section class="params">
+      <section v-show="!isMobile || mobileTab === 'over'" class="params">
         <div class="params-col">
           <div class="param">
             <span class="param-label">{{ $t('tasks.modal.project') }}</span>
@@ -58,19 +119,19 @@
         </div>
 
         <div class="params-col">
-          <div class="param">
+          <div v-if="!isMobile" class="param">
             <span class="param-label">{{ $t('tasks.table.status') }}</span>
             <select v-model="editFields.status_name" :disabled="!auth.canWrite" class="field-input" @change="saveField('status_name')">
               <option v-for="s in statuses" :key="s.id" :value="s.name">{{ s.name }}</option>
             </select>
           </div>
-          <div class="param">
+          <div v-if="!isMobile" class="param">
             <span class="param-label">{{ $t('tasks.table.priority') }}</span>
             <select v-model="editFields.priority_name" :disabled="!auth.canWrite" class="field-input" @change="saveField('priority_name')">
               <option v-for="p in priorityNames" :key="p" :value="p">{{ p }}</option>
             </select>
           </div>
-          <div class="param">
+          <div v-if="!isMobile" class="param">
             <span class="param-label">{{ $t('tasks.table.assignee') }}</span>
             <select v-model="editFields.assigned_to_name" :disabled="!auth.canWrite" class="field-input" @change="saveField('assigned_to_name')">
               <option value="">{{ $t('tasks.modal.no_assignee') }}</option>
@@ -88,7 +149,7 @@
             <span class="param-label">{{ $t('tasks.modal.start_date') }}</span>
             <span class="param-value">{{ formatDay(task.start_date) }}</span>
           </div>
-          <div class="param">
+          <div v-if="!isMobile" class="param">
             <span class="param-label">{{ $t('tasks.modal.deadline') }}</span>
             <input type="date" v-model="editFields.due_date" :disabled="!auth.canWrite" class="field-input" @change="saveField('due_date')" />
           </div>
@@ -96,7 +157,7 @@
       </section>
 
       <!-- Описание -->
-      <section class="section">
+      <section v-show="!isMobile || mobileTab === 'over'" class="section">
         <h4 class="section-title">{{ $t('tasks.modal.description') }}</h4>
         <div v-if="detailsLoading" class="section-loading"><AppSpinner :size="20" /></div>
         <div v-else-if="descriptionHtml" class="markup" v-html="descriptionHtml"></div>
@@ -104,7 +165,7 @@
       </section>
 
       <!-- Файлы -->
-      <section class="section">
+      <section v-show="!isMobile || mobileTab === 'files'" class="section">
         <h4 class="section-title">
           {{ $t('tasks.modal.files') }}
           <span v-if="attachments.length" class="section-count">{{ attachments.length }}</span>
@@ -132,7 +193,7 @@
       </section>
 
       <!-- Связанные задачи -->
-      <section v-if="related.length" class="section" data-testid="task-related">
+      <section v-if="related.length" v-show="!isMobile || mobileTab === 'over'" class="section" data-testid="task-related">
         <h4 class="section-title">
           {{ $t('tasks.related.title') }}
           <span class="section-count">{{ related.length }}</span>
@@ -155,9 +216,9 @@
         </div>
       </section>
 
-      <!-- Комментарии или вся история задачи -->
-      <section class="section">
-        <h4 class="section-title">
+      <!-- Комментарии или вся история задачи; на телефоне — вкладки «Обсуждение» и «История» -->
+      <section v-show="!isMobile || mobileTab === 'talk' || mobileTab === 'history'" class="section">
+        <h4 v-if="!isMobile" class="section-title">
           <button type="button" class="mode-pill" :class="{ active: historyMode === 'comments' }" data-testid="mode-comments" @click="historyMode = 'comments'">
             {{ $t('tasks.modal.comments') }}
             <span v-if="comments.length" class="section-count">{{ comments.length }}</span>
@@ -211,7 +272,7 @@
       </section>
 
       <!-- Новый комментарий -->
-      <section v-if="auth.canWrite" class="section new-comment">
+      <section v-if="auth.canWrite" v-show="!isMobile || mobileTab === 'talk'" class="section new-comment">
         <h4 class="section-title">{{ $t('tasks.modal.new_comment') }}</h4>
         <textarea
           v-model="newComment"
@@ -254,6 +315,9 @@ import { useAuthStore } from '../../stores/auth'
 import { useSwal } from '../../composables/useSwal'
 import { renderRedmineMarkup } from '../../utils/redmineMarkup'
 import { statusColor } from '../../utils/statusColor'
+import { useMobileTasks } from '../../composables/useMobileTasks'
+import { useMemberAvatars } from '../../composables/useMemberAvatars'
+import { avatarColor } from '../../utils/avatar'
 
 interface Attachment {
   id: number
@@ -300,6 +364,8 @@ const i18n = useI18n()
 // которую пользователь перешёл из неё.
 const currentId = ref<number | null>(props.taskId)
 watch(() => props.taskId, id => { currentId.value = id })
+// Другая задача открывается с вкладки «Обзор»
+watch(currentId, () => setMobileTab('over'))
 
 const task = ref<Task | null>(null)
 const loading = ref(false)
@@ -320,6 +386,47 @@ const rawComments = ref<Comment[]>([])
 const rawHistory = ref<HistoryEntry[]>([])
 const related = ref<RelatedIssue[]>([])
 const historyMode = ref<'comments' | 'history'>('comments')
+
+// Телефон: карточка — отдельный экран с вкладками
+const { isMobile } = useMobileTasks()
+const { avatarSrc } = useMemberAvatars()
+const mobileTab = ref<'over' | 'talk' | 'files' | 'history'>('over')
+const mobileTabs = computed(() => [
+  { key: 'over' as const, label: 'tasks.mobile.card.tab_over', count: 0 },
+  { key: 'talk' as const, label: 'tasks.modal.comments', count: comments.value.length },
+  { key: 'files' as const, label: 'tasks.modal.files', count: attachments.value.length },
+  { key: 'history' as const, label: 'tasks.history.title', count: history.value.length },
+])
+
+// Вкладки «Обсуждение» и «История» показывают тот же раздел в разных режимах
+function setMobileTab(key: 'over' | 'talk' | 'files' | 'history') {
+  mobileTab.value = key
+  if (key === 'talk') historyMode.value = 'comments'
+  if (key === 'history') historyMode.value = 'history'
+}
+
+// Сколько осталось до срока: дни, «сегодня» или сколько дней просрочено
+const dueState = computed(() => {
+  const due = task.value?.due_date?.slice(0, 10)
+  if (!due) return { kind: 'none', label: 'tasks.mobile.card.due_left', value: '—' }
+  const today = new Date()
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  const days = Math.round((Date.parse(due) - Date.parse(todayStr)) / 86_400_000)
+  if (days < 0) return { kind: 'overdue', label: 'tasks.mobile.card.overdue', value: i18n.t('tasks.mobile.card.days', { n: -days }) }
+  if (days === 0) return { kind: 'today', label: 'tasks.mobile.card.due_left', value: i18n.t('tasks.mobile.card.today') }
+  return { kind: days <= 3 ? 'soon' : 'ok', label: 'tasks.mobile.card.due_left', value: i18n.t('tasks.mobile.card.days', { n: days }) }
+})
+
+// Доля потраченных часов от плана, в процентах
+const hoursPct = computed(() => {
+  const est = Number(task.value?.estimated_hours) || 0
+  return est > 0 ? Math.round(((Number(task.value?.spent_hours) || 0) / est) * 100) : 0
+})
+
+// Цвета чипа статуса — от цвета самого статуса
+function chipColors(color: string) {
+  return { color, background: `color-mix(in srgb, ${color} 18%, transparent)` }
+}
 const detailsLoading = ref(false)
 const detailsError = ref('')
 
@@ -1111,4 +1218,239 @@ button.related-row:hover {
     grid-template-columns: 96px minmax(0, 1fr);
   }
 }
+/* ── Телефон: карточка-экран с вкладками ── */
+.m-project {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.m-subject {
+  margin: 2px 0 10px;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text-bright);
+  overflow-wrap: anywhere;
+}
+
+.m-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.m-chip,
+.m-assignee,
+.m-box {
+  position: relative;
+}
+
+.m-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.m-chip-priority {
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 18%, transparent);
+}
+
+.m-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* Прозрачный список поверх чипа или строки: нажатие открывает выбор телефона */
+.m-chip select,
+.m-assignee select,
+.m-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.m-kpi {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.m-box {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.m-hours {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.m-hours > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.m-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.m-big {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--text-bright);
+  white-space: nowrap;
+}
+
+.m-big small {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.m-small {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.m-box.overdue .m-big { color: var(--danger); }
+.m-box.today .m-big,
+.m-box.soon .m-big { color: var(--warning); }
+
+.m-ring {
+  width: 46px;
+  height: 46px;
+  flex: none;
+}
+
+.m-ring circle {
+  fill: none;
+  stroke-width: 4;
+}
+
+.m-ring-track {
+  stroke: var(--surface-3);
+}
+
+.m-ring-fill {
+  stroke: var(--accent);
+  stroke-linecap: round;
+  transform: rotate(-90deg);
+  transform-origin: 18px 18px;
+}
+
+.m-ring.over .m-ring-fill {
+  stroke: var(--danger);
+}
+
+.m-assignee {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 12px;
+  padding: 9px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.m-avatar {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.m-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.m-assignee-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-bright);
+}
+
+.m-chev {
+  color: var(--text-faint);
+}
+
+.m-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  gap: 2px;
+  margin: 0 -16px 12px;
+  padding: 0 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border);
+}
+
+.m-tabs button {
+  flex: none;
+  padding: 10px 8px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.m-tabs button.on {
+  color: var(--text-bright);
+  border-bottom-color: var(--accent);
+}
+
+.m-tabs i {
+  margin-left: 4px;
+  font-style: normal;
+  font-weight: 500;
+  color: var(--text-faint);
+}
+
+/* Свойства на «Обзоре» — одной колонкой */
+.task-card.mobile .params {
+  grid-template-columns: minmax(0, 1fr);
+}
 </style>
+

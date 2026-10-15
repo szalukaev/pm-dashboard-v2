@@ -205,7 +205,17 @@
       "sort_priority": "Priority",
       "sort_due": "Due date",
       "sort_number": "Number",
-      "sort_subject": "Title"
+      "sort_subject": "Title",
+      "card": {
+        "tab_over": "Overview",
+        "due_left": "Due in",
+        "overdue": "Overdue by",
+        "days": "{n} d",
+        "today": "today",
+        "no_due": "no due date",
+        "hours": "Hours",
+        "bug_fix": "bugs {h}"
+      }
     },
     "filters": {
       "open": "Open",

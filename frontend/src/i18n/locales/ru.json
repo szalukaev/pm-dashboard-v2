@@ -205,7 +205,17 @@
       "sort_priority": "Приоритет",
       "sort_due": "Дата окончания",
       "sort_number": "Номер",
-      "sort_subject": "Название"
+      "sort_subject": "Название",
+      "card": {
+        "tab_over": "Обзор",
+        "due_left": "До срока",
+        "overdue": "Просрочено на",
+        "days": "{n} дн",
+        "today": "сегодня",
+        "no_due": "срок не задан",
+        "hours": "Часы",
+        "bug_fix": "ошибки {h}"
+      }
     },
     "filters": {
       "open": "Открытые",

@@ -2,11 +2,15 @@
   <Teleport to="body">
     <Transition name="modal">
       <div v-if="modelValue" class="modal-overlay" @click.self="close">
-        <div class="modal-content" :class="{ fullscreen }" :style="fullscreen ? undefined : { width: width || '520px' }">
+        <div class="modal-content" :class="{ fullscreen: fullscreen || page, page }" :style="fullscreen || page ? undefined : { width: width || '520px' }">
           <div class="modal-header">
+            <!-- Страница на телефоне: «назад» слева вместо крестика справа -->
+            <button v-if="page" type="button" class="modal-back" :aria-label="$t('common.back')" data-testid="modal-back" @click="close">
+              <ChevronLeft :size="24" />
+            </button>
             <h3><slot name="title">{{ title }}</slot></h3>
             <button
-              v-if="expandable"
+              v-if="expandable && !page"
               class="modal-close modal-expand"
               :title="$t(fullscreen ? 'common.windowed' : 'common.fullscreen')"
               :aria-label="$t(fullscreen ? 'common.windowed' : 'common.fullscreen')"
@@ -16,7 +20,7 @@
               <Minimize2 v-if="fullscreen" :size="16" />
               <Maximize2 v-else :size="16" />
             </button>
-            <button type="button" class="modal-close" :aria-label="$t('common.close')" data-testid="modal-close" @click="close">
+            <button v-if="!page" type="button" class="modal-close" :aria-label="$t('common.close')" data-testid="modal-close" @click="close">
               <X :size="18" />
             </button>
           </div>
@@ -36,18 +40,20 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { X, Maximize2, Minimize2 } from 'lucide-vue-next'
+import { X, Maximize2, Minimize2, ChevronLeft } from 'lucide-vue-next'
 import AppSavingOverlay from './AppSavingOverlay.vue'
 
 // expandable: окно можно развернуть на весь экран и вернуть обратно; выбор
 // сохраняется, пока открыта страница.
 // busy: идёт сохранение — содержимое закрыто заслонкой, окно не закрывается.
+// page: окно — отдельный экран на телефоне: на весь экран, с кнопкой «назад».
 const props = defineProps<{
   modelValue: boolean
   title: string
   width?: string
   expandable?: boolean
   busy?: boolean
+  page?: boolean
 }>()
 
 const fullscreen = ref(false)
@@ -185,5 +191,32 @@ function close() {
     flex-wrap: wrap;
     padding: 12px 16px 16px;
   }
+}
+
+/* Страница на телефоне */
+.modal-content.page {
+  height: 100dvh;
+}
+
+.modal-content.page .modal-header {
+  gap: 4px;
+  padding: max(8px, env(safe-area-inset-top)) 12px 8px 6px;
+  border-bottom: 0;
+}
+
+.modal-content.page .modal-body {
+  padding: 0 16px calc(16px + env(safe-area-inset-bottom));
+}
+
+.modal-back {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
 }
 </style>
