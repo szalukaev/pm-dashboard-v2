@@ -415,7 +415,7 @@ const dueState = computed(() => {
 function openDatePicker(e: MouseEvent) {
   if (!auth.canWrite) return
   const input = (e.currentTarget as HTMLElement).querySelector('input[type="date"]') as HTMLInputElement | null
-  if (!input || e.target === input) return
+  if (!input) return
   e.preventDefault()
   try {
     input.showPicker()
@@ -1533,6 +1533,12 @@ button.related-row:hover {
 
 .m-due {
   cursor: pointer;
+}
+
+/* Компьютер: нажатие ловит плитка и сама открывает календарь — поле его
+   не перехватывает (иначе браузер открывает календарь только по значку) */
+.task-card.split .m-due .m-overlay {
+  pointer-events: none;
 }
 
 .task-card.carded .num-input {
