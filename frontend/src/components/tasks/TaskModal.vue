@@ -82,7 +82,7 @@
       <!-- Параметры -->
       <section v-show="!isMobile || mobileTab === 'over'" class="params">
         <div class="params-col">
-          <div class="param">
+          <div v-if="!isMobile" class="param">
             <span class="param-label">{{ $t('tasks.modal.project') }}</span>
             <span class="param-value">{{ task.project_name || '—' }}</span>
           </div>
@@ -105,11 +105,11 @@
               <span class="unit">{{ $t('tasks.units.hours') }}</span>
             </div>
           </div>
-          <div class="param">
+          <div v-if="!isMobile" class="param">
             <span class="param-label">{{ $t('tasks.modal.fact') }}</span>
             <span class="param-value num">{{ formatHours(task.spent_hours) }}</span>
           </div>
-          <div class="param">
+          <div v-if="!isMobile" class="param">
             <span class="param-label">{{ $t('tasks.modal.bug_fix') }}</span>
             <span class="param-value num">
               {{ formatHours(task.bug_fix_hours) }}
@@ -1448,9 +1448,79 @@ button.related-row:hover {
   color: var(--text-faint);
 }
 
-/* Свойства на «Обзоре» — одной колонкой */
+/* Свойства на «Обзоре» — список в карточке: название слева, значение справа */
 .task-card.mobile .params {
-  grid-template-columns: minmax(0, 1fr);
+  display: block;
+  padding: 0;
+  overflow: hidden;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.task-card.mobile .params-col {
+  display: contents;
+}
+
+.task-card.mobile .param {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 50px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.task-card.mobile .param:last-child {
+  border-bottom: 1px solid var(--border-light);
+}
+
+.task-card.mobile .params-col:last-child .param:last-child {
+  border-bottom: none;
+}
+
+.task-card.mobile .param-label {
+  flex: 1;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.task-card.mobile .param-value {
+  padding: 0;
+  font-size: 15px;
+  color: var(--text-bright);
+  text-align: right;
+}
+
+.task-card.mobile .param-control {
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+/* Поля без рамок: значение справа, как обычный текст */
+.task-card.mobile .field-input {
+  width: auto;
+  max-width: 60vw;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  font-size: 16px;
+  text-align: right;
+  text-align-last: right;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.task-card.mobile .num-input {
+  width: 64px;
+}
+
+/* У изменяемых значений справа «›» */
+.task-card.mobile .param:has(select:not(:disabled))::after,
+.task-card.mobile .param:has(input:not(:disabled))::after {
+  content: '›';
+  font-size: 18px;
+  color: var(--text-faint);
 }
 </style>
 
