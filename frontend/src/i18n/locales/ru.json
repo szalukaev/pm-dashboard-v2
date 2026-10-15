@@ -482,6 +482,12 @@
       "today": "Сегодня",
       "three_days": "3 дня",
       "week": "Неделя"
+    },
+    "sections": {
+      "overview": "Обзор",
+      "team": "Команда",
+      "deadlines": "Сроки",
+      "projects": "Проекты"
     }
   },
   "kanban": {

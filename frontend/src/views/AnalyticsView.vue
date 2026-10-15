@@ -14,12 +14,23 @@
 
     <!-- Содержимое: виджеты расставляет пользователь; скрытые от него
          администратором не показываются -->
-    <DashboardGrid v-else :widgets="WIDGETS" :available="available">
+    <DashboardGrid v-else :widgets="WIDGETS" :available="shownWidgets">
       <template #title>
         <div class="title-row">
           <h1 class="page-title">{{ $t('analytics.title') }}</h1>
           <PeriodFilter :model-value="period" @update:model-value="changePeriod" />
         </div>
+        <!-- Телефон: разделы вкладками вместо длинной ленты виджетов -->
+        <nav v-if="isMobile" class="m-sections" data-testid="analytics-sections">
+          <button
+            v-for="section in MOBILE_SECTIONS"
+            :key="section.key"
+            type="button"
+            :class="{ on: mobileSection === section.key }"
+            :data-testid="'analytics-section-' + section.key"
+            @click="setMobileSection(section.key)"
+          >{{ $t('analytics.sections.' + section.key) }}</button>
+        </nav>
       </template>
 
       <!-- Индикаторы выше порогов, заданных пользователем в настройках -->
@@ -119,6 +130,7 @@
 </template>
 
 <script setup lang="ts">
+import { useMobileTasks } from '../composables/useMobileTasks'
 import AppLoader from '../components/ui/AppLoader.vue'
 import { ref, computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
@@ -291,6 +303,42 @@ function weekLabel(weekStart: string): string {
 
 const available = computed(() => WIDGETS.map(w => w.id).filter(id => auth.widgetVisible(id)))
 
+// Телефон: виджеты разложены по разделам; Gantt на узком экране не читается
+// и не показывается. Выбранный раздел запоминается
+const { isMobile } = useMobileTasks()
+const MOBILE_SECTIONS = [
+  { key: 'overview', widgets: ['stats', 'health', 'velocity'] },
+  { key: 'team', widgets: ['team_load', 'hours', 'bug_hours'] },
+  { key: 'deadlines', widgets: ['deadlines'] },
+  { key: 'projects', widgets: ['distribution'] },
+] as const
+type MobileSection = typeof MOBILE_SECTIONS[number]['key']
+const SECTION_KEY = 'pm-dashboard-analytics-section'
+
+function readSection(): MobileSection {
+  try {
+    const saved = localStorage.getItem(SECTION_KEY)
+    if (MOBILE_SECTIONS.some(s => s.key === saved)) return saved as MobileSection
+  } catch {}
+  return 'overview'
+}
+
+const mobileSection = ref<MobileSection>(readSection())
+
+function setMobileSection(key: MobileSection) {
+  mobileSection.value = key
+  try {
+    localStorage.setItem(SECTION_KEY, key)
+  } catch {}
+}
+
+const shownWidgets = computed(() => {
+  if (!isMobile.value) return available.value
+  const section = MOBILE_SECTIONS.find(s => s.key === mobileSection.value)
+  const ids: readonly string[] = section ? section.widgets : []
+  return available.value.filter(id => ids.includes(id))
+})
+
 // Сохранённая раскладка уже известна: виджеты не прыгают после появления
 const ready = ref(false)
 const selectedTaskId = ref<number | null>(null)
@@ -375,5 +423,35 @@ onMounted(async () => {
 
 .page-title-alone {
   margin-bottom: 24px;
+}
+
+/* Телефон: переключатель разделов под заголовком */
+.m-sections {
+  display: flex;
+  gap: 2px;
+  margin-top: 10px;
+  padding: 3px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.m-sections button {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 2px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.m-sections button.on {
+  background: var(--bg-hover);
+  color: var(--text-bright);
 }
 </style>

@@ -482,6 +482,12 @@
       "today": "Today",
       "three_days": "3 Days",
       "week": "Week"
+    },
+    "sections": {
+      "overview": "Overview",
+      "team": "Team",
+      "deadlines": "Deadlines",
+      "projects": "Projects"
     }
   },
   "kanban": {
