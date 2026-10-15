@@ -12,6 +12,12 @@ import (
 	"pm-dashboard/utils"
 )
 
+// assigneeLabel — имя исполнителя для отчётов; задача без исполнителя и
+// исполнитель с пустым именем в базе одинаково попадают в «Неназначенные».
+// Группировать по этому выражению, а не по assigned_to_name, иначе NULL и
+// пустая строка дадут две строки с одной подписью.
+const assigneeLabel = `COALESCE(NULLIF(TRIM(assigned_to_name), ''), 'Неназначенные')`
+
 type AnalyticsHandler struct {
 	DB **sql.DB
 }
@@ -198,7 +204,7 @@ func (h *AnalyticsHandler) teamLoad(scope *access.Scope, now time.Time, period P
 	}
 
 	q := `SELECT
-		COALESCE(assigned_to_name, 'Неназначенные'),
+		` + assigneeLabel + `,
 		COUNT(CASE WHEN ` + statusIn("status_id", GroupOpen) + ` THEN 1 END),
 		COUNT(CASE WHEN ` + statusIn("status_id", GroupTesting) + ` THEN 1 END),
 		COUNT(CASE WHEN ` + statusIn("status_id", GroupClosed) + ` THEN 1 END),
@@ -207,8 +213,8 @@ func (h *AnalyticsHandler) teamLoad(scope *access.Scope, now time.Time, period P
 		COUNT(CASE WHEN ` + highPriority("priority_id") + ` THEN 1 END),
 		COUNT(CASE WHEN (estimated_hours IS NULL OR estimated_hours = 0) AND ` + statusIn("status_id", GroupOpen) + ` THEN 1 END)
 		FROM issues WHERE ` + projectFilter + teamFilter + `
-		GROUP BY assigned_to_name
-		ORDER BY assigned_to_name`
+		GROUP BY 1
+		ORDER BY 1`
 
 	args = append(args, today)
 	// #nosec G701 -- условие прав из Scope и фильтры-константы из кода, значения через $n
@@ -257,11 +263,11 @@ func (h *AnalyticsHandler) distribution(scope *access.Scope, period Period) ([]P
 	args := []interface{}{}
 	projectFilter := scope.ProjectIssueCond("", &args) + period.updatedCond(&args)
 
-	q := `SELECT COALESCE(project_id, 0), project_name, COALESCE(assigned_to_name, 'Неназначенные'), COUNT(*)
+	q := `SELECT COALESCE(project_id, 0), project_name, ` + assigneeLabel + `, COUNT(*)
 		FROM issues WHERE ` + projectFilter + `
 		AND ` + statusIn("status_id", GroupOpen) + `
-		GROUP BY project_id, project_name, assigned_to_name
-		ORDER BY project_name, project_id, assigned_to_name`
+		GROUP BY 1, 2, 3
+		ORDER BY 2, 1, 3`
 
 	// #nosec G701 -- условие прав из Scope и фильтры-константы из кода, значения через $n
 	rows, err := (*h.DB).Query(q, args...)

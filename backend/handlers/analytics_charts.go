@@ -54,14 +54,14 @@ func (h *AnalyticsHandler) GetHours(w http.ResponseWriter, r *http.Request) {
 	}
 
 	q := `SELECT
-		COALESCE(assigned_to_name, 'Неназначенные'),
+		` + assigneeLabel + `,
 		COALESCE(SUM(estimated_hours), 0),
 		COALESCE(SUM(spent_hours), 0),
 		COALESCE(SUM(bug_fix_hours), 0)
 		FROM issues WHERE ` + projectFilter + teamFilter + `
 		AND ` + statusNotIn("status_id", GroupClosed) + `
-		GROUP BY assigned_to_name
-		ORDER BY assigned_to_name`
+		GROUP BY 1
+		ORDER BY 1`
 
 	// #nosec G701 -- условие прав из Scope и фильтры-константы из кода, значения через $n
 	rows, err := (*h.DB).Query(q, args...)

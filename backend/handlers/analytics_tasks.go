@@ -63,7 +63,7 @@ func (h *AnalyticsHandler) GetTasks(w http.ResponseWriter, r *http.Request) {
 			filter += " AND assigned_to_id IS NOT NULL"
 		}
 		args = append(args, query.Get("assignee"))
-		filter += " AND COALESCE(assigned_to_name, 'Неназначенные') = $" + itoa(len(args))
+		filter += " AND " + assigneeLabel + " = $" + itoa(len(args))
 	} else {
 		filter, args = projectIssues(r)
 	}
