@@ -54,6 +54,16 @@ if ('serviceWorker' in navigator) {
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('message', async (event) => {
     const data = event.data || {}
+    // Нажали на push, а приложение уже открыто: переход по ссылке уведомления
+    // (задача откроется карточкой), колокольчик — с отметкой «прочитано»
+    if (data.type === 'open-url' && typeof data.url === 'string' && data.url.startsWith('/')) {
+      if (data.id) {
+        const { useNotificationsStore } = await import('./stores/notifications')
+        useNotificationsStore().fetch()
+      }
+      router.push(data.url)
+      return
+    }
     if (data.type !== 'push-shown' && data.type !== 'push-error') return
     if (data.tag !== 'push-test') return
     const { useToast } = await import('./composables/useToast')

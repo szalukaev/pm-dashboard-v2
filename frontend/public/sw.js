@@ -4,7 +4,7 @@
 // случай, когда сети нет), а файлы сборки с хешем в имени не меняются и
 // берутся из кэша.
 // Новое имя сбрасывает кэш, куда раньше могла попасть страница вместо JS-файла
-const CACHE_NAME = 'pm-dashboard-v3.1.5'
+const CACHE_NAME = 'pm-dashboard-v3.1.6'
 // Сколько ждать сеть, прежде чем показать сохранённую страницу: на плохой
 // мобильной сети запрос иначе висит до тайм-аута телефона (минута и больше)
 const NAVIGATE_TIMEOUT_MS = 4000
@@ -115,18 +115,29 @@ self.addEventListener('push', (event) => {
   )
 })
 
-// Нажатие на push: открытое окно приложения переходит по ссылке, иначе
-// открывается новое
+// Нажатие на push: уведомление в колокольчике отмечается прочитанным, затем
+// открытое окно приложения само переходит по ссылке (WindowClient.navigate
+// в Safari нет), а если окна нет — открывается новое сразу по ссылке
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const target = new URL(event.notification.data?.url || '/notifications', self.location.origin).href
+  const url = event.notification.data?.url || '/notifications'
+  const target = new URL(url, self.location.origin).href
+  // Метка push — «n<номер уведомления>» (у проверочного push номера нет)
+  const match = /^n(\d+)$/.exec(event.notification.tag || '')
+  const id = match ? Number(match[1]) : 0
+  const markRead = id
+    ? fetch('/api/notifications/' + id + '/read', { method: 'POST', credentials: 'include' }).catch(() => {})
+    : Promise.resolve()
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
-      const open = windows.find((w) => new URL(w.url).origin === self.location.origin)
-      if (open) {
-        return open.focus().then((w) => (w || open).navigate(target))
-      }
-      return self.clients.openWindow(target)
-    })
+    markRead.then(() =>
+      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
+        const open = windows.find((w) => new URL(w.url).origin === self.location.origin)
+        if (open) {
+          open.postMessage({ type: 'open-url', url, id })
+          return open.focus()
+        }
+        return self.clients.openWindow(target)
+      })
+    )
   )
 })
