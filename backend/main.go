@@ -23,6 +23,7 @@ import (
 	"pm-dashboard/middleware"
 	"pm-dashboard/notify"
 	"pm-dashboard/push"
+	"pm-dashboard/workcal"
 	"pm-dashboard/secrets"
 	"pm-dashboard/snapshots"
 	"pm-dashboard/utils"
@@ -233,6 +234,7 @@ func main() {
 		pushSvc.Notify(userID, push.Message{Title: title, Body: body, URL: link, Tag: tag})
 	}
 	pushH := &handlers.PushHandler{Service: pushSvc}
+	calendarH := &handlers.CalendarHandler{Calendar: workcal.New(&pgDB)}
 	mailH := &handlers.MailHandler{Mail: mailStore}
 	mailer := &jobs.Mailer{DB: &pgDB, Settings: jobSettings, Store: jobs.NewStore(redisURL), Mail: mailStore, Notify: wsHub.BroadcastEvent}
 	reportH := &handlers.ReportHandler{DB: &pgDB, Mail: mailStore, Scopes: (&access.Resolver{DB: &pgDB}).Scope}
@@ -387,6 +389,7 @@ func main() {
 	api.HandleFunc("/push/subscribe", pushH.Subscribe).Methods("POST")
 	api.HandleFunc("/push/unsubscribe", pushH.Unsubscribe).Methods("POST")
 	api.HandleFunc("/push/test", pushH.Test).Methods("POST")
+	api.HandleFunc("/calendar/days", calendarH.Days).Methods("GET")
 	api.HandleFunc("/notifications/{id}/read", notificationsH.MarkRead).Methods("POST")
 
 	// Оплаты. Изменения закрыты для «только чтения», отдельные действия

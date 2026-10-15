@@ -531,7 +531,11 @@
       "start_date": "Start Date",
       "due_date": "Due Date",
       "due_before_start": "The due date cannot be earlier than the start date",
-      "description": "Description"
+      "description": "Description",
+      "duration": "Duration",
+      "unit_workdays": "Working days",
+      "unit_calendar": "Calendar days",
+      "calendar_fallback": "The production calendar is unavailable: weekdays count as working days, holidays are not taken into account."
     },
     "backlog_filter": {
       "placeholder": "Project, task subject or number — then Enter",

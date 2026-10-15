@@ -28,6 +28,8 @@ export interface Sprint {
   description: string | null
   category_name: string | null
   auto_fill_category: boolean
+  // В чём считается продолжительность: рабочие дни или календарные
+  duration_unit?: 'workdays' | 'calendar'
   // Общий спринт виден команде создателя и забирает задачи из бэклога;
   // личный виден только создателю
   is_shared: boolean

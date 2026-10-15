@@ -29,6 +29,16 @@ const (
 	SprintClosed = "closed"
 )
 
+// Единицы продолжительности спринта
+const (
+	DurationWorkdays = "workdays"
+	DurationCalendar = "calendar"
+)
+
+func validDurationUnit(unit string) bool {
+	return unit == DurationWorkdays || unit == DurationCalendar
+}
+
 type Sprint struct {
 	ID               int     `json:"id"`
 	Name             string  `json:"name"`
@@ -39,6 +49,9 @@ type Sprint struct {
 	Description      *string `json:"description"`
 	CategoryName     *string `json:"category_name"`
 	AutoFillCategory bool    `json:"auto_fill_category"`
+	// DurationUnit — в чём показывать продолжительность: workdays (рабочие
+	// дни по производственному календарю) или calendar (календарные).
+	DurationUnit string `json:"duration_unit"`
 	// IsShared: общий спринт — виден команде создателя и забирает задачи из
 	// бэклога; иначе личный, виден только создателю.
 	IsShared bool `json:"is_shared"`
@@ -87,7 +100,7 @@ func (h *SprintHandler) visibleSprints(userID, sprintID int) ([]Sprint, error) {
 	}
 
 	query := `SELECT s.id, s.name, s.project_name, s.status, s.start_date, s.due_date,
-		s.description, s.category_name, s.auto_fill_category, s.is_shared, s.closed_at,
+		s.description, s.category_name, s.auto_fill_category, s.duration_unit, s.is_shared, s.closed_at,
 		COALESCE(s.user_id, 0), COALESCE(NULLIF(u.display_name, ''), u.username, ''), os.selected_team
 		FROM sprints s
 		LEFT JOIN users u ON u.id = s.user_id
@@ -112,7 +125,7 @@ func (h *SprintHandler) visibleSprints(userID, sprintID int) ([]Sprint, error) {
 		var closedAt *time.Time
 		var team []byte
 		if rows.Scan(&s.ID, &s.Name, &s.ProjectName, &s.Status, &s.StartDate, &s.DueDate,
-			&s.Description, &s.CategoryName, &s.AutoFillCategory, &s.IsShared, &closedAt,
+			&s.Description, &s.CategoryName, &s.AutoFillCategory, &s.DurationUnit, &s.IsShared, &closedAt,
 			&s.ownerID, &s.OwnerName, &team) != nil {
 			continue
 		}
@@ -265,6 +278,7 @@ func (h *SprintHandler) CreateSprint(w http.ResponseWriter, r *http.Request) {
 		CategoryName     *string `json:"category_name"`
 		AutoFillCategory bool    `json:"auto_fill_category"`
 		IsShared         bool    `json:"is_shared"`
+		DurationUnit     string  `json:"duration_unit"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
@@ -286,16 +300,23 @@ func (h *SprintHandler) CreateSprint(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusBadRequest, "DUE_BEFORE_START")
 		return
 	}
+	if body.DurationUnit == "" {
+		body.DurationUnit = DurationWorkdays
+	}
+	if !validDurationUnit(body.DurationUnit) {
+		utils.Error(w, http.StatusBadRequest, "INVALID_DURATION_UNIT")
+		return
+	}
 	body.ProjectName = emptyToNil(body.ProjectName)
 	body.CategoryName = emptyToNil(body.CategoryName)
 	body.Description = emptyToNil(body.Description)
 
 	var sprintID int
 	err := (*h.DB).QueryRow(`INSERT INTO sprints (user_id, name, project_name, start_date, due_date,
-		description, category_name, auto_fill_category, is_shared)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+		description, category_name, auto_fill_category, is_shared, duration_unit)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
 		userID, body.Name, body.ProjectName, body.StartDate, body.DueDate,
-		body.Description, body.CategoryName, body.AutoFillCategory, body.IsShared).Scan(&sprintID)
+		body.Description, body.CategoryName, body.AutoFillCategory, body.IsShared, body.DurationUnit).Scan(&sprintID)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "CREATE_FAILED")
 		return
@@ -331,6 +352,7 @@ func (h *SprintHandler) UpdateSprint(w http.ResponseWriter, r *http.Request) {
 		"name": true, "project_name": true, "status": true,
 		"start_date": true, "due_date": true, "description": true,
 		"category_name": true, "auto_fill_category": true, "is_shared": true,
+		"duration_unit": true,
 	}
 
 	// Смена статуса закрывает спринт или открывает его заново; всё остальное —
@@ -347,6 +369,12 @@ func (h *SprintHandler) UpdateSprint(w http.ResponseWriter, r *http.Request) {
 	if status, sent := body["status"]; sent && !validSprintStatus(status) {
 		utils.Error(w, http.StatusBadRequest, "INVALID_STATUS")
 		return
+	}
+	if unit, sent := body["duration_unit"]; sent {
+		if text, isText := unit.(string); !isText || !validDurationUnit(text) {
+			utils.Error(w, http.StatusBadRequest, "INVALID_DURATION_UNIT")
+			return
+		}
 	}
 	if shared, sent := body["is_shared"]; sent {
 		value, isBool := shared.(bool)

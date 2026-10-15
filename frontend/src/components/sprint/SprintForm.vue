@@ -31,14 +31,25 @@
       <div class="ios-group">
         <label class="ios-cell ios-pick">
           <span class="ios-name">{{ $t('sprint.form.start_date') }}</span>
-          <input v-model="form.start_date" type="date" required />
+          <input v-model="form.start_date" type="date" required @change="onDatesChange" />
         </label>
         <label class="ios-cell ios-pick">
           <span class="ios-name">{{ $t('sprint.form.due_date') }}</span>
-          <input v-model="form.due_date" type="date" :min="form.start_date" />
+          <input v-model="form.due_date" type="date" :min="form.start_date" @change="onDatesChange" />
         </label>
+        <div class="ios-cell">
+          <span class="ios-name">{{ $t('sprint.form.duration') }}</span>
+          <span class="duration-fields">
+            <input v-model.number="form.duration" type="number" min="1" step="1" inputmode="numeric" class="duration-input" data-testid="sprint-duration" @input="onDurationInput" />
+            <select v-model="form.duration_unit" data-testid="sprint-duration-unit" @change="onUnitChange">
+              <option value="workdays">{{ $t('sprint.form.unit_workdays') }}</option>
+              <option value="calendar">{{ $t('sprint.form.unit_calendar') }}</option>
+            </select>
+          </span>
+        </div>
       </div>
       <div v-if="!datesInOrder" class="ios-footnote ios-error">{{ $t('sprint.form.due_before_start') }}</div>
+      <div v-else-if="form.duration_unit === 'workdays' && calendarFallback" class="ios-footnote">{{ $t('sprint.form.calendar_fallback') }}</div>
 
       <div class="ios-title">{{ $t('sprint.form.group_tasks') }}</div>
       <div class="ios-group">
@@ -117,14 +128,25 @@
       <div class="form-row">
         <div class="form-field">
           <label for="sprint-start">{{ $t('sprint.form.start_date') }} *</label>
-          <input id="sprint-start" v-model="form.start_date" type="date" required />
+          <input id="sprint-start" v-model="form.start_date" type="date" required @change="onDatesChange" />
         </div>
         <div class="form-field">
           <label for="sprint-due">{{ $t('sprint.form.due_date') }}</label>
-          <input id="sprint-due" v-model="form.due_date" type="date" :min="form.start_date" />
+          <input id="sprint-due" v-model="form.due_date" type="date" :min="form.start_date" @change="onDatesChange" />
+        </div>
+      </div>
+      <div class="form-field">
+        <label for="sprint-duration">{{ $t('sprint.form.duration') }}</label>
+        <div class="duration-fields">
+          <input id="sprint-duration" v-model.number="form.duration" type="number" min="1" step="1" class="duration-input" data-testid="sprint-duration" @input="onDurationInput" />
+          <select v-model="form.duration_unit" data-testid="sprint-duration-unit" @change="onUnitChange">
+            <option value="workdays">{{ $t('sprint.form.unit_workdays') }}</option>
+            <option value="calendar">{{ $t('sprint.form.unit_calendar') }}</option>
+          </select>
         </div>
       </div>
       <div v-if="!datesInOrder" class="date-error">{{ $t('sprint.form.due_before_start') }}</div>
+      <div v-else-if="form.duration_unit === 'workdays' && calendarFallback" class="date-hint">{{ $t('sprint.form.calendar_fallback') }}</div>
 
       <div class="form-field">
         <label for="sprint-description">{{ $t('sprint.form.description') }}</label>
@@ -151,6 +173,7 @@ import type { Sprint } from '../../stores/sprint'
 import SprintStateBadge from './SprintStateBadge.vue'
 import { useTasksStore } from '../../stores/tasks'
 import { useMobileTasks } from '../../composables/useMobileTasks'
+import { useWorkCalendar, type DurationUnit } from '../../composables/useWorkCalendar'
 
 const tasksStore = useTasksStore()
 const { isMobile } = useMobileTasks()
@@ -172,7 +195,43 @@ const form = reactive({
   due_date: '',
   description: '',
   is_shared: false,
+  duration: '' as number | '',
+  duration_unit: 'workdays' as DurationUnit,
 })
+
+// Продолжительность и дата окончания связаны: меняется одно — пересчитывается
+// другое. Ответ календаря асинхронный: устаревший расчёт отбрасывается
+const { fallback: calendarFallback, endFromDuration, durationFromDates } = useWorkCalendar()
+let calcToken = 0
+
+async function onDurationInput() {
+  const token = ++calcToken
+  const n = Number(form.duration)
+  if (!form.start_date || !Number.isInteger(n) || n < 1 || n > 1000) return
+  try {
+    const due = await endFromDuration(form.start_date, n, form.duration_unit)
+    if (token === calcToken) form.due_date = due
+  } catch {}
+}
+
+async function onDatesChange() {
+  const token = ++calcToken
+  if (!form.start_date) return
+  // Срока нет, а продолжительность задана — срок считается от неё
+  if (!form.due_date) {
+    if (form.duration) onDurationInput()
+    return
+  }
+  try {
+    const n = await durationFromDates(form.start_date, form.due_date, form.duration_unit)
+    if (token === calcToken) form.duration = n > 0 ? n : ''
+  } catch {}
+}
+
+// Смена единицы: даты остаются, продолжительность пересчитывается в новых днях
+function onUnitChange() {
+  onDatesChange()
+}
 
 // Новый спринт — свой; у чужого общего спринта вид не меняется
 const canChangeKind = computed(() => !props.sprint || props.sprint.is_own)
@@ -216,6 +275,9 @@ watch([() => props.visible, () => props.sprint], ([visible, s]) => {
     form.due_date = (s.due_date || '').slice(0, 10)
     form.description = s.description || ''
     form.is_shared = s.is_shared
+    form.duration_unit = s.duration_unit === 'calendar' ? 'calendar' : 'workdays'
+    form.duration = ''
+    onDatesChange()
   } else {
     form.is_shared = false
     form.name = ''
@@ -225,6 +287,8 @@ watch([() => props.visible, () => props.sprint], ([visible, s]) => {
     form.start_date = ''
     form.due_date = ''
     form.description = ''
+    form.duration = ''
+    form.duration_unit = 'workdays'
   }
   loadCategories()
 }, { immediate: true })
@@ -238,8 +302,9 @@ const canSubmit = computed(() => form.name.trim() !== '' && form.start_date !== 
 function submit() {
   if (!canSubmit.value) return
   // Незаполненное поле — «не задано», а не пустая строка
+  const { duration: _duration, ...fields } = form
   emit('submit', {
-    ...form,
+    ...fields,
     name: form.name.trim(),
     project_name: form.project_name || null,
     category_name: form.category_name || null,
@@ -497,5 +562,23 @@ function submit() {
   font-size: 16px;
   resize: vertical;
   outline: none;
+}
+
+/* Продолжительность: число и единица в одну строку */
+.duration-fields {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.duration-input {
+  width: 80px;
+  flex: none;
+}
+
+.date-hint {
+  margin-top: -6px;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 </style>
