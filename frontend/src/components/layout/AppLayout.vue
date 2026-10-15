@@ -40,7 +40,19 @@ const bannerText = computed(() => {
 // лицензию каждый час
 let timer: ReturnType<typeof setInterval> | null = null
 
+// Код вкладок подгружается заранее, пока пользователь смотрит первую:
+// при переходе вкладка открывается сразу, без загрузки по сети
+function prefetchViews() {
+  import('../../views/TasksView.vue')
+  import('../../views/AnalyticsView.vue')
+  import('../../views/KanbanView.vue')
+  import('../../views/SprintView.vue')
+  import('../../views/PaymentsView.vue')
+  import('../../views/SettingsView.vue')
+}
+
 onMounted(() => {
+  setTimeout(prefetchViews, 1500)
   license.fetchStatus()
   timer = setInterval(() => license.fetchStatus(true), 5 * 60_000)
 })
@@ -117,6 +129,8 @@ onUnmounted(() => {
 
   .app-content {
     padding: 16px;
+    /* Снизу место под «остров» вкладок */
+    padding-bottom: calc(92px + env(safe-area-inset-bottom));
   }
 
   .license-banner {

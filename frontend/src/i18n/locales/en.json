@@ -174,7 +174,9 @@
     "sprint": "Sprints",
     "payments": "Payments",
     "settings": "Settings",
-    "admin": "Administration"
+    "admin": "Administration",
+    "account": "Account menu",
+    "sync": "Sync"
   },
   "tasks": {
     "title": "Tasks",
