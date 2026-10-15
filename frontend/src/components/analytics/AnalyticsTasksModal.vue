@@ -6,7 +6,15 @@
 
     <template v-else>
       <!-- Телефон: карточки, как в «Задачах», вместо широкой таблицы -->
-      <TaskMobileList v-if="isMobile" :tasks="(tasks as unknown as Task[])" cards-only data-testid="analytics-tasks" @open-task="$emit('open-task', $event)" />
+      <div v-if="isMobile" class="mobile-groups" data-testid="analytics-tasks">
+        <section v-for="group in groups" :key="group.key" class="mobile-group">
+          <div class="mobile-group-title">
+            <span>{{ group.name || '—' }}</span>
+            <span class="mobile-group-count">{{ group.tasks.length }}</span>
+          </div>
+          <TaskMobileList :tasks="(group.tasks as unknown as Task[])" cards-only @open-task="$emit('open-task', $event)" />
+        </section>
+      </div>
       <div v-else class="list-wrapper">
         <table class="list-table" data-testid="analytics-tasks">
           <thead>
@@ -194,6 +202,28 @@ function taskLink(externalId: number): string {
 
 .list-table .num {
   text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Телефон: проект заголовком, под ним его карточки */
+.mobile-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mobile-group-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 4px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-bright);
+}
+
+.mobile-group-count {
+  color: var(--text-faint);
   font-variant-numeric: tabular-nums;
 }
 
