@@ -58,7 +58,9 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function login(username: string, password: string) {
-    const { data } = await axios.post('/api/auth/login', { username, password })
+    // Без ответа за 15 с вход прерывается: на плохой сети телефон иначе
+    // ждёт минуту и дольше, и пользователь не понимает, что происходит
+    const { data } = await axios.post('/api/auth/login', { username, password }, { timeout: 15000 })
     user.value = data.user
     isAuthenticated.value = true
     return data

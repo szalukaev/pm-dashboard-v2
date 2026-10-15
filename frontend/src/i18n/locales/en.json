@@ -108,6 +108,7 @@
     "error_blocked": "The account is blocked. Contact the administrator.",
     "error_too_many_attempts": "Too many login attempts. Try again later.",
     "error_server": "Could not sign in because of a server error. Try again later.",
+    "error_network": "No connection to the server. Check the internet and try again.",
     "password_change": {
       "title": "Change password",
       "force_hint": "The administrator created your account. For safety you must change the password.",

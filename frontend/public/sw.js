@@ -3,7 +3,10 @@
 // страница и файлы без хеша в имени всегда берутся из сети (кэш — только на
 // случай, когда сети нет), а файлы сборки с хешем в имени не меняются и
 // берутся из кэша.
-const CACHE_NAME = 'pm-dashboard-v3.1.0'
+const CACHE_NAME = 'pm-dashboard-v3.1.1'
+// Сколько ждать сеть, прежде чем показать сохранённую страницу: на плохой
+// мобильной сети запрос иначе висит до тайм-аута телефона (минута и больше)
+const NAVIGATE_TIMEOUT_MS = 4000
 const SHELL = ['/index.html', '/manifest.json', '/favicon.svg']
 
 self.addEventListener('install', (event) => {
@@ -43,18 +46,22 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/ws')) return
 
-  // Страница: из сети, без сети — сохранённая копия
+  // Страница: из сети; если сети нет или она не ответила вовремя — сохранённая
+  // копия (а когда сеть всё же ответит, копия обновится)
   if (request.mode === 'navigate') {
+    const network = fetch(request).then((response) => {
+      if (response.ok) {
+        const clone = response.clone()
+        caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', clone))
+      }
+      return response
+    })
+    const cached = () => caches.match('/index.html')
+    const late = new Promise((resolve) => setTimeout(resolve, NAVIGATE_TIMEOUT_MS)).then(cached)
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response.ok) {
-            const clone = response.clone()
-            caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', clone))
-          }
-          return response
-        })
-        .catch(() => caches.match('/index.html'))
+      Promise.race([network, late])
+        .then((response) => response || network)
+        .catch(() => cached().then((copy) => copy || network))
     )
     return
   }
