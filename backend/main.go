@@ -233,7 +233,7 @@ func main() {
 	notifier.Push = func(userID int, title, body, link, tag string) {
 		pushSvc.Notify(userID, push.Message{Title: title, Body: body, URL: link, Tag: tag})
 	}
-	pushH := &handlers.PushHandler{Service: pushSvc}
+	pushH := &handlers.PushHandler{Service: pushSvc, Notifications: notifier}
 	calendarH := &handlers.CalendarHandler{Calendar: workcal.New(&pgDB)}
 	mailH := &handlers.MailHandler{Mail: mailStore}
 	mailer := &jobs.Mailer{DB: &pgDB, Settings: jobSettings, Store: jobs.NewStore(redisURL), Mail: mailStore, Notify: wsHub.BroadcastEvent}

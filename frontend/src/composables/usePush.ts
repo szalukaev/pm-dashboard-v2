@@ -85,8 +85,10 @@ export interface PushTestResult {
   error?: string
 }
 
-async function sendTest(title: string, body: string): Promise<PushTestResult[]> {
-  const { data } = await axios.post('/api/push/test', { title, body })
+// Сервер создаёт настоящее уведомление по задаче пользователя и отправляет
+// его push; нажатие на push откроет эту задачу
+async function sendTest(): Promise<PushTestResult[]> {
+  const { data } = await axios.post('/api/push/test')
   return data.results || []
 }
 

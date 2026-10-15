@@ -2,10 +2,13 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
 	"pm-dashboard/middleware"
+	"pm-dashboard/notify"
 	"pm-dashboard/push"
 	"pm-dashboard/utils"
 )
@@ -13,6 +16,8 @@ import (
 // PushHandler подписывает браузеры и устройства пользователя на push.
 type PushHandler struct {
 	Service *push.Service
+	// Notifications создаёт проверочное уведомление по задаче пользователя
+	Notifications *notify.Engine
 }
 
 // Key отдаёт открытый ключ VAPID, нужный браузеру для подписки.
@@ -40,19 +45,23 @@ func (h *PushHandler) Subscribe(w http.ResponseWriter, r *http.Request) {
 	utils.Success(w)
 }
 
-// Test отправляет проверочный push на все устройства пользователя и
-// возвращает, что ответили сервисы доставки.
+// Test создаёт настоящее уведомление по задаче пользователя (оно приходит в
+// колокольчик) и сразу отправляет его push на все устройства пользователя:
+// нажатие на push открывает задачу и отмечает уведомление прочитанным.
+// Возвращает ответы сервисов доставки по устройствам.
 func (h *PushHandler) Test(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Title string `json:"title"`
-		Body  string `json:"body"`
+	userID := middleware.GetUserID(r)
+	n, title, body, link, err := h.Notifications.Test(userID)
+	if errors.Is(err, notify.ErrNoIssue) {
+		utils.Error(w, http.StatusConflict, "NO_TASK_FOR_TEST")
+		return
 	}
-	json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&body)
-	if body.Title == "" || len(body.Title) > 200 || len(body.Body) > 500 {
-		body.Title, body.Body = "PM Dashboard", "Test push"
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "PUSH_TEST_FAILED")
+		return
 	}
-	results := h.Service.Test(middleware.GetUserID(r), push.Message{Title: body.Title, Body: body.Body, URL: "/settings/notifications", Tag: "push-test"})
-	utils.JSON(w, http.StatusOK, map[string]interface{}{"results": results})
+	results := h.Service.Test(userID, push.Message{Title: title, Body: body, URL: link, Tag: fmt.Sprintf("n%d", n.ID), Test: true})
+	utils.JSON(w, http.StatusOK, map[string]interface{}{"results": results, "task_id": n.EntityID})
 }
 
 // Unsubscribe удаляет подписку этого браузера или устройства.

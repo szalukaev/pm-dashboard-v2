@@ -49,6 +49,8 @@ type Message struct {
 	Body  string `json:"body"`
 	URL   string `json:"url"`
 	Tag   string `json:"tag"`
+	// Test — проверочный push из настроек: устройство сообщит, что получило его
+	Test bool `json:"test,omitempty"`
 }
 
 // Service хранит подписки и рассылает по ним push.

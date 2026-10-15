@@ -65,7 +65,8 @@ if ('serviceWorker' in navigator) {
       return
     }
     if (data.type !== 'push-shown' && data.type !== 'push-error') return
-    if (data.tag !== 'push-test') return
+    // Тост — только для проверочного push из настроек
+    if (!data.test) return
     const { useToast } = await import('./composables/useToast')
     const { t } = i18n.global
     if (data.type === 'push-shown') useToast().show(t('settings.notifications.push_received'), 'success')

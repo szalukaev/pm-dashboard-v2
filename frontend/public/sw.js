@@ -4,7 +4,7 @@
 // случай, когда сети нет), а файлы сборки с хешем в имени не меняются и
 // берутся из кэша.
 // Новое имя сбрасывает кэш, куда раньше могла попасть страница вместо JS-файла
-const CACHE_NAME = 'pm-dashboard-v3.1.6'
+const CACHE_NAME = 'pm-dashboard-v3.1.7'
 // Сколько ждать сеть, прежде чем показать сохранённую страницу: на плохой
 // мобильной сети запрос иначе висит до тайм-аута телефона (минута и больше)
 const NAVIGATE_TIMEOUT_MS = 4000
@@ -110,8 +110,8 @@ self.addEventListener('push', (event) => {
         badge: '/push-icon-192x192.png',
         data: { url: data.url || '/notifications' },
       })
-      .then(() => report({ type: 'push-shown', tag: data.tag || '' }))
-      .catch((err) => report({ type: 'push-error', tag: data.tag || '', message: String(err && err.message || err) }))
+      .then(() => report({ type: 'push-shown', tag: data.tag || '', test: !!data.test }))
+      .catch((err) => report({ type: 'push-error', tag: data.tag || '', test: !!data.test, message: String(err && err.message || err) }))
   )
 })
 

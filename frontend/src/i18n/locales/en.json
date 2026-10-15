@@ -894,8 +894,6 @@
         "unsupported": "This browser does not support push notifications."
       },
       "push_test": "Send a test push",
-      "push_test_title": "Test notification",
-      "push_test_body": "Push works: this is a check from PM Dashboard",
       "push_test_none": "No devices with push enabled",
       "push_test_accepted": "accepted for delivery",
       "push_test_rejected": "rejected ({reason})",
@@ -907,7 +905,8 @@
         "mozilla": "Firefox",
         "microsoft": "Edge (Windows)",
         "other": "Other device"
-      }
+      },
+      "push_test_no_task": "No open tasks to send a test for"
     },
     "sync": {
       "title": "Synchronization",

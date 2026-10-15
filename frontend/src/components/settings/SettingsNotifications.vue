@@ -207,9 +207,9 @@ const pushResults = ref<PushTestResult[] | null>(null)
 async function testPush() {
   pushTesting.value = true
   try {
-    pushResults.value = await sendPushTest(t('settings.notifications.push_test_title'), t('settings.notifications.push_test_body'))
-  } catch {
-    toast(t('settings.notifications.push_failed'), 'error')
+    pushResults.value = await sendPushTest()
+  } catch (e: any) {
+    toast(t(e?.response?.data?.error === 'NO_TASK_FOR_TEST' ? 'settings.notifications.push_test_no_task' : 'settings.notifications.push_failed'), 'error')
   } finally {
     pushTesting.value = false
   }

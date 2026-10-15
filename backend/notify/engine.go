@@ -602,6 +602,63 @@ func (e *Engine) create(who recipient, rule, key, entityType string, entityID in
 	return true
 }
 
+// ErrNoIssue — нет задачи, по которой можно сделать проверочное уведомление.
+var ErrNoIssue = errors.New("no issue for test notification")
+
+// Test создаёт настоящее уведомление «Вам назначена задача» для проверки
+// push: по открытой задаче пользователя, а если своих нет — по последней
+// изменённой. Оно попадает в колокольчик и уходит в открытые страницы, как
+// обычное; правила пользователя не проверяются. Push отправляет вызывающий:
+// он показывает ответы сервисов доставки. Возвращает уведомление и текст push.
+func (e *Engine) Test(userID int) (n Notification, title, body, link string, err error) {
+	db := *e.DB
+	var member *int
+	var lang string
+	if err = db.QueryRow(`SELECT u.member_id, COALESCE(us.language, '') FROM users u
+		LEFT JOIN user_settings us ON us.user_id = u.id WHERE u.id = $1`, userID).Scan(&member, &lang); err != nil {
+		return
+	}
+	var issue struct {
+		id      int
+		subject string
+		project string
+	}
+	pick := `SELECT i.external_id, COALESCE(i.subject, ''), COALESCE(i.project_name, '')
+		FROM issues i LEFT JOIN statuses st ON st.external_id = i.status_id AND st.data_source = 'redmine'
+		WHERE COALESCE(st.group_name, 'open') <> 'closed' %s ORDER BY i.updated_on DESC NULLS LAST LIMIT 1`
+	err = sql.ErrNoRows
+	if member != nil {
+		err = db.QueryRow(fmt.Sprintf(pick, "AND i.assigned_to_id = $1"), *member).Scan(&issue.id, &issue.subject, &issue.project)
+	}
+	if err == sql.ErrNoRows {
+		err = db.QueryRow(fmt.Sprintf(pick, "")).Scan(&issue.id, &issue.subject, &issue.project)
+	}
+	if err == sql.ErrNoRows {
+		err = ErrNoIssue
+	}
+	if err != nil {
+		return
+	}
+
+	params := map[string]interface{}{"issue_id": issue.id, "subject": issue.subject, "project": issue.project, "test": true}
+	data, _ := json.Marshal(params)
+	n = Notification{Rule: RuleTaskAssigned, Params: data, EntityType: "issue", EntityID: issue.id}
+	// Свой ключ на каждую проверку: повторная не теряется как дубль
+	key := fmt.Sprintf("test:%d", time.Now().UnixNano())
+	if err = db.QueryRow(`INSERT INTO notifications (user_id, rule, params, entity_type, entity_id, dedupe_key, to_bell, to_email)
+		VALUES ($1, $2, $3::jsonb, 'issue', $4, $5, TRUE, FALSE) RETURNING id, created_at`,
+		userID, RuleTaskAssigned, string(data), issue.id, key).Scan(&n.ID, &n.CreatedAt); err != nil {
+		return
+	}
+	if e.Send != nil {
+		e.Send(userID, EventNotification, n)
+	}
+	if lines := Lines(n, lang); len(lines) > 0 {
+		body = lines[0]
+	}
+	return n, Title(n, lang), body, Link(n), nil
+}
+
 // Link — куда ведёт уведомление в дашборде: задача открывается карточкой,
 // остальное — своей вкладкой. Те же правила, что у колокольчика на фронте.
 func Link(n Notification) string {

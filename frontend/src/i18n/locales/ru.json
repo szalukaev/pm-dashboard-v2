@@ -894,8 +894,6 @@
         "unsupported": "Этот браузер не поддерживает push-уведомления."
       },
       "push_test": "Отправить тестовый push",
-      "push_test_title": "Тестовое уведомление",
-      "push_test_body": "Push работает: это проверка от PM Dashboard",
       "push_test_none": "Нет ни одного устройства с включённым push",
       "push_test_accepted": "принято к доставке",
       "push_test_rejected": "отказ ({reason})",
@@ -907,7 +905,8 @@
         "mozilla": "Firefox",
         "microsoft": "Edge (Windows)",
         "other": "Другое устройство"
-      }
+      },
+      "push_test_no_task": "Нет открытых задач, по которым можно отправить проверку"
     },
     "sync": {
       "title": "Синхронизация",
