@@ -413,6 +413,7 @@ func (h *TaskHandler) GetAssigneeHours(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
 		return
 	}
+	h.importIssueIfMissing(externalID)
 	if !requireIssue(w, r, *h.DB, externalID) {
 		return
 	}
