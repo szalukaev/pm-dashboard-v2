@@ -104,6 +104,7 @@ func namesByID(db *sql.DB, table string, ids map[int]bool) map[int]string {
 		list = append(list, id)
 	}
 	result := map[int]string{}
+	// #nosec G202 -- имя таблицы из белого списка historyNameTables, номера через ANY($1)
 	rows, err := db.Query("SELECT external_id, name FROM "+table+" WHERE data_source = 'redmine' AND external_id = ANY($1)", pq.Array(list))
 	if err != nil {
 		return result
@@ -132,6 +133,7 @@ func describeRelated(db *sql.DB, scope *access.Scope, related []redmine.RelatedI
 	}
 	args := []interface{}{pq.Array(ids)}
 	visible := scope.AllowedIssueCond("", &args)
+	// #nosec G202 G701 -- имя таблицы из белого списка historyNameTables, номера через ANY($1)
 	rows, err := db.Query(`SELECT external_id, subject, status_name FROM issues
 		WHERE external_id = ANY($1) AND data_source = 'redmine' AND `+visible, args...)
 	if err != nil {

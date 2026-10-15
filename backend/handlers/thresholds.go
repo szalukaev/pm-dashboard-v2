@@ -108,6 +108,7 @@ func (h *AnalyticsHandler) indicators(scope *access.Scope, now time.Time, perPro
 			GROUP BY project_id, project_name ORDER BY project_name, project_id`
 	}
 
+	// #nosec G701 -- условие прав из Scope и фильтры-константы из кода, значения через $n
 	rows, err := (*h.DB).Query(query, args...)
 	if err != nil {
 		return nil, err

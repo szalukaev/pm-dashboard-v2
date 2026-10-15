@@ -553,6 +553,7 @@ func storeTimeEntries(db *sql.DB, projectID int, entries []TimeEntry, replace bo
 			values[i] = fmt.Sprintf("($%d,$%d,$%d,$%d,$%d,'redmine',NOW())", n+1, n+2, n+3, n+4, n+5)
 			args = append(args, e.ID, e.IssueID, projectID, e.ActivityName, e.Hours)
 		}
+		// #nosec G202 -- в текст попадают только номера параметров ($N через Sprintf %d), значения через args
 		_, err := tx.Exec(`
 			INSERT INTO time_entries (external_id, issue_id, project_id, activity_name, hours, data_source, synced_at)
 			VALUES `+strings.Join(values, ",")+`
@@ -589,6 +590,7 @@ func upsertIssues(db *sql.DB, batch []Issue) error {
 			it.DoneRatio, it.TrackerName, it.AuthorName,
 			it.CreatedOn, it.UpdatedOn, it.ClosedOn, it.FixedVersionName)
 	}
+	// #nosec G202 -- в текст попадают только номера параметров ($N через Sprintf %d), значения через args
 	_, err := db.Exec(`
 		INSERT INTO issues (
 			external_id, project_id, project_name, subject, description,

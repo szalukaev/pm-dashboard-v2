@@ -70,6 +70,7 @@ func (h HWID) Matches(licensed HWID) bool {
 // scripts/collect-hwid.sh (строки "machine_id=…" и "board_serial=…"), и
 // хэширует их.
 func ReadHWID(path string) (HWID, error) {
+	// #nosec G304 -- путь задаёт конфигурация сервера, не запрос
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return HWID{}, err

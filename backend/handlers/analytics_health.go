@@ -67,6 +67,7 @@ func (h *AnalyticsHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 		FROM issues WHERE ` + projectFilter + `
 		AND ` + statusIn("status_id", GroupOpen, GroupTesting)
 	args = append(args, today)
+	// #nosec G701 -- условие прав из Scope и фильтры-константы из кода, значения через $n
 	if err := (*h.DB).QueryRow(q, args...).Scan(&active, &overdue, &bugs, &noEstimate); err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return

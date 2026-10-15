@@ -176,6 +176,7 @@ func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 	limit, offset := pageOf(r)
 	total := 0
 	if limit > 0 {
+		// #nosec G701 -- условие прав из Scope и фильтры-константы из кода, значения через $n
 		if err := (*h.DB).QueryRow("SELECT COUNT(*) FROM issues WHERE "+condition, args...).Scan(&total); err != nil {
 			utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 			return
@@ -190,6 +191,7 @@ func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 		FROM issues WHERE ` + condition + `
 		ORDER BY ` + orderBy + pageClause(limit, offset)
 
+	// #nosec G701 -- сортировка из белого списка validSorts, LIMIT/OFFSET — числа; условие прав из Scope и фильтры-константы из кода, значения через $n
 	rows, err := (*h.DB).Query(query, args...)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
@@ -287,6 +289,7 @@ func (h *TaskHandler) attentionCounts(condition string, args []interface{}) (map
 	for i := range vals {
 		ptrs[i] = &vals[i]
 	}
+	// #nosec G701 -- столбцы из attentionSQL — константы; условие прав из Scope и фильтры-константы из кода, значения через $n
 	if err := (*h.DB).QueryRow("SELECT "+strings.Join(cols, ", ")+" FROM issues WHERE "+condition, args...).Scan(ptrs...); err != nil {
 		return nil, err
 	}
@@ -320,6 +323,7 @@ func taskGrouping(groupBy string) (expr, order string) {
 }
 
 func (h *TaskHandler) listTaskGroups(w http.ResponseWriter, groupExpr, order, condition, baseCondition string, args []interface{}) {
+	// #nosec G701 -- выражение группировки из taskGrouping — константа; условие прав из Scope и фильтры-константы из кода, значения через $n
 	rows, err := (*h.DB).Query(`SELECT `+groupExpr+` AS name, COUNT(*),
 		COALESCE(SUM(estimated_hours), 0), COALESCE(SUM(spent_hours), 0),
 		COUNT(*) FILTER (WHERE `+attentionSQL("overdue")+`),
@@ -831,6 +835,7 @@ func (h *TaskHandler) GetCategories(w http.ResponseWriter, r *http.Request) {
 		args = append(args, projectID)
 		where += " AND project_id = $" + strconv.Itoa(len(args))
 	}
+	// #nosec G701 -- условие прав из Scope и фильтры-константы из кода, значения через $n
 	rows, err := (*h.DB).Query("SELECT DISTINCT category_name FROM issues WHERE "+where+" ORDER BY category_name", args...)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")

@@ -69,6 +69,7 @@ func (r *Resolver) Grants(userID int) (*Grants, error) {
 		return nil, err
 	}
 
+	// #nosec G202 -- столбцы прав — константа access.Columns, значения через $n
 	rows, err := db.Query(`SELECT g.id, g.name, `+prefixed("p", Columns)+`
 		FROM group_members m JOIN groups g ON g.id = m.group_id
 		JOIN group_permissions p ON p.group_id = g.id

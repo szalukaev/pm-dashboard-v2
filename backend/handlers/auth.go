@@ -253,12 +253,13 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	// SECURE_COOKIES=true в продакшене за HTTPS (кука не уйдёт по http).
 	secureCookies := os.Getenv("SECURE_COOKIES") == "true"
+	// #nosec G124 -- Secure включается SECURE_COOKIES за HTTPS (тестовый сервер работает и без него)
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session_id",
 		Value:    sessionID,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   secureCookies, // #nosec G124 -- Secure включается SECURE_COOKIES за HTTPS
+		Secure:   secureCookies,
 		SameSite: http.SameSiteLaxMode,
 		Expires:  time.Now().Add(expiresAt),
 	})
@@ -336,12 +337,13 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		h.Audit.LogLogout(middleware.GetUserID(r), r)
 	}
 	secureCookies := os.Getenv("SECURE_COOKIES") == "true"
+	// #nosec G124 -- Secure включается SECURE_COOKIES за HTTPS (тестовый сервер работает и без него)
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session_id",
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   secureCookies, // #nosec G124 -- Secure включается SECURE_COOKIES за HTTPS
+		Secure:   secureCookies,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   -1,
 	})
@@ -531,6 +533,7 @@ func (h *AuthHandler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
 	// Предел тела до разбора: файл больше 2 МиБ (с запасом на заголовки
 	// формы) не читается в память целиком
 	r.Body = http.MaxBytesReader(w, r.Body, 3<<20)
+	// #nosec G120 -- тело ограничено http.MaxBytesReader строкой выше
 	if err := r.ParseMultipartForm(2 << 20); err != nil {
 		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
 		return

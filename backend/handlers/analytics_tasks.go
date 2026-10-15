@@ -87,11 +87,13 @@ func (h *AnalyticsHandler) GetTasks(w http.ResponseWriter, r *http.Request) {
 	filter += " AND (" + cond + ") AND $" + itoa(len(args)) + "::date IS NOT NULL"
 
 	var total int
+	// #nosec G701 -- условие прав из Scope и фильтры-константы из кода, значения через $n
 	if err := (*h.DB).QueryRow("SELECT COUNT(*) FROM issues WHERE "+filter, args...).Scan(&total); err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
 	}
 
+	// #nosec G701 -- условие прав из Scope и фильтры-константы из кода, значения через $n
 	rows, err := (*h.DB).Query(`SELECT external_id, COALESCE(project_id, 0), COALESCE(project_name, ''), COALESCE(subject, ''),
 		COALESCE(status_name, ''), COALESCE(status_id, 0), COALESCE(priority_name, ''), COALESCE(priority_id, 0),
 		COALESCE(assigned_to_name, ''), assigned_to_id,

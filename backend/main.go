@@ -461,6 +461,7 @@ func main() {
 	if d := os.Getenv("FRONTEND_DIR"); d != "" {
 		frontendDir = d
 	}
+	// #nosec G703 -- FRONTEND_DIR задаёт администратор в окружении
 	if _, err := os.Stat(frontendDir); err == nil {
 		r.PathPrefix("/").Handler(http.FileServer(http.Dir(frontendDir)))
 	}

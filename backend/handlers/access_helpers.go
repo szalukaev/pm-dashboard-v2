@@ -19,6 +19,7 @@ func canSeeIssue(db *sql.DB, scope *access.Scope, issueID int) bool {
 	args := []interface{}{issueID}
 	cond := scope.AllowedIssueCond("", &args)
 	var visible bool
+	// #nosec G701 -- условие прав из Scope и фильтры-константы из кода, значения через $n
 	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM issues WHERE external_id = $1 AND data_source = 'redmine' AND "+cond+")",
 		args...).Scan(&visible)
 	return err == nil && visible
@@ -52,6 +53,7 @@ func canSeeProject(db *sql.DB, scope *access.Scope, projectID int) bool {
 	args := []interface{}{projectID}
 	cond := scope.AllowedIssueCond("", &args)
 	var visible bool
+	// #nosec G701 -- условие прав из Scope и фильтры-константы из кода, значения через $n
 	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM issues WHERE project_id = $1 AND "+cond+")", args...).Scan(&visible)
 	return err == nil && visible
 }

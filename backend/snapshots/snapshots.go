@@ -231,8 +231,10 @@ func deleteBefore(db *sql.DB, before string) (int64, error) {
 	for _, table := range []string{"daily_snapshots", "issue_snapshots"} {
 		var res sql.Result
 		if before == "" {
+			// #nosec G202 -- имя таблицы из фиксированного списка в коде
 			res, err = tx.Exec(`DELETE FROM ` + table)
 		} else {
+			// #nosec G202 -- имя таблицы из фиксированного списка в коде
 			res, err = tx.Exec(`DELETE FROM `+table+` WHERE date < $1::date`, before)
 		}
 		if err != nil {

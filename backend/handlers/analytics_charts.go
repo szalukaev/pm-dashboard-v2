@@ -63,6 +63,7 @@ func (h *AnalyticsHandler) GetHours(w http.ResponseWriter, r *http.Request) {
 		GROUP BY assigned_to_name
 		ORDER BY assigned_to_name`
 
+	// #nosec G701 -- условие прав из Scope и фильтры-константы из кода, значения через $n
 	rows, err := (*h.DB).Query(q, args...)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
@@ -109,6 +110,7 @@ func (h *AnalyticsHandler) GetVelocity(w http.ResponseWriter, r *http.Request) {
 		AND ` + statusIn("status_id", GroupClosed)
 	args = append(args, weeks[0])
 
+	// #nosec G701 -- условие прав из Scope и фильтры-константы из кода, значения через $n
 	rows, err := (*h.DB).Query(q, args...)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")

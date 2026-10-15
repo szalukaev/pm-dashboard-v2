@@ -233,6 +233,7 @@ func (h *PaymentsHandler) loadContracts(owner interface{}, filter *contractFilte
 			" OR LOWER(COALESCE(o.name, '')) LIKE $"+n+")")
 	}
 
+	// #nosec G701 -- условия фильтра и ownedBy — константы из кода, LIMIT/OFFSET — числа, значения через $n
 	rows, err := (*h.DB).Query(`SELECT c.id, c.organization_id, c.contract_type, c.name, c.company_name, c.company_address,
 		c.amount, c.vat_rate, c.contact_name, c.contact_phone, c.start_date, c.end_date,
 		COALESCE(o.name, '') AS org_name,
@@ -473,6 +474,7 @@ func (h *PaymentsHandler) ListInvoices(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
 	}
+	// #nosec G701 -- условия фильтра и ownedBy — константы из кода, LIMIT/OFFSET — числа, значения через $n
 	rows, err := (*h.DB).Query(`SELECT i.id, i.amount, i.vat_rate, i.issued_at, i.paid_amount, i.status,
 			(SELECT MAX(p.paid_at)::text FROM contract_payments p WHERE p.invoice_id = i.id)
 		FROM invoices i JOIN contracts c ON i.contract_id = c.id

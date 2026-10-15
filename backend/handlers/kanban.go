@@ -204,6 +204,7 @@ func (h *KanbanHandler) userBoard(scope *access.Scope) ([]KanbanColumn, error) {
 
 // loadCards читает задачи для доски, сначала самые важные.
 func (h *KanbanHandler) loadCards(where string, args ...interface{}) ([]KanbanCard, error) {
+	// #nosec G701 -- условие прав из Scope и фильтры-константы из кода, значения через $n
 	rows, err := (*h.DB).Query(`SELECT external_id, subject, project_name, status_name, status_id,
 		priority_name, priority_id, assigned_to_name, assigned_to_id,
 		category_name, due_date, estimated_hours,

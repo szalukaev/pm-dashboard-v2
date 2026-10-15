@@ -48,6 +48,7 @@ func (h *AnalyticsHandler) GetGantt(w http.ResponseWriter, r *http.Request) {
 		AND ` + statusNotIn("status_id", GroupClosed)
 
 	projects := []GanttProject{}
+	// #nosec G701 -- условие прав из Scope и фильтры-константы из кода, значения через $n
 	rows, err := (*h.DB).Query(`SELECT DISTINCT project_id, COALESCE(project_name, '')
 		FROM issues WHERE `+base+` AND project_id IS NOT NULL
 		ORDER BY 2, 1`, args...)
@@ -81,6 +82,7 @@ func (h *AnalyticsHandler) GetGantt(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var total int
+	// #nosec G701 -- условие прав из Scope и фильтры-константы из кода, значения через $n
 	if err := (*h.DB).QueryRow(`SELECT COUNT(*) FROM issues WHERE `+taskFilter, args...).Scan(&total); err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
@@ -96,6 +98,7 @@ func (h *AnalyticsHandler) GetGantt(w http.ResponseWriter, r *http.Request) {
 		ORDER BY due_date ASC, external_id ASC
 		LIMIT ` + itoa(ganttLimit) + ` OFFSET ` + itoa(offset)
 
+	// #nosec G701 -- условие прав из Scope и фильтры-константы из кода, значения через $n
 	taskRows, err := (*h.DB).Query(q, args...)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")

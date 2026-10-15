@@ -65,6 +65,7 @@ func Save(db *sql.DB, table, keyColumn string, id int, p Permissions) error {
 // SaveTemplate записывает набор прав шаблона роли.
 func SaveTemplate(db *sql.DB, templateID int, p Permissions) error {
 	args := append([]interface{}{templateID}, p.Values()...)
+	// #nosec G202 -- столбцы прав — константа access.Columns, значения через $n
 	_, err := db.Exec(`UPDATE role_templates SET `+assignments(2)+` WHERE id = $1`, args...)
 	return err
 }

@@ -95,6 +95,7 @@ func (h *AnalyticsHandler) stats(scope *access.Scope, now time.Time, period Peri
 	var activeProjects int
 	q := `SELECT COUNT(DISTINCT project_id) FROM issues WHERE ` + projectFilter + `
 		AND ` + statusIn("status_id", GroupOpen, GroupTesting)
+	// #nosec G701 -- условие прав из Scope и фильтры-константы из кода, значения через $n
 	if err := (*h.DB).QueryRow(q, args...).Scan(&activeProjects); err != nil {
 		return nil, err
 	}
@@ -107,6 +108,7 @@ func (h *AnalyticsHandler) stats(scope *access.Scope, now time.Time, period Peri
 		COUNT(CASE WHEN ` + statusIn("status_id", GroupOpen) + ` THEN 1 END),
 		COUNT(CASE WHEN ` + statusIn("status_id", GroupTesting) + ` THEN 1 END)
 		FROM issues WHERE ` + projectFilter
+	// #nosec G701 -- условие прав из Scope и фильтры-константы из кода, значения через $n
 	if err := (*h.DB).QueryRow(q, args...).Scan(&closed, &open, &testing); err != nil {
 		return nil, err
 	}
@@ -129,6 +131,7 @@ func (h *AnalyticsHandler) stats(scope *access.Scope, now time.Time, period Peri
 		AND due_date IS NOT NULL AND due_date < $` + itoa(len(args)+1) + `
 		AND ` + statusIn("status_id", GroupOpen, GroupTesting)
 	overdueArgs := append(args, today)
+	// #nosec G701 -- условие прав из Scope и фильтры-константы из кода, значения через $n
 	if err := (*h.DB).QueryRow(q, overdueArgs...).Scan(&overdue); err != nil {
 		return nil, err
 	}
@@ -138,6 +141,7 @@ func (h *AnalyticsHandler) stats(scope *access.Scope, now time.Time, period Peri
 	var bugs int
 	q = `SELECT COUNT(*) FROM issues WHERE ` + projectFilter + `
 		AND ` + bugStatus("status_id")
+	// #nosec G701 -- условие прав из Scope и фильтры-константы из кода, значения через $n
 	if err := (*h.DB).QueryRow(q, args...).Scan(&bugs); err != nil {
 		return nil, err
 	}
@@ -148,6 +152,7 @@ func (h *AnalyticsHandler) stats(scope *access.Scope, now time.Time, period Peri
 	q = `SELECT COUNT(*) FROM issues WHERE ` + projectFilter + `
 		AND (estimated_hours IS NULL OR estimated_hours = 0)
 		AND ` + statusIn("status_id", GroupOpen)
+	// #nosec G701 -- условие прав из Scope и фильтры-константы из кода, значения через $n
 	if err := (*h.DB).QueryRow(q, args...).Scan(&noEstimate); err != nil {
 		return nil, err
 	}
@@ -206,6 +211,7 @@ func (h *AnalyticsHandler) teamLoad(scope *access.Scope, now time.Time, period P
 		ORDER BY assigned_to_name`
 
 	args = append(args, today)
+	// #nosec G701 -- условие прав из Scope и фильтры-константы из кода, значения через $n
 	rows, err := (*h.DB).Query(q, args...)
 	if err != nil {
 		return nil, err
@@ -257,6 +263,7 @@ func (h *AnalyticsHandler) distribution(scope *access.Scope, period Period) ([]P
 		GROUP BY project_id, project_name, assigned_to_name
 		ORDER BY project_name, project_id, assigned_to_name`
 
+	// #nosec G701 -- условие прав из Scope и фильтры-константы из кода, значения через $n
 	rows, err := (*h.DB).Query(q, args...)
 	if err != nil {
 		return nil, err
@@ -344,6 +351,7 @@ func (h *AnalyticsHandler) deadlines(scope *access.Scope, today time.Time, perio
 		AND ` + statusNotIn("status_id", GroupClosed) + `
 		ORDER BY due_date ASC`
 
+	// #nosec G701 -- условие прав из Scope и фильтры-константы из кода, значения через $n
 	rows, err := (*h.DB).Query(q, args...)
 	if err != nil {
 		return nil, err

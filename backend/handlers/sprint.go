@@ -635,6 +635,7 @@ func (h *SprintHandler) GetBacklog(w http.ResponseWriter, r *http.Request) {
 		AND i.external_id NOT IN (SELECT issue_external_id FROM sprint_issues WHERE sprint_id = ANY(` + sharedParam + `))
 		ORDER BY i.project_name, ` + priorityRank("i.priority_id") + ` DESC NULLS LAST`
 
+	// #nosec G701 -- условие прав из Scope и фильтры-константы из кода, значения через $n
 	rows, err := (*h.DB).Query(query, args...)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
@@ -717,6 +718,7 @@ func (s *Sprint) loadTasks(h *SprintHandler, scope *access.Scope) {
 func (h *SprintHandler) getSprintTasks(sprintID int, scope *access.Scope) []SprintTask {
 	args := []interface{}{sprintID}
 	visible := scope.AllowedIssueCond("i.", &args)
+	// #nosec G701 -- условие прав из Scope и фильтры-константы из кода, значения через $n
 	rows, err := (*h.DB).Query(`SELECT i.external_id, i.subject, COALESCE(i.project_name, ''), i.status_name,
 		i.priority_name, i.priority_id, i.assigned_to_name, i.due_date, i.estimated_hours,
 		COALESCE(st.group_name, 'open')
@@ -778,6 +780,7 @@ func (h *SprintHandler) autoFill(userID, sprintID int, shared bool, projectName,
 	visible := scope.AllowedIssueCond("", &args)
 	args = append(args, pq.Array(taken))
 	takenParam := "$" + strconv.Itoa(len(args))
+	// #nosec G701 -- условие прав из Scope и фильтры-константы из кода, значения через $n
 	rows, err := (*h.DB).Query(`SELECT external_id FROM issues
 		WHERE project_name = $1 AND category_name = $2
 		AND `+statusNotIn("status_id", GroupClosed, GroupTesting)+`

@@ -75,6 +75,7 @@ func RunMigrations(db *sql.DB) error {
 		}
 
 		// Чтение и выполнение миграции
+		// #nosec G304 -- файлы миграций из каталога приложения
 		sqlBytes, err := os.ReadFile(f)
 		if err != nil {
 			return fmt.Errorf("read migration %s: %w", f, err)

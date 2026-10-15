@@ -100,6 +100,7 @@ func (h *AccessHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
 	}
+	// #nosec G701 -- LIMIT/OFFSET из pageClause — числа
 	rows, err := (*h.DB).Query(`SELECT u.id, u.username, COALESCE(u.display_name, ''), u.role, u.created_at, u.last_login,
 			u.is_blocked, u.member_id, COALESCE(m.name, ''), u.role_template_id, COALESCE(t.name, ''),
 			EXISTS(SELECT 1 FROM user_permissions p WHERE p.user_id = u.id),
@@ -299,6 +300,7 @@ func (h *AccessHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 
 	if len(sets) > 0 {
 		args = append(args, userID)
+		// #nosec G701 -- имена столбцов задаёт сам обработчик (set), значения через $n
 		if _, err := (*h.DB).Exec("UPDATE users SET "+strings.Join(sets, ", ")+" WHERE id = $"+strconv.Itoa(len(args)), args...); err != nil {
 			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 			return
@@ -846,6 +848,7 @@ func (h *AccessHandler) DeleteTemplate(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 
+	// #nosec G202 -- столбцы прав — константа access.Columns, значения через $n
 	if _, err := tx.Exec(`INSERT INTO user_permissions (user_id, `+access.Columns+`)
 		SELECT u.id, `+prefixedPermissionColumns("t")+`
 		FROM users u JOIN role_templates t ON t.id = u.role_template_id

@@ -257,6 +257,7 @@ func (h *AdminHandler) TestDataSourceConfig(w http.ResponseWriter, r *http.Reque
 // secretMask возвращается вместо сохранённых секретов: интерфейс может
 // отправить форму обратно, не получив настоящего значения. Save* эту маску
 // пропускает и оставляет прежнее значение.
+// #nosec G101 -- маска из точек для поля пароля, не секрет
 const secretMask = "••••••••"
 
 // maskSecret возвращает secretMask, если v задано, иначе пустую строку.
