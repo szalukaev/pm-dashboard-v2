@@ -717,8 +717,9 @@ button.header-avatar {
 }
 
 @media (max-width: 768px) {
+  /* Отступ сверху: шапка не прилипает к краю экрана и строке состояния */
   .app-header {
-    padding: 0 16px;
+    padding: max(8px, env(safe-area-inset-top)) 16px 0;
   }
 }
 .m-back {
