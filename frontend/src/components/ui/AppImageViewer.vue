@@ -16,7 +16,7 @@
         <img :src="current.src" :alt="current.alt" class="viewer-img" @click.stop />
 
         <div class="viewer-bar">
-          <span v-if="images.length > 1" class="viewer-count">{{ index + 1 }} / {{ images.length }}</span>
+          <span v-if="images.length > 1" class="viewer-count">{{ (index ?? 0) + 1 }} / {{ images.length }}</span>
           <span class="viewer-name">{{ current.alt }}</span>
           <a :href="current.src" target="_blank" rel="noopener" class="viewer-btn" :title="$t('common.open_original')" @click.stop>
             <ExternalLink :size="18" />

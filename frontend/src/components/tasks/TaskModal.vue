@@ -2,7 +2,7 @@
   <AppModal
     :model-value="!!taskId"
     :title="task ? `#${task.external_id} ${task.subject}` : ''"
-    width="1040px"
+    width="80vw"
     expandable
     :page="isMobile"
     @update:model-value="!$event && $emit('close')"
