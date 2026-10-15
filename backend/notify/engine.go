@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -40,6 +41,9 @@ type Engine struct {
 	// LicenseState возвращает состояние лицензии, о котором надо сообщить
 	// администраторам (grace, read_only), или пустую строку. Может быть nil.
 	LicenseState func() string
+	// Push отправляет уведомление колокольчика push-ом на устройства
+	// пользователя: заголовок, первая строка текста и ссылка. Может быть nil.
+	Push func(userID int, title, body, link, tag string)
 
 	// Проходы не пересекаются: два одновременных сравнения состояний
 	// прислали бы одно изменение дважды.
@@ -52,10 +56,11 @@ type recipient struct {
 	member *int // сотрудник источника, с которым связан пользователь
 	admin  bool
 	rules  Rules
+	lang   string // язык интерфейса пользователя: на нём текст push
 }
 
 func (e *Engine) recipients() ([]recipient, error) {
-	rows, err := (*e.DB).Query(`SELECT u.id, u.member_id, u.role = 'admin', us.alert_rules
+	rows, err := (*e.DB).Query(`SELECT u.id, u.member_id, u.role = 'admin', us.alert_rules, COALESCE(us.language, '')
 		FROM users u LEFT JOIN user_settings us ON us.user_id = u.id
 		WHERE NOT COALESCE(u.is_blocked, false)`)
 	if err != nil {
@@ -67,7 +72,7 @@ func (e *Engine) recipients() ([]recipient, error) {
 	for rows.Next() {
 		var r recipient
 		var raw []byte
-		if rows.Scan(&r.userID, &r.member, &r.admin, &raw) != nil {
+		if rows.Scan(&r.userID, &r.member, &r.admin, &raw, &r.lang) != nil {
 			continue
 		}
 		r.rules = Effective(raw)
@@ -587,7 +592,32 @@ func (e *Engine) create(who recipient, rule, key, entityType string, entityID in
 	if setup.Bell && e.Send != nil {
 		e.Send(who.userID, EventNotification, n)
 	}
+	if setup.Bell && e.Push != nil {
+		body := ""
+		if lines := Lines(n, who.lang); len(lines) > 0 {
+			body = lines[0]
+		}
+		go e.Push(who.userID, Title(n, who.lang), body, Link(n), fmt.Sprintf("n%d", n.ID))
+	}
 	return true
+}
+
+// Link — куда ведёт уведомление в дашборде: задача открывается карточкой,
+// остальное — своей вкладкой. Те же правила, что у колокольчика на фронте.
+func Link(n Notification) string {
+	switch n.EntityType {
+	case "issue":
+		if n.EntityID > 0 {
+			return fmt.Sprintf("/tasks?task=%d", n.EntityID)
+		}
+	case "contract", "invoice":
+		return "/payments"
+	case "sprint":
+		return "/sprint"
+	case "system":
+		return "/settings"
+	}
+	return "/notifications"
 }
 
 // List возвращает страницу колокольчика пользователя, новые сверху, и сколько

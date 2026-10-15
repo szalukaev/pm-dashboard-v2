@@ -4,7 +4,7 @@
 // случай, когда сети нет), а файлы сборки с хешем в имени не меняются и
 // берутся из кэша.
 // Новое имя сбрасывает кэш, куда раньше могла попасть страница вместо JS-файла
-const CACHE_NAME = 'pm-dashboard-v3.1.2'
+const CACHE_NAME = 'pm-dashboard-v3.1.3'
 // Сколько ждать сеть, прежде чем показать сохранённую страницу: на плохой
 // мобильной сети запрос иначе висит до тайм-аута телефона (минута и больше)
 const NAVIGATE_TIMEOUT_MS = 4000
@@ -83,5 +83,41 @@ self.addEventListener('fetch', (event) => {
     fetch(request)
       .then((response) => remember(request, response))
       .catch(() => caches.match(request))
+  )
+})
+
+// Push: то же уведомление, что пришло в колокольчик. tag не даёт показать
+// одно уведомление дважды
+self.addEventListener('push', (event) => {
+  let data = {}
+  try {
+    data = event.data ? event.data.json() : {}
+  } catch {
+    data = { title: event.data ? event.data.text() : '' }
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'PM Dashboard', {
+      body: data.body || '',
+      tag: data.tag || undefined,
+      icon: '/android-chrome-192x192.png',
+      badge: '/android-chrome-192x192.png',
+      data: { url: data.url || '/notifications' },
+    })
+  )
+})
+
+// Нажатие на push: открытое окно приложения переходит по ссылке, иначе
+// открывается новое
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const target = new URL(event.notification.data?.url || '/notifications', self.location.origin).href
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
+      const open = windows.find((w) => new URL(w.url).origin === self.location.origin)
+      if (open) {
+        return open.focus().then((w) => (w || open).navigate(target))
+      }
+      return self.clients.openWindow(target)
+    })
   )
 })

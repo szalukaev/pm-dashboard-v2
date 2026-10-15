@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 	"pm-dashboard/mail"
 	"pm-dashboard/middleware"
 	"pm-dashboard/notify"
+	"pm-dashboard/push"
 	"pm-dashboard/secrets"
 	"pm-dashboard/snapshots"
 	"pm-dashboard/utils"
@@ -219,6 +221,18 @@ func main() {
 	// Почта: настройки SMTP у администратора и рассылка — письма с
 	// уведомлениями и регулярные сводки
 	mailStore := &mail.Store{DB: &pgDB, Box: secretBox}
+	// Push: те же уведомления, что в колокольчике, — на устройства пользователя.
+	// Контакт отправителя — адрес дашборда из настроек почты, если он задан
+	pushSvc := push.New(&pgDB, func() string {
+		if cfg, err := mailStore.Load(); err == nil && strings.HasPrefix(cfg.BaseURL, "https://") {
+			return cfg.BaseURL
+		}
+		return ""
+	})
+	notifier.Push = func(userID int, title, body, link, tag string) {
+		pushSvc.Notify(userID, push.Message{Title: title, Body: body, URL: link, Tag: tag})
+	}
+	pushH := &handlers.PushHandler{Service: pushSvc}
 	mailH := &handlers.MailHandler{Mail: mailStore}
 	mailer := &jobs.Mailer{DB: &pgDB, Settings: jobSettings, Store: jobs.NewStore(redisURL), Mail: mailStore, Notify: wsHub.BroadcastEvent}
 	reportH := &handlers.ReportHandler{DB: &pgDB, Mail: mailStore, Scopes: (&access.Resolver{DB: &pgDB}).Scope}
@@ -369,6 +383,9 @@ func main() {
 	api.HandleFunc("/notifications", notificationsH.List).Methods("GET")
 	api.HandleFunc("/notifications/read-all", notificationsH.MarkAllRead).Methods("POST")
 	api.HandleFunc("/notifications/clear", notificationsH.Clear).Methods("POST")
+	api.HandleFunc("/push/key", pushH.Key).Methods("GET")
+	api.HandleFunc("/push/subscribe", pushH.Subscribe).Methods("POST")
+	api.HandleFunc("/push/unsubscribe", pushH.Unsubscribe).Methods("POST")
 	api.HandleFunc("/notifications/{id}/read", notificationsH.MarkRead).Methods("POST")
 
 	// Оплаты. Изменения закрыты для «только чтения», отдельные действия

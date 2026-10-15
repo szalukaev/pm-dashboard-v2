@@ -14,6 +14,22 @@
       </label>
     </div>
 
+    <!-- Push на это устройство: те же уведомления, что в колокольчике -->
+    <div class="setting-block" data-testid="push-setting">
+      <label class="toggle-row">
+        <span class="toggle-label">{{ $t('settings.notifications.push') }}</span>
+        <input
+          type="checkbox"
+          class="toggle-input"
+          :checked="pushState === 'on'"
+          :disabled="pushBusy || pushState === 'unsupported' || pushState === 'install' || pushState === 'denied'"
+          data-testid="push-toggle"
+          @change="togglePush"
+        />
+      </label>
+      <p class="block-hint">{{ $t('settings.notifications.push_hint.' + pushState) }}</p>
+    </div>
+
     <!-- Правила: о чём сообщать и куда -->
     <h4 class="block-title">{{ $t('notifications.rules_title') }} <AppHint help :text="$t('hints.alert_rules')" /></h4>
     <p class="block-hint">{{ $t('notifications.rules_hint') }}</p>
@@ -82,6 +98,8 @@
 </template>
 
 <script setup lang="ts">
+import { usePush } from '../../composables/usePush'
+import { useSwal } from '../../composables/useSwal'
 import { ref, computed, onMounted } from 'vue'
 import AppHint from '../ui/AppHint.vue'
 import { useSettingsStore } from '../../stores/settings'
@@ -165,6 +183,21 @@ onMounted(async () => {
   await settingsStore.ensureLoaded()
   notificationsEnabled.value = settingsStore.settings.notifications_enabled
 })
+
+// Push на это устройство
+const { toast } = useSwal()
+const { state: pushState, busy: pushBusy, refresh: refreshPush, enable: enablePush, disable: disablePush } = usePush()
+refreshPush()
+
+async function togglePush() {
+  try {
+    if (pushState.value === 'on') await disablePush()
+    else await enablePush()
+  } catch {
+    toast(t('settings.notifications.push_failed'), 'error')
+    refreshPush()
+  }
+}
 </script>
 
 <style scoped>

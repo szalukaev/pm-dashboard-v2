@@ -877,7 +877,16 @@
     },
     "notifications": {
       "title": "Notifications",
-      "toast": "Toast Notifications"
+      "toast": "Toast Notifications",
+      "push": "Push notifications on this device",
+      "push_failed": "Could not enable push notifications",
+      "push_hint": {
+        "on": "On: bell notifications arrive on this device even when the dashboard is closed.",
+        "off": "The same notifications as in the bell will arrive on this device even when the dashboard is closed.",
+        "denied": "Notifications for this site are blocked in browser or phone settings. Allow them there and come back.",
+        "install": "On iPhone and iPad push works only in the installed app: Share → Add to Home Screen, then open the dashboard from the Home Screen.",
+        "unsupported": "This browser does not support push notifications."
+      }
     },
     "sync": {
       "title": "Synchronization",

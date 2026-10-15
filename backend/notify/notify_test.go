@@ -375,3 +375,24 @@ func TestMailTexts(t *testing.T) {
 		t.Error("в письме должны быть заголовки уведомлений и время")
 	}
 }
+
+// Push ведёт туда же, куда колокольчик: задача — карточкой, остальное — вкладкой.
+func TestLink(t *testing.T) {
+	cases := []struct {
+		n    Notification
+		want string
+	}{
+		{Notification{EntityType: "issue", EntityID: 42}, "/tasks?task=42"},
+		{Notification{EntityType: "issue"}, "/notifications"},
+		{Notification{EntityType: "contract", EntityID: 1}, "/payments"},
+		{Notification{EntityType: "invoice", EntityID: 1}, "/payments"},
+		{Notification{EntityType: "sprint", EntityID: 3}, "/sprint"},
+		{Notification{EntityType: "system"}, "/settings"},
+		{Notification{EntityType: "other"}, "/notifications"},
+	}
+	for _, c := range cases {
+		if got := Link(c.n); got != c.want {
+			t.Errorf("Link(%s, %d) = %q, want %q", c.n.EntityType, c.n.EntityID, got, c.want)
+		}
+	}
+}
