@@ -13,7 +13,7 @@
           <CircleDot v-else-if="groupBy === 'status' && isMobile" :size="18" class="person" />
           <span v-else-if="groupBy === 'status'" class="status-dot" :style="{ background: statusColor(group.name) }"></span>
           <span
-            v-else-if="group.name !== NO_ASSIGNEE && !isMobile"
+            v-else-if="group.name !== NO_ASSIGNEE"
             class="avatar"
             :style="{ background: avatarColor(group.name) }"
           ><img v-if="avatarSrc(null, group.name)" :src="avatarSrc(null, group.name)" alt="" /><template v-else>{{ initials(group.name) }}</template></span>
