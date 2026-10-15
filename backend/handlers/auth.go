@@ -258,7 +258,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		Value:    sessionID,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   secureCookies,
+		Secure:   secureCookies, // #nosec G124 -- Secure включается SECURE_COOKIES за HTTPS
 		SameSite: http.SameSiteLaxMode,
 		Expires:  time.Now().Add(expiresAt),
 	})
@@ -341,7 +341,8 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   secureCookies,
+		Secure:   secureCookies, // #nosec G124 -- Secure включается SECURE_COOKIES за HTTPS
+		SameSite: http.SameSiteLaxMode,
 		MaxAge:   -1,
 	})
 	utils.Success(w)
@@ -527,6 +528,9 @@ func (h *AuthHandler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusUnauthorized, "UNAUTHORIZED")
 		return
 	}
+	// Предел тела до разбора: файл больше 2 МиБ (с запасом на заголовки
+	// формы) не читается в память целиком
+	r.Body = http.MaxBytesReader(w, r.Body, 3<<20)
 	if err := r.ParseMultipartForm(2 << 20); err != nil {
 		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
 		return

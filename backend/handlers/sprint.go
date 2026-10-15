@@ -15,6 +15,7 @@ import (
 	"pm-dashboard/utils"
 
 	"github.com/gorilla/mux"
+	"github.com/lib/pq"
 )
 
 type SprintHandler struct {
@@ -507,19 +508,6 @@ func (h *SprintHandler) openSprintIDs(userID int, shared bool) ([]int, error) {
 	return ids, nil
 }
 
-// idList записывает номера через запятую для условия IN; для пустого списка
-// возвращает номер, которого нет ни у одной строки.
-func idList(ids []int) string {
-	if len(ids) == 0 {
-		return "-1"
-	}
-	parts := make([]string, len(ids))
-	for i, id := range ids {
-		parts[i] = strconv.Itoa(id)
-	}
-	return strings.Join(parts, ",")
-}
-
 // AssignTask кладёт задачу в спринт. Задача лежит только в одном незакрытом
 // спринте своего вида, поэтому из остальных таких спринтов она убирается;
 // from_sprint_id — спринт, из которого задачу перетащили: из него она
@@ -571,7 +559,7 @@ func (h *SprintHandler) AssignTask(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 	if _, err := tx.Exec(`DELETE FROM sprint_issues WHERE issue_external_id = $1 AND sprint_id <> $2
-		AND sprint_id IN (`+idList(others)+`)`, body.IssueExternalID, target.ID); err != nil {
+		AND sprint_id = ANY($3)`, body.IssueExternalID, target.ID, pq.Array(others)); err != nil {
 		utils.Error(w, http.StatusInternalServerError, "ASSIGN_FAILED")
 		return
 	}
@@ -638,11 +626,13 @@ func (h *SprintHandler) GetBacklog(w http.ResponseWriter, r *http.Request) {
 		middleware.GetScope(r).ProjectIssueCond("i.", &args),
 	}
 
+	args = append(args, pq.Array(shared))
+	sharedParam := "$" + strconv.Itoa(len(args))
 	query := `SELECT i.external_id, i.subject, COALESCE(i.project_name, ''), i.status_name,
 		i.priority_name, i.priority_id, i.assigned_to_name, i.due_date, i.estimated_hours
 		FROM issues i
 		WHERE ` + utils.JoinStrings(where, " AND ") + `
-		AND i.external_id NOT IN (SELECT issue_external_id FROM sprint_issues WHERE sprint_id IN (` + idList(shared) + `))
+		AND i.external_id NOT IN (SELECT issue_external_id FROM sprint_issues WHERE sprint_id = ANY(` + sharedParam + `))
 		ORDER BY i.project_name, ` + priorityRank("i.priority_id") + ` DESC NULLS LAST`
 
 	rows, err := (*h.DB).Query(query, args...)
@@ -786,10 +776,12 @@ func (h *SprintHandler) autoFill(userID, sprintID int, shared bool, projectName,
 
 	args := []interface{}{projectName, categoryName}
 	visible := scope.AllowedIssueCond("", &args)
+	args = append(args, pq.Array(taken))
+	takenParam := "$" + strconv.Itoa(len(args))
 	rows, err := (*h.DB).Query(`SELECT external_id FROM issues
 		WHERE project_name = $1 AND category_name = $2
 		AND `+statusNotIn("status_id", GroupClosed, GroupTesting)+`
-		AND external_id NOT IN (SELECT issue_external_id FROM sprint_issues WHERE sprint_id IN (`+idList(taken)+`))
+		AND external_id NOT IN (SELECT issue_external_id FROM sprint_issues WHERE sprint_id = ANY(`+takenParam+`))
 		AND `+visible, args...)
 	if err != nil {
 		return

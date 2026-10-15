@@ -151,16 +151,6 @@ func TestValidSprintStatus(t *testing.T) {
 	}
 }
 
-func TestIDList(t *testing.T) {
-	if got := idList([]int{3, 1, 20}); got != "3,1,20" {
-		t.Errorf("idList = %q", got)
-	}
-	// Пустой список не должен ломать условие IN и не должен ничего выбирать
-	if got := idList(nil); got != "-1" {
-		t.Errorf("idList пустого списка = %q", got)
-	}
-}
-
 func TestSprintDatesInOrder(t *testing.T) {
 	cases := []struct {
 		name       string

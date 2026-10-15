@@ -82,7 +82,7 @@ func (t *InvoiceTemplates) info() *templateInfo {
 // Save заменяет загруженный шаблон. Файл пишется рядом со своим местом и
 // затем переносится на него: при сбое посередине остаётся прежний.
 func (t *InvoiceTemplates) Save(content []byte, info templateInfo) error {
-	if err := os.MkdirAll(t.Dir, 0755); err != nil {
+	if err := os.MkdirAll(t.Dir, 0750); err != nil {
 		return err
 	}
 	tmp, err := os.CreateTemp(t.Dir, "invoice_template_*.tmp")

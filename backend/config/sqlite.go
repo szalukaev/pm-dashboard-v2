@@ -14,7 +14,7 @@ type SQLiteStore struct {
 }
 
 func NewSQLiteStore(dataDir string) (*SQLiteStore, error) {
-	if err := os.MkdirAll(dataDir, 0755); err != nil {
+	if err := os.MkdirAll(dataDir, 0750); err != nil {
 		return nil, fmt.Errorf("create data dir: %w", err)
 	}
 	dbPath := filepath.Join(dataDir, "config.db")
