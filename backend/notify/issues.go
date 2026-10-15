@@ -97,9 +97,10 @@ func dueSoonKey(issueID int, due string) string {
 	return fmt.Sprintf("%s:%d:%s", RuleTaskDueSoon, issueID, due)
 }
 
-// overdueKey — «задача просрочена»: один раз в день.
-func overdueKey(issueID int, today string) string {
-	return fmt.Sprintf("%s:%d:%s", RuleTaskOverdue, issueID, today)
+// overdueKey — «задача просрочена»: одно уведомление в день на человека,
+// сколько бы задач ни было просрочено.
+func overdueKey(today string) string {
+	return fmt.Sprintf("%s:%s", RuleTaskOverdue, today)
 }
 
 // eventKey — событие, которое само случается один раз (назначение,

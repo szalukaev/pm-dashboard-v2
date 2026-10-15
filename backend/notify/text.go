@@ -53,13 +53,15 @@ var words = map[string]map[string]string{
 		"status": "Статус", "priority": "Приоритет", "due_date": "Срок", "estimated_hours": "Оценка, ч",
 		"due": "Срок", "issued": "Счёт выставлен", "grace": "льготный период", "read_only": "только чтение",
 		"subject": "PM Dashboard: новых уведомлений — %d", "intro": "Новые уведомления по вашим правилам:",
-		"footer": "Правила уведомлений настраиваются в дашборде: Настройки → Уведомления.",
+		"footer":       "Правила уведомлений настраиваются в дашборде: Настройки → Уведомления.",
+		"overdue_many": "Просрочено задач: %d", "overdue_days": "дней: %d", "and_more": "и ещё %d",
 	},
 	"en": {
 		"status": "Status", "priority": "Priority", "due_date": "Due date", "estimated_hours": "Estimate, h",
 		"due": "Due", "issued": "Invoice issued", "grace": "grace period", "read_only": "read only",
 		"subject": "PM Dashboard: new notifications — %d", "intro": "New notifications by your rules:",
-		"footer": "The notification rules are set up in the dashboard: Settings → Notifications.",
+		"footer":       "The notification rules are set up in the dashboard: Settings → Notifications.",
+		"overdue_many": "Overdue tasks: %d", "overdue_days": "days: %d", "and_more": "and %d more",
 	},
 }
 
@@ -81,6 +83,13 @@ type params struct {
 	Days    int      `json:"days"`
 	State   string   `json:"state"`
 	Changes []Change `json:"changes"`
+	// Сводка просрочек: сколько всего задач и первые из них
+	Count  int `json:"count"`
+	Issues []struct {
+		IssueID int    `json:"issue_id"`
+		Subject string `json:"subject"`
+		Days    int    `json:"days"`
+	} `json:"issues"`
 }
 
 // dateText записывает дату ГГГГ-ММ-ДД как ДД.ММ.ГГГГ; пустую — прочерком.
@@ -109,6 +118,8 @@ func Title(n Notification, lang string) string {
 		return n.Rule
 	case n.Rule == RuleLicenseState:
 		return fmt.Sprintf(format, words[lang][p.State])
+	case p.Count > 0:
+		return fmt.Sprintf(words[lang]["overdue_many"], p.Count)
 	case strings.Contains(format, "%d"):
 		return fmt.Sprintf(format, p.Days)
 	}
@@ -126,6 +137,12 @@ func Lines(n Notification, lang string) []string {
 	var lines []string
 	if p.IssueID != 0 {
 		lines = append(lines, strings.TrimSpace(fmt.Sprintf("#%d %s", p.IssueID, p.Subject)))
+	}
+	for _, issue := range p.Issues {
+		lines = append(lines, strings.TrimSpace(fmt.Sprintf("#%d %s", issue.IssueID, issue.Subject))+" — "+fmt.Sprintf(w["overdue_days"], issue.Days))
+	}
+	if more := p.Count - len(p.Issues); p.Count > 0 && more > 0 {
+		lines = append(lines, fmt.Sprintf(w["and_more"], more))
 	}
 	for _, change := range p.Changes {
 		from, to := orDash(change.From), orDash(change.To)

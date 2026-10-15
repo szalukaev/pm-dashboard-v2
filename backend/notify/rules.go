@@ -13,7 +13,7 @@ const (
 	RuleTaskAssigned = "task_assigned" // мне назначена задача
 	RuleTaskChanged  = "task_changed"  // в моей задаче изменились статус, приоритет, срок или оценка
 	RuleTaskDueSoon  = "task_due_soon" // до срока моей задачи осталось не больше Days дней
-	RuleTaskOverdue  = "task_overdue"  // моя задача просрочена — каждый день, пока не закрыта
+	RuleTaskOverdue  = "task_overdue"  // мои задачи просрочены — одно уведомление в день, пока они есть
 
 	// Мои договоры и счета по ним.
 	RuleContractEnding  = "contract_ending"  // до окончания договора осталось не больше Days дней

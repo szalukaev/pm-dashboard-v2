@@ -118,15 +118,12 @@ func TestDaysBetween(t *testing.T) {
 }
 
 func TestDedupeKeys(t *testing.T) {
-	// Просрочка напоминает раз в день: в один день ключ один, назавтра другой
-	if overdueKey(10, "2026-10-13") != overdueKey(10, "2026-10-13") {
+	// Просрочки — одно уведомление в день: в один день ключ один, назавтра другой
+	if overdueKey("2026-10-13") != overdueKey("2026-10-13") {
 		t.Error("ключ просрочки за один день должен совпадать")
 	}
-	if overdueKey(10, "2026-10-13") == overdueKey(10, "2026-10-14") {
+	if overdueKey("2026-10-13") == overdueKey("2026-10-14") {
 		t.Error("на следующий день просрочка должна напомнить снова")
-	}
-	if overdueKey(10, "2026-10-13") == overdueKey(11, "2026-10-13") {
-		t.Error("у разных задач разные ключи")
 	}
 
 	// «Скоро срок» — один раз на срок; перенесли срок — напомнит снова
@@ -394,5 +391,23 @@ func TestLink(t *testing.T) {
 		if got := Link(c.n); got != c.want {
 			t.Errorf("Link(%s, %d) = %q, want %q", c.n.EntityType, c.n.EntityID, got, c.want)
 		}
+	}
+}
+
+func TestOverdueDigestText(t *testing.T) {
+	// Несколько просрочек — одно уведомление: число в заголовке, первые задачи
+	// строками, остальные — «и ещё», ведёт на вкладку «Задачи»
+	n := Notification{Rule: RuleTaskOverdue, EntityType: "issue_list", Params: []byte(`{"count": 7, "issues": [
+		{"issue_id": 5, "subject": "Первая", "days": 12}, {"issue_id": 6, "subject": "Вторая", "days": 3}]}`)}
+	if got := Title(n, "ru"); got != "Просрочено задач: 7" {
+		t.Errorf("заголовок: %q", got)
+	}
+	lines := Lines(n, "ru")
+	want := []string{"#5 Первая — дней: 12", "#6 Вторая — дней: 3", "и ещё 5"}
+	if strings.Join(lines, "|") != strings.Join(want, "|") {
+		t.Errorf("строки: %q", lines)
+	}
+	if Link(n) != "/tasks" {
+		t.Errorf("ссылка: %q", Link(n))
 	}
 }

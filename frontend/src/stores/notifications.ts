@@ -21,6 +21,9 @@ export interface AppNotification {
     due?: string
     days?: number
     changes?: NotificationChange[]
+    // Сводка просрочек за день: сколько всего задач и первые из них
+    count?: number
+    issues?: { issue_id: number; subject: string; days: number }[]
     [key: string]: unknown
   }
   entity_type: string

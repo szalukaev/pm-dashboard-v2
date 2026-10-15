@@ -815,7 +815,7 @@
       },
       "task_overdue": {
         "name": "A task is overdue",
-        "hint": "Every day while your overdue task is not closed",
+        "hint": "Once a day while you have overdue tasks: one task — a notification about it, several — one notification with a list",
         "title": "The task is overdue, days: {days}"
       }
     },
@@ -827,7 +827,10 @@
     "group_yesterday": "Yesterday",
     "group_earlier": "Earlier",
     "clear": "Clear",
-    "clear_confirm": "Remove all notifications from the bell?"
+    "clear_confirm": "Remove all notifications from the bell?",
+    "overdue_many": "Overdue tasks: {count}",
+    "overdue_item": "#{id} {subject} — days: {days}",
+    "and_more": "and {count} more"
   },
   "settings": {
     "title": "Settings",

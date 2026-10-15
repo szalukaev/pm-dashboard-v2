@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sort"
 	"sync"
 	"time"
 
@@ -363,6 +364,9 @@ func (e *Engine) projectRule(p *pass, who recipient, rule string, issue IssueSta
 func (e *Engine) deadlines(p *pass, current map[int]IssueState) int {
 	today := p.now.Format("2006-01-02")
 	created := 0
+	// Просроченные задачи каждого получателя: о них одно уведомление в день
+	overdue := map[int][]IssueState{}
+	recipients := map[int]recipient{}
 	for _, cur := range current {
 		if cur.Closed() || cur.Due == "" {
 			continue
@@ -378,10 +382,8 @@ func (e *Engine) deadlines(p *pass, current map[int]IssueState) int {
 			for _, who := range p.members[*cur.AssignedTo] {
 				switch {
 				case left < 0:
-					params["days"] = -left
-					if e.create(who, RuleTaskOverdue, overdueKey(cur.ID, today), "issue", cur.ID, params) {
-						created++
-					}
+					overdue[who.userID] = append(overdue[who.userID], cur)
+					recipients[who.userID] = who
 				case left <= who.rules[RuleTaskDueSoon].Days:
 					params["days"] = left
 					if e.create(who, RuleTaskDueSoon, dueSoonKey(cur.ID, cur.Due), "issue", cur.ID, params) {
@@ -403,7 +405,45 @@ func (e *Engine) deadlines(p *pass, current map[int]IssueState) int {
 			}
 		}
 	}
+
+	for userID, list := range overdue {
+		if e.overdueDigest(recipients[userID], list, today) {
+			created++
+		}
+	}
 	return created
+}
+
+// overdueListMax — сколько просроченных задач перечисляется в уведомлении;
+// остальные — числом.
+const overdueListMax = 5
+
+// overdueDigest создаёт уведомление «задача просрочена» за день: одна
+// задача — уведомление о ней, несколько — одно со списком, самые
+// просроченные первыми; ведёт оно тогда на вкладку «Задачи».
+func (e *Engine) overdueDigest(who recipient, list []IssueState, today string) bool {
+	days := func(issue IssueState) int {
+		left, _ := daysBetween(today, issue.Due)
+		return -left
+	}
+	sort.Slice(list, func(i, j int) bool {
+		if days(list[i]) != days(list[j]) {
+			return days(list[i]) > days(list[j])
+		}
+		return list[i].ID < list[j].ID
+	})
+	if len(list) == 1 {
+		params := issueParams(list[0])
+		params["due"] = list[0].Due
+		params["days"] = days(list[0])
+		return e.create(who, RuleTaskOverdue, overdueKey(today), "issue", list[0].ID, params)
+	}
+	issues := []map[string]interface{}{}
+	for _, issue := range list[:min(len(list), overdueListMax)] {
+		issues = append(issues, map[string]interface{}{"issue_id": issue.ID, "subject": issue.Subject, "days": days(issue)})
+	}
+	params := map[string]interface{}{"count": len(list), "issues": issues}
+	return e.create(who, RuleTaskOverdue, overdueKey(today), "issue_list", 0, params)
 }
 
 // byUser возвращает получателя по номеру пользователя.
@@ -667,6 +707,8 @@ func Link(n Notification) string {
 		if n.EntityID > 0 {
 			return fmt.Sprintf("/tasks?task=%d", n.EntityID)
 		}
+	case "issue_list":
+		return "/tasks"
 	case "contract", "invoice":
 		return "/payments"
 	case "sprint":

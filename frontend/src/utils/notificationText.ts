@@ -12,6 +12,7 @@ function dateText(date: unknown): string {
 
 // Заголовок уведомления: что произошло
 export function notificationTitle(n: AppNotification, t: Translate): string {
+  if (n.params.count) return t('notifications.overdue_many', { count: n.params.count })
   return t('notifications.rules.' + n.rule + '.title', {
     days: n.params.days ?? 0,
     due: dateText(n.params.due),
@@ -26,6 +27,12 @@ export function notificationLines(n: AppNotification, t: Translate): string[] {
   if (n.params.issue_id) {
     lines.push('#' + n.params.issue_id + ' ' + (n.params.subject || ''))
   }
+  // Сводка просрочек: первые задачи и сколько ещё
+  for (const issue of n.params.issues || []) {
+    lines.push(t('notifications.overdue_item', { id: issue.issue_id, subject: issue.subject, days: issue.days }))
+  }
+  const more = (n.params.count || 0) - (n.params.issues?.length || 0)
+  if (n.params.count && more > 0) lines.push(t('notifications.and_more', { count: more }))
   for (const change of n.params.changes || []) {
     const isDate = change.field === 'due_date'
     lines.push(t('notifications.change', {
@@ -44,6 +51,7 @@ export function notificationLines(n: AppNotification, t: Translate): string[] {
 
 // Куда ведёт уведомление: задача открывается карточкой, остальное — своей вкладкой
 const NOTIFICATION_PAGES: Record<string, string> = {
+  issue_list: '/tasks',
   contract: '/payments',
   invoice: '/payments',
   sprint: '/sprint',
