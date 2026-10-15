@@ -1,6 +1,6 @@
 <template>
   <!-- Карточки: одна задача — одна карточка во всю ширину -->
-  <div v-if="mode === 'cards'" class="mobile-cards" data-testid="task-cards">
+  <div v-if="cardsOnly || mode === 'cards'" class="mobile-cards" data-testid="task-cards">
     <div
       v-for="task in tasks"
       :key="task.external_id"
@@ -87,7 +87,8 @@ import { statusColor, priorityColor } from '../../utils/statusColor'
 import { initials, avatarColor } from '../../utils/avatar'
 import { useMemberAvatars } from '../../composables/useMemberAvatars'
 
-const props = defineProps<{ tasks: Task[] }>()
+// cardsOnly — всегда карточки, без ленты сроков (списки задач вне вкладки «Задачи»)
+const props = defineProps<{ tasks: Task[]; cardsOnly?: boolean }>()
 defineEmits(['open-task'])
 const { avatarSrc } = useMemberAvatars()
 

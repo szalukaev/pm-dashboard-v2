@@ -5,7 +5,9 @@
     <div v-else-if="tasks.length === 0" class="list-hint">{{ $t('common.empty') }}</div>
 
     <template v-else>
-      <div class="list-wrapper">
+      <!-- Телефон: карточки, как в «Задачах», вместо широкой таблицы -->
+      <TaskMobileList v-if="isMobile" :tasks="(tasks as unknown as Task[])" cards-only data-testid="analytics-tasks" @open-task="$emit('open-task', $event)" />
+      <div v-else class="list-wrapper">
         <table class="list-table" data-testid="analytics-tasks">
           <thead>
             <tr>
@@ -59,6 +61,9 @@ import { useAnalyticsStore, type TaskListQuery } from '../../stores/analytics'
 import { statusColor } from '../../utils/statusColor'
 import AppModal from '../ui/AppModal.vue'
 import AppPagination from '../ui/AppPagination.vue'
+import TaskMobileList from '../tasks/TaskMobileList.vue'
+import { useMobileTasks } from '../../composables/useMobileTasks'
+import type { Task } from '../../stores/tasks'
 
 interface ListTask {
   external_id: number
@@ -71,6 +76,9 @@ interface ListTask {
   estimated_hours: number | null
   spent_hours: number
   bug_fix_hours: number
+  priority_id: number
+  assigned_to_id: number | null
+  due_date: string | null
 }
 
 const props = defineProps<{ query: TaskListQuery | null }>()
@@ -80,6 +88,8 @@ defineEmits<{
 }>()
 
 const PAGE = 25
+
+const { isMobile } = useMobileTasks()
 
 const settingsStore = useSettingsStore()
 const tasks = ref<ListTask[]>([])

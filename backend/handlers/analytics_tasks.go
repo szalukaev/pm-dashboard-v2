@@ -97,7 +97,7 @@ func (h *AnalyticsHandler) GetTasks(w http.ResponseWriter, r *http.Request) {
 	rows, err := (*h.DB).Query(`SELECT external_id, COALESCE(project_id, 0), COALESCE(project_name, ''), COALESCE(subject, ''),
 		COALESCE(status_name, ''), COALESCE(status_id, 0), COALESCE(priority_name, ''), COALESCE(priority_id, 0),
 		COALESCE(assigned_to_name, ''), assigned_to_id,
-		estimated_hours, COALESCE(spent_hours, 0), COALESCE(bug_fix_hours, 0)
+		estimated_hours, COALESCE(spent_hours, 0), COALESCE(bug_fix_hours, 0), due_date
 		FROM issues WHERE `+filter+`
 		ORDER BY project_name ASC NULLS LAST, project_id ASC, external_id DESC
 		LIMIT `+itoa(analyticsTasksPage)+` OFFSET `+itoa(offset), args...)
@@ -113,7 +113,7 @@ func (h *AnalyticsHandler) GetTasks(w http.ResponseWriter, r *http.Request) {
 		if rows.Scan(&t.ExternalID, &t.ProjectID, &t.ProjectName, &t.Subject,
 			&t.StatusName, &t.StatusID, &t.PriorityName, &t.PriorityID,
 			&t.AssignedToName, &t.AssignedToID,
-			&t.EstimatedHours, &t.SpentHours, &t.BugFixHours) == nil {
+			&t.EstimatedHours, &t.SpentHours, &t.BugFixHours, &t.DueDate) == nil {
 			tasks = append(tasks, t)
 		}
 	}
