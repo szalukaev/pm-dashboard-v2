@@ -886,6 +886,21 @@
         "denied": "Notifications for this site are blocked in browser or phone settings. Allow them there and come back.",
         "install": "On iPhone and iPad push works only in the installed app: Share → Add to Home Screen, then open the dashboard from the Home Screen.",
         "unsupported": "This browser does not support push notifications."
+      },
+      "push_test": "Send a test push",
+      "push_test_title": "Test notification",
+      "push_test_body": "Push works: this is a check from PM Dashboard",
+      "push_test_none": "No devices with push enabled",
+      "push_test_accepted": "accepted for delivery",
+      "push_test_rejected": "rejected ({reason})",
+      "push_received": "Push received and shown on this device",
+      "push_not_shown": "Push received but could not be shown: {reason}",
+      "push_service": {
+        "apple": "iPhone / iPad / Safari",
+        "google": "Chrome / Android",
+        "mozilla": "Firefox",
+        "microsoft": "Edge (Windows)",
+        "other": "Other device"
       }
     },
     "sync": {

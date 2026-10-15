@@ -28,6 +28,16 @@
         />
       </label>
       <p class="block-hint">{{ $t('settings.notifications.push_hint.' + pushState) }}</p>
+      <button v-if="pushState === 'on'" type="button" class="push-test-btn" :disabled="pushTesting" data-testid="push-test" @click="testPush">
+        {{ $t('settings.notifications.push_test') }}
+      </button>
+      <ul v-if="pushResults" class="push-results" data-testid="push-results">
+        <li v-if="pushResults.length === 0">{{ $t('settings.notifications.push_test_none') }}</li>
+        <li v-for="(r, i) in pushResults" :key="i" :class="{ bad: r.status === 0 || r.status >= 400 }">
+          {{ $t('settings.notifications.push_service.' + (['apple', 'google', 'mozilla', 'microsoft'].includes(r.service) ? r.service : 'other')) }}:
+          {{ r.status && r.status < 400 ? $t('settings.notifications.push_test_accepted') : $t('settings.notifications.push_test_rejected', { reason: r.error || r.status }) }}
+        </li>
+      </ul>
     </div>
 
     <!-- Правила: о чём сообщать и куда -->
@@ -98,7 +108,7 @@
 </template>
 
 <script setup lang="ts">
-import { usePush } from '../../composables/usePush'
+import { usePush, type PushTestResult } from '../../composables/usePush'
 import { useSwal } from '../../composables/useSwal'
 import { ref, computed, onMounted } from 'vue'
 import AppHint from '../ui/AppHint.vue'
@@ -186,8 +196,24 @@ onMounted(async () => {
 
 // Push на это устройство
 const { toast } = useSwal()
-const { state: pushState, busy: pushBusy, refresh: refreshPush, enable: enablePush, disable: disablePush } = usePush()
+const { state: pushState, busy: pushBusy, refresh: refreshPush, enable: enablePush, disable: disablePush, sendTest: sendPushTest } = usePush()
 refreshPush()
+
+// Проверка доставки: ответы сервисов — списком, а получение этим
+// устройством — тостом от service worker
+const pushTesting = ref(false)
+const pushResults = ref<PushTestResult[] | null>(null)
+
+async function testPush() {
+  pushTesting.value = true
+  try {
+    pushResults.value = await sendPushTest(t('settings.notifications.push_test_title'), t('settings.notifications.push_test_body'))
+  } catch {
+    toast(t('settings.notifications.push_failed'), 'error')
+  } finally {
+    pushTesting.value = false
+  }
+}
 
 async function togglePush() {
   try {
@@ -359,5 +385,27 @@ async function togglePush() {
   width: 16px;
   height: 16px;
   accent-color: var(--accent);
+}
+
+.push-test-btn {
+  margin-top: 8px;
+  padding: 6px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent-bg);
+  color: var(--text-bright);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.push-results {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--success);
+}
+
+.push-results .bad {
+  color: var(--danger);
 }
 </style>

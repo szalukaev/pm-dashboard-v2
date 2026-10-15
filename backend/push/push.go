@@ -151,21 +151,55 @@ func (s *Service) subject() string {
 	return fallbackSubject
 }
 
+// Result — что ответил сервис push по одному устройству.
+type Result struct {
+	Service string `json:"service"` // apple, google, mozilla, microsoft или адрес
+	Status  int    `json:"status"`
+	Error   string `json:"error,omitempty"`
+}
+
 // Notify рассылает сообщение на все устройства пользователя. Подписки,
 // которые сервис push больше не знает (404, 410), удаляются.
 func (s *Service) Notify(userID int, msg Message) {
+	s.notify(userID, msg)
+}
+
+// Test отправляет проверочное сообщение и возвращает ответы по устройствам.
+func (s *Service) Test(userID int, msg Message) []Result {
+	return s.notify(userID, msg)
+}
+
+func serviceName(endpoint string) string {
+	switch {
+	case strings.Contains(endpoint, "push.apple.com"):
+		return "apple"
+	case strings.Contains(endpoint, "googleapis.com"):
+		return "google"
+	case strings.Contains(endpoint, "mozilla.com"):
+		return "mozilla"
+	case strings.Contains(endpoint, "notify.windows.com"):
+		return "microsoft"
+	}
+	if len(endpoint) > 40 {
+		return endpoint[:40]
+	}
+	return endpoint
+}
+
+func (s *Service) notify(userID int, msg Message) []Result {
+	results := []Result{}
 	if *s.DB == nil {
-		return
+		return results
 	}
 	keys, err := s.loadKeys()
 	if err != nil {
 		slog.Error("Push: no VAPID keys", "error", err)
-		return
+		return results
 	}
 	rows, err := (*s.DB).Query(`SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = $1`, userID)
 	if err != nil {
 		slog.Error("Push: failed to read subscriptions", "user", userID, "error", err)
-		return
+		return results
 	}
 	var subs []webpush.Subscription
 	for rows.Next() {
@@ -176,7 +210,7 @@ func (s *Service) Notify(userID int, msg Message) {
 	}
 	rows.Close()
 	if len(subs) == 0 {
-		return
+		return results
 	}
 
 	payload, _ := json.Marshal(msg)
@@ -189,13 +223,21 @@ func (s *Service) Notify(userID int, msg Message) {
 		Urgency:         webpush.UrgencyHigh,
 	}
 	for i := range subs {
+		result := Result{Service: serviceName(subs[i].Endpoint)}
 		resp, err := s.Send(payload, &subs[i], opts)
 		if err != nil {
 			slog.Warn("Push: send failed", "user", userID, "error", err)
+			result.Error = err.Error()
+			results = append(results, result)
 			continue
 		}
-		io.Copy(io.Discard, resp.Body)
+		reason, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
 		resp.Body.Close()
+		result.Status = resp.StatusCode
+		if resp.StatusCode >= 400 {
+			result.Error = strings.TrimSpace(string(reason))
+		}
+		results = append(results, result)
 		switch {
 		case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusGone:
 			// Подписка отозвана (приложение удалено, разрешение снято)
@@ -204,4 +246,5 @@ func (s *Service) Notify(userID int, msg Message) {
 			slog.Warn("Push: rejected", "user", userID, "status", resp.StatusCode)
 		}
 	}
+	return results
 }

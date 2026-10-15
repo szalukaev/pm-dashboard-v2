@@ -77,6 +77,19 @@ async function disable() {
   }
 }
 
+// Проверка: сервер отправляет push на все устройства пользователя и
+// возвращает ответы сервисов доставки
+export interface PushTestResult {
+  service: string
+  status: number
+  error?: string
+}
+
+async function sendTest(title: string, body: string): Promise<PushTestResult[]> {
+  const { data } = await axios.post('/api/push/test', { title, body })
+  return data.results || []
+}
+
 export function usePush() {
-  return { state, busy, refresh, enable, disable }
+  return { state, busy, refresh, enable, disable, sendTest }
 }

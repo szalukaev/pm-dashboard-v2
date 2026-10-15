@@ -886,6 +886,21 @@
         "denied": "Уведомления для сайта запрещены в настройках браузера или телефона. Разрешите их там и вернитесь сюда.",
         "install": "На iPhone и iPad push работает только в установленном приложении: «Поделиться» → «На экран «Домой»», затем откройте дашборд с экрана «Домой».",
         "unsupported": "Этот браузер не поддерживает push-уведомления."
+      },
+      "push_test": "Отправить тестовый push",
+      "push_test_title": "Тестовое уведомление",
+      "push_test_body": "Push работает: это проверка от PM Dashboard",
+      "push_test_none": "Нет ни одного устройства с включённым push",
+      "push_test_accepted": "принято к доставке",
+      "push_test_rejected": "отказ ({reason})",
+      "push_received": "Push получен этим устройством и показан",
+      "push_not_shown": "Push получен, но показать его не удалось: {reason}",
+      "push_service": {
+        "apple": "iPhone / iPad / Safari",
+        "google": "Chrome / Android",
+        "mozilla": "Firefox",
+        "microsoft": "Edge (Windows)",
+        "other": "Другое устройство"
       }
     },
     "sync": {

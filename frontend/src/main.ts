@@ -49,3 +49,16 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {})
   })
 }
+
+// Service worker сообщает, что push дошёл до устройства и показан ли он
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', async (event) => {
+    const data = event.data || {}
+    if (data.type !== 'push-shown' && data.type !== 'push-error') return
+    if (data.tag !== 'push-test') return
+    const { useToast } = await import('./composables/useToast')
+    const { t } = i18n.global
+    if (data.type === 'push-shown') useToast().show(t('settings.notifications.push_received'), 'success')
+    else useToast().show(t('settings.notifications.push_not_shown', { reason: data.message }), 'error')
+  })
+}

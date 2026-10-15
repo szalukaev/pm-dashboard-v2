@@ -40,6 +40,21 @@ func (h *PushHandler) Subscribe(w http.ResponseWriter, r *http.Request) {
 	utils.Success(w)
 }
 
+// Test отправляет проверочный push на все устройства пользователя и
+// возвращает, что ответили сервисы доставки.
+func (h *PushHandler) Test(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Title string `json:"title"`
+		Body  string `json:"body"`
+	}
+	json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&body)
+	if body.Title == "" || len(body.Title) > 200 || len(body.Body) > 500 {
+		body.Title, body.Body = "PM Dashboard", "Test push"
+	}
+	results := h.Service.Test(middleware.GetUserID(r), push.Message{Title: body.Title, Body: body.Body, URL: "/settings/notifications", Tag: "push-test"})
+	utils.JSON(w, http.StatusOK, map[string]interface{}{"results": results})
+}
+
 // Unsubscribe удаляет подписку этого браузера или устройства.
 func (h *PushHandler) Unsubscribe(w http.ResponseWriter, r *http.Request) {
 	var body struct {

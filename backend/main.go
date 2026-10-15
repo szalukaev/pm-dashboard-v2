@@ -386,6 +386,7 @@ func main() {
 	api.HandleFunc("/push/key", pushH.Key).Methods("GET")
 	api.HandleFunc("/push/subscribe", pushH.Subscribe).Methods("POST")
 	api.HandleFunc("/push/unsubscribe", pushH.Unsubscribe).Methods("POST")
+	api.HandleFunc("/push/test", pushH.Test).Methods("POST")
 	api.HandleFunc("/notifications/{id}/read", notificationsH.MarkRead).Methods("POST")
 
 	// Оплаты. Изменения закрыты для «только чтения», отдельные действия
