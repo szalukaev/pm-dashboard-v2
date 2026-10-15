@@ -185,7 +185,7 @@
         </div>
 
         <div class="m-kpi">
-          <label class="m-box" :class="dueState.kind">
+          <label class="m-box m-due" :class="dueState.kind" @click="openDatePicker">
             <span class="m-label">{{ $t(dueState.label) }}</span>
             <b class="m-big">{{ dueState.value }}</b>
             <span class="m-small">{{ task.due_date ? formatDay(task.due_date) : $t('tasks.mobile.card.no_due') }}</span>
@@ -409,6 +409,20 @@ const dueState = computed(() => {
   if (days === 0) return { kind: 'today', label: 'tasks.mobile.card.due_left', value: i18n.t('tasks.mobile.card.today') }
   return { kind: days <= 3 ? 'soon' : 'ok', label: 'tasks.mobile.card.due_left', value: i18n.t('tasks.mobile.card.days', { n: days }) }
 })
+
+// Календарь срока: на компьютере браузер открывает его только по значку
+// в поле, поэтому нажатие на плитку открывает его явно
+function openDatePicker(e: MouseEvent) {
+  if (!auth.canWrite) return
+  const input = (e.currentTarget as HTMLElement).querySelector('input[type="date"]') as HTMLInputElement | null
+  if (!input || e.target === input) return
+  e.preventDefault()
+  try {
+    input.showPicker()
+  } catch {
+    input.focus()
+  }
+}
 
 // Доля потраченных часов от плана, в процентах
 const hoursPct = computed(() => {
@@ -1507,6 +1521,18 @@ button.related-row:hover {
   text-align-last: right;
   appearance: none;
   -webkit-appearance: none;
+}
+
+/* Оценка во время ввода — по центру поля и на подложке, в просмотре — справа */
+.task-card.carded .num-input:focus {
+  text-align: center;
+  text-align-last: center;
+  background: var(--surface-3);
+  border-radius: 6px;
+}
+
+.m-due {
+  cursor: pointer;
 }
 
 .task-card.carded .num-input {
