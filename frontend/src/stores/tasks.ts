@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import axios from 'axios'
 import { useSettingsStore } from './settings'
 import i18n from '../i18n'
+import { useMobileTasks } from '../composables/useMobileTasks'
 
 export interface Task {
   id: number
@@ -242,7 +243,9 @@ export const useTasksStore = defineStore('tasks', () => {
     if (filters.value.project_id) params.project_id = filters.value.project_id
     if (filters.value.search) params.search = filters.value.search
     if (filters.value.category) params.category = filters.value.category
-    if (filters.value.attention.length) params.attention = filters.value.attention.join(',')
+    // «Внимание» — фильтр компьютерной версии; на телефоне его нет, и он не
+    // должен незаметно отбирать задачи
+    if (filters.value.attention.length && !useMobileTasks().isMobile.value) params.attention = filters.value.attention.join(',')
     if (filters.value.sort_by) {
       params.sort_by = filters.value.sort_by
       params.sort_dir = filters.value.sort_dir

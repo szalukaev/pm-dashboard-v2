@@ -10,9 +10,10 @@
         >
           <ChevronDown :size="18" class="chevron" :class="{ collapsed: !isOpen(group.name) }" />
           <Folder v-if="groupBy === 'project'" :size="18" class="person" />
+          <CircleDot v-else-if="groupBy === 'status' && isMobile" :size="18" class="person" />
           <span v-else-if="groupBy === 'status'" class="status-dot" :style="{ background: statusColor(group.name) }"></span>
           <span
-            v-else-if="group.name !== NO_ASSIGNEE"
+            v-else-if="group.name !== NO_ASSIGNEE && !isMobile"
             class="avatar"
             :style="{ background: avatarColor(group.name) }"
           >{{ initials(group.name) }}</span>
@@ -23,10 +24,10 @@
             {{ $t('tasks.accordions.estimate') }}: <b class="estimate">{{ formatTotal(group.estimate_total) }}</b>
           </span>
           <span class="group-metric">
-            {{ $t('tasks.accordions.fact') }}: <b class="fact" :class="{ over: group.fact_total > group.estimate_total && group.estimate_total > 0 }">{{ formatTotal(group.fact_total) }}</b>
+            {{ $t('tasks.accordions.fact') }}: <b class="fact" :class="{ over: !isMobile && group.fact_total > group.estimate_total && group.estimate_total > 0 }">{{ formatTotal(group.fact_total) }}</b>
           </span>
-          <!-- Что в группе требует внимания -->
-          <span class="group-flags">
+          <!-- Что в группе требует внимания; только на компьютере, у телефона своя шапка -->
+          <span v-if="!isMobile" class="group-flags">
             <span v-if="group.overdue" class="flag overdue">{{ $t('tasks.attention.group_overdue', { n: group.overdue }) }}</span>
             <span v-if="group.overrun" class="flag overrun">{{ $t('tasks.attention.group_overrun', { n: group.overrun }) }}</span>
             <span v-if="group.unassigned && groupBy !== 'assignee'" class="flag">{{ $t('tasks.attention.group_unassigned', { n: group.unassigned }) }}</span>
@@ -66,10 +67,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ChevronDown, Folder, User } from 'lucide-vue-next'
+import { ChevronDown, Folder, User, CircleDot } from 'lucide-vue-next'
 import { statusColor } from '../../utils/statusColor'
 import { initials, avatarColor } from '../../utils/avatar'
 import TaskTable from './TaskTable.vue'
+import { useMobileTasks } from '../../composables/useMobileTasks'
 import AppPagination from '../ui/AppPagination.vue'
 import { useTasksStore, type TaskGroup } from '../../stores/tasks'
 
@@ -91,8 +93,16 @@ function groupTitle(name: string): string {
 // Статусы сервер отдаёт в рабочем порядке (открытые, в тестировании,
 // закрытые) — его не меняем. Остальные группы: сначала те, где больше
 // задач с проблемами, затем по алфавиту; «Без исполнителя» — первой
+const { isMobile } = useMobileTasks()
+
 const sortedGroups = computed(() =>
   props.groupBy === 'status' ? props.groups : [...props.groups].sort((a, b) => {
+    // На телефоне прежний порядок: по алфавиту, «Без исполнителя» — последней
+    if (isMobile.value) {
+      if (a.name === NO_ASSIGNEE) return 1
+      if (b.name === NO_ASSIGNEE) return -1
+      return a.name.localeCompare(b.name, 'ru')
+    }
     if (a.name === NO_ASSIGNEE) return -1
     if (b.name === NO_ASSIGNEE) return 1
     return problems(b) - problems(a) || a.name.localeCompare(b.name, 'ru')

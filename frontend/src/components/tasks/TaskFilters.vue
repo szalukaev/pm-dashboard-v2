@@ -84,17 +84,6 @@
               <button :class="{ active: useGrouping && filters.group_by === 'status' }" data-testid="filter-group-status-mobile" @click="setGrouping('status')">{{ $t('tasks.filters.group_by_status') }}</button>
               <button :class="{ active: !useGrouping }" data-testid="filter-no-group" @click="setGrouping('')">{{ $t('tasks.filters.no_grouping') }}</button>
             </div>
-
-            <div class="m-label">{{ $t('tasks.attention.title') }}</div>
-            <div class="m-pills">
-              <button
-                v-for="key in ATTENTION_KEYS"
-                :key="key"
-                :class="{ active: filters.attention.includes(key) }"
-                :data-testid="'filter-attention-mobile-' + key"
-                @click="toggleAttention(key)"
-              >{{ $t('tasks.attention.' + key) }} · {{ attentionCounts[key] }}</button>
-            </div>
           </div>
 
           <div class="m-panel-foot">
@@ -284,7 +273,8 @@ const activeChips = computed(() => {
   if (f.category) {
     chips.push({ key: 'category', label: f.category, clear: () => setFilter('category', '') })
   }
-  for (const key of f.attention) {
+  // Чипы «Внимание» есть только на компьютере
+  if (!isMobile.value) for (const key of f.attention) {
     chips.push({ key: 'attention-' + key, label: t('tasks.attention.' + key), clear: () => toggleAttention(key) })
   }
   if (f.search) {
