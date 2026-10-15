@@ -219,7 +219,8 @@
         "today": "сегодня",
         "no_due": "срок не задан",
         "hours": "Часы",
-        "bug_fix": "ошибки {h}"
+        "bug_fix": "ошибки {h}",
+        "assignee_hours": "исполнитель {h}"
       }
     },
     "filters": {

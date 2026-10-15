@@ -17,6 +17,8 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { installSwipeBack } from '../../composables/useSwipeBack'
 import { formatDateTime } from '../../utils/format'
 import { useI18n } from 'vue-i18n'
 import { AlertTriangle } from 'lucide-vue-next'
@@ -51,7 +53,11 @@ function prefetchViews() {
   import('../../views/SettingsView.vue')
 }
 
+// Телефон: смахивание от левого края — «назад»
+const router = useRouter()
+
 onMounted(() => {
+  installSwipeBack(router)
   setTimeout(prefetchViews, 1500)
   license.fetchStatus()
   timer = setInterval(() => license.fetchStatus(true), 5 * 60_000)

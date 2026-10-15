@@ -345,6 +345,7 @@ func main() {
 	api.HandleFunc("/tasks/{id}/details", taskH.GetTaskDetails).Methods("GET")
 	api.HandleFunc("/tasks/{id}/attachments/{attachment_id}", taskH.GetTaskAttachment).Methods("GET")
 	api.HandleFunc("/tasks/{id}/comments", taskH.GetComments).Methods("GET")
+	api.HandleFunc("/tasks/{id}/assignee-hours", taskH.GetAssigneeHours).Methods("GET")
 	api.Handle("/tasks/{id}/comments", middleware.RequireWrite(http.HandlerFunc(taskH.AddComment))).Methods("POST")
 	api.HandleFunc("/tasks/{id}", taskH.GetTask).Methods("GET")
 	api.Handle("/tasks/{id}", middleware.RequireWrite(http.HandlerFunc(taskH.UpdateTask))).Methods("PUT")

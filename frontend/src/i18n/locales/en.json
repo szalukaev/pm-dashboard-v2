@@ -219,7 +219,8 @@
         "today": "today",
         "no_due": "no due date",
         "hours": "Hours",
-        "bug_fix": "bugs {h}"
+        "bug_fix": "bugs {h}",
+        "assignee_hours": "assignee {h}"
       }
     },
     "filters": {

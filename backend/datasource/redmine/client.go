@@ -225,6 +225,28 @@ func (c *Client) GetTimeEntries(projectID int, from string) ([]TimeEntry, error)
 	return all, nil
 }
 
+// GetUserIssueHours возвращает часы, списанные сотрудником userID на саму
+// задачу issueID (без подзадач).
+func (c *Client) GetUserIssueHours(issueID, userID int) (float64, error) {
+	pages, err := c.getPages(fmt.Sprintf("/time_entries.json?issue_id=%d&user_id=%d", issueID, userID))
+	if err != nil {
+		return 0, err
+	}
+	total := 0.0
+	for _, data := range pages {
+		var resp timeEntryResp
+		if err := json.Unmarshal(data, &resp); err != nil {
+			return 0, err
+		}
+		for _, e := range resp.TimeEntries {
+			if e.Issue != nil && e.Issue.ID == issueID {
+				total += e.Hours
+			}
+		}
+	}
+	return total, nil
+}
+
 type statusResp struct {
 	Statuses []struct {
 		ID       int    `json:"id"`

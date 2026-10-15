@@ -5,7 +5,7 @@
     width="80vw"
     expandable
     :page="isMobile"
-    @update:model-value="!$event && $emit('close')"
+    @update:model-value="!$event && goBack()"
   >
     <template #title>
       <template v-if="task">
@@ -199,6 +199,7 @@
             <div>
               <span class="m-label">{{ $t('tasks.mobile.card.hours') }}</span>
               <b class="m-big">{{ formatHours(task.spent_hours) }}<small v-if="task.estimated_hours">/{{ formatHours(task.estimated_hours) }}</small></b>
+              <span v-if="assigneeHours !== null && editFields.assigned_to_name" class="m-small" data-testid="assignee-hours">{{ $t('tasks.mobile.card.assignee_hours', { h: formatHours(assigneeHours) }) }}</span>
               <span v-if="task.bug_fix_hours" class="m-small">{{ $t('tasks.mobile.card.bug_fix', { h: formatHours(task.bug_fix_hours) }) }}</span>
             </div>
           </div>
@@ -270,7 +271,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, reactive } from 'vue'
+import { ref, computed, watch, reactive, onBeforeUnmount } from 'vue'
+import { onSwipeBack } from '../../composables/useSwipeBack'
 import { formatDate as formatCalendarDate, formatDateTime } from '../../utils/format'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
@@ -496,8 +498,40 @@ function relationName(relation: string): string {
   return i18n.te(key) ? i18n.t(key) : relation
 }
 
+// Переходы по связанным задачам запоминаются: «назад» (кнопка или смахивание
+// от края) возвращает к предыдущей задаче, с первой — закрывает карточку
+const visited = ref<number[]>([])
+
 function openRelated(id: number) {
+  if (currentId.value) visited.value.push(currentId.value)
   currentId.value = id
+}
+
+function goBack() {
+  const previous = visited.value.pop()
+  if (previous) currentId.value = previous
+  else emit('close')
+}
+
+// Смахивание «назад» берёт открытая карточка
+let releaseSwipe: (() => void) | null = null
+watch(() => props.taskId, id => {
+  releaseSwipe?.()
+  releaseSwipe = null
+  visited.value = []
+  if (id) releaseSwipe = onSwipeBack(() => { goBack(); return true })
+}, { immediate: true })
+onBeforeUnmount(() => releaseSwipe?.())
+
+// Часы исполнителя по этой задаче — из Redmine при открытии и смене исполнителя
+const assigneeHours = ref<number | null>(null)
+
+async function loadAssigneeHours(id: number) {
+  assigneeHours.value = null
+  try {
+    const { data } = await axios.get(`/api/tasks/${id}/assignee-hours`)
+    if (currentId.value === id) assigneeHours.value = data.hours
+  } catch {}
 }
 
 function attachmentUrl(id: number): string {
@@ -590,6 +624,7 @@ watch(currentId, async (id) => {
   editFields.due_date = (loaded.due_date || '').slice(0, 10)
   editFields.estimated_hours = loaded.estimated_hours ?? ''
   store.fetchProjectCategories(loaded.project_id)
+  loadAssigneeHours(id)
   loadDetails(id)
 }, { immediate: true })
 
@@ -628,6 +663,8 @@ async function saveField(field: keyof typeof editFields) {
     }
     t[field] = field === 'estimated_hours' && value !== null ? Number(value) : value
     showChange(String(old ?? '—'), String(value ?? '—'), i18n.t(fieldLabels[field]), task.value.external_id)
+    // Новый исполнитель — его часы по задаче
+    if (field === 'assigned_to_name') loadAssigneeHours(task.value.external_id)
   } catch {
     editFields[field] = old ?? ''
     swalError(i18n.t('tasks.messages.save_error'))
