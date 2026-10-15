@@ -199,7 +199,13 @@
         "later": "Later",
         "none": "No due date",
         "closed": "Closed"
-      }
+      },
+      "sort": "Sorting",
+      "sort_status": "Status",
+      "sort_priority": "Priority",
+      "sort_due": "Due date",
+      "sort_number": "Number",
+      "sort_subject": "Title"
     },
     "filters": {
       "open": "Open",

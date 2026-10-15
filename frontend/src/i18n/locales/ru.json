@@ -199,7 +199,13 @@
         "later": "Позже",
         "none": "Без срока",
         "closed": "Закрытые"
-      }
+      },
+      "sort": "Сортировка",
+      "sort_status": "Статус",
+      "sort_priority": "Приоритет",
+      "sort_due": "Дата окончания",
+      "sort_number": "Номер",
+      "sort_subject": "Название"
     },
     "filters": {
       "open": "Открытые",

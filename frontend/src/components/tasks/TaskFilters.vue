@@ -84,6 +84,23 @@
               <button :class="{ active: useGrouping && filters.group_by === 'status' }" data-testid="filter-group-status-mobile" @click="setGrouping('status')">{{ $t('tasks.filters.group_by_status') }}</button>
               <button :class="{ active: !useGrouping }" data-testid="filter-no-group" @click="setGrouping('')">{{ $t('tasks.filters.no_grouping') }}</button>
             </div>
+
+            <!-- Сортировка — только для карточек: в ленте сроков порядок задают сами сроки -->
+            <template v-if="mobileMode === 'cards'">
+              <div class="m-label">{{ $t('tasks.mobile.sort') }}</div>
+              <div class="m-pills">
+                <button
+                  v-for="option in sortOptions"
+                  :key="option.key"
+                  :class="{ active: filters.sort_by === option.key }"
+                  :data-testid="'filter-sort-' + option.key"
+                  @click="setSort(option.key, option.dir)"
+                >
+                  {{ $t(option.label) }}
+                  <template v-if="filters.sort_by === option.key">{{ filters.sort_dir === 'asc' ? '↑' : '↓' }}</template>
+                </button>
+              </div>
+            </template>
           </div>
 
           <div class="m-panel-foot">
@@ -227,7 +244,7 @@ const settingsStore = useSettingsStore()
 const { filters, projects, categories, useGrouping, total, attentionCounts } = storeToRefs(store)
 const { settings } = storeToRefs(settingsStore)
 const { t } = useI18n()
-const { isMobile } = useMobileTasks()
+const { isMobile, mode: mobileMode } = useMobileTasks()
 
 // Экран фильтров на телефоне
 const panelOpen = ref(false)
@@ -290,6 +307,23 @@ function setFilter(key: string, value: string) {
 
 function toggleAttention(key: AttentionKey) {
   store.toggleAttention(key)
+  store.fetchTasks()
+}
+
+// Варианты сортировки на телефоне; dir — направление при первом выборе
+const sortOptions = [
+  { key: 'status_name', label: 'tasks.mobile.sort_status', dir: 'asc' },
+  { key: 'priority_name', label: 'tasks.mobile.sort_priority', dir: 'desc' },
+  { key: 'due_date', label: 'tasks.mobile.sort_due', dir: 'asc' },
+  { key: 'external_id', label: 'tasks.mobile.sort_number', dir: 'desc' },
+  { key: 'subject', label: 'tasks.mobile.sort_subject', dir: 'asc' },
+]
+
+// Повторное нажатие на выбранный вариант меняет направление
+function setSort(key: string, dir: string) {
+  const nextDir = store.filters.sort_by === key ? (store.filters.sort_dir === 'asc' ? 'desc' : 'asc') : dir
+  store.setFilter('sort_by', key)
+  store.setFilter('sort_dir', nextDir)
   store.fetchTasks()
 }
 
