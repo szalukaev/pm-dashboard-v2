@@ -160,7 +160,12 @@ export const useAnalyticsStore = defineStore('analytics', () => {
   // Новый период: перестраиваются отчёты, которые от него зависят
   function setPeriod(next: AnalyticsPeriod) {
     period.value = { ...next }
-    return Promise.all([fetchStats(), fetchTeamLoad(), fetchVelocity()])
+    // Период действует на все виджеты: пересчитываются все
+    ganttOffset.value = 0
+    return Promise.all([
+      fetchStats(), fetchTeamLoad(), fetchVelocity(), fetchDistribution(),
+      fetchDeadlines(), fetchHours(), fetchHealth(), fetchGantt(),
+    ])
   }
 
   const exceeded = ref<Exceeded[]>([])
@@ -227,21 +232,21 @@ export const useAnalyticsStore = defineStore('analytics', () => {
 
   async function fetchDistribution() {
     try {
-      const { data } = await axios.get('/api/analytics/distribution')
+      const { data } = await axios.get('/api/analytics/distribution', { params: periodParams() })
       distribution.value = data.distribution || []
     } catch { failures++ }
   }
 
   async function fetchDeadlines() {
     try {
-      const { data } = await axios.get('/api/analytics/deadlines')
+      const { data } = await axios.get('/api/analytics/deadlines', { params: periodParams() })
       deadlines.value = data.deadlines || []
     } catch { failures++ }
   }
 
   async function fetchHours() {
     try {
-      const { data } = await axios.get('/api/analytics/hours')
+      const { data } = await axios.get('/api/analytics/hours', { params: periodParams() })
       hours.value = data.hours || []
     } catch { failures++ }
   }
@@ -263,14 +268,14 @@ export const useAnalyticsStore = defineStore('analytics', () => {
 
   async function fetchHealth() {
     try {
-      const { data } = await axios.get('/api/analytics/health')
+      const { data } = await axios.get('/api/analytics/health', { params: periodParams() })
       health.value = data && Array.isArray(data.parts) ? data : null
     } catch { failures++ }
   }
 
   async function fetchGantt(): Promise<void> {
     try {
-      const params: Record<string, number> = { offset: ganttOffset.value }
+      const params: Record<string, string | number> = { ...periodParams(), offset: ganttOffset.value }
       if (ganttProject.value !== null) params.project_id = ganttProject.value
       const { data } = await axios.get('/api/analytics/gantt', { params })
       const projects: GanttProject[] = data.projects || []

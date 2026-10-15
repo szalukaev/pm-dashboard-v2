@@ -87,3 +87,16 @@ func TestVelocityWeeksOf(t *testing.T) {
 		t.Errorf("past range: %v", weeks)
 	}
 }
+
+func TestPeriodUpdatedCond(t *testing.T) {
+	args := []interface{}{"x"}
+	if cond := (Period{}).updatedCond(&args); cond != "" || len(args) != 1 {
+		t.Errorf("без периода: cond %q, args %v", cond, args)
+	}
+	from := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
+	cond := Period{From: &from}.updatedCond(&args)
+	// Только нижняя граница; закрытые задачи отбираются так же, как открытые
+	if cond != " AND updated_on IS NOT NULL AND updated_on >= $2" || len(args) != 2 {
+		t.Errorf("cond %q, args %v", cond, args)
+	}
+}

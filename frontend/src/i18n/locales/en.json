@@ -359,7 +359,7 @@
       "label": "Report period",
       "from": "From",
       "to": "To",
-      "hint": "The period applies to closed tasks: only the ones closed on the chosen days are counted. It affects Completion in the statistics, the closed column of Team load, the lists of closed tasks and the weeks of Velocity (26 at most).\n\nOpen tasks, tasks in testing, overdue ones, Bugs, No estimate, hours, health, deadlines and Gantt show the current state and do not depend on the period.\n\nThe choice is remembered.",
+      "hint": "The period selects tasks changed on the chosen days (by the last change date in Redmine). It applies to every widget: statistics, team load, distribution, hours, health, deadlines, Gantt and the task lists behind the numbers.\n\nVelocity counts tasks closed in the period by the week they were closed (26 weeks at most).\n\nThe choice is remembered.",
       "modes": {
         "all": "Whole period",
         "range": "Range",

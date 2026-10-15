@@ -41,6 +41,12 @@ func (h *AnalyticsHandler) GetHours(w http.ResponseWriter, r *http.Request) {
 	scope := middleware.GetScope(r)
 	args := []interface{}{}
 	projectFilter := scope.IssueCond("", &args)
+	period, ok := parsePeriod(r.URL.Query(), time.Now())
+	if !ok {
+		utils.Error(w, http.StatusBadRequest, "INVALID_PERIOD")
+		return
+	}
+	projectFilter += period.updatedCond(&args)
 	teamFilter := ""
 	if !scope.AllTeam {
 		// Выбранная команда — это строка на каждого сотрудника, без «неназначенных»

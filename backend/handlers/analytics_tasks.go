@@ -75,7 +75,7 @@ func (h *AnalyticsHandler) GetTasks(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusBadRequest, "INVALID_PERIOD")
 		return
 	}
-	filter += period.closedCond(&args)
+	filter += period.updatedCond(&args)
 
 	args = append(args, now.Format("2006-01-02"))
 	cond, ok := analyticsTaskCond(query.Get("metric"), "$"+itoa(len(args)))

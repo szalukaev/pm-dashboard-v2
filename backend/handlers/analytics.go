@@ -74,12 +74,12 @@ func (h *AnalyticsHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 }
 
 // stats считает карточки статистики по проектам пользователя в пределах его
-// прав. Этим же расчётом пользуется письмо со сводкой. period ограничивает
-// закрытые задачи теми, что закрыты в периоде.
+// прав. Этим же расчётом пользуется письмо со сводкой. period оставляет
+// задачи, изменённые в периоде.
 func (h *AnalyticsHandler) stats(scope *access.Scope, now time.Time, period Period) []StatCard {
 	args := []interface{}{}
 	projectFilter := scope.ProjectIssueCond("", &args)
-	projectFilter += period.closedCond(&args)
+	projectFilter += period.updatedCond(&args)
 
 	var stats []StatCard
 	today := now.Format("2006-01-02")
@@ -167,8 +167,8 @@ func (h *AnalyticsHandler) teamLoad(scope *access.Scope, now time.Time, period P
 	// Команда, за которой следит пользователь, в пределах прав
 	args := []interface{}{}
 	projectFilter := scope.IssueCond("", &args)
-	// Закрытые считаются только за период
-	projectFilter += period.closedCond(&args)
+	// Только задачи, изменённые в периоде
+	projectFilter += period.updatedCond(&args)
 	teamFilter := ""
 	if !scope.AllTeam {
 		// Выбранная команда — это строка на каждого сотрудника, без «неназначенных»
@@ -215,7 +215,12 @@ func (h *AnalyticsHandler) GetDistribution(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	dist, err := h.distribution(middleware.GetScope(r))
+	period, ok := parsePeriod(r.URL.Query(), time.Now())
+	if !ok {
+		utils.Error(w, http.StatusBadRequest, "INVALID_PERIOD")
+		return
+	}
+	dist, err := h.distribution(middleware.GetScope(r), period)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
@@ -225,9 +230,9 @@ func (h *AnalyticsHandler) GetDistribution(w http.ResponseWriter, r *http.Reques
 
 // distribution считает открытые задачи по проектам и сотрудникам в пределах
 // прав пользователя. Этим же расчётом пользуется письмо со сводкой.
-func (h *AnalyticsHandler) distribution(scope *access.Scope) ([]ProjectDist, error) {
+func (h *AnalyticsHandler) distribution(scope *access.Scope, period Period) ([]ProjectDist, error) {
 	args := []interface{}{}
-	projectFilter := scope.ProjectIssueCond("", &args)
+	projectFilter := scope.ProjectIssueCond("", &args) + period.updatedCond(&args)
 
 	q := `SELECT COALESCE(project_id, 0), project_name, COALESCE(assigned_to_name, 'Неназначенные'), COUNT(*)
 		FROM issues WHERE ` + projectFilter + `
@@ -290,7 +295,13 @@ func (h *AnalyticsHandler) GetDeadlines(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	result, err := h.deadlines(middleware.GetScope(r), time.Now())
+	now := time.Now()
+	period, ok := parsePeriod(r.URL.Query(), now)
+	if !ok {
+		utils.Error(w, http.StatusBadRequest, "INVALID_PERIOD")
+		return
+	}
+	result, err := h.deadlines(middleware.GetScope(r), now, period)
 	if err != nil {
 		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
 		return
@@ -300,9 +311,9 @@ func (h *AnalyticsHandler) GetDeadlines(w http.ResponseWriter, r *http.Request) 
 
 // deadlines раскладывает незакрытые задачи со сроком по срочности в пределах
 // прав пользователя. Этим же расчётом пользуется письмо со сводкой.
-func (h *AnalyticsHandler) deadlines(scope *access.Scope, today time.Time) ([]DeadlineGroup, error) {
+func (h *AnalyticsHandler) deadlines(scope *access.Scope, today time.Time, period Period) ([]DeadlineGroup, error) {
 	args := []interface{}{}
-	projectFilter := scope.ProjectIssueCond("", &args)
+	projectFilter := scope.ProjectIssueCond("", &args) + period.updatedCond(&args)
 
 	// Все незакрытые задачи со сроком
 	q := `SELECT external_id, project_id, project_name, subject, '',
@@ -417,6 +428,17 @@ func projectIssues(r *http.Request) (string, []interface{}) {
 	args := []interface{}{}
 	cond := middleware.GetScope(r).ProjectIssueCond("", &args)
 	return cond, args
+}
+
+// periodIssues — projectIssues плюс задачи, изменённые в периоде из
+// запроса; ok = false, если период задан неверно
+func periodIssues(r *http.Request) (string, []interface{}, bool) {
+	period, ok := parsePeriod(r.URL.Query(), time.Now())
+	if !ok {
+		return "", nil, false
+	}
+	cond, args := projectIssues(r)
+	return cond + period.updatedCond(&args), args, true
 }
 
 func itoa(n int) string {

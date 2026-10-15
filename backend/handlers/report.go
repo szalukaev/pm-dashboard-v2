@@ -397,7 +397,7 @@ func (h *ReportHandler) build(scope *access.Scope, settings ReportSettings, lang
 	}
 
 	if settings.has("distribution") {
-		dist, err := analytics.distribution(scope)
+		dist, err := analytics.distribution(scope, Period{})
 		if err != nil {
 			return "", "", err
 		}
@@ -437,7 +437,7 @@ func (h *ReportHandler) build(scope *access.Scope, settings ReportSettings, lang
 	}
 
 	if settings.has("deadlines") || settings.OverdueList {
-		groups, err := analytics.deadlines(scope, now)
+		groups, err := analytics.deadlines(scope, now, Period{})
 		if err != nil {
 			return "", "", err
 		}

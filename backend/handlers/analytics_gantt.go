@@ -38,7 +38,11 @@ func (h *AnalyticsHandler) GetGantt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	projectFilter, args := projectIssues(r)
+	projectFilter, args, ok := periodIssues(r)
+	if !ok {
+		utils.Error(w, http.StatusBadRequest, "INVALID_PERIOD")
+		return
+	}
 	base := projectFilter + `
 		AND due_date IS NOT NULL
 		AND ` + statusNotIn("status_id", GroupClosed)
