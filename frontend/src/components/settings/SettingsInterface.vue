@@ -6,10 +6,13 @@
     <div class="setting-block">
       <h4 class="block-title">{{ $t('settings.interface.theme') }}</h4>
       <div class="mode-switch">
-        <button class="mode-btn" :class="{ active: currentMode === 'dark' }" @click="changeMode('dark')" data-testid="mode-dark">
+        <button class="mode-btn" :class="{ active: modePreference === 'system' }" @click="changeMode('system')" data-testid="mode-system">
+          <Monitor :size="14" /> {{ $t('settings.interface.mode_system') }}
+        </button>
+        <button class="mode-btn" :class="{ active: modePreference === 'dark' }" @click="changeMode('dark')" data-testid="mode-dark">
           <Moon :size="14" /> {{ $t('settings.interface.mode_dark') }}
         </button>
-        <button class="mode-btn" :class="{ active: currentMode === 'light' }" @click="changeMode('light')" data-testid="mode-light">
+        <button class="mode-btn" :class="{ active: modePreference === 'light' }" @click="changeMode('light')" data-testid="mode-light">
           <Sun :size="14" /> {{ $t('settings.interface.mode_light') }}
         </button>
       </div>
@@ -61,11 +64,11 @@ import { ref, computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { browserTimeZone, timeZoneList } from '../../utils/format'
-import { Moon, Sun } from 'lucide-vue-next'
-import { useTheme, THEMES, type ThemeName, type ThemeMode } from '../../composables/useTheme'
+import { Moon, Sun, Monitor } from 'lucide-vue-next'
+import { useTheme, THEMES, type ThemeName, type ModePreference } from '../../composables/useTheme'
 import { useSettingsStore } from '../../stores/settings'
 
-const { currentTheme, currentMode, setTheme, setMode } = useTheme()
+const { currentTheme, modePreference, setTheme, setMode } = useTheme()
 const { locale } = useI18n()
 const settingsStore = useSettingsStore()
 
@@ -92,9 +95,9 @@ async function changeTimeZone() {
   await settingsStore.updateSettings({ timezone: currentZone.value })
 }
 
-// На сервере хранится в виде "<тема>-<режим>", например "nord-dark".
+// На сервере хранится в виде "<тема>-<режим>", например "nord-dark" или "nord-system".
 function persist() {
-  return settingsStore.updateSettings({ theme: `${currentTheme.value}-${currentMode.value}` } as any)
+  return settingsStore.updateSettings({ theme: `${currentTheme.value}-${modePreference.value}` } as any)
 }
 
 async function changeTheme(theme: ThemeName) {
@@ -102,7 +105,7 @@ async function changeTheme(theme: ThemeName) {
   await persist()
 }
 
-async function changeMode(mode: ThemeMode) {
+async function changeMode(mode: ModePreference) {
   setMode(mode)
   await persist()
 }

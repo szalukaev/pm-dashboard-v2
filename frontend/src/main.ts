@@ -9,6 +9,8 @@ import i18n from './i18n'
 import './styles/tokens.css'
 import './styles/global.css'
 import './styles/admin.css'
+// Тема и режим (в том числе «как в системе») — до первого экрана
+import './composables/useTheme'
 
 const app = createApp(App)
 app.use(createPinia())

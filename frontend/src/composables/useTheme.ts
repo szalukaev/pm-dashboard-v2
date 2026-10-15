@@ -1,7 +1,9 @@
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
 export type ThemeName = 'nord' | 'amber' | 'forest' | 'dusk'
 export type ThemeMode = 'dark' | 'light'
+// Выбор пользователя: «как в системе» или явный режим
+export type ModePreference = ThemeMode | 'system'
 
 // Описание темы — в словаре: settings.interface.themes.<id>
 export const THEMES: { id: ThemeName; name: string; preview: { accent: string; bg: string; surface: string } }[] = [
@@ -30,25 +32,40 @@ function writeStorage(key: string, value: string) {
 }
 
 // Прежние версии хранили одно значение: 'dark', 'light' или название темы.
-function initialState(): { theme: ThemeName; mode: ThemeMode } {
+// Без сохранённого выбора режим берётся из системы пользователя.
+function initialState(): { theme: ThemeName; pref: ModePreference } {
   const stored = readStorage(THEME_KEY) || ''
   const storedMode = readStorage(MODE_KEY)
   const theme = (themeIds.includes(stored) ? stored : 'nord') as ThemeName
-  const mode: ThemeMode = storedMode === 'light' || storedMode === 'dark'
+  const pref: ModePreference = storedMode === 'light' || storedMode === 'dark' || storedMode === 'system'
     ? storedMode
-    : stored === 'light' ? 'light' : 'dark'
-  return { theme, mode }
+    : stored === 'light' || stored === 'dark' ? stored : 'system'
+  return { theme, pref }
 }
+
+const systemQuery = window.matchMedia('(prefers-color-scheme: dark)')
+const systemMode = ref<ThemeMode>(systemQuery.matches ? 'dark' : 'light')
 
 const initial = initialState()
 const currentTheme = ref<ThemeName>(initial.theme)
-const currentMode = ref<ThemeMode>(initial.mode)
+const modePreference = ref<ModePreference>(initial.pref)
+// Действующий режим: при «Системной» — тот, что сейчас в системе
+const currentMode = computed<ThemeMode>(() => modePreference.value === 'system' ? systemMode.value : modePreference.value)
 
 function apply() {
   const root = document.documentElement
   root.setAttribute('data-theme', currentTheme.value)
   root.setAttribute('data-mode', currentMode.value)
 }
+
+// Тема ставится сразу при загрузке, ещё до экрана входа
+apply()
+
+// Система переключилась (например, вечером) — при «Системной» тема меняется сразу
+systemQuery.addEventListener('change', e => {
+  systemMode.value = e.matches ? 'dark' : 'light'
+  apply()
+})
 
 export function useTheme() {
   function setTheme(theme: ThemeName) {
@@ -57,8 +74,8 @@ export function useTheme() {
     apply()
   }
 
-  function setMode(mode: ThemeMode) {
-    currentMode.value = mode
+  function setMode(mode: ModePreference) {
+    modePreference.value = mode
     writeStorage(MODE_KEY, mode)
     apply()
   }
@@ -69,5 +86,5 @@ export function useTheme() {
 
   apply()
 
-  return { currentTheme, currentMode, setTheme, setMode, toggleMode }
+  return { currentTheme, currentMode, modePreference, setTheme, setMode, toggleMode }
 }
