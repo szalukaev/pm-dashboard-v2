@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,8 +19,13 @@ import (
 // settingsKey — где в таблице settings лежат ключи VAPID.
 const settingsKey = "webpush_vapid"
 
-// fallbackSubject — контакт отправителя, если адрес дашборда не задан.
-const fallbackSubject = "mailto:push@pm-dashboard.local"
+// subjectKey — адрес сайта, с которого подписывались: им подписываются отправки.
+const subjectKey = "webpush_subject"
+
+// fallbackSubject — контакт отправителя, если адрес сайта неизвестен.
+// Библиотека сама добавляет «mailto:» ко всему, что не начинается с https://;
+// с готовым «mailto:» получается «mailto:mailto:…», и Apple отвергает подпись.
+const fallbackSubject = "push@pm-dashboard.app"
 
 // Keys — пара ключей VAPID: открытый отдаётся браузеру при подписке,
 // закрытым подписываются отправки.
@@ -107,7 +113,13 @@ func (s *Service) loadKeys() (*Keys, error) {
 
 // Subscribe сохраняет подписку пользователя; та же подписка другого
 // пользователя (сменили учётную запись на устройстве) переходит к этому.
-func (s *Service) Subscribe(userID int, sub Subscription, userAgent string) error {
+// origin — адрес сайта, на котором подписались (https://…): Apple принимает
+// подпись только с настоящим контактом, им и становится этот адрес.
+func (s *Service) Subscribe(userID int, sub Subscription, userAgent, origin string) error {
+	if strings.HasPrefix(origin, "https://") && len(origin) < 200 {
+		(*s.DB).Exec(`INSERT INTO settings (key, value) VALUES ($1, to_jsonb($2::text))
+			ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`, subjectKey, origin)
+	}
 	if len(userAgent) > 255 {
 		userAgent = userAgent[:255]
 	}
@@ -122,6 +134,21 @@ func (s *Service) Subscribe(userID int, sub Subscription, userAgent string) erro
 func (s *Service) Unsubscribe(userID int, endpoint string) error {
 	_, err := (*s.DB).Exec(`DELETE FROM push_subscriptions WHERE user_id = $1 AND endpoint = $2`, userID, endpoint)
 	return err
+}
+
+// subject — контакт отправителя: адрес дашборда из настроек, иначе адрес
+// сайта, с которого подписывались, иначе служебный адрес.
+func (s *Service) subject() string {
+	if s.Subject != nil {
+		if v := s.Subject(); v != "" {
+			return v
+		}
+	}
+	var origin string
+	if (*s.DB).QueryRow(`SELECT value #>> '{}' FROM settings WHERE key = $1`, subjectKey).Scan(&origin) == nil && strings.HasPrefix(origin, "https://") {
+		return origin
+	}
+	return fallbackSubject
 }
 
 // Notify рассылает сообщение на все устройства пользователя. Подписки,
@@ -153,12 +180,7 @@ func (s *Service) Notify(userID int, msg Message) {
 	}
 
 	payload, _ := json.Marshal(msg)
-	subject := fallbackSubject
-	if s.Subject != nil {
-		if v := s.Subject(); v != "" {
-			subject = v
-		}
-	}
+	subject := s.subject()
 	opts := &webpush.Options{
 		Subscriber:      subject,
 		VAPIDPublicKey:  keys.Public,

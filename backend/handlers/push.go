@@ -33,7 +33,7 @@ func (h *PushHandler) Subscribe(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusBadRequest, "INVALID_SUBSCRIPTION")
 		return
 	}
-	if err := h.Service.Subscribe(middleware.GetUserID(r), sub, r.UserAgent()); err != nil {
+	if err := h.Service.Subscribe(middleware.GetUserID(r), sub, r.UserAgent(), r.Header.Get("Origin")); err != nil {
 		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 		return
 	}
