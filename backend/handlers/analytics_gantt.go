@@ -29,7 +29,8 @@ type GanttProject struct {
 }
 
 // GetGantt возвращает незакрытые задачи со сроком — и просроченные, и
-// запланированные, по сроку, постранично — и проекты, к которым они
+// запланированные, постранично: сначала со сроком сегодня и позже (ближайшие
+// сверху), за ними просроченные от недавних к давним — и проекты, к которым они
 // относятся, для фильтра. ?project_id= оставляет задачи одного проекта,
 // ?offset= — первая задача страницы.
 func (h *AnalyticsHandler) GetGantt(w http.ResponseWriter, r *http.Request) {
@@ -95,7 +96,9 @@ func (h *AnalyticsHandler) GetGantt(w http.ResponseWriter, r *http.Request) {
 		to_char(LEAST(COALESCE(start_date, created_on::date, due_date), due_date), 'YYYY-MM-DD'),
 		to_char(due_date, 'YYYY-MM-DD'), NULLIF(estimated_hours, 0)
 		FROM issues WHERE ` + taskFilter + `
-		ORDER BY due_date ASC, external_id ASC
+		ORDER BY due_date < CURRENT_DATE,
+			CASE WHEN due_date >= CURRENT_DATE THEN due_date END ASC,
+			due_date DESC, external_id ASC
 		LIMIT ` + itoa(ganttLimit) + ` OFFSET ` + itoa(offset)
 
 	// #nosec G701 -- условие прав из Scope и фильтры-константы из кода, значения через $n

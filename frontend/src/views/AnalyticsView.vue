@@ -90,7 +90,7 @@
           :total="gantt.total"
           :project="ganttProject"
           :offset="ganttOffset"
-          @update:project="store.setGanttProject($event)"
+          @update:project="changeGanttProject"
           @update:offset="store.setGanttOffset($event)"
           @open-task="openTask"
         />
@@ -183,6 +183,19 @@ function savedPeriod(): AnalyticsPeriod {
 function changePeriod(next: AnalyticsPeriod) {
   store.setPeriod(next)
   settingsStore.setLastFilters(PERIOD_FILTER, { ...next })
+}
+
+// Проект в фильтре диаграммы Ганта запоминается в настройках пользователя
+const GANTT_FILTER = 'analytics_gantt'
+
+function savedGanttProject(): number | null {
+  const id = settingsStore.settings.last_filters?.[GANTT_FILTER]?.project_id
+  return typeof id === 'number' ? id : null
+}
+
+function changeGanttProject(id: number | null) {
+  store.setGanttProject(id)
+  settingsStore.setLastFilters(GANTT_FILTER, { project_id: id })
 }
 
 // Индикаторы, превысившие порог хотя бы в одном проекте: их карточки красные
@@ -303,6 +316,7 @@ onMounted(async () => {
   // Сначала настройки: в них период, с которым запрашиваются отчёты
   await settingsStore.ensureLoaded()
   period.value = savedPeriod()
+  ganttProject.value = savedGanttProject()
   await fetchAll()
   ready.value = true
 })
