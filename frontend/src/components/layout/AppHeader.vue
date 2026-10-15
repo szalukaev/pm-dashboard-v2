@@ -2,7 +2,10 @@
   <header class="app-header">
     <!-- Телефон: название раздела, колокольчик и аватар; вкладки — «островом» внизу -->
     <template v-if="isMobile">
-      <span class="m-title">{{ currentTitle }}</span>
+      <button v-if="backTarget" class="m-back" :aria-label="$t('common.back')" data-testid="mobile-back" @click="goBack">
+        <ChevronLeft :size="24" />
+      </button>
+      <span class="m-title" :class="{ 'm-title-sub': backTarget }">{{ currentTitle }}</span>
       <div class="m-actions">
         <NotificationBell />
         <button class="header-avatar" :aria-label="$t('navigation.account')" data-testid="account-menu" @click="sheetOpen = true">
@@ -12,7 +15,7 @@
       </div>
 
       <Teleport to="body">
-        <nav class="m-island" data-testid="mobile-nav">
+        <nav v-show="!backTarget" class="m-island" data-testid="mobile-nav">
           <router-link
             v-for="tab in tabs"
             v-show="auth.tabVisible(tab.testId)"
@@ -35,7 +38,7 @@
         <Transition name="m-sheet-up">
           <div v-if="sheetOpen" class="m-sheet" data-testid="account-sheet">
             <div class="m-grab"></div>
-            <div class="m-me">
+            <button class="m-me m-me-link" data-testid="account-profile" @click="openPage('/profile')">
               <div class="header-avatar m-me-avatar">
                 <img v-if="auth.user?.avatar" :src="auth.user.avatar" class="avatar-img" />
                 <span v-else class="avatar-initials">{{ avatarInitials }}</span>
@@ -44,7 +47,12 @@
                 <b>{{ auth.user?.display_name || auth.user?.username }}</b>
                 <span v-if="auth.user?.email">{{ auth.user.email }}</span>
               </div>
-            </div>
+              <ChevronRight :size="18" class="m-me-chev" />
+            </button>
+            <button class="m-row" data-testid="account-notifications" @click="openPage('/notifications')">
+              <Bell :size="20" /> {{ $t('notifications.title') }}
+              <span v-if="notifications.unread" class="m-row-end m-count">{{ notifications.unread }}</span>
+            </button>
             <div class="m-row m-row-static">
               <RefreshCw :size="20" /> {{ $t('navigation.sync') }}
               <AppSyncStatus class="m-row-end" />
@@ -144,7 +152,10 @@ import {
   Sun,
   LogOut,
   GripVertical,
-  RefreshCw
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  Bell
 } from 'lucide-vue-next'
 import { useTheme } from '../../composables/useTheme'
 import { useAuthStore } from '../../stores/auth'
@@ -152,6 +163,7 @@ import { useSettingsStore } from '../../stores/settings'
 import AppSyncStatus from '../ui/AppSyncStatus.vue'
 import NotificationBell from './NotificationBell.vue'
 import { useMobileTasks } from '../../composables/useMobileTasks'
+import { useNotificationsStore } from '../../stores/notifications'
 import { useI18n } from 'vue-i18n'
 
 const router = useRouter()
@@ -223,6 +235,7 @@ watch(() => settingsStore.settings.tab_order, order => {
 
 const { isMobile } = useMobileTasks()
 const { t } = useI18n()
+const notifications = useNotificationsStore()
 
 // Вкладка, на которую только что нажали: подсвечивается сразу, не дожидаясь
 // окончания перехода
@@ -235,10 +248,28 @@ function isActive(path: string) {
 }
 
 // Название раздела в шапке телефона
+// Вложенный экран на телефоне: куда ведёт «назад»; пусто — экран верхнего уровня
+const backTarget = computed(() => {
+  const section = String(route.params.section || '')
+  if (route.name === 'settings') return section ? '/settings' : ''
+  if (route.name === 'profile') return section ? '/profile' : '/settings'
+  return typeof route.meta.back === 'string' ? route.meta.back : ''
+})
+
+function goBack() {
+  // Пришли изнутри приложения — шаг назад по истории, иначе — на экран уровнем выше
+  if (window.history.state?.back) router.back()
+  else router.replace(backTarget.value)
+}
+
+// Название экрана в шапке телефона
 const currentTitle = computed(() => {
   const tab = tabs.value.find(tab => tab.path === route.path)
   if (tab) return t(tab.label)
-  if (route.path === '/settings') return t('navigation.settings')
+  const section = String(route.params.section || '')
+  if (route.name === 'settings') return section ? t('settings.tabs.' + section) : t('navigation.settings')
+  if (route.name === 'profile') return section === 'password' ? t('profile.password') : section === 'key' ? t('source_token.title') : t('profile.title')
+  if (typeof route.meta.title === 'string') return t(route.meta.title)
   return 'PM Dashboard'
 })
 
@@ -247,8 +278,12 @@ const sheetOpen = ref(false)
 watch(() => route.path, () => { sheetOpen.value = false })
 
 function openSettings() {
+  openPage('/settings')
+}
+
+function openPage(path: string) {
   sheetOpen.value = false
-  router.push('/settings')
+  router.push(path)
 }
 
 async function handleLogout() {
@@ -686,4 +721,45 @@ button.header-avatar {
     padding: 0 16px;
   }
 }
+.m-back {
+  width: 36px;
+  height: 36px;
+  margin-left: -10px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.m-title-sub {
+  font-size: 17px;
+}
+
+.m-me-link {
+  width: 100%;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.m-me-chev {
+  margin-left: auto;
+  color: var(--text-faint);
+}
+
+.m-count {
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 11px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
 </style>
+

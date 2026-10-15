@@ -18,6 +18,7 @@
         <button v-if="unread > 0" type="button" class="bell-link" @click="store.markAllRead()">
           {{ $t('notifications.read_all') }}
         </button>
+        <button v-if="items.length > 0" type="button" class="bell-link" data-testid="notifications-clear" @click="clearAll">{{ $t('notifications.clear') }}</button>
         <button type="button" class="bell-link" @click="openSettings">{{ $t('notifications.setup') }}</button>
       </div>
 
@@ -59,7 +60,8 @@ import type { AppNotification } from '../../stores/notifications'
 import { useSettingsStore } from '../../stores/settings'
 import { useWebSocket } from '../../composables/useWebSocket'
 import { useSwal } from '../../composables/useSwal'
-import { notificationTitle, notificationLines } from '../../utils/notificationText'
+import { notificationTitle, notificationLines, notificationTarget } from '../../utils/notificationText'
+import { useMobileTasks } from '../../composables/useMobileTasks'
 import TaskModal from '../tasks/TaskModal.vue'
 
 const store = useNotificationsStore()
@@ -71,13 +73,19 @@ const t = (key: string, params?: Record<string, unknown>): string => (params ? t
 const router = useRouter()
 const route = useRoute()
 const { on, off } = useWebSocket()
-const { toast } = useSwal()
+const { toast, confirm } = useSwal()
 
+const { isMobile } = useMobileTasks()
 const open = ref(false)
 const root = ref<HTMLElement | null>(null)
 const taskId = ref<number | null>(null)
 
+// На телефоне уведомления — отдельная страница, на компьютере — выпадающая панель
 function toggle() {
+  if (isMobile.value) {
+    router.push('/notifications')
+    return
+  }
   open.value = !open.value
   if (open.value) store.fetch()
 }
@@ -85,29 +93,25 @@ function toggle() {
 // Клик по уведомлению помечает его прочитанным и ведёт к тому, о чём оно
 function openItem(n: AppNotification) {
   store.markRead(n.id)
-  if (n.entity_type === 'issue' && n.entity_id) {
+  const target = notificationTarget(n)
+  if (target.taskId) {
     open.value = false
-    taskId.value = n.entity_id
-    return
-  }
-  // Остальные уведомления ведут на свою вкладку
-  const page = PAGES[n.entity_type]
-  if (page) {
+    taskId.value = target.taskId
+  } else if (target.path) {
     open.value = false
-    router.push(page)
+    router.push(target.path)
   }
 }
 
-const PAGES: Record<string, string> = {
-  contract: '/payments',
-  invoice: '/payments',
-  sprint: '/sprint',
-  system: '/settings',
+// Очистка спрашивает подтверждение: вернуть уведомления нельзя
+async function clearAll() {
+  const answer = await confirm(t('notifications.clear_confirm'))
+  if (answer.isConfirmed) store.clear()
 }
 
 function openSettings() {
   open.value = false
-  router.push('/settings')
+  router.push('/settings/notifications')
 }
 
 // Старые уведомления догружаются, когда список долистан до конца

@@ -368,6 +368,7 @@ func main() {
 	// Уведомления пользователя (колокольчик)
 	api.HandleFunc("/notifications", notificationsH.List).Methods("GET")
 	api.HandleFunc("/notifications/read-all", notificationsH.MarkAllRead).Methods("POST")
+	api.HandleFunc("/notifications/clear", notificationsH.Clear).Methods("POST")
 	api.HandleFunc("/notifications/{id}/read", notificationsH.MarkRead).Methods("POST")
 
 	// Оплаты. Изменения закрыты для «только чтения», отдельные действия

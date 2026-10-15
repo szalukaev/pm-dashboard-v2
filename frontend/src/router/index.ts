@@ -32,7 +32,10 @@ const routes = [
       { path: 'kanban', name: 'kanban', component: () => import('../views/KanbanView.vue') },
       { path: 'sprint', name: 'sprint', component: () => import('../views/SprintView.vue') },
       { path: 'payments', name: 'payments', component: () => import('../views/PaymentsView.vue') },
-      { path: 'settings', name: 'settings', component: () => import('../views/SettingsView.vue') },
+      { path: 'settings/:section?', name: 'settings', component: () => import('../views/SettingsView.vue') },
+      // Телефон: уведомления и профиль — отдельные экраны с кнопкой «назад»
+      { path: 'notifications', name: 'notifications', component: () => import('../views/NotificationsView.vue'), meta: { back: '/tasks', title: 'notifications.title' } },
+      { path: 'profile/:section?', name: 'profile', component: () => import('../views/ProfileView.vue'), meta: { back: '/settings', title: 'profile.title' } },
       { path: 'license', name: 'license', component: () => import('../views/LicenseView.vue') },
     ]
   }

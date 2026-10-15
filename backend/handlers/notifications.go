@@ -70,6 +70,19 @@ func (h *NotificationsHandler) MarkAllRead(w http.ResponseWriter, r *http.Reques
 	h.markRead(w, r, 0)
 }
 
+// Clear убирает все уведомления пользователя из колокольчика.
+func (h *NotificationsHandler) Clear(w http.ResponseWriter, r *http.Request) {
+	if *h.DB == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")
+		return
+	}
+	if err := notify.ClearBell(*h.DB, middleware.GetUserID(r)); err != nil {
+		utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
+		return
+	}
+	utils.Success(w)
+}
+
 func (h *NotificationsHandler) markRead(w http.ResponseWriter, r *http.Request, id int64) {
 	if *h.DB == nil {
 		utils.Error(w, http.StatusServiceUnavailable, "DATABASE_NOT_AVAILABLE")

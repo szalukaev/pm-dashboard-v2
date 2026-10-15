@@ -48,7 +48,8 @@
       "analytics": "Crunching analytics",
       "kanban": "Placing cards on the board",
       "sprint": "Gathering sprints",
-      "payments": "Checking payments"
+      "payments": "Checking payments",
+      "notifications": "Collecting notifications"
     }
   },
   "auth": {
@@ -788,7 +789,16 @@
         "hint": "Every day while your overdue task is not closed",
         "title": "The task is overdue, days: {days}"
       }
-    }
+    },
+    "filter_all": "All",
+    "filter_unread": "Unread",
+    "empty_unread": "No unread notifications",
+    "mark_read": "Read",
+    "group_today": "Today",
+    "group_yesterday": "Yesterday",
+    "group_earlier": "Earlier",
+    "clear": "Clear",
+    "clear_confirm": "Remove all notifications from the bell?"
   },
   "settings": {
     "title": "Settings",
@@ -844,7 +854,8 @@
         "amber": "Warm amber and copper, deep rich tones",
         "forest": "Deep green, natural earthy tones",
         "dusk": "Dusky violet and amber, a warm coolness"
-      }
+      },
+      "mode_system": "System"
     },
     "notifications": {
       "title": "Notifications",
@@ -922,6 +933,10 @@
       "cleanup_confirm_text": "Snapshots older than {days} days will be deleted. This cannot be undone.",
       "purge_confirm_title": "Delete all snapshots?",
       "purge_confirm_text": "The whole history will be lost: the trend charts will start from scratch. Current issues are not affected. This cannot be undone."
+    },
+    "mobile": {
+      "profile_hint": "Profile, password, Redmine key",
+      "mine": "Mine"
     }
   },
   "access": {
@@ -1663,5 +1678,16 @@
       "CONFIG_SAVE_FAILED": "Could not save the settings on the server.",
       "INVALID_REQUEST": "The request is malformed."
     }
+  },
+  "profile": {
+    "title": "Profile",
+    "password_hint": "At least 6 characters.",
+    "last_login": "signed in {at}",
+    "security": "Security and access",
+    "password": "Password",
+    "key_linked": "linked",
+    "key_missing": "not set",
+    "saved": "Profile saved",
+    "avatar_failed": "Could not update the photo"
   }
 }

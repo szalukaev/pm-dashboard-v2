@@ -41,3 +41,41 @@ export function notificationLines(n: AppNotification, t: Translate): string[] {
   if (n.params.issued) lines.push(t('notifications.issued', { date: dateText(n.params.issued) }))
   return lines
 }
+
+// Куда ведёт уведомление: задача открывается карточкой, остальное — своей вкладкой
+const NOTIFICATION_PAGES: Record<string, string> = {
+  contract: '/payments',
+  invoice: '/payments',
+  sprint: '/sprint',
+  system: '/settings',
+}
+
+export function notificationTarget(n: AppNotification): { taskId?: number; path?: string } {
+  if (n.entity_type === 'issue' && n.entity_id) return { taskId: n.entity_id }
+  const path = NOTIFICATION_PAGES[n.entity_type]
+  return path ? { path } : {}
+}
+
+// Вид значка уведомления на телефоне: по смыслу правила
+export type NotificationKind = 'overdue' | 'soon' | 'assigned' | 'changed' | 'system'
+
+const KINDS: Record<string, NotificationKind> = {
+  task_overdue: 'overdue',
+  sprint_overdue: 'overdue',
+  project_overdue: 'overdue',
+  contract_expired: 'overdue',
+  invoice_unpaid: 'overdue',
+  task_due_soon: 'soon',
+  sprint_ending: 'soon',
+  contract_ending: 'soon',
+  task_assigned: 'assigned',
+  task_changed: 'changed',
+  project_task_closed: 'changed',
+  project_high_priority: 'changed',
+  sync_failed: 'system',
+  license_state: 'system',
+}
+
+export function notificationKind(n: AppNotification): NotificationKind {
+  return KINDS[n.rule] || 'changed'
+}

@@ -623,3 +623,12 @@ func MarkRead(db *sql.DB, userID int, id int64) error {
 		WHERE user_id = $1 AND read_at IS NULL AND ($2::bigint = 0 OR id = $2::bigint)`, userID, id)
 	return err
 }
+
+// ClearBell убирает все уведомления пользователя из колокольчика. Записи не
+// удаляются: по их ключу повтора то же уведомление не создаётся второй раз,
+// а старые записи и так удаляет очистка по сроку хранения.
+func ClearBell(db *sql.DB, userID int) error {
+	_, err := db.Exec(`UPDATE notifications SET to_bell = FALSE, read_at = COALESCE(read_at, NOW())
+		WHERE user_id = $1 AND to_bell`, userID)
+	return err
+}

@@ -94,5 +94,17 @@ export const useNotificationsStore = defineStore('notifications', () => {
     } catch {}
   }
 
-  return { items, total, unread, loading, fetch, fetchMore, add, markRead, markAllRead }
+  // Колокольчик очищается целиком; при сбое список перечитывается с сервера
+  async function clear() {
+    items.value = []
+    total.value = 0
+    unread.value = 0
+    try {
+      await axios.post('/api/notifications/clear')
+    } catch {
+      await fetch()
+    }
+  }
+
+  return { items, total, unread, loading, fetch, fetchMore, add, markRead, markAllRead, clear }
 })
