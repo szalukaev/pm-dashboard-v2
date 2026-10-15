@@ -21,17 +21,7 @@
     </div>
 
     <!-- Загрузка -->
-    <template v-if="loading">
-      <div class="skeleton-list">
-        <div v-for="i in 5" :key="i" class="skeleton-row">
-          <div class="skeleton-cell" style="width: 40%"></div>
-          <div class="skeleton-cell" style="width: 15%"></div>
-          <div class="skeleton-cell" style="width: 20%"></div>
-          <div class="skeleton-cell" style="width: 10%"></div>
-          <div class="skeleton-cell" style="width: 15%"></div>
-        </div>
-      </div>
-    </template>
+    <AppLoader v-if="loading" :text="$t('common.loader.tasks')" />
 
     <!-- Ошибка -->
     <AppEmptyState v-else-if="error" state="error" @retry="fetchTasks()" />
@@ -83,6 +73,7 @@
 </template>
 
 <script setup lang="ts">
+import AppLoader from '../components/ui/AppLoader.vue'
 import { ref, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTasksStore } from '../stores/tasks'
@@ -181,28 +172,6 @@ onMounted(async () => {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
 }
 
-.skeleton-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.skeleton-row {
-  display: flex;
-  gap: 16px;
-  padding: 14px 16px;
-  background: var(--surface-1);
-  border: 1px solid var(--hairline);
-  border-radius: 8px;
-}
-
-.skeleton-cell {
-  height: 14px;
-  background: var(--surface-2);
-  border-radius: 8px;
-  animation: skeleton-pulse 1.2s ease-in-out infinite;
-}
-
 .filtered-empty {
   display: flex;
   flex-direction: column;
@@ -237,10 +206,5 @@ onMounted(async () => {
 
 .reset-filters-btn:hover {
   filter: brightness(1.1);
-}
-
-@keyframes skeleton-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
 }
 </style>

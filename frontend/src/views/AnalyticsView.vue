@@ -3,9 +3,7 @@
     <!-- Загрузка -->
     <template v-if="loading || !ready">
       <h1 class="page-title page-title-alone">{{ $t('analytics.title') }}</h1>
-      <div class="skeleton-stats">
-        <div v-for="i in 7" :key="i" class="skeleton-card"></div>
-      </div>
+      <AppLoader :text="$t('common.loader.analytics')" />
     </template>
 
     <!-- Ошибка -->
@@ -121,6 +119,7 @@
 </template>
 
 <script setup lang="ts">
+import AppLoader from '../components/ui/AppLoader.vue'
 import { ref, computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
@@ -362,25 +361,5 @@ onMounted(async () => {
 
 .page-title-alone {
   margin-bottom: 24px;
-}
-
-.skeleton-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 12px;
-  margin-bottom: 24px;
-}
-
-.skeleton-card {
-  height: 100px;
-  background: var(--surface-1);
-  border: 1px solid var(--hairline);
-  border-radius: 12px;
-  animation: skeleton-pulse 1.2s ease-in-out infinite;
-}
-
-@keyframes skeleton-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
 }
 </style>

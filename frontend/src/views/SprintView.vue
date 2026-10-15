@@ -9,7 +9,7 @@
 
     <!-- Загрузка -->
     <div v-if="loading" class="sprint-loading">
-      <AppSpinner :size="32" />
+      <AppLoader :text="$t('common.loader.sprint')" />
     </div>
 
     <!-- Ошибка -->
@@ -122,7 +122,7 @@ import SprintBacklog from '../components/sprint/SprintBacklog.vue'
 import SprintForm from '../components/sprint/SprintForm.vue'
 import AppButton from '../components/ui/AppButton.vue'
 import AppEmptyState from '../components/ui/AppEmptyState.vue'
-import AppSpinner from '../components/ui/AppSpinner.vue'
+import AppLoader from '../components/ui/AppLoader.vue'
 import AppConfirmDialog from '../components/ui/AppConfirmDialog.vue'
 import TaskModal from '../components/tasks/TaskModal.vue'
 import SprintMobileList from '../components/sprint/SprintMobileList.vue'
@@ -258,7 +258,6 @@ onMounted(async () => {
 .sprint-loading {
   display: flex;
   justify-content: center;
-  padding: 60px;
 }
 
 .sprint-content {

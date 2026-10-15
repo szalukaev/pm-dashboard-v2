@@ -13,7 +13,7 @@
 
     <!-- Загрузка -->
     <div v-if="loading" class="kanban-loading">
-      <AppSpinner :size="32" />
+      <AppLoader :text="$t('common.loader.kanban')" />
     </div>
 
     <!-- Ошибка -->
@@ -66,7 +66,7 @@ import { useSwal } from '../composables/useSwal'
 import KanbanToolbar from '../components/kanban/KanbanToolbar.vue'
 import KanbanColumn from '../components/kanban/KanbanColumn.vue'
 import AppEmptyState from '../components/ui/AppEmptyState.vue'
-import AppSpinner from '../components/ui/AppSpinner.vue'
+import AppLoader from '../components/ui/AppLoader.vue'
 import TaskModal from '../components/tasks/TaskModal.vue'
 import KanbanMobileBoard from '../components/kanban/KanbanMobileBoard.vue'
 import { useMobileTasks } from '../composables/useMobileTasks'
@@ -150,7 +150,6 @@ onMounted(async () => {
 .kanban-loading {
   display: flex;
   justify-content: center;
-  padding: 60px;
 }
 
 .kanban-placeholder {

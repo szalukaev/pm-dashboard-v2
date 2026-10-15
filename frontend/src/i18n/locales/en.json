@@ -41,6 +41,14 @@
     "columns": {
       "title": "Configure columns",
       "reset": "Reset to standard"
+    },
+    "loader": {
+      "default": "Loading",
+      "tasks": "Sorting tasks",
+      "analytics": "Crunching analytics",
+      "kanban": "Placing cards on the board",
+      "sprint": "Gathering sprints",
+      "payments": "Checking payments"
     }
   },
   "auth": {

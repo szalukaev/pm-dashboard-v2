@@ -23,7 +23,7 @@
     />
 
     <!-- Загрузка -->
-    <div v-if="loading" class="loading"><AppSpinner :size="32" /></div>
+    <div v-if="loading" class="loading"><AppLoader :text="$t('common.loader.payments')" /></div>
 
     <!-- Ошибка -->
     <AppEmptyState v-else-if="error" state="error" @retry="fetchAll" />
@@ -184,7 +184,7 @@ import PayForm from '../components/payments/PayForm.vue'
 import AppButton from '../components/ui/AppButton.vue'
 import AppModal from '../components/ui/AppModal.vue'
 import AppEmptyState from '../components/ui/AppEmptyState.vue'
-import AppSpinner from '../components/ui/AppSpinner.vue'
+import AppLoader from '../components/ui/AppLoader.vue'
 import AppConfirmDialog from '../components/ui/AppConfirmDialog.vue'
 
 const store = usePaymentsStore()
@@ -465,7 +465,6 @@ onMounted(() => fetchAll())
 .loading {
   display: flex;
   justify-content: center;
-  padding: 60px;
 }
 
 .modal-form {
