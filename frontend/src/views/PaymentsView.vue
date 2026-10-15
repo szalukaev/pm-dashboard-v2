@@ -13,30 +13,14 @@
     </div>
 
     <!-- Фильтры -->
-    <div class="filter-row">
-      <div class="filter-group">
-        <button
-          v-for="t in filterOptions"
-          :key="t.value"
-          class="pill-btn"
-          :class="{ active: filterType === t.value }"
-          @click="setFilter(t.value)"
-        >
-          {{ $t(t.label) }}
-        </button>
-      </div>
-      <label class="toggle-label">
-        <input type="checkbox" v-model="showClosedVal" @change="toggleClosed" />
-        {{ $t('payments.filters.show_closed') }}
-      </label>
-      <input
-        v-model="searchVal"
-        type="text"
-        :placeholder="$t('payments.filters.search_placeholder')"
-        class="search-input"
-        @keyup.enter="doSearch"
-      />
-    </div>
+    <PaymentFilters
+      :type="filterType"
+      :closed="showClosed"
+      :total="contracts.length"
+      @update:type="setFilter"
+      @update:closed="toggleClosed"
+      @search="doSearch"
+    />
 
     <!-- Загрузка -->
     <div v-if="loading" class="loading"><AppSpinner :size="32" /></div>
@@ -192,6 +176,7 @@ import { useSwal } from '../composables/useSwal'
 import { useAuthStore } from '../stores/auth'
 import { formatMoney } from '../utils/format'
 import { invoiceActionsKey } from '../components/payments/invoiceActions'
+import PaymentFilters from '../components/payments/PaymentFilters.vue'
 import PaymentStats from '../components/payments/PaymentStats.vue'
 import OrganizationAccordion from '../components/payments/OrganizationAccordion.vue'
 import InvoiceForm from '../components/payments/InvoiceForm.vue'
@@ -204,7 +189,7 @@ import AppConfirmDialog from '../components/ui/AppConfirmDialog.vue'
 
 const store = usePaymentsStore()
 const auth = useAuthStore()
-const { organizations, contracts, stats, loading, error, filterType } = storeToRefs(store)
+const { organizations, contracts, stats, loading, error, filterType, showClosed } = storeToRefs(store)
 const { fetchAll } = store
 const { t, te } = useI18n()
 const { toast } = useSwal()
@@ -227,26 +212,18 @@ function exportCSV() {
 }
 
 // Фильтры
-const filterOptions = [
-  { value: '', label: 'payments.filters.all' },
-  { value: 'service', label: 'payments.filters.service' },
-  { value: 'onetime', label: 'payments.filters.onetime' },
-]
-const showClosedVal = ref(false)
-const searchVal = ref('')
-
 function setFilter(type: string) {
   store.filterType = type
   store.fetchContracts()
 }
 
-function toggleClosed() {
-  store.showClosed = showClosedVal.value
+function toggleClosed(value: boolean) {
+  store.showClosed = value
   store.fetchContracts()
 }
 
-function doSearch() {
-  store.searchQuery = searchVal.value
+function doSearch(query: string) {
+  store.searchQuery = query
   store.fetchContracts()
 }
 
@@ -469,65 +446,7 @@ onMounted(() => fetchAll())
   gap: 8px;
 }
 
-.filter-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
-  flex-wrap: wrap;
-}
-
-.filter-group {
-  display: flex;
-  gap: 4px;
-}
-
-.pill-btn {
-  padding: 6px 14px;
-  font-size: 12px;
-  font-weight: 500;
-  border-radius: 9999px;
-  background: transparent;
-  border: 1px solid var(--hairline);
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.pill-btn:hover {
-  border-color: var(--text-faint);
-  color: var(--text-bright);
-}
-
-/* Активный фильтр — заливка акцентом, как в фильтрах задач */
-.pill-btn.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
-
-.toggle-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-muted);
-  cursor: pointer;
-}
-
-.search-input {
-  padding: 6px 12px;
-  font-size: 12px;
-  background: var(--surface-2);
-  border: 1px solid var(--hairline);
-  border-radius: 8px;
-  color: var(--text);
-  /* Подсказка «Поиск по договору или организации…» должна помещаться целиком */
-  min-width: 260px;
-  margin-left: auto;
-}
-
-/* Телефон: поиск во всю ширину, кнопки шапки делят строку */
+/* Телефон: кнопки шапки делят строку */
 @media (max-width: 768px) {
   .view-header {
     margin-bottom: 14px;
@@ -540,20 +459,6 @@ onMounted(() => fetchAll())
   .header-actions > * {
     flex: 1;
     justify-content: center;
-  }
-
-  .filter-row {
-    gap: 10px;
-    margin-bottom: 14px;
-  }
-
-  .search-input {
-    order: -1;
-    width: 100%;
-    min-width: 0;
-    margin-left: 0;
-    padding: 10px 12px;
-    font-size: 16px;
   }
 }
 

@@ -1,23 +1,33 @@
 <template>
-  <div class="org-accordion">
+  <!-- Организации — сеткой карточек. Свёрнутая карточка показывает только итоги;
+       по клику она растягивается на всю ширину и показывает договоры -->
+  <div class="org-grid">
     <div
       v-for="org in organizations"
       :key="org.id"
-      class="org-group"
+      class="org-card"
+      :class="{ open: isOpen(org.id) }"
+      :data-testid="'org-' + org.id"
     >
       <div class="org-header" @click="toggle(org.id)">
-        <ChevronDown :size="16" class="chevron" :class="{ collapsed: !isOpen(org.id) }" />
-        <Building2 :size="16" class="org-icon" />
-        <span class="org-name">{{ org.name }}</span>
-        <span v-if="org.owner" class="org-stat org-owner" :title="$t('payments.owner')">{{ org.owner }}</span>
-        <span class="org-stat">{{ $t('payments.org.contracts', { count: orgContracts(org.id).length }) }}</span>
-        <span class="org-stat" :title="$t('payments.stats.total_amount')">{{ formatMoney(orgSum(org.id, 'total_amount')) }}</span>
-        <span class="org-stat" :title="$t('payments.stats.invoiced')">{{ $t('payments.org.invoiced', { amount: formatMoney(orgSum(org.id, 'invoiced_amount')) }) }}</span>
-        <span class="org-stat" :class="{ 'has-debt': orgSum(org.id, 'debt_amount') > 0 }" :title="$t('payments.stats.debt')">
-          {{ $t('payments.org.debt', { amount: formatMoney(orgSum(org.id, 'debt_amount')) }) }}
-        </span>
+        <svg class="ring" viewBox="0 0 36 36" :title="$t('payments.org.paid_pct', { pct: orgPct(org.id) })">
+          <circle cx="18" cy="18" r="15" class="ring-track" />
+          <circle
+            cx="18" cy="18" r="15"
+            class="ring-fill"
+            :class="{ 'has-debt': orgSum(org.id, 'debt_amount') > 0 }"
+            :stroke-dasharray="ringDash(orgPct(org.id))"
+          />
+          <text x="18" y="21.5" text-anchor="middle">{{ orgPct(org.id) }}</text>
+        </svg>
+        <div class="org-title">
+          <div class="org-name">{{ org.name }}</div>
+          <div class="org-meta">
+            <span v-if="org.inn">{{ $t('payments.org.inn', { inn: org.inn }) }} · </span>{{ $t('payments.org.contracts', { count: orgContracts(org.id).length }) }}<span v-if="org.owner"> · {{ org.owner }}</span>
+          </div>
+        </div>
 
-        <div class="org-actions" @click.stop>
+        <div v-if="isOpen(org.id)" class="org-actions" @click.stop>
           <button v-if="auth.canPayment('contract_create')" class="action-btn" @click="$emit('add-contract', org.id)" :title="$t('payments.add_contract')" data-testid="org-add-contract">
             <Plus :size="14" />
           </button>
@@ -28,9 +38,18 @@
             <Trash2 :size="14" />
           </button>
         </div>
+        <span v-else class="org-debt-short" :class="{ 'has-debt': orgSum(org.id, 'debt_amount') > 0 }">
+          {{ orgSum(org.id, 'debt_amount') > 0 ? '−' + formatMoney(orgSum(org.id, 'debt_amount')) : $t('payments.org.no_debt') }}
+        </span>
+        <ChevronRight :size="16" class="chevron" />
       </div>
 
-      <div v-if="isOpen(org.id)" class="org-body">
+      <div v-if="!isOpen(org.id)" class="org-foot">
+        <span :title="$t('payments.stats.total_amount')">{{ formatMoney(orgSum(org.id, 'total_amount')) }}</span>
+        <span :title="$t('payments.stats.invoiced')">{{ $t('payments.org.invoiced', { amount: formatMoney(orgSum(org.id, 'invoiced_amount')) }) }}</span>
+      </div>
+
+      <div v-else class="org-body">
         <ContractRow
           v-for="contract in orgContracts(org.id)"
           :key="contract.id"
@@ -39,16 +58,18 @@
           @delete="$emit('delete-contract', contract.id)"
           @issue-invoice="$emit('issue-invoice', contract.id)"
         />
+        <div v-if="orgContracts(org.id).length === 0" class="org-empty">{{ $t('payments.org.empty') }}</div>
       </div>
     </div>
 
     <!-- Договоры без организации -->
-    <div v-if="noOrgContracts.length > 0" class="org-group">
+    <div v-if="noOrgContracts.length > 0" class="org-card no-org" :class="{ open: isOpen(0) }">
       <div class="org-header" @click="toggle(0)">
-        <ChevronDown :size="16" class="chevron" :class="{ collapsed: !isOpen(0) }" />
-        <Building2 :size="16" class="org-icon" style="opacity: 0.3" />
-        <span class="org-name">{{ $t('payments.without_org') }}</span>
-        <span class="org-stat">{{ $t('payments.org.contracts', { count: noOrgContracts.length }) }}</span>
+        <div class="org-title">
+          <div class="org-name">{{ $t('payments.without_org') }}</div>
+          <div class="org-meta">{{ $t('payments.org.contracts', { count: noOrgContracts.length }) }}</div>
+        </div>
+        <ChevronRight :size="16" class="chevron" />
       </div>
       <div v-if="isOpen(0)" class="org-body">
         <ContractRow
@@ -66,7 +87,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { ChevronDown, Building2, Plus, Pencil, Trash2 } from 'lucide-vue-next'
+import { ChevronRight, Plus, Pencil, Trash2 } from 'lucide-vue-next'
 import ContractRow from './ContractRow.vue'
 import { formatMoney } from '../../utils/format'
 import type { Organization, Contract } from '../../stores/payments'
@@ -100,70 +121,162 @@ function orgContracts(orgId: number) {
 const noOrgContracts = computed(() => props.contracts.filter(c => !c.organization_id))
 
 // Цифра организации: сумма по её договорам
-function orgSum(orgId: number, field: 'total_amount' | 'invoiced_amount' | 'debt_amount') {
+function orgSum(orgId: number, field: 'total_amount' | 'invoiced_amount' | 'debt_amount' | 'total_paid') {
   return orgContracts(orgId).reduce((sum, c) => sum + (c[field] || 0), 0)
+}
+
+// Доля оплаченного от суммы договоров организации, целым процентом
+function orgPct(orgId: number) {
+  const total = orgSum(orgId, 'total_amount')
+  if (!total) return 0
+  return Math.min(100, Math.round((orgSum(orgId, 'total_paid') / total) * 100))
+}
+
+// Длина дуги кольца: окружность r=15 ≈ 94.25
+function ringDash(pct: number) {
+  const full = 2 * Math.PI * 15
+  return `${(pct / 100) * full} ${full}`
 }
 </script>
 
 <style scoped>
-.org-accordion {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.org-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 10px;
+  align-items: start;
 }
 
-.org-group {
-  border: 1px solid var(--hairline);
+.org-card {
+  min-width: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 12px;
   overflow: hidden;
+  transition: border-color 0.15s;
+}
+
+.org-card:hover {
+  border-color: var(--hairline-strong);
+}
+
+/* Раскрытая карточка — на всю ширину сетки */
+.org-card.open {
+  grid-column: 1 / -1;
+  border-color: var(--border-accent);
+}
+
+.org-card.no-org {
+  border-style: dashed;
 }
 
 .org-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 14px 16px;
-  background: var(--surface-1);
+  gap: 12px;
+  padding: 14px 14px 0;
   cursor: pointer;
-  transition: background 0.15s;
   user-select: none;
 }
 
-.org-header:hover {
-  background: var(--bg-hover);
+.org-card.open .org-header,
+.org-card.no-org .org-header {
+  padding-bottom: 14px;
 }
 
-.chevron {
-  color: var(--text-faint);
-  transition: transform 0.2s;
-  flex-shrink: 0;
+.ring {
+  width: 40px;
+  height: 40px;
+  flex: none;
 }
 
-.chevron.collapsed {
+.ring circle {
+  fill: none;
+  stroke-width: 4;
+}
+
+.ring-track {
+  stroke: var(--surface-3);
+}
+
+.ring-fill {
+  stroke: var(--success);
+  stroke-linecap: round;
   transform: rotate(-90deg);
+  transform-origin: 18px 18px;
 }
 
-.org-icon {
-  color: var(--accent);
-  flex-shrink: 0;
+.ring-fill.has-debt {
+  stroke: var(--warning);
+}
+
+.ring text {
+  font-size: 9px;
+  font-weight: 600;
+  fill: var(--text-muted);
+}
+
+.org-title {
+  flex: 1;
+  min-width: 0;
 }
 
 .org-name {
   font-size: 14px;
   font-weight: 600;
   color: var(--text-bright);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.org-stat {
+.org-meta {
+  margin-top: 1px;
+  font-size: 12px;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.org-debt-short {
+  flex: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--success);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.org-debt-short.has-debt {
+  color: var(--danger);
+}
+
+.chevron {
+  flex: none;
+  color: var(--text-faint);
+  transition: transform 0.2s;
+}
+
+.org-card.open .chevron {
+  transform: rotate(90deg);
+}
+
+.org-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px 14px 66px;
   font-size: 12px;
   color: var(--text-muted);
-  margin-left: 8px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
 }
 
 .org-actions {
   display: flex;
   gap: 4px;
-  margin-left: auto;
 }
 
 .action-btn {
@@ -190,38 +303,31 @@ function orgSum(orgId: number, field: 'total_amount' | 'invoiced_amount' | 'debt
   border-top: 1px solid var(--border-light);
 }
 
-.org-stat.has-debt {
-  color: var(--danger);
+.org-empty {
+  padding: 14px 16px;
+  font-size: 12px;
+  color: var(--text-faint);
 }
 
-/* Телефон: название и кнопки в первой строке, цифры организации — под ними */
+/* Телефон: одна колонка, итоги свёрнутой карточки — в шапке */
 @media (max-width: 768px) {
+  .org-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
   .org-header {
-    flex-wrap: wrap;
-    row-gap: 4px;
-    padding: 12px 14px;
+    gap: 10px;
+    padding: 12px;
   }
 
-  .org-name {
-    flex: 1 1 0;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .ring {
+    width: 36px;
+    height: 36px;
   }
 
-  .org-stat {
-    order: 2;
-    margin-left: 0;
-    font-size: 11.5px;
-    white-space: nowrap;
-  }
-
-  /* Разрыв строки: цифры идут после него, кнопки остаются в первой строке */
-  .org-header::after {
-    content: '';
-    order: 1;
-    flex-basis: 100%;
+  .org-foot {
+    display: none;
   }
 }
 </style>

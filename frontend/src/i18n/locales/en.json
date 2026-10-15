@@ -84,7 +84,13 @@
       "minutes": "min"
     },
     "board": {
-      "columns": ["New", "In progress", "Review", "Done", "On hold"],
+      "columns": [
+        "New",
+        "In progress",
+        "Review",
+        "Done",
+        "On hold"
+      ],
       "tasks": [
         "Export report to PDF",
         "Group permissions",
@@ -541,14 +547,23 @@
       "invoiced": "Invoiced",
       "debt": "Outstanding",
       "paid": "Paid",
-      "closed_amount": "Closed amount"
+      "closed_amount": "Closed amount",
+      "not_invoiced": "Not invoiced",
+      "contracts_count": "Contracts: {n}",
+      "of_total": "of {amount}"
     },
     "filters": {
       "all": "All",
       "service": "Service",
       "onetime": "One-time",
       "show_closed": "Closed",
-      "search_placeholder": "Search by contract or organization…"
+      "search_placeholder": "Search by contract or organization…",
+      "title": "Filters",
+      "reset": "Reset",
+      "type": "Contract type",
+      "show": "Show",
+      "closed_contracts": "Closed contracts",
+      "show_contracts": "Show contracts: {n}"
     },
     "export_csv": "Export CSV",
     "owner": "Created by",
@@ -598,7 +613,11 @@
     "org": {
       "contracts": "{count} contracts",
       "invoiced": "invoiced {amount}",
-      "debt": "debt {amount}"
+      "debt": "debt {amount}",
+      "inn": "TIN {inn}",
+      "paid_pct": "Paid {pct}%",
+      "no_debt": "no debt",
+      "empty": "No contracts yet"
     },
     "contract": {
       "amount_with_vat": "Contract amount with VAT",

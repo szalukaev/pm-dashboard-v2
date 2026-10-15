@@ -14,6 +14,11 @@
         {{ formatMoney(contract.debt_amount) }}
       </span>
       </span>
+      <!-- Полоса: оплачено и выставлено от суммы договора -->
+      <span class="paid-bar" :title="$t('payments.stats.paid') + ': ' + formatMoney(contract.total_paid)">
+        <i class="seg-paid" :style="{ width: share(contract.total_paid) }"></i>
+        <i class="seg-unpaid" :style="{ width: share(Math.max(contract.invoiced_amount - contract.total_paid, 0)) }"></i>
+      </span>
       <span class="end-date" v-if="contract.end_date">
         <span v-if="contract.is_overdue" class="overdue-icon" :title="$t('payments.contract.overdue')"><AlertCircle :size="12" /></span>
         {{ formatDate(contract.end_date) }}
@@ -48,11 +53,17 @@ import { useAuthStore } from '../../stores/auth'
 
 const auth = useAuthStore()
 
-defineProps<{ contract: Contract }>()
+const props = defineProps<{ contract: Contract }>()
 defineEmits(['edit', 'delete', 'issue-invoice'])
 
 // Счета договора показываются, когда его раскрывают
 const expanded = ref(false)
+
+// Доля от суммы договора, не больше 100 %
+function share(amount: number): string {
+  if (!props.contract.total_amount) return '0%'
+  return Math.min(100, (amount / props.contract.total_amount) * 100) + '%'
+}
 </script>
 
 <style scoped>
@@ -142,6 +153,29 @@ const expanded = ref(false)
 .invoiced { color: var(--text-muted); }
 .debt.has-debt { color: var(--danger); font-weight: 500; }
 
+.paid-bar {
+  display: flex;
+  width: 80px;
+  height: 4px;
+  flex: none;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--surface-3);
+}
+
+.paid-bar i {
+  display: block;
+  height: 100%;
+}
+
+.seg-paid {
+  background: var(--success);
+}
+
+.seg-unpaid {
+  background: var(--warning);
+}
+
 .end-date {
   font-size: 12px;
   color: var(--text-faint);
@@ -226,6 +260,10 @@ const expanded = ref(false)
     letter-spacing: 0.04em;
     text-transform: uppercase;
     color: var(--text-muted);
+  }
+  .paid-bar {
+    order: 2;
+    width: 100%;
   }
   .end-date {
     order: 3;

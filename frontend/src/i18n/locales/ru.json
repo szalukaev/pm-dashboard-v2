@@ -84,7 +84,13 @@
       "minutes": "мин"
     },
     "board": {
-      "columns": ["Новые", "В работе", "На проверке", "Готово", "Отложено"],
+      "columns": [
+        "Новые",
+        "В работе",
+        "На проверке",
+        "Готово",
+        "Отложено"
+      ],
       "tasks": [
         "Экспорт отчёта в PDF",
         "Права групп",
@@ -541,14 +547,23 @@
       "invoiced": "Выставлено",
       "debt": "Задолженность",
       "paid": "Оплачено",
-      "closed_amount": "Сумма закрытых"
+      "closed_amount": "Сумма закрытых",
+      "not_invoiced": "Не выставлено",
+      "contracts_count": "Договоров: {n}",
+      "of_total": "из {amount}"
     },
     "filters": {
       "all": "Все",
       "service": "Сопровождение",
       "onetime": "Разовый",
       "show_closed": "Закрытые",
-      "search_placeholder": "Поиск по договору или организации…"
+      "search_placeholder": "Поиск по договору или организации…",
+      "title": "Фильтры",
+      "reset": "Сбросить",
+      "type": "Тип договора",
+      "show": "Показывать",
+      "closed_contracts": "Закрытые договоры",
+      "show_contracts": "Показать договоры: {n}"
     },
     "export_csv": "Экспорт CSV",
     "owner": "Кто создал",
@@ -598,7 +613,11 @@
     "org": {
       "contracts": "{count} дог.",
       "invoiced": "выставлено {amount}",
-      "debt": "долг {amount}"
+      "debt": "долг {amount}",
+      "inn": "ИНН {inn}",
+      "paid_pct": "Оплачено {pct}%",
+      "no_debt": "долга нет",
+      "empty": "Договоров пока нет"
     },
     "contract": {
       "amount_with_vat": "Сумма договора с НДС",
