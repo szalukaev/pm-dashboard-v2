@@ -4,7 +4,7 @@
 // случай, когда сети нет), а файлы сборки с хешем в имени не меняются и
 // берутся из кэша.
 // Новое имя сбрасывает кэш, куда раньше могла попасть страница вместо JS-файла
-const CACHE_NAME = 'pm-dashboard-v3.1.4'
+const CACHE_NAME = 'pm-dashboard-v3.1.5'
 // Сколько ждать сеть, прежде чем показать сохранённую страницу: на плохой
 // мобильной сети запрос иначе висит до тайм-аута телефона (минута и больше)
 const NAVIGATE_TIMEOUT_MS = 4000
@@ -104,8 +104,10 @@ self.addEventListener('push', (event) => {
       .showNotification(data.title || 'PM Dashboard', {
         body: data.body || '',
         tag: data.tag || undefined,
-        icon: '/android-chrome-192x192.png',
-        badge: '/android-chrome-192x192.png',
+        // Иконка на тёмной подложке: само окно уведомления рисует система
+        // в своей теме, цвет ему задать нельзя
+        icon: '/push-icon-192x192.png',
+        badge: '/push-icon-192x192.png',
         data: { url: data.url || '/notifications' },
       })
       .then(() => report({ type: 'push-shown', tag: data.tag || '' }))
