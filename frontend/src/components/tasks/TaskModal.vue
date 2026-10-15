@@ -320,7 +320,7 @@ interface RelatedIssue {
 }
 
 const props = defineProps<{ taskId: number | null }>()
-defineEmits(['close'])
+const emit = defineEmits(['close'])
 
 const store = useTasksStore()
 const settingsStore = useSettingsStore()
@@ -576,7 +576,12 @@ watch(currentId, async (id) => {
   if (currentId.value !== id) return
   task.value = loaded
   loading.value = false
-  if (!loaded) return
+  // Нет ни у нас, ни в Redmine (или нет прав) — сообщение вместо пустого окна
+  if (!loaded) {
+    toast(i18n.t('tasks.modal.not_found', { id }), 'error')
+    emit('close')
+    return
+  }
 
   editFields.status_name = loaded.status_name
   editFields.priority_name = loaded.priority_name

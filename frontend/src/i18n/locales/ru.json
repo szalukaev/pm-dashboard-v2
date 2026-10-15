@@ -327,7 +327,8 @@
       "comments_empty": "Комментариев пока нет",
       "new_comment": "Новый комментарий",
       "comment_placeholder": "Напишите комментарий… Поддерживается разметка Redmine",
-      "comment_hint": "Ctrl + Enter — отправить"
+      "comment_hint": "Ctrl + Enter — отправить",
+      "not_found": "Задача #{id} не найдена или нет доступа"
     },
     "history": {
       "title": "Вся история",

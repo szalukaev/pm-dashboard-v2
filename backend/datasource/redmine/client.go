@@ -502,6 +502,30 @@ func (c *Client) GetIssues(projectID int, updatedSince *time.Time) ([]Issue, err
 	if err != nil {
 		return nil, err
 	}
+	return parseIssuePages(pages)
+}
+
+// GetIssue возвращает одну задачу по номеру (в любом статусе) или nil, если
+// такой задачи нет или она недоступна ключу.
+func (c *Client) GetIssue(id int) (*Issue, error) {
+	pages, err := c.getPages(fmt.Sprintf("/issues.json?status_id=*&issue_id=%d", id))
+	if err != nil {
+		return nil, err
+	}
+	list, err := parseIssuePages(pages)
+	if err != nil {
+		return nil, err
+	}
+	for i := range list {
+		if list[i].ExternalID == id {
+			return &list[i], nil
+		}
+	}
+	return nil, nil
+}
+
+// parseIssuePages разбирает страницы ответа /issues.json в задачи.
+func parseIssuePages(pages [][]byte) ([]Issue, error) {
 	var all []Issue
 	for _, data := range pages {
 		var resp issueResp

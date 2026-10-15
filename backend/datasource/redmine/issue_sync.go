@@ -573,6 +573,10 @@ func storeTimeEntries(db *sql.DB, projectID int, entries []TimeEntry, replace bo
 // upsertIssues записывает пачку задач одним многострочным запросом: база
 // удалённая, и запрос на каждую задачу делал синхронизацию медленной.
 // Фактические часы и часы на исправление багов ведёт updateIssueHours.
+// SaveIssues сохраняет задачи так же, как синхронизация (например, одну
+// задачу, найденную по номеру и ещё не пришедшую синхронизацией).
+func SaveIssues(db *sql.DB, batch []Issue) error { return upsertIssues(db, batch) }
+
 func upsertIssues(db *sql.DB, batch []Issue) error {
 	const cols = 22
 	values := make([]string, len(batch))

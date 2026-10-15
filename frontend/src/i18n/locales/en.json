@@ -327,7 +327,8 @@
       "comments_empty": "No comments yet",
       "new_comment": "New comment",
       "comment_placeholder": "Write a comment… Redmine markup is supported",
-      "comment_hint": "Ctrl + Enter to send"
+      "comment_hint": "Ctrl + Enter to send",
+      "not_found": "Task #{id} not found or no access"
     },
     "history": {
       "title": "Whole history",

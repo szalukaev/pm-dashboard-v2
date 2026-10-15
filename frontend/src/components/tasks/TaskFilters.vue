@@ -229,6 +229,7 @@
 </template>
 
 <script setup lang="ts">
+import { useRouter, useRoute } from 'vue-router'
 import AppColumnSettings from '../ui/AppColumnSettings.vue'
 import { TASK_COLUMNS, TASKS_TABLE } from './taskColumns'
 import { ref, watch, computed } from 'vue'
@@ -245,6 +246,8 @@ const { filters, projects, categories, useGrouping, total, attentionCounts } = s
 const { settings } = storeToRefs(settingsStore)
 const { t } = useI18n()
 const { isMobile, mode: mobileMode } = useMobileTasks()
+const router = useRouter()
+const route = useRoute()
 
 // Экран фильтров на телефоне
 const panelOpen = ref(false)
@@ -338,7 +341,16 @@ function onProjectChange() {
   store.fetchTasks()
 }
 
+// Номер задачи (25183 или #25183) — не поиск по тексту, а сразу карточка этой
+// задачи; если её ещё нет у нас, сервер возьмёт её из Redmine
+const TASK_NUMBER = /^#?\s*(\d+)$/
+
 function doSearch() {
+  const number = TASK_NUMBER.exec(searchInput.value.trim())
+  if (number) {
+    router.replace({ path: route.path, query: { ...route.query, task: number[1] } })
+    return
+  }
   store.setFilter('search', searchInput.value)
   store.fetchTasks()
 }

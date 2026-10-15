@@ -377,6 +377,9 @@ func (h *TaskHandler) GetTask(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
 		return
 	}
+	// Задачи ещё нет у нас (не пришла синхронизацией) — берётся из Redmine
+	// сразу и сохраняется; права проверяются как обычно
+	h.importIssueIfMissing(externalID)
 	if !requireIssue(w, r, *h.DB, externalID) {
 		return
 	}
@@ -400,6 +403,31 @@ func (h *TaskHandler) GetTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	utils.JSON(w, http.StatusOK, t)
+}
+
+// importIssueIfMissing берёт задачу из Redmine и сохраняет её, если её нет
+// в базе. Ошибки не мешают ответу: задачи просто не окажется.
+func (h *TaskHandler) importIssueIfMissing(externalID int) {
+	var exists bool
+	if err := (*h.DB).QueryRow("SELECT EXISTS(SELECT 1 FROM issues WHERE external_id = $1)", externalID).Scan(&exists); err != nil || exists {
+		return
+	}
+	client := h.getRedmineClient()
+	if client == nil {
+		return
+	}
+	issue, err := client.GetIssue(externalID)
+	if err != nil || issue == nil {
+		if err != nil {
+			slog.Warn("Issue import from Redmine failed", "issue", externalID, "error", err)
+		}
+		return
+	}
+	if err := redmine.SaveIssues(*h.DB, []redmine.Issue{*issue}); err != nil {
+		slog.Warn("Issue import: save failed", "issue", externalID, "error", err)
+		return
+	}
+	slog.Info("Issue imported from Redmine on request", "issue", externalID, "project", issue.ProjectName)
 }
 
 func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
