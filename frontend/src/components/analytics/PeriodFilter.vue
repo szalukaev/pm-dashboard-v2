@@ -57,10 +57,13 @@ function setMode(mode: PeriodMode) {
   if (mode !== props.modelValue.mode) emit('update:modelValue', { ...props.modelValue, mode })
 }
 
-// Перепутанные границы не применяются: дата начала позже даты конца
+// Перепутанные границы меняются местами: в полях всегда тот период, по
+// которому построен отчёт (раньше поле показывало непринятую дату)
 function setDate(edge: 'from' | 'to', value: string) {
   const next = { ...props.modelValue, [edge]: value }
-  if (next.from && next.to && next.from > next.to) return
+  if (next.from && next.to && next.from > next.to) {
+    [next.from, next.to] = [next.to, next.from]
+  }
   emit('update:modelValue', next)
 }
 </script>
