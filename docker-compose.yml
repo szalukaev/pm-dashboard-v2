@@ -1,6 +1,8 @@
 services:
   redis:
     image: redis:7-alpine
+    # Поднимается сам после перезагрузки сервера
+    restart: unless-stopped
     # Redis доступен только внутри сети: порта на хосте нет, пароль обязателен.
     command: redis-server --requirepass ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
     networks:
@@ -73,6 +75,7 @@ services:
     build:
       context: ./frontend
       dockerfile: ../Dockerfile.frontend
+    restart: unless-stopped
     # FRONTEND_BIND=127.0.0.1 — порт 82 только для обратного прокси на этом
     # же хосте (HTTPS); по умолчанию открыт наружу, как раньше
     ports:
