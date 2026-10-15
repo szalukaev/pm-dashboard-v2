@@ -125,7 +125,7 @@ interface UserItem {
 
 const METHODS = ['GET', 'POST', 'PUT', 'DELETE']
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { toast, confirm } = useSwal()
 
 const users = ref<UserItem[]>([])
@@ -189,6 +189,13 @@ async function open(log: DebugLog) {
 // JSON — с отступами; пометка «не сохранено» и пустое тело — как есть
 function pretty(body?: string): string {
   if (!body) return t('debug_logs.no_body')
+  // Тело, которое сервер не сохранил: «[тип, N bytes — not saved]»
+  const skipped = /^\[(.+), (?:(\d+) bytes|size unknown) — not saved\]$/.exec(body)
+  if (skipped) {
+    return skipped[2]
+      ? t('debug_logs.not_saved', { type: skipped[1], size: Number(skipped[2]).toLocaleString(locale.value) })
+      : t('debug_logs.not_saved_unknown', { type: skipped[1] })
+  }
   try {
     return JSON.stringify(JSON.parse(body), null, 2)
   } catch {

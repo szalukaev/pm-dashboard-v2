@@ -109,6 +109,9 @@ func (m *AuditMiddleware) Log(next http.Handler) http.Handler {
 		var entityIDArg interface{}
 		if n, err := strconv.ParseInt(entityID, 10, 64); err == nil {
 			entityIDArg = n
+		} else if n, ok := createdID(aw.statusCode, aw.body.Bytes()); ok {
+			// У создания id в пути нет — он есть в ответе сервера
+			entityIDArg = n
 		}
 
 		go func() {
@@ -241,4 +244,28 @@ func parseEntity(path string) (string, string) {
 	default:
 		return entity, entityID
 	}
+}
+
+// createdID достаёт id созданной записи из успешного ответа: {"id": N}
+// или {"data": {"id": N}}
+func createdID(status int, body []byte) (int64, bool) {
+	if status >= 300 || len(body) == 0 {
+		return 0, false
+	}
+	var resp struct {
+		ID   *int64 `json:"id"`
+		Data struct {
+			ID *int64 `json:"id"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(body, &resp) != nil {
+		return 0, false
+	}
+	if resp.ID != nil {
+		return *resp.ID, true
+	}
+	if resp.Data.ID != nil {
+		return *resp.Data.ID, true
+	}
+	return 0, false
 }

@@ -869,6 +869,7 @@
       "status_partial": "with errors",
       "status_stopped": "stopped",
       "partial_error": "Projects not updated: {failed} of {total}",
+      "interrupted": "Interrupted by a server restart",
       "total_issues": "Issues in the database: {count}"
     },
     "priorities": {
@@ -1575,6 +1576,8 @@
     "request_body": "Request body",
     "response_body": "Server response",
     "no_body": "(empty)",
+    "not_saved": "Body not saved: {type}, {size} bytes",
+    "not_saved_unknown": "Body not saved: {type}, size unknown",
     "empty": "No records. Turn debug logging on for a user in the users table.",
     "load_error": "Could not load the log",
     "clear": "Clear logs",

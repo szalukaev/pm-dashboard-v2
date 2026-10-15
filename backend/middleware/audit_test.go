@@ -66,3 +66,24 @@ func TestParseEntity(t *testing.T) {
 		}
 	}
 }
+
+func TestCreatedIDFromResponse(t *testing.T) {
+	cases := []struct {
+		status int
+		body   string
+		want   int64
+		ok     bool
+	}{
+		{201, `{"id": 42, "success": true}`, 42, true},
+		{200, `{"data": {"id": 7}}`, 7, true},
+		{400, `{"id": 42}`, 0, false},
+		{200, `{"success": true}`, 0, false},
+		{200, `[1,2]`, 0, false},
+	}
+	for _, c := range cases {
+		got, ok := createdID(c.status, []byte(c.body))
+		if got != c.want || ok != c.ok {
+			t.Errorf("createdID(%d, %s) = %d, %v; ожидалось %d, %v", c.status, c.body, got, ok, c.want, c.ok)
+		}
+	}
+}

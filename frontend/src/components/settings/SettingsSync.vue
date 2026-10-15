@@ -26,7 +26,7 @@
       <AppSavingOverlay cover :active="savingInterval" :text="$t('common.restarting')" progress guard />
     </div>
 
-    <p class="total-issues" data-testid="sync-total-issues">{{ $t('settings.sync.total_issues', { count: totalIssues.toLocaleString() }) }}</p>
+    <p class="total-issues" data-testid="sync-total-issues">{{ $t('settings.sync.total_issues', { count: totalIssues.toLocaleString(locale) }) }}</p>
 
     <div class="table-scroll">
     <table class="sync-table">
@@ -86,7 +86,7 @@ interface SyncLog {
   error_text: string | null
 }
 
-const { t, te } = useI18n()
+const { t, te, locale } = useI18n()
 const { toast } = useSwal()
 
 const logs = ref<SyncLog[]>([])
@@ -151,6 +151,8 @@ function errorText(log: SyncLog): string {
     const [failed, total] = log.error_text.split('/')
     return t('settings.sync.partial_error', { failed, total })
   }
+  // Синхронизация, прерванная перезапуском сервера: текст пишет сам сервер
+  if (log.error_text === 'interrupted by a server restart') return t('settings.sync.interrupted')
   return log.error_text || ''
 }
 
