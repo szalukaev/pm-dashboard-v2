@@ -592,6 +592,17 @@ function submit() {
   flex: 0 1 auto;
 }
 
+/* Число без рамки сливалось со строкой — пустое поле было не видно */
+.ios-cell .duration-input {
+  padding: 6px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text-bright);
+  font-size: 16px;
+  text-align: right;
+}
+
 .date-hint {
   margin-top: -6px;
   font-size: 12px;

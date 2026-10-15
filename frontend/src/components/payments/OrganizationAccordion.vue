@@ -257,7 +257,6 @@ function ringDash(pct: number) {
   -webkit-line-clamp: 2;
   line-clamp: 2;
   overflow: hidden;
-  overflow-wrap: anywhere;
 }
 
 .org-meta {
@@ -374,6 +373,41 @@ function ringDash(pct: number) {
 
   .org-foot {
     display: none;
+  }
+}
+
+/* Узкий телефон: рядом с суммой названию не хватает места — сумма уходит строкой ниже */
+@media (max-width: 480px) {
+  .org-header {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    column-gap: 12px;
+    row-gap: 4px;
+    padding-bottom: 14px;
+  }
+
+  .ring-hint {
+    grid-column: 1;
+    grid-row: 1 / 3;
+    align-self: center;
+  }
+
+  .org-title {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .org-debt-short,
+  .org-actions {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: start;
+  }
+
+  .chevron {
+    grid-column: 3;
+    grid-row: 1 / 3;
+    align-self: center;
   }
 }
 </style>
