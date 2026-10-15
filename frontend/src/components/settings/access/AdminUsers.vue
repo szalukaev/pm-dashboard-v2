@@ -13,7 +13,31 @@
       <option v-for="zone in zones" :key="zone" :value="zone" />
     </datalist>
 
-    <div class="adm-table-wrap">
+    <!-- Телефон: список пользователей, правка — в нижней шторке -->
+    <div v-if="isMobile" class="m-users" data-testid="users-list">
+      <button
+        v-for="u in users"
+        :key="u.id"
+        type="button"
+        class="m-user"
+        :class="{ blocked: u.is_blocked }"
+        :data-testid="'user-row-' + u.id"
+        @click="sheetId = u.id"
+      >
+        <span class="m-avatar">{{ initials(u) }}</span>
+        <span class="m-user-main">
+          <span class="m-user-name">
+            {{ u.display_name || u.username }}
+            <span v-if="u.role === 'admin'" class="adm-badge accent">{{ $t('access.users.role_admin') }}</span>
+            <span v-if="u.is_blocked" class="adm-badge danger">{{ $t('access.users.blocked') }}</span>
+          </span>
+          <span class="m-user-meta">{{ u.username }}<template v-if="u.groups.length"> · {{ u.groups.join(', ') }}</template></span>
+        </span>
+        <span class="m-chevron">›</span>
+      </button>
+    </div>
+
+    <div v-else class="adm-table-wrap">
       <table class="adm-table" data-testid="users-table">
         <thead>
           <tr>
@@ -129,6 +153,77 @@
       @update:offset="setPage"
       @update:limit="setPageSize"
     />
+
+    <!-- Пользователь на телефоне: поля и действия, сохраняются сразу, как в таблице -->
+    <AppModal :model-value="!!sheetUser" :title="sheetUser ? sheetUser.username : ''" width="440px" @close="sheetId = null">
+      <div v-for="su in sheetUser ? [sheetUser] : []" :key="su.id" class="m-sheet" data-testid="user-sheet">
+        <div class="adm-field">
+          <label>{{ $t('access.users.name') }}</label>
+          <input :value="su.display_name" @change="update(su, { display_name: ($event.target as HTMLInputElement).value })" />
+        </div>
+        <div class="adm-field">
+          <label>{{ $t('access.users.role') }}</label>
+          <select :value="su.role" @change="update(su, { role: ($event.target as HTMLSelectElement).value })">
+            <option value="user">{{ $t('access.users.role_user') }}</option>
+            <option value="admin">{{ $t('access.users.role_admin') }}</option>
+          </select>
+        </div>
+        <div class="adm-field">
+          <label>{{ $t('access.users.template') }}</label>
+          <span v-if="su.role === 'admin'" class="adm-muted">{{ $t('access.users.full_access') }}</span>
+          <select
+            v-else
+            :value="su.custom ? CUSTOM : (su.role_template_id ?? '')"
+            @change="changeTemplate(su, ($event.target as HTMLSelectElement).value)"
+          >
+            <option value="">{{ $t('access.users.no_template') }}</option>
+            <option v-if="su.custom" :value="CUSTOM" disabled>{{ $t('access.users.custom') }}</option>
+            <option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">{{ tpl.name }}</option>
+          </select>
+        </div>
+        <div class="adm-field">
+          <label>{{ $t('access.users.timezone') }}</label>
+          <input
+            list="timezone-list"
+            :value="su.default_timezone"
+            :placeholder="$t('access.users.timezone_browser')"
+            @change="changeTimeZone(su, ($event.target as HTMLInputElement).value)"
+          />
+        </div>
+
+        <dl class="m-facts">
+          <dt>{{ $t('access.users.member') }}</dt>
+          <dd>{{ su.member_id ? (su.member_name || '#' + su.member_id) : $t('access.users.no_member') }}</dd>
+          <dt>{{ $t('access.users.groups') }}</dt>
+          <dd>{{ su.groups.length ? su.groups.join(', ') : '—' }}</dd>
+          <dt>{{ $t('access.users.created') }}</dt>
+          <dd>{{ formatDate(su.created_at) }}</dd>
+        </dl>
+
+        <div class="m-actions">
+          <button type="button" class="m-action" :disabled="su.role === 'admin'" @click="fromSheet(openRights)">
+            <ShieldCheck :size="16" /> {{ $t('access.users.rights') }}
+          </button>
+          <button type="button" class="m-action" :disabled="su.role === 'admin'" @click="fromSheet(openClone)">
+            <Copy :size="16" /> {{ $t('access.clone.title_short') }}
+          </button>
+          <button type="button" class="m-action" @click="resetPassword(su)">
+            <KeyRound :size="16" /> {{ $t('access.users.reset_password') }}
+          </button>
+          <button type="button" class="m-action" :class="{ on: su.debug_until }" @click="toggleDebug(su)">
+            <Bug :size="16" />
+            {{ su.debug_until ? $t('access.users.debug_on', { time: formatDateTime(su.debug_until) }) : $t('access.users.debug_off') }}
+          </button>
+          <button type="button" class="m-action" :disabled="su.id === auth.user?.id" @click="update(su, { is_blocked: !su.is_blocked })">
+            <Unlock v-if="su.is_blocked" :size="16" /><Lock v-else :size="16" />
+            {{ $t(su.is_blocked ? 'access.users.unblock' : 'access.users.block') }}
+          </button>
+          <button type="button" class="m-action danger" :disabled="su.id === auth.user?.id" @click="deleteUser(su)">
+            <Trash2 :size="16" /> {{ $t('common.delete') }}
+          </button>
+        </div>
+      </div>
+    </AppModal>
 
     <!-- Новый пользователь -->
     <AppModal v-model="createOpen" :title="$t('access.users.new_title')" width="440px" :busy="saving">
@@ -267,6 +362,7 @@ import AppPagination from '../../ui/AppPagination.vue'
 import { useSettingsStore } from '../../../stores/settings'
 import { useAuthStore } from '../../../stores/auth'
 import { useSwal } from '../../../composables/useSwal'
+import { useMobileTasks } from '../../../composables/useMobileTasks'
 import { formatDate, formatDateTime, timeZoneList } from '../../../utils/format'
 import { copyText } from '../../../utils/clipboard'
 import {
@@ -292,6 +388,24 @@ interface AdminUser {
 }
 
 const zones = timeZoneList()
+
+// На телефоне вместо таблицы — список и шторка выбранного пользователя
+const { isMobile } = useMobileTasks()
+const sheetId = ref<number | null>(null)
+// Берётся из свежего списка: после сохранения список перезагружается; удалённый — шторка закрывается
+const sheetUser = computed(() => users.value.find(u => u.id === sheetId.value))
+
+// Окна прав и копирования открываются поверх, поэтому шторка закрывается
+function fromSheet(open: (u: AdminUser) => void) {
+  const u = sheetUser.value
+  sheetId.value = null
+  if (u) open(u)
+}
+
+function initials(u: AdminUser): string {
+  const name = (u.display_name || u.username).trim()
+  return name.split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase()
+}
 
 const props = defineProps<{
   projects: ProjectItem[]
@@ -610,6 +724,151 @@ defineExpose({ load })
 </script>
 
 <style scoped>
+/* Телефон: список пользователей */
+.m-users {
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  background: var(--bg-card);
+}
+
+.m-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 60px;
+  padding: 10px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--border-light);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.m-user:last-child {
+  border-bottom: 0;
+}
+
+.m-user.blocked .m-user-name,
+.m-user.blocked .m-avatar {
+  opacity: 0.55;
+}
+
+.m-avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.m-user-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.m-user-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-bright);
+}
+
+.m-user-meta {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.m-chevron {
+  flex: none;
+  font-size: 20px;
+  color: var(--text-faint);
+}
+
+/* Шторка пользователя */
+.m-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.m-sheet .adm-field input,
+.m-sheet .adm-field select {
+  min-height: 40px;
+  font-size: 16px;
+}
+
+.m-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.m-facts dt {
+  color: var(--text-muted);
+}
+
+.m-facts dd {
+  margin: 0;
+  text-align: right;
+  color: var(--text-bright);
+}
+
+.m-actions {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+}
+
+.m-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 0 14px;
+  border: 0;
+  border-bottom: 1px solid var(--border-light);
+  background: none;
+  color: var(--text-bright);
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.m-action:last-child {
+  border-bottom: 0;
+}
+
+.m-action:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.m-action.on {
+  color: var(--warning);
+}
+
+.m-action.danger {
+  color: var(--danger);
+}
 .users-loading {
   margin-top: 12px;
   text-align: center;

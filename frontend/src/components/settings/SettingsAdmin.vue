@@ -2,7 +2,7 @@
   <div class="settings-admin">
     <h3 class="section-title">{{ $t('settings.tabs.admin') }}</h3>
 
-    <div class="adm-tabs">
+    <div ref="tabsEl" class="adm-tabs">
       <button
         v-for="tab in tabs"
         :key="tab"
@@ -38,20 +38,20 @@
         <h4 class="adm-title">{{ $t('settings.priorities.title') }}</h4>
         <p class="adm-hint">{{ $t('settings.priorities.order_hint') }}</p>
         <div class="adm-table-wrap">
-          <table class="adm-table">
+          <table class="adm-table adm-stack">
             <thead>
               <tr>
-                <th>ID</th>
                 <th>{{ $t('settings.priorities.name') }}</th>
+                <th>ID</th>
                 <th>{{ $t('settings.priorities.order') }}</th>
                 <th>{{ $t('settings.priorities.color') }}</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="p in priorities" :key="p.external_id">
-                <td>{{ p.external_id }}</td>
                 <td>{{ p.name }}</td>
-                <td>
+                <td data-label="ID">{{ p.external_id }}</td>
+                <td :data-label="$t('settings.priorities.order')">
                   <input
                     type="text"
                     inputmode="numeric"
@@ -60,7 +60,7 @@
                     @change="updatePriority(p.external_id, { sort_order: Number(($event.target as HTMLInputElement).value) || 0 })"
                   />
                 </td>
-                <td>
+                <td :data-label="$t('settings.priorities.color')">
                   <input
                     type="color"
                     :value="p.color"
@@ -78,7 +78,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, nextTick } from 'vue'
 import axios from 'axios'
 import { useI18n } from 'vue-i18n'
 import SettingsStatusGroups from './SettingsStatusGroups.vue'
@@ -112,6 +112,13 @@ function tabOr(name: string | undefined, fallback: AdminTab): AdminTab {
 const activeTab = ref<AdminTab>(tabOr(props.tab, 'users'))
 watch(() => props.tab, name => { activeTab.value = tabOr(name, activeTab.value) })
 
+// На телефоне вкладки — чипсы с прокруткой вбок: выбранный чипс держим на виду
+const tabsEl = ref<HTMLElement | null>(null)
+function showActiveTab() {
+  nextTick(() => tabsEl.value?.querySelector('.adm-tab.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' }))
+}
+watch(activeTab, showActiveTab)
+
 const { t } = useI18n()
 const { toast } = useSwal()
 
@@ -137,6 +144,7 @@ async function updatePriority(id: number, fields: Record<string, unknown>) {
 }
 
 onMounted(async () => {
+  showActiveTab()
   loadPriorities()
   try {
     const [p, m] = await Promise.all([axios.get('/api/tasks/projects'), axios.get('/api/tasks/members')])

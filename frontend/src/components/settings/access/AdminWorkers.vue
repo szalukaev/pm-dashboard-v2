@@ -9,7 +9,7 @@
     <p class="adm-hint">{{ $t('workers.hint') }}</p>
 
     <div class="adm-table-wrap">
-      <table class="adm-table" data-testid="workers-table">
+      <table class="adm-table adm-stack" data-testid="workers-table">
         <thead>
           <tr>
             <th>{{ $t('workers.col_worker') }}</th>
@@ -26,13 +26,13 @@
               <div class="worker-name">{{ $t('workers.names.' + w.key) }}</div>
               <div class="worker-schedule">{{ scheduleText(w) }}</div>
             </td>
-            <td>
+            <td :data-label="$t('workers.col_status')">
               <span class="state" :class="w.state" :data-testid="'worker-state-' + w.key">{{ $t('workers.states.' + w.state) }}</span>
               <div v-if="w.error && w.state === 'error'" class="worker-error" :title="errorText(w)">{{ errorText(w) }}</div>
             </td>
-            <td class="num">{{ formatDateTime(w.last_start) }}</td>
-            <td class="num">{{ formatDuration(w.duration_ms) }}</td>
-            <td class="num">{{ processedText(w) }}</td>
+            <td :data-label="$t('workers.col_last_start')" class="num">{{ formatDateTime(w.last_start) }}</td>
+            <td :data-label="$t('workers.col_duration')" class="num">{{ formatDuration(w.duration_ms) }}</td>
+            <td :data-label="$t('workers.col_processed')" class="num">{{ processedText(w) }}</td>
             <td>
               <div class="actions">
                 <AppButton v-if="w.running && w.key === 'sync'" variant="danger" :test-id="'worker-stop-' + w.key" @click="act(w, 'stop')">

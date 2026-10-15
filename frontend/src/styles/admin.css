@@ -69,6 +69,83 @@
   color: var(--text-faint);
 }
 
+/* Телефон: таблица с классом adm-stack — карточками. Строка — карточка,
+   первая ячейка — её заголовок, остальные — «подпись: значение» (подпись из
+   data-label), ячейка без подписи — во всю ширину (действия). */
+@media (max-width: 768px) {
+  .adm-table-wrap:has(> .adm-stack) {
+    overflow: visible;
+    border: 0;
+  }
+
+  .adm-stack thead {
+    display: none;
+  }
+
+  .adm-stack,
+  .adm-stack tbody,
+  .adm-stack tr,
+  .adm-stack td {
+    display: block;
+    width: 100%;
+  }
+
+  .adm-stack tr {
+    margin-bottom: 10px;
+    padding: 12px 14px;
+    border: 1px solid var(--hairline);
+    border-radius: 12px;
+    background: var(--bg-card);
+  }
+
+  .adm-stack tr:hover td {
+    background: none;
+  }
+
+  .adm-stack td,
+  .adm-stack tr:last-child td {
+    padding: 3px 0;
+    border-bottom: 0;
+    text-align: left;
+  }
+
+  .adm-stack td:first-child {
+    padding-bottom: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-bright);
+  }
+
+  .adm-stack td[data-label] {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    text-align: right;
+  }
+
+  .adm-stack td[data-label]::before {
+    content: attr(data-label);
+    flex: none;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-muted);
+    text-align: left;
+  }
+
+  .adm-stack .adm-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding-top: 6px;
+  }
+
+  .adm-stack .adm-icon-btn {
+    width: 36px;
+    height: 36px;
+  }
+}
+
 .adm-muted {
   font-size: 12px;
   color: var(--text-faint);
@@ -234,6 +311,44 @@
 .adm-tab.active {
   color: var(--accent);
   border-bottom-color: var(--accent);
+}
+
+/* Телефон: вкладки — чипсы в одну строку, лишние уходят вбок под прокрутку */
+@media (max-width: 768px) {
+  .adm-tabs {
+    flex-wrap: nowrap;
+    gap: 6px;
+    margin: 0 -16px 16px;
+    padding: 0 16px 2px;
+    overflow-x: auto;
+    border-bottom: 0;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .adm-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .adm-tab {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    padding: 0 14px;
+    margin-bottom: 0;
+    white-space: nowrap;
+    border: 1px solid var(--hairline);
+    border-radius: 9999px;
+    background: var(--surface-2);
+    text-decoration: none;
+  }
+
+  .adm-tab.active {
+    color: #fff;
+    background: var(--accent);
+    border-color: var(--accent);
+  }
 }
 
 /* Списки выбора */

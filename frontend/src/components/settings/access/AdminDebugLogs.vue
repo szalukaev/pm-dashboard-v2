@@ -42,7 +42,7 @@
     </div>
 
     <div class="adm-table-wrap">
-      <table class="adm-table" data-testid="debug-table">
+      <table class="adm-table adm-stack" data-testid="debug-table">
         <thead>
           <tr>
             <th>{{ $t('debug_logs.col_time') }}</th>
@@ -57,12 +57,12 @@
         <tbody>
           <tr v-for="log in logs" :key="log.id" class="debug-row" :data-testid="'debug-row-' + log.id" @click="open(log)">
             <td class="nowrap">{{ formatAt(log.occurred_at, { seconds: true }) }}</td>
-            <td>{{ log.username || '#' + log.user_id }}</td>
-            <td><span class="method" :class="log.method.toLowerCase()">{{ log.method }}</span></td>
-            <td class="path">{{ log.path }}<span v-if="log.query" class="adm-muted">?{{ log.query }}</span></td>
-            <td class="num" :class="{ failed: log.status_code >= 400 }">{{ log.status_code }}</td>
-            <td class="num">{{ log.duration_ms }}</td>
-            <td class="adm-muted">{{ log.ip_address || '—' }}</td>
+            <td :data-label="$t('debug_logs.user')">{{ log.username || '#' + log.user_id }}</td>
+            <td :data-label="$t('debug_logs.method')"><span class="method" :class="log.method.toLowerCase()">{{ log.method }}</span></td>
+            <td :data-label="$t('debug_logs.col_path')" class="path">{{ log.path }}<span v-if="log.query" class="adm-muted">?{{ log.query }}</span></td>
+            <td :data-label="$t('debug_logs.col_status')" class="num" :class="{ failed: log.status_code >= 400 }">{{ log.status_code }}</td>
+            <td :data-label="$t('debug_logs.col_duration')" class="num">{{ log.duration_ms }}</td>
+            <td data-label="IP" class="adm-muted">{{ log.ip_address || '—' }}</td>
           </tr>
         </tbody>
       </table>

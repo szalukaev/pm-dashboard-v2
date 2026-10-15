@@ -9,7 +9,7 @@
     <p class="adm-hint">{{ $t('access.groups.hint') }}</p>
 
     <div class="adm-table-wrap">
-      <table class="adm-table" data-testid="groups-table">
+      <table class="adm-table adm-stack" data-testid="groups-table">
         <thead>
           <tr>
             <th>{{ $t('access.groups.name') }}</th>
@@ -25,9 +25,9 @@
               {{ g.name }}
               <div v-if="g.description" class="adm-muted">{{ g.description }}</div>
             </td>
-            <td>{{ g.member_ids.length }}</td>
-            <td>{{ g.permissions.all_projects ? $t('access.summary.all') : g.permissions.project_ids.length }}</td>
-            <td>{{ g.permissions.all_team ? $t('access.summary.all') : g.permissions.team_ids.length }}</td>
+            <td :data-label="$t('access.groups.members')">{{ g.member_ids.length }}</td>
+            <td :data-label="$t('access.groups.projects')">{{ g.permissions.all_projects ? $t('access.summary.all') : g.permissions.project_ids.length }}</td>
+            <td :data-label="$t('access.groups.team')">{{ g.permissions.all_team ? $t('access.summary.all') : g.permissions.team_ids.length }}</td>
             <td>
               <div class="adm-actions">
                 <button class="adm-icon-btn" :title="$t('common.edit')" :data-testid="'group-edit-' + g.id" @click="openEdit(g)"><Pencil :size="15" /></button>

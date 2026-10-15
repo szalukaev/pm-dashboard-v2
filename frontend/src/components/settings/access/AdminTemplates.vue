@@ -9,7 +9,7 @@
     <p class="adm-hint">{{ $t('access.templates.hint') }}</p>
 
     <div class="adm-table-wrap">
-      <table class="adm-table" data-testid="templates-table">
+      <table class="adm-table adm-stack" data-testid="templates-table">
         <thead>
           <tr>
             <th>{{ $t('access.templates.name') }}</th>
@@ -29,9 +29,9 @@
               <span v-if="tpl.permissions.own_tasks_only" class="adm-badge">{{ $t('access.summary.own_tasks') }}</span>
               <div v-if="tpl.description" class="adm-muted">{{ tpl.description }}</div>
             </td>
-            <td>{{ tpl.permissions.all_projects ? $t('access.summary.all') : tpl.permissions.project_ids.length }}</td>
-            <td>{{ tpl.permissions.all_team ? $t('access.summary.all') : tpl.permissions.team_ids.length }}</td>
-            <td>{{ tpl.user_count }}</td>
+            <td :data-label="$t('access.groups.projects')">{{ tpl.permissions.all_projects ? $t('access.summary.all') : tpl.permissions.project_ids.length }}</td>
+            <td :data-label="$t('access.groups.team')">{{ tpl.permissions.all_team ? $t('access.summary.all') : tpl.permissions.team_ids.length }}</td>
+            <td :data-label="$t('access.templates.users')">{{ tpl.user_count }}</td>
             <td>
               <div class="adm-actions">
                 <button class="adm-icon-btn" :title="$t('common.edit')" :data-testid="'template-edit-' + tpl.id" @click="openEdit(tpl)"><Pencil :size="15" /></button>
