@@ -117,7 +117,8 @@ const props = defineProps<{
 const emit = defineEmits(['complete', 'reopen', 'edit', 'refresh', 'delete', 'open-task', 'assign-task'])
 const auth = useAuthStore()
 
-const expanded = ref(props.sprint.status !== 'closed')
+// При открытии страницы спринты свёрнуты
+const expanded = ref(false)
 
 function toggleExpanded() {
   expanded.value = !expanded.value
@@ -269,6 +270,11 @@ function formatDate(d: string | null): string {
   display: flex;
   gap: 4px;
   margin-left: auto;
+}
+
+/* Даты прижаты к кнопкам справа, а не висят посередине */
+.date-range ~ .header-actions {
+  margin-left: 12px;
 }
 
 .action-btn {
