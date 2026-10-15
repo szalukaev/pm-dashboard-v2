@@ -162,7 +162,7 @@ export const useTasksStore = defineStore('tasks', () => {
     search: '',
     group_by: 'project',
     category: '',
-    sort_by: 'external_id',
+    sort_by: 'priority_name',
     sort_dir: 'desc',
     attention: [],
   })
@@ -444,7 +444,7 @@ export const useTasksStore = defineStore('tasks', () => {
       search: '',
       group_by: filters.value.group_by,
       category: '',
-      sort_by: 'external_id',
+      sort_by: 'priority_name',
       sort_dir: 'desc',
       attention: [],
     }
@@ -471,8 +471,11 @@ export const useTasksStore = defineStore('tasks', () => {
         if (saved.search) filters.value.search = saved.search
         if (saved.group_by) filters.value.group_by = saved.group_by
         if (saved.category) filters.value.category = saved.category
-        if (saved.sort_by) filters.value.sort_by = saved.sort_by
-        if (saved.sort_dir) filters.value.sort_dir = saved.sort_dir
+        // Прежняя сортировка по умолчанию (номер, по убыванию) сохранялась у всех
+        // и не была выбором пользователя — вместо неё новая: по приоритету
+        const oldDefault = saved.sort_by === 'external_id' && saved.sort_dir === 'desc'
+        if (saved.sort_by && !oldDefault) filters.value.sort_by = saved.sort_by
+        if (saved.sort_dir && !oldDefault) filters.value.sort_dir = saved.sort_dir
         if (Array.isArray(saved.attention)) filters.value.attention = ATTENTION_KEYS.filter(k => saved.attention.includes(k))
         if (saved.useGrouping !== undefined) useGrouping.value = saved.useGrouping
         if (Array.isArray(saved.expandedGroups)) expandedGroups.value = saved.expandedGroups
