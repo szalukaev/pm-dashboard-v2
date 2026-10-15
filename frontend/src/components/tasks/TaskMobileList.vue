@@ -59,6 +59,7 @@
           <small v-else>—</small>
         </div>
         <div class="deadline-card" :style="{ borderLeftColor: statusColor(task.status_name) }">
+          <div v-if="task.project_name" class="deadline-project">{{ task.project_name }}</div>
           <div class="deadline-subject">{{ task.subject }}</div>
           <div class="deadline-foot">
             <span class="task-number">#{{ task.external_id }}</span>
@@ -350,6 +351,16 @@ function chipStyle(color: string) {
   border: 1px solid var(--border);
   border-left: 3px solid;
   border-radius: 10px;
+}
+
+.deadline-project {
+  margin-bottom: 2px;
+  overflow: hidden;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .deadline-subject {
