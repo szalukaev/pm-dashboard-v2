@@ -16,6 +16,8 @@ export const useLicenseStore = defineStore('license', () => {
   const state = ref<LicenseState>('active')
   const graceEndsAt = ref<string | null>(null)
   let loadedAt = 0
+  // Сервер хотя бы раз ответил о лицензии
+  const loaded = ref(false)
 
   const notActivated = computed(() => state.value === 'not_activated')
   const readOnly = computed(() => state.value === 'read_only')
@@ -26,6 +28,7 @@ export const useLicenseStore = defineStore('license', () => {
     }
     graceEndsAt.value = data?.grace_ends_at || null
     loadedAt = Date.now()
+    loaded.value = true
   }
 
   // force: спросить сервер, даже если ответ свежий
@@ -37,5 +40,5 @@ export const useLicenseStore = defineStore('license', () => {
     } catch {}
   }
 
-  return { state, graceEndsAt, notActivated, readOnly, apply, fetchStatus }
+  return { state, graceEndsAt, notActivated, readOnly, loaded, apply, fetchStatus }
 })

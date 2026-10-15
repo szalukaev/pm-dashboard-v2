@@ -67,8 +67,10 @@ router.beforeEach(async (to, _from, next) => {
   if (!versionWarningShown) {
     try {
       const { data } = await axios.get('/api/status')
+      // Версия сверяется один раз за сеанс, совпала она или нет:
+      // иначе каждый переход между вкладками ждёт лишний запрос
+      versionWarningShown = true
       if (data.version && data.version !== APP_VERSION) {
-        versionWarningShown = true
         // Предупреждение показывается плашкой, а не только в консоли
         const banner = document.createElement('div')
         banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:var(--warning);color:#111;padding:8px 16px;text-align:center;font-size:13px;font-weight:500;z-index:99999;'
@@ -84,12 +86,29 @@ router.beforeEach(async (to, _from, next) => {
     try {
       const { useAuthStore } = await import('../stores/auth')
       const authStore = useAuthStore()
-      await authStore.fetchMe()
+      // Пользователь уже загружен — вкладка открывается сразу, а вход
+      // перепроверяется в фоне; истёк сеанс — переход на экран входа.
+      // Ждать сервер на каждом клике нельзя: при медленной связи
+      // переключение вкладки растягивалось до минуты
+      if (authStore.isAuthenticated && authStore.user) {
+        authStore.fetchMe().then(() => {
+          if (!authStore.isAuthenticated) {
+            router.push({ name: 'login', query: { redirect: router.currentRoute.value.fullPath } })
+          }
+        })
+      } else {
+        await authStore.fetchMe()
+      }
       if (authStore.isAuthenticated) {
         // Без активированной лицензии работает только экран лицензии
         const { useLicenseStore } = await import('../stores/license')
         const licenseStore = useLicenseStore()
-        await licenseStore.fetchStatus(licenseStore.notActivated)
+        // Лицензия уже известна и активна — обновляется в фоне, переход не ждёт
+        if (licenseStore.loaded && !licenseStore.notActivated) {
+          licenseStore.fetchStatus()
+        } else {
+          await licenseStore.fetchStatus(licenseStore.notActivated)
+        }
         if (licenseStore.notActivated && to.name !== 'license') {
           return next({ name: 'license' })
         }
