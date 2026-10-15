@@ -10,7 +10,12 @@
         >
           <ChevronDown :size="18" class="chevron" :class="{ collapsed: !isOpen(group.name) }" />
           <Folder v-if="groupBy === 'project'" :size="18" class="person" />
-          <CircleDot v-else-if="groupBy === 'status'" :size="18" class="person" />
+          <span v-else-if="groupBy === 'status'" class="status-dot" :style="{ background: statusColor(group.name) }"></span>
+          <span
+            v-else-if="group.name !== NO_ASSIGNEE"
+            class="avatar"
+            :style="{ background: avatarColor(group.name) }"
+          >{{ initials(group.name) }}</span>
           <User v-else :size="18" class="person" />
           <span class="assignee-name">{{ groupTitle(group.name) }}</span>
           <span class="count-badge">{{ group.task_count }}</span>
@@ -18,7 +23,22 @@
             {{ $t('tasks.accordions.estimate') }}: <b class="estimate">{{ formatTotal(group.estimate_total) }}</b>
           </span>
           <span class="group-metric">
-            {{ $t('tasks.accordions.fact') }}: <b class="fact">{{ formatTotal(group.fact_total) }}</b>
+            {{ $t('tasks.accordions.fact') }}: <b class="fact" :class="{ over: group.fact_total > group.estimate_total && group.estimate_total > 0 }">{{ formatTotal(group.fact_total) }}</b>
+          </span>
+          <!-- Что в группе требует внимания -->
+          <span class="group-flags">
+            <span v-if="group.overdue" class="flag overdue">{{ $t('tasks.attention.group_overdue', { n: group.overdue }) }}</span>
+            <span v-if="group.overrun" class="flag overrun">{{ $t('tasks.attention.group_overrun', { n: group.overrun }) }}</span>
+            <span v-if="group.unassigned && groupBy !== 'assignee'" class="flag">{{ $t('tasks.attention.group_unassigned', { n: group.unassigned }) }}</span>
+            <!-- Загрузка исполнителя: факт против оценки, перерасход оранжевым -->
+            <span
+              v-if="groupBy === 'assignee' && (group.estimate_total || group.fact_total)"
+              class="load"
+              :title="$t('tasks.attention.load', { fact: formatTotal(group.fact_total), estimate: formatTotal(group.estimate_total) })"
+            >
+              <i class="used" :style="{ width: loadUsedPct(group) + '%' }"></i>
+              <i class="extra" :style="{ width: loadOverPct(group) + '%' }"></i>
+            </span>
           </span>
         </div>
         <template v-if="isOpen(group.name)">
@@ -46,7 +66,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ChevronDown, Folder, User, CircleDot } from 'lucide-vue-next'
+import { ChevronDown, Folder, User } from 'lucide-vue-next'
+import { statusColor } from '../../utils/statusColor'
+import { initials, avatarColor } from '../../utils/avatar'
 import TaskTable from './TaskTable.vue'
 import AppPagination from '../ui/AppPagination.vue'
 import { useTasksStore, type TaskGroup } from '../../stores/tasks'
@@ -67,14 +89,30 @@ function groupTitle(name: string): string {
 }
 
 // Статусы сервер отдаёт в рабочем порядке (открытые, в тестировании,
-// закрытые) — его не меняем; остальные группы — по алфавиту
+// закрытые) — его не меняем. Остальные группы: сначала те, где больше
+// задач с проблемами, затем по алфавиту; «Без исполнителя» — первой
 const sortedGroups = computed(() =>
   props.groupBy === 'status' ? props.groups : [...props.groups].sort((a, b) => {
-    if (a.name === NO_ASSIGNEE) return 1
-    if (b.name === NO_ASSIGNEE) return -1
-    return a.name.localeCompare(b.name, 'ru')
+    if (a.name === NO_ASSIGNEE) return -1
+    if (b.name === NO_ASSIGNEE) return 1
+    return problems(b) - problems(a) || a.name.localeCompare(b.name, 'ru')
   })
 )
+
+function problems(g: TaskGroup): number {
+  return g.overdue + g.overrun + g.unassigned
+}
+
+// Полоса загрузки: доля факта до оценки и перерасход сверх неё
+function loadUsedPct(g: TaskGroup): number {
+  const max = Math.max(g.estimate_total, g.fact_total)
+  return max ? Math.min(g.fact_total, g.estimate_total) / max * 100 : 0
+}
+
+function loadOverPct(g: TaskGroup): number {
+  const max = Math.max(g.estimate_total, g.fact_total)
+  return max && g.fact_total > g.estimate_total ? (g.fact_total - g.estimate_total) / max * 100 : 0
+}
 
 // По умолчанию группы свёрнуты; раскрытые хранятся в сторе и сохраняются
 // вместе с фильтрами, поэтому переживают закрытие браузера.
@@ -181,5 +219,72 @@ function formatTotal(h: number): string {
 
 .group-metric .fact {
   color: var(--success);
+}
+
+.group-metric .fact.over {
+  color: var(--orange);
+}
+
+.status-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.avatar {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+/* Метки проблем и загрузка — у правого края заголовка */
+.group-flags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.flag {
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--surface-3);
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.flag.overdue {
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+  color: var(--danger);
+}
+
+.flag.overrun {
+  background: color-mix(in srgb, var(--orange) 15%, transparent);
+  color: var(--orange);
+}
+
+.load {
+  display: flex;
+  width: 110px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.load .used {
+  background: var(--accent);
+}
+
+.load .extra {
+  background: var(--orange);
 }
 </style>

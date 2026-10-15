@@ -9,8 +9,8 @@ export const TASK_COLUMNS = [
   { key: 'subject', label: 'tasks.table.name', sortable: true },
   { key: 'priority_name', label: 'tasks.table.priority', sortable: true },
   { key: 'assigned_to', label: 'tasks.table.responsible', sortable: true },
-  { key: 'estimate', label: 'tasks.table.estimate', sortable: true },
-  { key: 'fact', label: 'tasks.table.fact', sortable: true },
+  // Оценка и факт в одной колонке: полоса расхода и «оценка / факт»
+  { key: 'estimate', label: 'tasks.table.estimate_fact', sortable: true },
   { key: 'status_name', label: 'tasks.table.status', sortable: true },
   { key: 'bug_fix_hours', label: 'tasks.table.bug_fix', sortable: true },
   { key: 'bug_fix_pct', label: 'tasks.table.bug_fix_pct', sortable: true },

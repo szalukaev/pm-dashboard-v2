@@ -36,3 +36,22 @@ func TestParseHours(t *testing.T) {
 		}
 	}
 }
+
+func TestAttentionCond(t *testing.T) {
+	if got := attentionCond(""); got != "" {
+		t.Errorf("empty list: got %q, want no condition", got)
+	}
+	if got := attentionCond("bogus, ;DROP"); got != "" {
+		t.Errorf("unknown values: got %q, want no condition", got)
+	}
+	got := attentionCond("unassigned, overdue")
+	want := "(" + attentionSQL("overdue") + " OR " + attentionSQL("unassigned") + ")"
+	if got != want {
+		t.Errorf("two chips: got %q, want %q", got, want)
+	}
+	for _, key := range attentionKeys {
+		if attentionSQL(key) == "" {
+			t.Errorf("key %q has no condition", key)
+		}
+	}
+}

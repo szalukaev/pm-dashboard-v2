@@ -33,6 +33,10 @@ export interface TaskGroup {
   task_count: number
   estimate_total: number
   fact_total: number
+  // Сколько задач группы требуют внимания
+  overdue: number
+  overrun: number
+  unassigned: number
   // Загруженная страница группы
   tasks: Task[]
   offset: number
@@ -47,7 +51,14 @@ interface GroupHeader {
   task_count: number
   estimate_total: number
   fact_total: number
+  overdue: number
+  overrun: number
+  unassigned: number
 }
+
+// Чипы «Внимание» над таблицей в порядке показа
+export const ATTENTION_KEYS = ['overdue', 'due_today', 'overrun', 'unassigned'] as const
+export type AttentionKey = typeof ATTENTION_KEYS[number]
 
 interface GroupPage {
   ids: number[]
@@ -64,6 +75,8 @@ export interface TaskFilters {
   category: string
   sort_by: string
   sort_dir: string
+  // Включённые чипы «Внимание»: показываются задачи с любой из этих проблем
+  attention: AttentionKey[]
 }
 
 export const useTasksStore = defineStore('tasks', () => {
@@ -136,6 +149,8 @@ export const useTasksStore = defineStore('tasks', () => {
   const loading = ref(false)
   const error = ref('')
   const total = ref(0)
+  // Числа на чипах «Внимание» при остальных фильтрах
+  const attentionCounts = ref<Record<AttentionKey, number>>({ overdue: 0, due_today: 0, overrun: 0, unassigned: 0 })
   const useGrouping = ref(false)
   // Группы, которые пользователь раскрыл; остальные свёрнуты.
   const expandedGroups = ref<string[]>([])
@@ -148,6 +163,7 @@ export const useTasksStore = defineStore('tasks', () => {
     category: '',
     sort_by: 'external_id',
     sort_dir: 'desc',
+    attention: [],
   })
 
   // Справочники
@@ -180,6 +196,9 @@ export const useTasksStore = defineStore('tasks', () => {
           task_count: g.task_count,
           estimate_total: g.estimate_total,
           fact_total: g.fact_total,
+          overdue: g.overdue || 0,
+          overrun: g.overrun || 0,
+          unassigned: g.unassigned || 0,
         }))
         // Страницы исчезнувших или свёрнутых групп не хранятся
         const kept: Record<string, GroupPage> = {}
@@ -191,6 +210,7 @@ export const useTasksStore = defineStore('tasks', () => {
         groupDefs.value = headers
         taskOrder.value = []
         total.value = data.total || 0
+        if (data.attention) attentionCounts.value = data.attention
         await Promise.all(headers.filter(g => isGroupExpanded(g.name)).map(g => loadGroup(g.name)))
       } else {
         let data = await fetchPage(offset.value)
@@ -206,6 +226,7 @@ export const useTasksStore = defineStore('tasks', () => {
         groupDefs.value = []
         groupPages.value = {}
         total.value = data.total || 0
+        if (data.attention) attentionCounts.value = data.attention
       }
       pruneTasks()
     } catch (e: any) {
@@ -221,6 +242,7 @@ export const useTasksStore = defineStore('tasks', () => {
     if (filters.value.project_id) params.project_id = filters.value.project_id
     if (filters.value.search) params.search = filters.value.search
     if (filters.value.category) params.category = filters.value.category
+    if (filters.value.attention.length) params.attention = filters.value.attention.join(',')
     if (filters.value.sort_by) {
       params.sort_by = filters.value.sort_by
       params.sort_dir = filters.value.sort_dir
@@ -228,7 +250,7 @@ export const useTasksStore = defineStore('tasks', () => {
     return params
   }
 
-  async function fetchPage(pageOffset: number, group?: string): Promise<{ tasks: Task[]; total: number }> {
+  async function fetchPage(pageOffset: number, group?: string): Promise<{ tasks: Task[]; total: number; attention?: Record<AttentionKey, number> }> {
     const params: Record<string, string | number> = { ...queryParams(), limit: pageSize.value, offset: pageOffset }
     if (group !== undefined) {
       params.group_by = filters.value.group_by
@@ -387,8 +409,16 @@ export const useTasksStore = defineStore('tasks', () => {
     } catch {}
   }
 
-  function setFilter(key: keyof TaskFilters, value: string) {
+  function setFilter(key: Exclude<keyof TaskFilters, 'attention'>, value: string) {
     filters.value[key] = value
+    resetPages()
+    saveFilters()
+  }
+
+  // Включает или выключает чип «Внимание»
+  function toggleAttention(key: AttentionKey) {
+    const list = filters.value.attention
+    filters.value.attention = list.includes(key) ? list.filter(k => k !== key) : ATTENTION_KEYS.filter(k => k === key || list.includes(k))
     resetPages()
     saveFilters()
   }
@@ -399,6 +429,7 @@ export const useTasksStore = defineStore('tasks', () => {
       filters.value.project_id ||
       filters.value.search ||
       filters.value.category ||
+      filters.value.attention.length > 0 ||
       (filters.value.type && filters.value.type !== 'all')
     )
   }
@@ -412,6 +443,7 @@ export const useTasksStore = defineStore('tasks', () => {
       category: '',
       sort_by: 'external_id',
       sort_dir: 'desc',
+      attention: [],
     }
     resetPages()
     await saveFilters()
@@ -438,6 +470,7 @@ export const useTasksStore = defineStore('tasks', () => {
         if (saved.category) filters.value.category = saved.category
         if (saved.sort_by) filters.value.sort_by = saved.sort_by
         if (saved.sort_dir) filters.value.sort_dir = saved.sort_dir
+        if (Array.isArray(saved.attention)) filters.value.attention = ATTENTION_KEYS.filter(k => saved.attention.includes(k))
         if (saved.useGrouping !== undefined) useGrouping.value = saved.useGrouping
         if (Array.isArray(saved.expandedGroups)) expandedGroups.value = saved.expandedGroups
       }
@@ -473,7 +506,7 @@ export const useTasksStore = defineStore('tasks', () => {
   }
 
   return {
-    tasks, groups, loading, error, total, useGrouping, filters, expandedGroups,
+    tasks, groups, loading, error, total, attentionCounts, toggleAttention, useGrouping, filters, expandedGroups,
     offset, pageSize, setPage, setGroupPage, setPageSize,
     isGroupExpanded, toggleGroup, setGrouping,
     projects, categories, projectCategories, members, statuses, priorities,

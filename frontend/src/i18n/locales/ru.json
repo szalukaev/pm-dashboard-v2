@@ -205,6 +205,17 @@
       "no_grouping": "Без группировки",
       "show_tasks": "Показать задачи: {n}"
     },
+    "attention": {
+      "title": "Внимание",
+      "overdue": "Просрочено",
+      "due_today": "Срок сегодня",
+      "overrun": "Перерасход",
+      "unassigned": "Без исполнителя",
+      "group_overdue": "{n} просрочено",
+      "group_overrun": "{n} перерасход",
+      "group_unassigned": "{n} без исполнителя",
+      "load": "Факт {fact} из оценки {estimate}"
+    },
     "table": {
       "name": "Наименование",
       "number": "Номер",
@@ -220,7 +231,9 @@
       "bug_fix_pct": "Bug fix, %",
       "start_date": "Дата старта",
       "end_date": "Дата окончания",
-      "category": "Категория"
+      "category": "Категория",
+      "estimate_fact": "Оценка / факт",
+      "no_category": "Без категории"
     },
     "accordions": {
       "estimate": "Оценка",

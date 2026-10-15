@@ -84,6 +84,17 @@
               <button :class="{ active: useGrouping && filters.group_by === 'status' }" data-testid="filter-group-status-mobile" @click="setGrouping('status')">{{ $t('tasks.filters.group_by_status') }}</button>
               <button :class="{ active: !useGrouping }" data-testid="filter-no-group" @click="setGrouping('')">{{ $t('tasks.filters.no_grouping') }}</button>
             </div>
+
+            <div class="m-label">{{ $t('tasks.attention.title') }}</div>
+            <div class="m-pills">
+              <button
+                v-for="key in ATTENTION_KEYS"
+                :key="key"
+                :class="{ active: filters.attention.includes(key) }"
+                :data-testid="'filter-attention-mobile-' + key"
+                @click="toggleAttention(key)"
+              >{{ $t('tasks.attention.' + key) }} · {{ attentionCounts[key] }}</button>
+            </div>
           </div>
 
           <div class="m-panel-foot">
@@ -174,6 +185,24 @@
         </button>
       </div>
 
+      <!-- Задачи, требующие внимания; несколько чипов показывают задачи с любой из проблем -->
+      <div class="filter-group attention" data-testid="filter-attention">
+        <span class="filter-label">{{ $t('tasks.attention.title') }}:</span>
+        <button
+          v-for="key in ATTENTION_KEYS"
+          :key="key"
+          class="attention-chip"
+          :class="[key, { active: filters.attention.includes(key) }]"
+          :aria-pressed="filters.attention.includes(key)"
+          :data-testid="'filter-attention-' + key"
+          @click="toggleAttention(key)"
+        >
+          {{ $t('tasks.attention.' + key) }}
+          <b>{{ attentionCounts[key] }}</b>
+          <X v-if="filters.attention.includes(key)" :size="12" />
+        </button>
+      </div>
+
       <AppColumnSettings class="columns-gear" :table="TASKS_TABLE" :columns="TASK_COLUMNS" />
 
       <div class="filter-group" v-if="categories.length > 0 && filters.project_id">
@@ -201,12 +230,12 @@ import { storeToRefs } from 'pinia'
 import { RotateCcw, Search, Filter, X, ChevronLeft } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { useMobileTasks } from '../../composables/useMobileTasks'
-import { useTasksStore } from '../../stores/tasks'
+import { useTasksStore, ATTENTION_KEYS, type AttentionKey } from '../../stores/tasks'
 import { useSettingsStore } from '../../stores/settings'
 
 const store = useTasksStore()
 const settingsStore = useSettingsStore()
-const { filters, projects, categories, useGrouping, total } = storeToRefs(store)
+const { filters, projects, categories, useGrouping, total, attentionCounts } = storeToRefs(store)
 const { settings } = storeToRefs(settingsStore)
 const { t } = useI18n()
 const { isMobile } = useMobileTasks()
@@ -255,6 +284,9 @@ const activeChips = computed(() => {
   if (f.category) {
     chips.push({ key: 'category', label: f.category, clear: () => setFilter('category', '') })
   }
+  for (const key of f.attention) {
+    chips.push({ key: 'attention-' + key, label: t('tasks.attention.' + key), clear: () => toggleAttention(key) })
+  }
   if (f.search) {
     chips.push({ key: 'search', label: '«' + f.search + '»', clear: () => { searchInput.value = '' } })
   }
@@ -263,6 +295,11 @@ const activeChips = computed(() => {
 
 function setFilter(key: string, value: string) {
   store.setFilter(key as any, value)
+  store.fetchTasks()
+}
+
+function toggleAttention(key: AttentionKey) {
+  store.toggleAttention(key)
   store.fetchTasks()
 }
 
@@ -329,6 +366,48 @@ watch(searchInput, (val) => {
   gap: 6px;
   flex-wrap: wrap;
 }
+
+/* Чипы «Внимание»: включённый чип окрашен цветом своей проблемы */
+.attention-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-family: inherit;
+  border-radius: 9999px;
+  border: 1px solid var(--hairline);
+  background: var(--surface-1);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.attention-chip b {
+  color: var(--text-bright);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.attention-chip:hover {
+  border-color: var(--accent);
+  color: var(--text-bright);
+}
+
+.attention-chip.active {
+  --chip: var(--accent);
+  border-color: var(--chip);
+  color: var(--chip);
+  background: color-mix(in srgb, var(--chip) 10%, transparent);
+}
+
+.attention-chip.active b {
+  color: inherit;
+}
+
+.attention-chip.overdue.active { --chip: var(--danger); }
+.attention-chip.due_today.active { --chip: var(--warning); }
+.attention-chip.overrun.active { --chip: var(--orange); }
 
 .filter-label {
   font-size: 11px;

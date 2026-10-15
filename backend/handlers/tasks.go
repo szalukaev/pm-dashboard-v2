@@ -53,11 +53,15 @@ type TaskResponse struct {
 }
 
 type TaskGroup struct {
-	Name          string         `json:"name"`
-	TaskCount     int            `json:"task_count"`
-	EstimateTotal float64        `json:"estimate_total"`
-	FactTotal     float64        `json:"fact_total"`
-	Tasks         []TaskResponse `json:"tasks"`
+	Name          string  `json:"name"`
+	TaskCount     int     `json:"task_count"`
+	EstimateTotal float64 `json:"estimate_total"`
+	FactTotal     float64 `json:"fact_total"`
+	// Сколько задач группы требуют внимания — метки в заголовке группы
+	Overdue    int            `json:"overdue"`
+	Overrun    int            `json:"overrun"`
+	Unassigned int            `json:"unassigned"`
+	Tasks      []TaskResponse `json:"tasks"`
 }
 
 func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
@@ -76,6 +80,7 @@ func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 	sortBy := r.URL.Query().Get("sort_by")
 	sortDir := r.URL.Query().Get("sort_dir")
 	category := r.URL.Query().Get("category")
+	attention := r.URL.Query().Get("attention") // через запятую: overdue, due_today, overrun, unassigned
 
 	// Только то, что пользователь вправе видеть: права от администратора,
 	// суженные проектами и командой, выбранными в настройках пользователя.
@@ -115,11 +120,18 @@ func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 		argIdx++
 	}
 
+	// Счётчики чипов «Внимание» считаются по остальным фильтрам: чип
+	// показывает, сколько задач добавится, если его включить
+	baseCondition := strings.Join(where, " AND ")
+	if cond := attentionCond(attention); cond != "" {
+		where = append(where, cond)
+	}
+
 	// Вид с группировкой: без группы ответ — заголовки групп (название,
 	// число задач, итоги), с группой — задачи этой группы.
 	groupExpr, groupOrder := taskGrouping(groupBy)
 	if groupExpr != "" && !r.URL.Query().Has("group") {
-		h.listTaskGroups(w, groupExpr, groupOrder, strings.Join(where, " AND "), args)
+		h.listTaskGroups(w, groupExpr, groupOrder, strings.Join(where, " AND "), baseCondition, args)
 		return
 	}
 	if groupExpr != "" {
@@ -209,10 +221,79 @@ func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 		total = len(tasks)
 	}
 
-	utils.JSON(w, http.StatusOK, map[string]interface{}{
+	resp := map[string]interface{}{
 		"tasks": tasks,
 		"total": total,
-	})
+	}
+	// Страница одной группы: счётчики уже пришли вместе с заголовками групп.
+	// Аргументы отбора группы условию baseCondition тоже не подходят.
+	if groupExpr == "" {
+		counts, err := h.attentionCounts(baseCondition, args)
+		if err != nil {
+			utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
+			return
+		}
+		resp["attention"] = counts
+	}
+	utils.JSON(w, http.StatusOK, resp)
+}
+
+// Признаки задач, требующих внимания, в порядке чипов над таблицей.
+// Закрытая задача не бывает просроченной: срок у неё уже не горит.
+var attentionKeys = []string{"overdue", "due_today", "overrun", "unassigned"}
+
+func attentionSQL(key string) string {
+	switch key {
+	case "overdue":
+		return "(due_date < CURRENT_DATE AND " + statusNotIn("status_id", GroupClosed) + ")"
+	case "due_today":
+		return "(due_date = CURRENT_DATE AND " + statusNotIn("status_id", GroupClosed) + ")"
+	case "overrun":
+		return "(estimated_hours > 0 AND spent_hours > estimated_hours)"
+	case "unassigned":
+		return "(assigned_to_id IS NULL AND COALESCE(assigned_to_name, '') = '')"
+	}
+	return ""
+}
+
+// attentionCond — условие отбора по включённым чипам «Внимание». Несколько
+// чипов складываются: показываются задачи с любой из выбранных проблем.
+// Неизвестные значения пропускаются; пустой ответ — без отбора.
+func attentionCond(list string) string {
+	var parts []string
+	for _, key := range attentionKeys {
+		for _, v := range strings.Split(list, ",") {
+			if strings.TrimSpace(v) == key {
+				parts = append(parts, attentionSQL(key))
+				break
+			}
+		}
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "(" + strings.Join(parts, " OR ") + ")"
+}
+
+// attentionCounts — числа на чипах «Внимание» при текущих остальных фильтрах
+func (h *TaskHandler) attentionCounts(condition string, args []interface{}) (map[string]int, error) {
+	cols := make([]string, len(attentionKeys))
+	for i, key := range attentionKeys {
+		cols[i] = "COUNT(*) FILTER (WHERE " + attentionSQL(key) + ")"
+	}
+	vals := make([]int, len(attentionKeys))
+	ptrs := make([]interface{}, len(attentionKeys))
+	for i := range vals {
+		ptrs[i] = &vals[i]
+	}
+	if err := (*h.DB).QueryRow("SELECT "+strings.Join(cols, ", ")+" FROM issues WHERE "+condition, args...).Scan(ptrs...); err != nil {
+		return nil, err
+	}
+	counts := make(map[string]int, len(attentionKeys))
+	for i, key := range attentionKeys {
+		counts[key] = vals[i]
+	}
+	return counts, nil
 }
 
 // listTaskGroups отвечает на вид с группировкой заголовками групп; задачи
@@ -237,9 +318,12 @@ func taskGrouping(groupBy string) (expr, order string) {
 	}
 }
 
-func (h *TaskHandler) listTaskGroups(w http.ResponseWriter, groupExpr, order, condition string, args []interface{}) {
+func (h *TaskHandler) listTaskGroups(w http.ResponseWriter, groupExpr, order, condition, baseCondition string, args []interface{}) {
 	rows, err := (*h.DB).Query(`SELECT `+groupExpr+` AS name, COUNT(*),
-		COALESCE(SUM(estimated_hours), 0), COALESCE(SUM(spent_hours), 0)
+		COALESCE(SUM(estimated_hours), 0), COALESCE(SUM(spent_hours), 0),
+		COUNT(*) FILTER (WHERE `+attentionSQL("overdue")+`),
+		COUNT(*) FILTER (WHERE `+attentionSQL("overrun")+`),
+		COUNT(*) FILTER (WHERE `+attentionSQL("unassigned")+`)
 		FROM issues WHERE `+condition+`
 		GROUP BY 1 ORDER BY `+order, args...)
 	if err != nil {
@@ -252,16 +336,27 @@ func (h *TaskHandler) listTaskGroups(w http.ResponseWriter, groupExpr, order, co
 	total := 0
 	for rows.Next() {
 		g := TaskGroup{Tasks: []TaskResponse{}}
-		if rows.Scan(&g.Name, &g.TaskCount, &g.EstimateTotal, &g.FactTotal) != nil {
+		if rows.Scan(&g.Name, &g.TaskCount, &g.EstimateTotal, &g.FactTotal, &g.Overdue, &g.Overrun, &g.Unassigned) != nil {
 			continue
 		}
 		total += g.TaskCount
 		groups = append(groups, g)
 	}
 
+	if err := rows.Err(); err != nil {
+		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
+		return
+	}
+	counts, err := h.attentionCounts(baseCondition, args)
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, "QUERY_FAILED")
+		return
+	}
+
 	utils.JSON(w, http.StatusOK, map[string]interface{}{
-		"groups": groups,
-		"total":  total,
+		"groups":    groups,
+		"total":     total,
+		"attention": counts,
 	})
 }
 

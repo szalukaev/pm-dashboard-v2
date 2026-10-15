@@ -205,6 +205,17 @@
       "no_grouping": "No grouping",
       "show_tasks": "Show tasks: {n}"
     },
+    "attention": {
+      "title": "Attention",
+      "overdue": "Overdue",
+      "due_today": "Due today",
+      "overrun": "Over estimate",
+      "unassigned": "Unassigned",
+      "group_overdue": "{n} overdue",
+      "group_overrun": "{n} over estimate",
+      "group_unassigned": "{n} unassigned",
+      "load": "Actual {fact} of {estimate} estimated"
+    },
     "table": {
       "name": "Name",
       "number": "Number",
@@ -220,7 +231,9 @@
       "bug_fix_pct": "Bug fix, %",
       "start_date": "Start Date",
       "end_date": "End Date",
-      "category": "Category"
+      "category": "Category",
+      "estimate_fact": "Estimate / actual",
+      "no_category": "No category"
     },
     "accordions": {
       "estimate": "Estimate",

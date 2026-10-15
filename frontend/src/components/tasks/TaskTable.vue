@@ -22,7 +22,7 @@
           <tr
             v-for="task in tasks"
             :key="task.external_id"
-            :class="{ overdue: isOverdue(task), 'flash-update': isFlashing(task.external_id) }"
+            :class="{ overdue: isOverdue(task), attention: !isOverdue(task) && needsAttention(task), 'flash-update': isFlashing(task.external_id) }"
             :data-testid="'task-row-' + task.external_id"
           >
             <!-- Ячейки идут по колонкам, выбранным пользователем, в их порядке -->
@@ -37,7 +37,11 @@
 
             <td v-else-if="col.key === 'subject'" class="subject" @click="$emit('open-task', task.external_id)">{{ task.subject }}</td>
 
-            <td v-else-if="col.key === 'priority_name'" class="center">
+            <td v-else-if="col.key === 'priority_name'">
+              <span class="cell-with-icon">
+              <span class="prio-bars" :style="{ color: priorityColor({ name: task.priority_name }) }" aria-hidden="true">
+                <i v-for="n in PRIORITY_BARS" :key="n" :class="{ on: n <= priorityLevel(task.priority_name) }" :style="{ height: 3 + n * 2 + 'px' }"></i>
+              </span>
               <select
                 :disabled="!auth.canWrite"
                 class="cell-input priority"
@@ -47,9 +51,17 @@
               >
                 <option v-for="p in withCurrent(priorityNames, task.priority_name)" :key="p" :value="p">{{ p }}</option>
               </select>
+              </span>
             </td>
 
             <td v-else-if="col.key === 'assigned_to'">
+              <span class="cell-with-icon">
+              <span
+                class="avatar"
+                :class="{ none: !task.assigned_to_name }"
+                :style="task.assigned_to_name ? { background: avatarColor(task.assigned_to_name) } : undefined"
+                aria-hidden="true"
+              >{{ task.assigned_to_name ? initials(task.assigned_to_name) : '?' }}</span>
               <select
                 :disabled="!auth.canWrite"
                 class="cell-input assignee"
@@ -59,28 +71,36 @@
                 <option value="">{{ $t('tasks.table.unassigned') }}</option>
                 <option v-for="m in withCurrent(memberNames, task.assigned_to_name)" :key="m" :value="m">{{ m }}</option>
               </select>
+              </span>
             </td>
 
-            <td v-else-if="col.key === 'estimate'" class="center">
-              <input
-                :disabled="!auth.canWrite"
-                class="cell-input estimate"
-                type="text"
-                inputmode="decimal"
-                :value="task.estimated_hours ?? ''"
-                placeholder="—"
-                @change="saveInlineEdit(task, 'estimated_hours', ($event.target as HTMLInputElement).value.trim().replace(',', '.'))"
-                @keyup.enter="($event.target as HTMLInputElement).blur()"
-              />
+            <!-- Оценка и факт: полоса показывает, какая часть оценки израсходована;
+                 оценка правится на месте, факт приходит из трудозатрат -->
+            <td v-else-if="col.key === 'estimate'">
+              <span class="effort" :class="{ over: isOverrun(task) }">
+                <span class="effort-bar" aria-hidden="true"><i :style="{ width: effortPct(task) + '%' }"></i></span>
+                <input
+                  :disabled="!auth.canWrite"
+                  class="cell-input estimate"
+                  type="text"
+                  inputmode="decimal"
+                  :value="task.estimated_hours ?? ''"
+                  placeholder="—"
+                  :aria-label="$t('tasks.fields.estimate')"
+                  @change="saveInlineEdit(task, 'estimated_hours', ($event.target as HTMLInputElement).value.trim().replace(',', '.'))"
+                  @keyup.enter="($event.target as HTMLInputElement).blur()"
+                />
+                <span class="slash">/</span>
+                <span class="fact num">{{ formatEffort(task.spent_hours) }}</span>
+                <span class="unit">{{ $t('tasks.units.hours_short') }}</span>
+              </span>
             </td>
-
-            <td v-else-if="col.key === 'fact'" class="center num">{{ formatHours(task.spent_hours) }}</td>
 
             <td v-else-if="col.key === 'status_name'" class="center">
               <select
                 :disabled="!auth.canWrite"
                 class="cell-input status-select"
-                :style="{ color: statusColor(task.status_name) }"
+                :style="chipStyle(statusColor(task.status_name))"
                 :value="task.status_name"
                 @change="saveInlineEdit(task, 'status_name', ($event.target as HTMLSelectElement).value)"
               >
@@ -116,12 +136,13 @@
               <select
                 :disabled="!auth.canWrite"
                 class="cell-input category"
+                :class="{ empty: !task.category_name }"
                 :value="task.category_name || ''"
                 @focus="tasksStore.fetchProjectCategories(task.project_id)"
                 @mousedown="tasksStore.fetchProjectCategories(task.project_id)"
                 @change="saveInlineEdit(task, 'category_name', ($event.target as HTMLSelectElement).value)"
               >
-                <option value="">—</option>
+                <option value="">{{ $t('tasks.table.no_category') }}</option>
                 <option v-for="c in projectCategories(task)" :key="c" :value="c">{{ c }}</option>
               </select>
             </td>
@@ -147,6 +168,7 @@ import { TASK_COLUMNS, TASKS_TABLE } from './taskColumns'
 import { statusColor, priorityColor } from '../../utils/statusColor'
 import { useMobileTasks } from '../../composables/useMobileTasks'
 import TaskMobileList from './TaskMobileList.vue'
+import { initials, avatarColor } from '../../utils/avatar'
 
 const settingsStore = useSettingsStore()
 const tasksStore = useTasksStore()
@@ -232,6 +254,40 @@ const shownColumns = computed(() =>
 function toggleSort(key: string) {
   const dir = sortBy.value === key && sortDir.value === 'asc' ? 'desc' : 'asc'
   emit('sort-change', { sortBy: key, sortDir: dir })
+}
+
+// Перерасход или нет исполнителя — строка помечается оранжевой кромкой
+function isOverrun(task: Task): boolean {
+  return !!task.estimated_hours && task.spent_hours > task.estimated_hours
+}
+
+function needsAttention(task: Task): boolean {
+  return isOverrun(task) || !task.assigned_to_name
+}
+
+function effortPct(task: Task): number {
+  if (!task.estimated_hours) return task.spent_hours > 0 ? 100 : 0
+  return Math.min(100, task.spent_hours / task.estimated_hours * 100)
+}
+
+function formatEffort(h: number): string {
+  if (!h) return '0'
+  return String(Math.round(h * 100) / 100)
+}
+
+// Уровень приоритета — место в списке приоритетов Redmine (от низкого к
+// высокому), столбиков столько, сколько приоритетов, но не больше пяти
+const PRIORITY_BARS = computed(() => Math.min(5, Math.max(priorities.value.length, 1)))
+function priorityLevel(name: string): number {
+  const sorted = [...priorities.value].sort((a, b) => a.sort_order - b.sort_order)
+  const i = sorted.findIndex(p => p.name === name)
+  if (i < 0) return 0
+  return Math.max(1, Math.round((i + 1) / sorted.length * PRIORITY_BARS.value))
+}
+
+// Полупрозрачный фон и текст цвета статуса
+function chipStyle(color: string) {
+  return { background: `color-mix(in srgb, ${color} 16%, transparent)`, color }
 }
 
 function isOverdue(task: Task): boolean {
@@ -341,6 +397,89 @@ tr.overdue td:first-child {
   box-shadow: inset 3px 0 0 var(--critical);
 }
 
+tr.attention td:first-child {
+  box-shadow: inset 3px 0 0 var(--orange);
+}
+
+/* Значок перед полем правки: столбики приоритета, аватар исполнителя */
+.cell-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.prio-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 13px;
+}
+
+.prio-bars i {
+  width: 3px;
+  border-radius: 1px;
+  background: var(--hairline-strong);
+}
+
+.prio-bars i.on {
+  background: currentColor;
+}
+
+.avatar {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.avatar.none {
+  border: 1px dashed var(--text-faint);
+  color: var(--text-faint);
+}
+
+.effort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.effort-bar {
+  position: relative;
+  width: 80px;
+  height: 6px;
+  margin-right: 4px;
+  border-radius: 3px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.effort-bar i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 3px;
+  background: var(--accent);
+}
+
+.effort.over .effort-bar i {
+  background: var(--orange);
+}
+
+.effort.over .fact {
+  color: var(--orange);
+  font-weight: 600;
+}
+
+.slash,
+.unit {
+  color: var(--text-muted);
+}
+
 .center {
   text-align: center;
 }
@@ -434,8 +573,8 @@ tr.overdue td:first-child {
 }
 
 .estimate {
-  width: 60px;
-  text-align: center;
+  width: 48px;
+  text-align: right;
   cursor: text;
 }
 
@@ -443,9 +582,11 @@ tr.overdue td:first-child {
   color: var(--text-faint);
 }
 
-/* Статус выглядит как приоритет: цветной текст без плашки */
+/* Статус — цветная плашка; рамка при наведении та же, что у других полей */
 .status-select {
-  width: 120px;
+  max-width: 140px;
+  padding: 3px 10px;
+  border-radius: 9999px;
   font-size: 11px;
   font-weight: 600;
 }
@@ -458,10 +599,20 @@ tr.overdue td:first-child {
   color: var(--critical);
 }
 
+/* Категория — метка; без категории — пунктирная рамка */
 .category {
-  width: 140px;
+  max-width: 150px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--tag-bg);
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--text-dim);
+}
+
+.category.empty {
+  background: none;
+  border: 1px dashed var(--hairline);
+  color: var(--text-faint);
 }
 
 @media (max-width: 768px) {
