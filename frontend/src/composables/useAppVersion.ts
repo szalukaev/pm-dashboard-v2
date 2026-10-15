@@ -8,9 +8,13 @@ import { useToast } from './useToast'
 const CHECK_EVERY_MS = 5 * 60_000
 
 let notified = false
+// Проверка уже идёт: таймер, возврат на вкладку и появление сети не должны
+// запустить вторую параллельно — иначе тост появлялся дважды
+let checking = false
 
 async function check() {
-  if (notified) return
+  if (notified || checking) return
+  checking = true
   try {
     const response = await fetch('/version.json', { cache: 'no-store' })
     if (!response.ok) return
@@ -18,7 +22,10 @@ async function check() {
     if (!build || build === __BUILD_ID__) return
   } catch {
     return
+  } finally {
+    checking = false
   }
+  if (notified) return
   // Один тост на версию; закрытый крестиком до перезагрузки не возвращается
   notified = true
   useToast().showPersistent(i18n.global.t('common.app_updated'), {
