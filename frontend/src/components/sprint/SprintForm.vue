@@ -64,14 +64,14 @@
 
       <div class="ios-title">{{ $t('sprint.form.description') }}</div>
       <div class="ios-group">
-        <textarea v-model="form.description" rows="3" class="ios-text" :placeholder="$t('sprint.form.description_placeholder')"></textarea>
+        <textarea v-model="form.description" rows="3" class="ios-text" :aria-label="$t('sprint.form.description')" :placeholder="$t('sprint.form.description_placeholder')"></textarea>
       </div>
     </form>
 
     <form v-else class="sprint-form" @submit.prevent="submit">
       <div class="form-field">
-        <label>{{ $t('sprint.form.name') }} *</label>
-        <input v-model="form.name" type="text" required />
+        <label for="sprint-name">{{ $t('sprint.form.name') }} *</label>
+        <input id="sprint-name" v-model="form.name" type="text" required />
       </div>
 
       <!-- Вид спринта меняет только его создатель -->
@@ -91,17 +91,17 @@
       </div>
 
       <div class="form-field">
-        <label>{{ $t('sprint.form.project') }}</label>
-        <select v-model="form.project_name" @change="onProjectChange">
+        <label for="sprint-project">{{ $t('sprint.form.project') }}</label>
+        <select id="sprint-project" v-model="form.project_name" @change="onProjectChange">
           <option value="">—</option>
           <option v-for="name in projectOptions" :key="name" :value="name">{{ name }}</option>
         </select>
       </div>
 
       <div class="form-field">
-        <label>{{ $t('sprint.form.category') }}</label>
+        <label for="sprint-category">{{ $t('sprint.form.category') }}</label>
         <!-- Категории выбранного проекта -->
-        <select v-model="form.category_name" :disabled="!projectId">
+        <select id="sprint-category" v-model="form.category_name" :disabled="!projectId">
           <option value="">{{ projectId ? '—' : $t('sprint.form.category_pick_project') }}</option>
           <option v-for="c in categoryOptions" :key="c" :value="c">{{ c }}</option>
         </select>
@@ -116,19 +116,19 @@
 
       <div class="form-row">
         <div class="form-field">
-          <label>{{ $t('sprint.form.start_date') }} *</label>
-          <input v-model="form.start_date" type="date" required />
+          <label for="sprint-start">{{ $t('sprint.form.start_date') }} *</label>
+          <input id="sprint-start" v-model="form.start_date" type="date" required />
         </div>
         <div class="form-field">
-          <label>{{ $t('sprint.form.due_date') }}</label>
-          <input v-model="form.due_date" type="date" :min="form.start_date" />
+          <label for="sprint-due">{{ $t('sprint.form.due_date') }}</label>
+          <input id="sprint-due" v-model="form.due_date" type="date" :min="form.start_date" />
         </div>
       </div>
       <div v-if="!datesInOrder" class="date-error">{{ $t('sprint.form.due_before_start') }}</div>
 
       <div class="form-field">
-        <label>{{ $t('sprint.form.description') }}</label>
-        <textarea v-model="form.description" rows="3"></textarea>
+        <label for="sprint-description">{{ $t('sprint.form.description') }}</label>
+        <textarea id="sprint-description" v-model="form.description" rows="3"></textarea>
       </div>
     </form>
 

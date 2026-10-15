@@ -9,13 +9,14 @@
               v-if="expandable"
               class="modal-close modal-expand"
               :title="$t(fullscreen ? 'common.windowed' : 'common.fullscreen')"
+              :aria-label="$t(fullscreen ? 'common.windowed' : 'common.fullscreen')"
               data-testid="modal-expand"
               @click="fullscreen = !fullscreen"
             >
               <Minimize2 v-if="fullscreen" :size="16" />
               <Maximize2 v-else :size="16" />
             </button>
-            <button class="modal-close" data-testid="modal-close" @click="close">
+            <button type="button" class="modal-close" :aria-label="$t('common.close')" data-testid="modal-close" @click="close">
               <X :size="18" />
             </button>
           </div>
