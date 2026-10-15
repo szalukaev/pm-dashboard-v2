@@ -3,14 +3,17 @@
        по клику она растягивается на всю ширину и показывает договоры -->
   <div class="org-grid">
     <div
-      v-for="org in organizations"
+      v-for="org in sortedOrganizations"
       :key="org.id"
       class="org-card"
       :class="{ open: isOpen(org.id) }"
       :data-testid="'org-' + org.id"
     >
       <div class="org-header" @click="toggle(org.id)">
-        <svg class="ring" viewBox="0 0 36 36" :title="$t('payments.org.paid_pct', { pct: orgPct(org.id) })">
+        <!-- Подсказка: что за число в кружке и как оно посчитано; нажатие на
+             кружок не сворачивает и не разворачивает карточку -->
+        <AppHint class="ring-hint" :text="ringHint(org.id)" @click.stop>
+        <svg class="ring" viewBox="0 0 36 36">
           <circle cx="18" cy="18" r="15" class="ring-track" />
           <circle
             cx="18" cy="18" r="15"
@@ -20,6 +23,7 @@
           />
           <text x="18" y="21.5" text-anchor="middle">{{ orgPct(org.id) }}</text>
         </svg>
+        </AppHint>
         <div class="org-title">
           <div class="org-name">{{ org.name }}</div>
           <div class="org-meta">
@@ -44,9 +48,10 @@
         <ChevronRight :size="16" class="chevron" />
       </div>
 
+      <!-- Суммы с подписями, каждая своей строкой: большие числа не помещаются в одну -->
       <div v-if="!isOpen(org.id)" class="org-foot">
-        <span :title="$t('payments.stats.total_amount')">{{ formatMoney(orgSum(org.id, 'total_amount')) }}</span>
-        <span :title="$t('payments.stats.invoiced')">{{ $t('payments.org.invoiced', { amount: formatMoney(orgSum(org.id, 'invoiced_amount')) }) }}</span>
+        <div class="foot-row"><span>{{ $t('payments.org.total_label') }}</span><b>{{ formatMoney(orgSum(org.id, 'total_amount')) }}</b></div>
+        <div class="foot-row"><span>{{ $t('payments.stats.invoiced') }}</span><b>{{ formatMoney(orgSum(org.id, 'invoiced_amount')) }}</b></div>
       </div>
 
       <div v-else class="org-body">
@@ -89,11 +94,14 @@
 import { ref, computed } from 'vue'
 import { ChevronRight, Plus, Pencil, Trash2 } from 'lucide-vue-next'
 import ContractRow from './ContractRow.vue'
+import AppHint from '../ui/AppHint.vue'
+import { useI18n } from 'vue-i18n'
 import { formatMoney } from '../../utils/format'
 import type { Organization, Contract } from '../../stores/payments'
 import { useAuthStore } from '../../stores/auth'
 
 const auth = useAuthStore()
+const { t } = useI18n()
 
 const props = defineProps<{
   organizations: Organization[]
@@ -118,6 +126,15 @@ function orgContracts(orgId: number) {
   return props.contracts.filter(c => c.organization_id === orgId)
 }
 
+// Сначала организации с долгом — от большего к меньшему, без долга — в конце
+// (между собой в прежнем порядке)
+const sortedOrganizations = computed(() =>
+  props.organizations
+    .map((org, index) => ({ org, index, debt: orgSum(org.id, 'debt_amount') }))
+    .sort((a, b) => (b.debt - a.debt) || (a.index - b.index))
+    .map(item => item.org)
+)
+
 const noOrgContracts = computed(() => props.contracts.filter(c => !c.organization_id))
 
 // Цифра организации: сумма по её договорам
@@ -130,6 +147,15 @@ function orgPct(orgId: number) {
   const total = orgSum(orgId, 'total_amount')
   if (!total) return 0
   return Math.min(100, Math.round((orgSum(orgId, 'total_paid') / total) * 100))
+}
+
+// Подсказка к кружку: доля оплаченного и из чего она посчитана
+function ringHint(orgId: number) {
+  return t('payments.org.ring_hint', {
+    pct: orgPct(orgId),
+    paid: formatMoney(orgSum(orgId, 'total_paid')),
+    total: formatMoney(orgSum(orgId, 'total_amount')),
+  })
 }
 
 // Длина дуги кольца: окружность r=15 ≈ 94.25
@@ -264,14 +290,30 @@ function ringDash(pct: number) {
 
 .org-foot {
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  gap: 4px;
   padding: 10px 14px 14px 66px;
   font-size: 12px;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
   cursor: pointer;
+}
+
+.foot-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  white-space: nowrap;
+}
+
+.foot-row b {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.ring-hint {
+  flex: none;
+  display: inline-flex;
 }
 
 .org-actions {

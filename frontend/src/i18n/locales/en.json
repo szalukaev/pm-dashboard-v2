@@ -650,7 +650,9 @@
       "inn": "TIN {inn}",
       "paid_pct": "Paid {pct}%",
       "no_debt": "no debt",
-      "empty": "No contracts yet"
+      "empty": "No contracts yet",
+      "total_label": "Contracts total",
+      "ring_hint": "Paid {pct}% of the organization's contracts total: {paid} of {total} (incl. VAT). Green: no debt, yellow: there are unpaid invoices."
     },
     "contract": {
       "amount_with_vat": "Contract amount with VAT",
