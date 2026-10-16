@@ -55,10 +55,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useKanbanStore } from '../stores/kanban'
 import { useTasksStore } from '../stores/tasks'
+import { useSettingsStore } from '../stores/settings'
+import { trackedProjects } from '../utils/projects'
 import { useLiveRefresh } from '../composables/useLiveRefresh'
 import { useAuthStore } from '../stores/auth'
 import { useI18n } from 'vue-i18n'
@@ -76,10 +78,12 @@ const auth = useAuthStore()
 const { t } = useI18n()
 const { toast } = useSwal()
 const tasksStore = useTasksStore()
+const settingsStore = useSettingsStore()
 const { columns, mode, total, loading, error, projectId } = storeToRefs(kanbanStore)
 const { fetchBoard, moveCard, moveColumn, setMode, setProject } = kanbanStore
 
-const projects = ref<{ id: number; name: string }[]>([])
+// Только проекты из настроек; если там пусто — все доступные
+const projects = computed(() => trackedProjects(tasksStore.projects, settingsStore.settings.selected_projects || []))
 const selectedTaskId = ref<number | null>(null)
 const { isMobile } = useMobileTasks()
 
@@ -124,9 +128,8 @@ onMounted(async () => {
   if (!tasksStore.priorities.length) tasksStore.fetchPriorities()
   await Promise.all([
     fetchBoard(),
-    tasksStore.fetchProjects().then(() => {
-      projects.value = tasksStore.projects
-    }),
+    tasksStore.fetchProjects(),
+    settingsStore.ensureLoaded(),
   ])
 })
 </script>
