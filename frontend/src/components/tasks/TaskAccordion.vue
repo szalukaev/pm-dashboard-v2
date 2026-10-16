@@ -237,8 +237,11 @@ function formatTotal(h: number): string {
 .assignee-header {
   border-radius: 7px 7px 0 0;
   display: flex;
+  /* Заголовок не прокручивается вместе с таблицей: на узком экране правый
+     блок (метки и шкала) переносится строкой ниже, а не уходит за край */
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 6px 10px;
   padding: 10px 14px;
   background: var(--bg-card);
   cursor: pointer;
@@ -259,6 +262,10 @@ function formatTotal(h: number): string {
 }
 
 .assignee-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 14px;
   font-weight: 600;
   color: var(--text);
@@ -293,6 +300,7 @@ function formatTotal(h: number): string {
 
 /* Итоги */
 .group-metric {
+  white-space: nowrap;
   font-size: 12px;
   font-weight: 400;
   letter-spacing: 0;
@@ -346,9 +354,12 @@ function formatTotal(h: number): string {
 /* Метки проблем и загрузка — у правого края заголовка */
 .group-flags {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: center;
   gap: 6px;
   margin-left: auto;
+  min-width: 0;
 }
 
 .flag {
