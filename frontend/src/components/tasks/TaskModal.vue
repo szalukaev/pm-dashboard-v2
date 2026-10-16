@@ -1369,18 +1369,43 @@ button.related-row:hover {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 14px;
+  min-width: 0;
 }
 
 .m-hours {
   flex-direction: row;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .m-hours > div {
+  flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+
+/* Половина колонки узкая: факт крупно, оценка строкой ниже, подписи переносятся */
+.m-hours .m-ring {
+  width: 40px;
+  height: 40px;
+}
+
+.m-hours .m-big {
+  font-size: 18px;
+}
+
+.m-hours .m-big small {
+  display: block;
+  font-size: 12px;
+}
+
+.m-hours .m-small {
+  overflow-wrap: anywhere;
+}
+
+.m-bugs .m-big {
+  white-space: normal;
 }
 
 .m-label {
