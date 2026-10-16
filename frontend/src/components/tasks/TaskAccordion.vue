@@ -31,10 +31,10 @@
             <span v-if="group.overdue" class="flag overdue">{{ $t('tasks.attention.group_overdue', { n: group.overdue }) }}</span>
             <span v-if="group.overrun" class="flag overrun">{{ $t('tasks.attention.group_overrun', { n: group.overrun }) }}</span>
             <span v-if="group.unassigned && groupBy !== 'assignee'" class="flag">{{ $t('tasks.attention.group_unassigned', { n: group.unassigned }) }}</span>
-            <!-- Загрузка исполнителя: факт против оценки, перерасход оранжевым.
+            <!-- План/факт группы при любой группировке: факт против оценки, перерасход оранжевым.
                  Считаются только задачи с оценкой; по клику — список задач с перерасходом -->
             <span
-              v-if="groupBy === 'assignee' && group.estimate_total"
+              v-if="group.estimate_total"
               class="load-wrap"
               @click.stop="toggleOverrunList(group.name)"
             >
