@@ -226,25 +226,28 @@ func (c *Client) GetTimeEntries(projectID int, from string) ([]TimeEntry, error)
 }
 
 // GetUserIssueHours возвращает часы, списанные сотрудником userID на саму
-// задачу issueID (без подзадач).
-func (c *Client) GetUserIssueHours(issueID, userID int) (float64, error) {
+// задачу issueID (без подзадач), и сколько из них — на исправление ошибок.
+func (c *Client) GetUserIssueHours(issueID, userID int) (total, bugFix float64, err error) {
 	pages, err := c.getPages(fmt.Sprintf("/time_entries.json?issue_id=%d&user_id=%d", issueID, userID))
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	total := 0.0
 	for _, data := range pages {
 		var resp timeEntryResp
 		if err := json.Unmarshal(data, &resp); err != nil {
-			return 0, err
+			return 0, 0, err
 		}
 		for _, e := range resp.TimeEntries {
 			if e.Issue != nil && e.Issue.ID == issueID {
 				total += e.Hours
+				// Как при синхронизации: баг-часы — деятельность «Fixing bugs»
+				if strings.EqualFold(strings.TrimSpace(e.Activity.Name), "fixing bugs") {
+					bugFix += e.Hours
+				}
 			}
 		}
 	}
-	return total, nil
+	return total, bugFix, nil
 }
 
 type statusResp struct {

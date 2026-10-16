@@ -219,8 +219,10 @@
         "today": "today",
         "no_due": "no due date",
         "hours": "Hours",
-        "bug_fix": "bugs {h}",
-        "assignee_hours": "assignee {h}"
+        "assignee_hours": "assignee",
+        "bugs": "Bugs",
+        "bugs_share": "{pct}% of actual",
+        "bugs_assignee": "of which assignee"
       }
     },
     "filters": {

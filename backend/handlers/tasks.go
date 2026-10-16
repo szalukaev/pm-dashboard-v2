@@ -419,7 +419,7 @@ func (h *TaskHandler) GetAssigneeHours(w http.ResponseWriter, r *http.Request) {
 	}
 	var assignee *int
 	if err := (*h.DB).QueryRow("SELECT assigned_to_id FROM issues WHERE external_id = $1", externalID).Scan(&assignee); err != nil || assignee == nil {
-		utils.JSON(w, http.StatusOK, map[string]interface{}{"hours": nil})
+		utils.JSON(w, http.StatusOK, map[string]interface{}{"hours": nil, "bug_fix_hours": nil})
 		return
 	}
 	client := h.getRedmineClient()
@@ -427,13 +427,13 @@ func (h *TaskHandler) GetAssigneeHours(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusServiceUnavailable, "SOURCE_NOT_CONFIGURED")
 		return
 	}
-	hours, err := client.GetUserIssueHours(externalID, *assignee)
+	hours, bugFix, err := client.GetUserIssueHours(externalID, *assignee)
 	if err != nil {
 		slog.Warn("Assignee hours from Redmine failed", "issue", externalID, "error", err)
 		utils.Error(w, http.StatusBadGateway, "SOURCE_UNAVAILABLE")
 		return
 	}
-	utils.JSON(w, http.StatusOK, map[string]interface{}{"hours": utils.Round2(hours)})
+	utils.JSON(w, http.StatusOK, map[string]interface{}{"hours": utils.Round2(hours), "bug_fix_hours": utils.Round2(bugFix)})
 }
 
 // importIssueIfMissing берёт задачу из Redmine и сохраняет её, если её нет

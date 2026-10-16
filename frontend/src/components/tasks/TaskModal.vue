@@ -199,10 +199,16 @@
             <div>
               <span class="m-label">{{ $t('tasks.mobile.card.hours') }}</span>
               <b class="m-big">{{ formatHours(task.spent_hours) }}<small v-if="task.estimated_hours">/{{ formatHours(task.estimated_hours) }}</small></b>
-              <span v-if="assigneeHours !== null && editFields.assigned_to_name" class="m-small" data-testid="assignee-hours">{{ $t('tasks.mobile.card.assignee_hours', { h: formatHours(assigneeHours) }) }}</span>
-              <span v-if="task.bug_fix_hours" class="m-small">{{ $t('tasks.mobile.card.bug_fix', { h: formatHours(task.bug_fix_hours) }) }}</span>
+              <span v-if="assigneeHours !== null && editFields.assigned_to_name" class="m-small" data-testid="assignee-hours">{{ $t('tasks.mobile.card.assignee_hours') }} <b class="m-accent">{{ formatHours(assigneeHours) }}</b></span>
             </div>
           </div>
+        </div>
+
+        <!-- Ошибки — отдельной заметной плашкой: всего по задаче и доля исполнителя -->
+        <div v-if="task.bug_fix_hours" class="m-box m-bugs" data-testid="bug-hours">
+          <span class="m-label">{{ $t('tasks.mobile.card.bugs') }}</span>
+          <b class="m-big">{{ formatHours(task.bug_fix_hours) }}<span v-if="bugSharePct" class="m-pill">{{ $t('tasks.mobile.card.bugs_share', { pct: bugSharePct }) }}</span></b>
+          <span v-if="assigneeBugHours !== null && editFields.assigned_to_name" class="m-small" data-testid="assignee-bug-hours">{{ $t('tasks.mobile.card.bugs_assignee') }} <b class="m-accent">{{ formatHours(assigneeBugHours) }}</b></span>
         </div>
 
         <label class="m-assignee">
@@ -525,14 +531,26 @@ onBeforeUnmount(() => releaseSwipe?.())
 
 // Часы исполнителя по этой задаче — из Redmine при открытии и смене исполнителя
 const assigneeHours = ref<number | null>(null)
+const assigneeBugHours = ref<number | null>(null)
 
 async function loadAssigneeHours(id: number) {
   assigneeHours.value = null
+  assigneeBugHours.value = null
   try {
     const { data } = await axios.get(`/api/tasks/${id}/assignee-hours`)
-    if (currentId.value === id) assigneeHours.value = data.hours
+    if (currentId.value === id) {
+      assigneeHours.value = data.hours
+      assigneeBugHours.value = data.bug_fix_hours ?? null
+    }
   } catch {}
 }
+
+// Доля баг-часов от всего факта по задаче, целым числом
+const bugSharePct = computed(() => {
+  const t = task.value
+  if (!t || !t.spent_hours || !t.bug_fix_hours) return 0
+  return Math.round(t.bug_fix_hours / t.spent_hours * 100)
+})
 
 function attachmentUrl(id: number): string {
   return `/api/tasks/${task.value?.external_id}/attachments/${id}`
@@ -1338,7 +1356,7 @@ button.related-row:hover {
 
 .m-kpi {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 8px;
   margin-top: 12px;
 }
@@ -1390,6 +1408,33 @@ button.related-row:hover {
 .m-small {
   font-size: 12px;
   color: var(--text-muted);
+}
+
+/* Цифры исполнителя — ярче подписи */
+.m-accent {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.m-bugs {
+  background: color-mix(in srgb, var(--danger) 10%, var(--bg-card));
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
+}
+
+.m-bugs .m-label,
+.m-bugs .m-big {
+  color: var(--danger);
+}
+
+.m-pill {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: middle;
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
 }
 
 .m-box.overdue .m-big { color: var(--danger); }
@@ -1652,6 +1697,7 @@ button.related-row:hover {
 
 .task-card.mobile .m-chips,
 .task-card.mobile .m-kpi,
+.task-card.mobile .m-bugs,
 .task-card.mobile .m-assignee { order: 1; }
 .task-card.mobile .m-tabs { order: 2; }
 .task-card.mobile .params { order: 3; }
