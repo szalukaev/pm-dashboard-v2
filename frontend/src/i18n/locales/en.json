@@ -488,6 +488,11 @@
       "team": "Team",
       "deadlines": "Deadlines",
       "projects": "Projects"
+    },
+    "mobile": {
+      "overdue_short": "{n} overdue",
+      "of_estimate": "of {h}",
+      "no_deadlines": "No upcoming deadlines"
     }
   },
   "kanban": {

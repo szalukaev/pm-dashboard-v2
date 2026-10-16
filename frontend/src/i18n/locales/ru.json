@@ -488,6 +488,11 @@
       "team": "Команда",
       "deadlines": "Сроки",
       "projects": "Проекты"
+    },
+    "mobile": {
+      "overdue_short": "просрочено {n}",
+      "of_estimate": "из {h}",
+      "no_deadlines": "Ближайших дедлайнов нет"
     }
   },
   "kanban": {

@@ -14,23 +14,61 @@
 
     <!-- Содержимое: виджеты расставляет пользователь; скрытые от него
          администратором не показываются -->
+    <!-- Телефон: разделы вкладками, блоки нарисованы под узкий экран -->
+    <template v-else-if="isMobile">
+      <div class="title-row">
+        <h1 class="page-title">{{ $t('analytics.title') }}</h1>
+        <PeriodFilter :model-value="period" @update:model-value="changePeriod" />
+      </div>
+      <nav class="m-sections" data-testid="analytics-sections">
+        <button
+          v-for="section in MOBILE_SECTIONS"
+          :key="section.key"
+          type="button"
+          :class="{ on: mobileSection === section.key }"
+          :data-testid="'analytics-section-' + section.key"
+          @click="setMobileSection(section.key)"
+        >{{ $t('analytics.sections.' + section.key) }}</button>
+      </nav>
+      <!-- Индикаторы выше порогов, заданных пользователем -->
+      <template v-if="exceeded.length > 0">
+        <div class="threshold-banner" data-testid="threshold-banner">
+          <AlertTriangle :size="18" class="threshold-icon" />
+          <div>
+            <div class="threshold-title">{{ $t('analytics.thresholds.title') }}</div>
+            <div v-for="(item, index) in exceeded" :key="index" class="threshold-line">
+              {{ $t('analytics.thresholds.line', {
+                indicator: $t('analytics.stats.' + item.indicator),
+                value: item.value,
+                limit: item.limit,
+              }) }}<template v-if="item.project_name"> — {{ item.project_name }}</template>
+            </div>
+          </div>
+        </div>
+      </template>
+      <MobileAnalytics
+        :section="mobileSection"
+        :available="available"
+        :stats="stats"
+        :exceeded="exceededIndicators"
+        :health="health"
+        :velocity="velocity"
+        :team-load="teamLoad"
+        :hours="hours"
+        :deadlines="deadlines"
+        :distribution="distribution"
+        @open-stat="openStatTasks"
+        @open-team="openTeamTasks"
+        @open-task="openTask"
+      />
+    </template>
+
     <DashboardGrid v-else :widgets="WIDGETS" :available="shownWidgets">
       <template #title>
         <div class="title-row">
           <h1 class="page-title">{{ $t('analytics.title') }}</h1>
           <PeriodFilter :model-value="period" @update:model-value="changePeriod" />
         </div>
-        <!-- Телефон: разделы вкладками вместо длинной ленты виджетов -->
-        <nav v-if="isMobile" class="m-sections" data-testid="analytics-sections">
-          <button
-            v-for="section in MOBILE_SECTIONS"
-            :key="section.key"
-            type="button"
-            :class="{ on: mobileSection === section.key }"
-            :data-testid="'analytics-section-' + section.key"
-            @click="setMobileSection(section.key)"
-          >{{ $t('analytics.sections.' + section.key) }}</button>
-        </nav>
       </template>
 
       <!-- Индикаторы выше порогов, заданных пользователем в настройках -->
@@ -157,6 +195,7 @@ import AppEmptyState from '../components/ui/AppEmptyState.vue'
 import TaskModal from '../components/tasks/TaskModal.vue'
 import AnalyticsTasksModal from '../components/analytics/AnalyticsTasksModal.vue'
 import AppModal from '../components/ui/AppModal.vue'
+import MobileAnalytics from '../components/analytics/MobileAnalytics.vue'
 import PeriodFilter from '../components/analytics/PeriodFilter.vue'
 import { PERIOD_MODES, DEFAULT_PERIOD, assigneeLabel, type AnalyticsPeriod, type TaskListQuery, type DistChart, type ProjectDist } from '../stores/analytics'
 
@@ -429,7 +468,7 @@ onMounted(async () => {
 .m-sections {
   display: flex;
   gap: 2px;
-  margin-top: 10px;
+  margin: 10px 0 12px;
   padding: 3px;
   background: var(--bg-card);
   border: 1px solid var(--border);
