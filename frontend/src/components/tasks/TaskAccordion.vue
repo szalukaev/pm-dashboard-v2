@@ -184,7 +184,7 @@ async function toggleOverrunList(name: string) {
 
 function openOverrunTask(task: Task) {
   overrunList.group = ''
-  emit('open-task', task)
+  emit('open-task', task.external_id)
 }
 
 function closeOverrunList(e: MouseEvent) {
