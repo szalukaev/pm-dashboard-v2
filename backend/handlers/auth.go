@@ -414,6 +414,16 @@ func (h *AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusBadRequest, "INVALID_REQUEST")
 		return
 	}
+	// Сначала все проверки: при отказе не должно сохраниться ничего
+	displayName := strings.TrimSpace(body.DisplayName)
+	if displayName == "" {
+		utils.Error(w, http.StatusBadRequest, "DISPLAY_NAME_REQUIRED")
+		return
+	}
+	if len(displayName) > 255 {
+		utils.Error(w, http.StatusBadRequest, "DISPLAY_NAME_TOO_LONG")
+		return
+	}
 	if body.Email != nil {
 		address := strings.TrimSpace(*body.Email)
 		if address != "" && !mail.ValidAddress(address) {
@@ -424,16 +434,6 @@ func (h *AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 			utils.Error(w, http.StatusInternalServerError, "UPDATE_FAILED")
 			return
 		}
-	}
-
-	displayName := strings.TrimSpace(body.DisplayName)
-	if displayName == "" {
-		utils.Error(w, http.StatusBadRequest, "DISPLAY_NAME_REQUIRED")
-		return
-	}
-	if len(displayName) > 255 {
-		utils.Error(w, http.StatusBadRequest, "DISPLAY_NAME_TOO_LONG")
-		return
 	}
 
 	res, err := (*h.DB).Exec("UPDATE users SET display_name = $1 WHERE id = $2", displayName, userID)

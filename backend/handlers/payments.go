@@ -393,6 +393,15 @@ func (h *PaymentsHandler) UpdateContract(w http.ResponseWriter, r *http.Request)
 			body[field] = nil
 		}
 	}
+	// Как и при создании: привязать договор можно только к видимой организации
+	if orgID, sent := body["organization_id"]; sent && orgID != nil {
+		var visible bool
+		if err := (*h.DB).QueryRow("SELECT EXISTS(SELECT 1 FROM organizations WHERE id=$1 AND "+ownedBy("user_id", 2)+")",
+			orgID, paymentsOwner(r)).Scan(&visible); err != nil || !visible {
+			utils.Error(w, http.StatusNotFound, "ORGANIZATION_NOT_FOUND")
+			return
+		}
+	}
 	sets, args, idx := buildUpdateSets(body, map[string]bool{
 		"name": true, "contract_type": true, "organization_id": true, "company_name": true,
 		"company_address": true, "amount": true, "vat_rate": true, "contact_name": true,
