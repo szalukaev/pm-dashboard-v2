@@ -27,6 +27,10 @@ export function notificationLines(n: AppNotification, t: Translate): string[] {
   if (n.params.issue_id) {
     lines.push('#' + n.params.issue_id + ' ' + (n.params.subject || ''))
   }
+  // Кто внёс изменение
+  if (typeof n.params.actor === 'string' && n.params.actor) {
+    lines.push(t('notifications.changed_by', { name: n.params.actor }))
+  }
   // Сводка просрочек: первые задачи и сколько ещё
   for (const issue of n.params.issues || []) {
     lines.push(t('notifications.overdue_item', { id: issue.issue_id, subject: issue.subject, days: issue.days }))

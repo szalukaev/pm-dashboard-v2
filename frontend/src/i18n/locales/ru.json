@@ -732,6 +732,7 @@
     "setup": "Настроить",
     "empty": "Уведомлений пока нет",
     "change": "{field}: {from} → {to}",
+    "changed_by": "Изменил(а): {name}",
     "fields": {
       "status": "Статус",
       "priority": "Приоритет",

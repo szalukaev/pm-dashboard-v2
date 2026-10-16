@@ -920,3 +920,36 @@ func (c *Client) FindCategoryID(projectID int, name string) (int, error) {
 	}
 	return 0, fmt.Errorf("category %q not found in project %d", name, projectID)
 }
+
+type lastChangeResp struct {
+	Issue struct {
+		Journals []struct {
+			User struct {
+				ID   int    `json:"id"`
+				Name string `json:"name"`
+			} `json:"user"`
+			Details []json.RawMessage `json:"details"`
+		} `json:"journals"`
+	} `json:"issue"`
+}
+
+// LastChangeAuthor возвращает, кто последним изменял поля задачи: сотрудника
+// и его имя. Записи только с комментарием не учитываются. found — false,
+// если в журнале нет ни одного изменения полей.
+func (c *Client) LastChangeAuthor(issueID int) (userID int, name string, found bool, err error) {
+	data, err := c.doRequest(fmt.Sprintf("/issues/%d.json?include=journals", issueID))
+	if err != nil {
+		return 0, "", false, err
+	}
+	var resp lastChangeResp
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return 0, "", false, err
+	}
+	journals := resp.Issue.Journals
+	for i := len(journals) - 1; i >= 0; i-- {
+		if len(journals[i].Details) > 0 {
+			return journals[i].User.ID, journals[i].User.Name, true, nil
+		}
+	}
+	return 0, "", false, nil
+}

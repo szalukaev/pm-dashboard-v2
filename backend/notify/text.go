@@ -54,14 +54,14 @@ var words = map[string]map[string]string{
 		"due": "Срок", "issued": "Счёт выставлен", "grace": "льготный период", "read_only": "только чтение",
 		"subject": "PM Dashboard: новых уведомлений — %d", "intro": "Новые уведомления по вашим правилам:",
 		"footer":       "Правила уведомлений настраиваются в дашборде: Настройки → Уведомления.",
-		"overdue_many": "Просрочено задач: %d", "overdue_days": "дней: %d", "and_more": "и ещё %d",
+		"overdue_many": "Просрочено задач: %d", "changed_by": "Изменил(а): %s", "overdue_days": "дней: %d", "and_more": "и ещё %d",
 	},
 	"en": {
 		"status": "Status", "priority": "Priority", "due_date": "Due date", "estimated_hours": "Estimate, h",
 		"due": "Due", "issued": "Invoice issued", "grace": "grace period", "read_only": "read only",
 		"subject": "PM Dashboard: new notifications — %d", "intro": "New notifications by your rules:",
 		"footer":       "The notification rules are set up in the dashboard: Settings → Notifications.",
-		"overdue_many": "Overdue tasks: %d", "overdue_days": "days: %d", "and_more": "and %d more",
+		"overdue_many": "Overdue tasks: %d", "changed_by": "Changed by: %s", "overdue_days": "days: %d", "and_more": "and %d more",
 	},
 }
 
@@ -82,6 +82,7 @@ type params struct {
 	Issued  string   `json:"issued"`
 	Days    int      `json:"days"`
 	State   string   `json:"state"`
+	Actor   string   `json:"actor"` // кто внёс изменение
 	Changes []Change `json:"changes"`
 	// Сводка просрочек: сколько всего задач и первые из них
 	Count  int `json:"count"`
@@ -144,6 +145,9 @@ func Lines(n Notification, lang string) []string {
 	if more := p.Count - len(p.Issues); p.Count > 0 && more > 0 {
 		lines = append(lines, fmt.Sprintf(w["and_more"], more))
 	}
+	if by := ChangedBy(n, lang); by != "" {
+		lines = append(lines, by)
+	}
 	for _, change := range p.Changes {
 		from, to := orDash(change.From), orDash(change.To)
 		if change.Field == "due_date" {
@@ -164,6 +168,16 @@ func Lines(n Notification, lang string) []string {
 		lines = append(lines, w["issued"]+": "+dateText(p.Issued))
 	}
 	return lines
+}
+
+// ChangedBy возвращает строку «кто изменил» или пустую, если автор неизвестен.
+func ChangedBy(n Notification, lang string) string {
+	var p params
+	_ = json.Unmarshal(n.Params, &p)
+	if p.Actor == "" {
+		return ""
+	}
+	return fmt.Sprintf(words[language(lang)]["changed_by"], p.Actor)
 }
 
 // issueID возвращает номер задачи, о которой уведомление, или 0.

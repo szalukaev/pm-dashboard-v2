@@ -732,6 +732,7 @@
     "setup": "Set up",
     "empty": "No notifications yet",
     "change": "{field}: {from} → {to}",
+    "changed_by": "Changed by: {name}",
     "fields": {
       "status": "Status",
       "priority": "Priority",

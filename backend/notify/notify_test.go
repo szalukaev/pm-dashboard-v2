@@ -411,3 +411,34 @@ func TestOverdueDigestText(t *testing.T) {
 		t.Errorf("ссылка: %q", Link(n))
 	}
 }
+
+// Об изменении, которое получатель внёс сам, ему не сообщается.
+func TestOwnChange(t *testing.T) {
+	five, seven := 5, 7
+	me := recipient{userID: 1, member: &five}
+	if !(&actor{member: &five}).own(me) {
+		t.Error("своё изменение должно отсекаться")
+	}
+	if (&actor{member: &seven}).own(me) {
+		t.Error("чужое изменение отсекаться не должно")
+	}
+	var unknown *actor
+	if unknown.own(me) || (&actor{name: "Иван"}).own(me) || (&actor{member: &five}).own(recipient{userID: 2}) {
+		t.Error("без сведений об авторе или сотруднике уведомление не отсекается")
+	}
+}
+
+func TestChangedBy(t *testing.T) {
+	n := Notification{Rule: RuleTaskChanged, Params: []byte(`{"issue_id": 5, "subject": "Отчёт", "actor": "Иван Петров",
+		"changes": [{"field": "status", "from": "Новая", "to": "В работе"}]}`)}
+	want := []string{"#5 Отчёт", "Изменил(а): Иван Петров", "Статус: Новая → В работе"}
+	if got := Lines(n, "ru"); !reflect.DeepEqual(got, want) {
+		t.Errorf("строки: %q", got)
+	}
+	if got := ChangedBy(n, "en"); got != "Changed by: Иван Петров" {
+		t.Errorf("en: %q", got)
+	}
+	if got := ChangedBy(Notification{Params: []byte(`{}`)}, "ru"); got != "" {
+		t.Errorf("без автора: %q", got)
+	}
+}

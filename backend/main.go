@@ -205,6 +205,19 @@ func main() {
 		}
 	})
 	handlers.IssueEdited = notifier.IssueEdited
+	// Автор изменения, пришедшего с синхронизацией, — из журнала задачи в Redmine
+	notifier.Author = func(issueID int) (int, string, bool) {
+		client := source.Client()
+		if client == nil {
+			return 0, "", false
+		}
+		member, name, found, err := client.LastChangeAuthor(issueID)
+		if err != nil {
+			slog.Warn("Notifications: failed to read who changed the issue", "issue", issueID, "error", err)
+			return 0, "", false
+		}
+		return member, name, found
+	}
 	notificationsH := &handlers.NotificationsHandler{DB: &pgDB}
 	source.SetAfterSync(func() {
 		if pgDB == nil {

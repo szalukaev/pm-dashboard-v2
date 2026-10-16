@@ -45,6 +45,9 @@ type Engine struct {
 	// Push отправляет уведомление колокольчика push-ом на устройства
 	// пользователя: заголовок, первая строка текста и ссылка. Может быть nil.
 	Push func(userID int, title, body, link, tag string)
+	// Author возвращает, кто последним изменил задачу в источнике: сотрудника
+	// и имя. found — false, если узнать не удалось. Может быть nil.
+	Author func(issueID int) (member int, name string, found bool)
 
 	// Проходы не пересекаются: два одновременных сравнения состояний
 	// прислали бы одно изменение дважды.
@@ -162,7 +165,9 @@ type pass struct {
 	highPriority int
 	// except — пользователь, которому не сообщается: он сам внёс изменение.
 	except int
-	now    time.Time
+	// actor — кто внёс изменение, если известно заранее (правка в дашборде).
+	actor *actor
+	now   time.Time
 }
 
 func (e *Engine) newPass(now time.Time, except int) (*pass, error) {
@@ -274,6 +279,7 @@ func (e *Engine) IssueEdited(issueID, actorID int, now time.Time) {
 	if err != nil {
 		return
 	}
+	p.actor = e.dashboardActor(actorID)
 	prev, hasPrev := previous[issueID]
 	e.issueChanged(p, prev, hasPrev, cur)
 	if err := e.remember("WHERE i.external_id = $1", issueID); err != nil {
@@ -304,47 +310,100 @@ func issueParams(cur IssueState) map[string]interface{} {
 	return map[string]interface{}{"issue_id": cur.ID, "subject": cur.Subject, "project": cur.ProjectName}
 }
 
+// actor — кто внёс изменение в задачу.
+type actor struct {
+	member *int // сотрудник источника; nil — неизвестен
+	name   string
+}
+
+// dashboardActor — пользователь дашборда, который изменил задачу; nil, если
+// прочитать его не удалось.
+func (e *Engine) dashboardActor(userID int) *actor {
+	a := &actor{}
+	if err := (*e.DB).QueryRow(`SELECT u.member_id, COALESCE(NULLIF(u.display_name, ''), NULLIF(m.name, ''), u.username)
+		FROM users u LEFT JOIN members m ON m.external_id = u.member_id AND m.data_source = 'redmine' WHERE u.id = $1`, userID).Scan(&a.member, &a.name); err != nil {
+		slog.Warn("Database query failed", "at", "dashboardActor", "error", err)
+		return nil
+	}
+	return a
+}
+
+// sourceActor спрашивает у источника, кто последним изменил задачу; nil —
+// неизвестно.
+func (e *Engine) sourceActor(issueID int) *actor {
+	if e.Author == nil {
+		return nil
+	}
+	member, name, found := e.Author(issueID)
+	if !found {
+		return nil
+	}
+	return &actor{member: &member, name: name}
+}
+
+// own сообщает, внёс ли изменение сам получатель.
+func (a *actor) own(who recipient) bool {
+	return a != nil && a.member != nil && who.member != nil && *a.member == *who.member
+}
+
 // issueChanged создаёт уведомления об изменении одной задачи и возвращает их
 // число.
 func (e *Engine) issueChanged(p *pass, prev IssueState, hasPrev bool, cur IssueState) int {
+	member, assigned := assignedTo(prev, hasPrev, cur)
+	var list []Change
+	if hasPrev && !assigned && cur.AssignedTo != nil {
+		list = changes(prev, cur)
+	}
+	closed := hasPrev && !prev.Closed() && cur.Closed()
+	becameHigh := p.highPriority != 0 && cur.PriorityID == p.highPriority && !cur.Closed() &&
+		(!hasPrev || prev.PriorityID != p.highPriority)
+	if !assigned && len(list) == 0 && !closed && !becameHigh {
+		return 0
+	}
+
+	// Автора изменения спрашиваем у источника, только когда есть о чём сообщить
+	who := p.actor
+	if who == nil {
+		who = e.sourceActor(cur.ID)
+	}
 	created := 0
-	to := func(who recipient, rule string, params map[string]interface{}) {
-		if who.userID != p.except && e.create(who, rule, eventKey(rule, cur.ID, p.now), "issue", cur.ID, params) {
+	to := func(r recipient, rule string, params map[string]interface{}) {
+		if r.userID == p.except || who.own(r) {
+			return
+		}
+		if who != nil && who.name != "" {
+			params["actor"] = who.name
+		}
+		if e.create(r, rule, eventKey(rule, cur.ID, p.now), "issue", cur.ID, params) {
 			created++
 		}
 	}
 
-	member, assigned := assignedTo(prev, hasPrev, cur)
 	if assigned {
-		for _, who := range p.members[member] {
-			to(who, RuleTaskAssigned, issueParams(cur))
+		for _, r := range p.members[member] {
+			to(r, RuleTaskAssigned, issueParams(cur))
 		}
 	}
 
 	// Тому, кому задачу только что назначили, хватит уведомления о назначении
-	if hasPrev && !assigned && cur.AssignedTo != nil {
-		if list := changes(prev, cur); len(list) > 0 {
+	if len(list) > 0 {
+		for _, r := range p.members[*cur.AssignedTo] {
 			params := issueParams(cur)
 			params["changes"] = list
-			for _, who := range p.members[*cur.AssignedTo] {
-				to(who, RuleTaskChanged, params)
-			}
+			to(r, RuleTaskChanged, params)
 		}
 	}
 
 	// Правила по проектам: кто бы ни был ответственным
-	closed := hasPrev && !prev.Closed() && cur.Closed()
-	becameHigh := p.highPriority != 0 && cur.PriorityID == p.highPriority && !cur.Closed() &&
-		(!hasPrev || prev.PriorityID != p.highPriority)
 	if closed || becameHigh {
-		for _, who := range p.people {
-			if closed && e.projectRule(p, who, RuleProjectTaskClosed, cur) {
-				to(who, RuleProjectTaskClosed, issueParams(cur))
+		for _, r := range p.people {
+			if closed && e.projectRule(p, r, RuleProjectTaskClosed, cur) {
+				to(r, RuleProjectTaskClosed, issueParams(cur))
 			}
-			if becameHigh && e.projectRule(p, who, RuleProjectHighPriority, cur) {
+			if becameHigh && e.projectRule(p, r, RuleProjectHighPriority, cur) {
 				params := issueParams(cur)
 				params["priority"] = cur.PriorityName
-				to(who, RuleProjectHighPriority, params)
+				to(r, RuleProjectHighPriority, params)
 			}
 		}
 	}
@@ -636,6 +695,10 @@ func (e *Engine) create(who recipient, rule, key, entityType string, entityID in
 		body := ""
 		if lines := Lines(n, who.lang); len(lines) > 0 {
 			body = lines[0]
+		}
+		// Кто изменил — отдельной строкой: по ней видно, от кого push
+		if by := ChangedBy(n, who.lang); by != "" {
+			body += "\n" + by
 		}
 		go e.Push(who.userID, Title(n, who.lang), body, Link(n), fmt.Sprintf("n%d", n.ID))
 	}
