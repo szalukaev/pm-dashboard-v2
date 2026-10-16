@@ -629,6 +629,25 @@ func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
+		// Смену статуса или исполнителя, запрещённую workflow, Redmine
+		// пропускает молча — как и при переносе на Kanban, задача
+		// перечитывается, прежде чем менять локальную копию
+		_, statusSent := redmineFields["status_id"]
+		_, assigneeSent := redmineFields["assigned_to_id"]
+		if statusSent || assigneeSent {
+			if state, err := client.GetIssueState(externalID); err != nil {
+				slog.Warn("Could not verify the update in Redmine", "issue", externalID, "error", err)
+			} else if !moveApplied(state, redmineFields) {
+				utils.JSON(w, http.StatusOK, map[string]interface{}{
+					"success":       false,
+					"old_values":    oldValues,
+					"new_values":    body,
+					"redmine_ok":    false,
+					"redmine_error": "REDMINE_CHANGE_REJECTED",
+				})
+				return
+			}
+		}
 	}
 
 	setClauses := []string{}

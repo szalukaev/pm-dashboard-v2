@@ -657,7 +657,8 @@ async function saveField(field: keyof typeof editFields) {
   try {
     const result = await store.updateTask(task.value.external_id, { [field]: value }, true)
     if (result && result.redmine_ok === false) {
-      toast(i18n.t('tasks.messages.redmine_sync_error') + ': ' + (result.redmine_error || ''), 'error')
+      toast(result.redmine_error === 'REDMINE_CHANGE_REJECTED' ? i18n.t('kanban.move_rejected')
+        : i18n.t('tasks.messages.redmine_sync_error') + ': ' + (result.redmine_error || ''), 'error')
       editFields[field] = old ?? ''
       return
     }

@@ -209,7 +209,8 @@ async function saveInlineEdit(task: Task, field: string, value: string) {
     const result = await tasksStore.updateTask(task.external_id, { [field]: savedValue }, true)
     if (result && result.redmine_ok === false) {
       ;(task as any)[field] = oldValue
-      toast(t('tasks.messages.redmine_sync_error') + ': ' + (result.redmine_error || ''), 'error')
+      toast(result.redmine_error === 'REDMINE_CHANGE_REJECTED' ? t('kanban.move_rejected')
+        : t('tasks.messages.redmine_sync_error') + ': ' + (result.redmine_error || ''), 'error')
       return
     }
     showChange(oldNormalized || '—', value || '—', fieldLabels[field] ? t(fieldLabels[field]) : field, task.external_id)
