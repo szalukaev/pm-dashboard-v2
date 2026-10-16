@@ -262,10 +262,8 @@ CREATE TABLE IF NOT EXISTS user_settings (
     kanban_last_project INTEGER,
     last_filters JSONB DEFAULT '{}',
     notifications_enabled BOOLEAN DEFAULT true,
-    overdue_alerts BOOLEAN DEFAULT false,
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS overdue_alerts BOOLEAN DEFAULT false;
 CREATE TABLE IF NOT EXISTS projects (
     id SERIAL PRIMARY KEY, external_id INTEGER NOT NULL, name VARCHAR(500) NOT NULL,
     parent_id INTEGER, data_source VARCHAR(50) DEFAULT 'redmine', synced_at TIMESTAMPTZ DEFAULT NOW(),
