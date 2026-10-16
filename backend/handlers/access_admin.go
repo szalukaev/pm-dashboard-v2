@@ -384,7 +384,7 @@ func (h *AccessHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	// Прежний пароль больше не действует — не должны действовать и
 	// открытые с ним сессии: пользователь выходит на всех устройствах.
 	if h.Sessions != nil {
-		if _, err := h.Sessions.DeleteUser(r.Context(), userID); err != nil {
+		if _, err := h.Sessions.DeleteUser(r.Context(), userID, ""); err != nil {
 			slog.Warn("Could not end the sessions after a password reset", "user", userID, "error", err)
 		}
 	}

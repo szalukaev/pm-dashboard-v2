@@ -109,7 +109,7 @@
                 <button v-else-if="auth.canSprint('close')" class="s-act primary" data-testid="sprint-reopen" @click="act('reopen')">
                   <RotateCcw :size="15" /> {{ $t('sprint.reopen') }}
                 </button>
-                <button v-if="auth.canSprint('delete')" class="s-act danger" :aria-label="$t('common.delete')" @click="act('delete')">
+                <button v-if="auth.canSprint('delete') && current?.is_own" class="s-act danger" :aria-label="$t('common.delete')" @click="act('delete')">
                   <Trash2 :size="15" />
                 </button>
               </div>

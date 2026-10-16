@@ -511,6 +511,11 @@ func (h *SprintHandler) DeleteSprint(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	// Общий спринт видят все, но удалить его может только создатель
+	if !s.IsOwn {
+		utils.Error(w, http.StatusForbidden, "SPRINT_DELETE_OWNER_ONLY")
+		return
+	}
 	if _, err := (*h.DB).Exec("DELETE FROM sprints WHERE id = $1", s.ID); err != nil {
 		utils.Error(w, http.StatusInternalServerError, "DELETE_FAILED")
 		return

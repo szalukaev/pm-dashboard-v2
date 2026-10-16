@@ -46,7 +46,7 @@
         <button v-if="auth.canSprint('tasks')" class="action-btn" @click="$emit('refresh', sprint.id)" :title="$t('sprint.refresh_from_redmine')">
           <RefreshCw :size="16" />
         </button>
-        <button v-if="auth.canSprint('delete')" class="action-btn danger-btn" @click="$emit('delete', sprint.id)" :title="$t('common.delete')">
+        <button v-if="auth.canSprint('delete') && sprint.is_own" class="action-btn danger-btn" @click="$emit('delete', sprint.id)" :title="$t('common.delete')">
           <Trash2 :size="16" />
         </button>
       </div>
@@ -56,7 +56,7 @@
         <button v-if="auth.canSprint('close')" class="action-btn" @click="$emit('reopen', sprint.id)" :title="$t('sprint.reopen')" data-testid="sprint-reopen">
           <RotateCcw :size="16" />
         </button>
-        <button v-if="auth.canSprint('delete')" class="action-btn danger-btn" @click="$emit('delete', sprint.id)" :title="$t('common.delete')">
+        <button v-if="auth.canSprint('delete') && sprint.is_own" class="action-btn danger-btn" @click="$emit('delete', sprint.id)" :title="$t('common.delete')">
           <Trash2 :size="16" />
         </button>
       </div>

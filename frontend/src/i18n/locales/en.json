@@ -532,6 +532,7 @@
     "action_forbidden": "You have no right to do this with a sprint",
     "action_failed": "The sprint action failed",
     "kind_owner_only": "Only the creator of a sprint can change its kind",
+    "delete_owner_only": "Only the creator of a shared sprint can delete it",
     "kind": {
       "personal": "Personal",
       "shared": "Shared",

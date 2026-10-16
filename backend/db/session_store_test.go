@@ -52,7 +52,7 @@ func TestMemorySessionStoreDeleteUser(t *testing.T) {
 	s.Set(ctx, "laptop", 7, time.Minute)
 	s.Set(ctx, "other", 8, time.Minute)
 
-	deleted, err := s.DeleteUser(ctx, 7)
+	deleted, err := s.DeleteUser(ctx, 7, "")
 	if err != nil || deleted != 2 {
 		t.Fatalf("DeleteUser = %d, %v; want 2 sessions", deleted, err)
 	}
@@ -63,6 +63,26 @@ func TestMemorySessionStoreDeleteUser(t *testing.T) {
 	}
 	if _, err := s.Get(ctx, "other"); err != nil {
 		t.Errorf("a session of another user must stay: %v", err)
+	}
+}
+
+// После смены пароля самим пользователем остаётся только текущая сессия
+func TestMemorySessionStoreDeleteUserKeepsCurrent(t *testing.T) {
+	s := newMemorySessionStore()
+	defer s.Close()
+	ctx := context.Background()
+	s.Set(ctx, "phone", 7, time.Minute)
+	s.Set(ctx, "laptop", 7, time.Minute)
+
+	deleted, err := s.DeleteUser(ctx, 7, "laptop")
+	if err != nil || deleted != 1 {
+		t.Fatalf("DeleteUser = %d, %v; want 1 session", deleted, err)
+	}
+	if _, err := s.Get(ctx, "phone"); err == nil {
+		t.Error("другая сессия должна быть закрыта")
+	}
+	if _, err := s.Get(ctx, "laptop"); err != nil {
+		t.Errorf("текущая сессия должна остаться: %v", err)
 	}
 }
 

@@ -517,6 +517,13 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusNotFound, "USER_NOT_FOUND")
 		return
 	}
+	// Со старым паролем входили и на других устройствах: те сессии
+	// закрываются, текущая остаётся
+	if cookie, err := r.Cookie("session_id"); err == nil && cookie.Value != "" && h.Sessions != nil {
+		if _, err := h.Sessions.DeleteUser(r.Context(), userID, cookie.Value); err != nil {
+			slog.Warn("Could not end other sessions after a password change", "user", userID, "error", err)
+		}
+	}
 	utils.Success(w)
 }
 

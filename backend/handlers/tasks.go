@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"pm-dashboard/access"
 	"pm-dashboard/datasource/manager"
 	"pm-dashboard/datasource/redmine"
 	"pm-dashboard/middleware"
@@ -383,7 +384,7 @@ func (h *TaskHandler) GetTask(w http.ResponseWriter, r *http.Request) {
 	}
 	// Задачи ещё нет у нас (не пришла синхронизацией) — берётся из Redmine
 	// сразу и сохраняется; права проверяются как обычно
-	h.importIssueIfMissing(externalID)
+	h.importIssueIfMissing(middleware.GetScope(r), externalID)
 	if !requireIssue(w, r, *h.DB, externalID) {
 		return
 	}
@@ -417,7 +418,7 @@ func (h *TaskHandler) GetAssigneeHours(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
 		return
 	}
-	h.importIssueIfMissing(externalID)
+	h.importIssueIfMissing(middleware.GetScope(r), externalID)
 	if !requireIssue(w, r, *h.DB, externalID) {
 		return
 	}
@@ -441,8 +442,9 @@ func (h *TaskHandler) GetAssigneeHours(w http.ResponseWriter, r *http.Request) {
 }
 
 // importIssueIfMissing берёт задачу из Redmine и сохраняет её, если её нет
-// в базе. Ошибки не мешают ответу: задачи просто не окажется.
-func (h *TaskHandler) importIssueIfMissing(externalID int) {
+// в базе и пользователь вправе её видеть: чужую задачу по номеру в базу не
+// затянуть. Ошибки не мешают ответу: задачи просто не окажется.
+func (h *TaskHandler) importIssueIfMissing(scope *access.Scope, externalID int) {
 	var exists bool
 	if err := (*h.DB).QueryRow("SELECT EXISTS(SELECT 1 FROM issues WHERE external_id = $1)", externalID).Scan(&exists); err != nil || exists {
 		return
@@ -456,6 +458,10 @@ func (h *TaskHandler) importIssueIfMissing(externalID int) {
 		if err != nil {
 			slog.Warn("Issue import from Redmine failed", "issue", externalID, "error", err)
 		}
+		return
+	}
+	if !scope.SeesIssue(issue.ProjectID, issue.AssignedToID) {
+		slog.Warn("Issue import outside of user rights", "user", scope.UserID, "issue", externalID)
 		return
 	}
 	if err := redmine.SaveIssues(*h.DB, []redmine.Issue{*issue}); err != nil {

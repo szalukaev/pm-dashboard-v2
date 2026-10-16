@@ -16,9 +16,9 @@ type SessionStore interface {
 	Set(ctx context.Context, sessionID string, userID int, expiry time.Duration) error
 	Get(ctx context.Context, sessionID string) (int, error)
 	Delete(ctx context.Context, sessionID string) error
-	// DeleteUser завершает все сессии пользователя (на всех устройствах) и
-	// возвращает, сколько их было.
-	DeleteUser(ctx context.Context, userID int) (int, error)
+	// DeleteUser завершает сессии пользователя на всех устройствах, кроме
+	// сессии keep (пустая строка — все), и возвращает, сколько их было.
+	DeleteUser(ctx context.Context, userID int, keep string) (int, error)
 	Close() error
 }
 
@@ -140,12 +140,15 @@ func (s *RedisSessionStore) Delete(ctx context.Context, sessionID string) error 
 
 // DeleteUser обходит все сессии: индекса по пользователю нет, а сессий у
 // установки на своём сервере немного.
-func (s *RedisSessionStore) DeleteUser(ctx context.Context, userID int) (int, error) {
+func (s *RedisSessionStore) DeleteUser(ctx context.Context, userID int, keep string) (int, error) {
 	want := strconv.Itoa(userID)
 	deleted := 0
 	iter := s.client.Scan(ctx, 0, "session:*", 200).Iterator()
 	for iter.Next(ctx) {
 		key := iter.Val()
+		if keep != "" && key == "session:"+keep {
+			continue
+		}
 		if val, err := s.client.Get(ctx, key).Result(); err == nil && val == want {
 			if err := s.client.Del(ctx, key).Err(); err != nil {
 				return deleted, err
@@ -196,12 +199,12 @@ func (s *MemorySessionStore) Delete(ctx context.Context, sessionID string) error
 	return nil
 }
 
-func (s *MemorySessionStore) DeleteUser(ctx context.Context, userID int) (int, error) {
+func (s *MemorySessionStore) DeleteUser(ctx context.Context, userID int, keep string) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	deleted := 0
 	for id, entry := range s.sessions {
-		if entry.userID == userID {
+		if entry.userID == userID && (keep == "" || id != keep) {
 			delete(s.sessions, id)
 			deleted++
 		}

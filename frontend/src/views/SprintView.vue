@@ -175,7 +175,9 @@ async function guarded(action: () => Promise<unknown>) {
   } catch (e: any) {
     const code = e?.response?.data?.error
     const forbidden = code === 'SPRINT_ACTION_FORBIDDEN'
-    const message = code === 'SPRINT_KIND_OWNER_ONLY' ? 'sprint.kind_owner_only' : forbidden ? 'sprint.action_forbidden' : 'sprint.action_failed'
+    const message = code === 'SPRINT_KIND_OWNER_ONLY' ? 'sprint.kind_owner_only'
+      : code === 'SPRINT_DELETE_OWNER_ONLY' ? 'sprint.delete_owner_only'
+      : forbidden ? 'sprint.action_forbidden' : 'sprint.action_failed'
     toast(t(message), 'error')
     if (forbidden) auth.fetchMe()
   }
