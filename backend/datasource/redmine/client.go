@@ -177,7 +177,13 @@ type timeEntryResp struct {
 		Activity struct {
 			Name string `json:"name"`
 		} `json:"activity"`
-		Hours float64 `json:"hours"`
+		User struct {
+			ID   int    `json:"id"`
+			Name string `json:"name"`
+		} `json:"user"`
+		SpentOn  string  `json:"spent_on"`
+		Comments string  `json:"comments"`
+		Hours    float64 `json:"hours"`
 	} `json:"time_entries"`
 	TotalCount int `json:"total_count"`
 }
@@ -225,26 +231,69 @@ func (c *Client) GetTimeEntries(projectID int, from string) ([]TimeEntry, error)
 	return all, nil
 }
 
-// GetUserIssueHours возвращает часы, списанные сотрудником userID на саму
-// задачу issueID (без подзадач), и сколько из них — на исправление ошибок.
-func (c *Client) GetUserIssueHours(issueID, userID int) (total, bugFix float64, err error) {
-	pages, err := c.getPages(fmt.Sprintf("/time_entries.json?issue_id=%d&user_id=%d", issueID, userID))
-	if err != nil {
-		return 0, 0, err
+// IsBugActivity — деятельность трудозатраты считается исправлением ошибок.
+// То же правило, что при синхронизации баг-часов задачи.
+func IsBugActivity(name string) bool {
+	return strings.EqualFold(strings.TrimSpace(name), "fixing bugs")
+}
+
+// IssueTimeEntry — трудозатрата задачи со всеми полями для списка.
+type IssueTimeEntry struct {
+	ID       int
+	SpentOn  string
+	UserID   int
+	UserName string
+	Activity string
+	Comments string
+	Hours    float64
+}
+
+// GetIssueTimeEntries возвращает трудозатраты самой задачи issueID (без
+// подзадач); userID > 0 — только этого сотрудника.
+func (c *Client) GetIssueTimeEntries(issueID, userID int) ([]IssueTimeEntry, error) {
+	path := fmt.Sprintf("/time_entries.json?issue_id=%d", issueID)
+	if userID > 0 {
+		path += fmt.Sprintf("&user_id=%d", userID)
 	}
+	pages, err := c.getPages(path)
+	if err != nil {
+		return nil, err
+	}
+	var all []IssueTimeEntry
 	for _, data := range pages {
 		var resp timeEntryResp
 		if err := json.Unmarshal(data, &resp); err != nil {
-			return 0, 0, err
+			return nil, err
 		}
 		for _, e := range resp.TimeEntries {
-			if e.Issue != nil && e.Issue.ID == issueID {
-				total += e.Hours
-				// Как при синхронизации: баг-часы — деятельность «Fixing bugs»
-				if strings.EqualFold(strings.TrimSpace(e.Activity.Name), "fixing bugs") {
-					bugFix += e.Hours
-				}
+			if e.Issue == nil || e.Issue.ID != issueID {
+				continue
 			}
+			all = append(all, IssueTimeEntry{
+				ID:       e.ID,
+				SpentOn:  e.SpentOn,
+				UserID:   e.User.ID,
+				UserName: e.User.Name,
+				Activity: e.Activity.Name,
+				Comments: e.Comments,
+				Hours:    e.Hours,
+			})
+		}
+	}
+	return all, nil
+}
+
+// GetUserIssueHours возвращает часы, списанные сотрудником userID на саму
+// задачу issueID (без подзадач), и сколько из них — на исправление ошибок.
+func (c *Client) GetUserIssueHours(issueID, userID int) (total, bugFix float64, err error) {
+	entries, err := c.GetIssueTimeEntries(issueID, userID)
+	if err != nil {
+		return 0, 0, err
+	}
+	for _, e := range entries {
+		total += e.Hours
+		if IsBugActivity(e.Activity) {
+			bugFix += e.Hours
 		}
 	}
 	return total, bugFix, nil

@@ -308,6 +308,18 @@
       "comment_error": "Failed to add the comment",
       "details_error": "Failed to load data from Redmine"
     },
+    "time_entries": {
+      "title_all": "Time spent on the task",
+      "title_assignee": "Assignee's time",
+      "title_bugs": "Time spent fixing bugs",
+      "title_assignee_bugs": "Assignee: fixing bugs",
+      "date": "Date",
+      "user": "User",
+      "activity": "Activity",
+      "comment": "Comment",
+      "hours": "Hours",
+      "total": "Total"
+    },
     "units": {
       "hours": "h",
       "hours_short": "h",

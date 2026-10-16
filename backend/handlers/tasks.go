@@ -441,6 +441,66 @@ func (h *TaskHandler) GetAssigneeHours(w http.ResponseWriter, r *http.Request) {
 	utils.JSON(w, http.StatusOK, map[string]interface{}{"hours": utils.Round2(hours), "bug_fix_hours": utils.Round2(bugFix)})
 }
 
+// TimeEntryRow — строка списка трудозатрат задачи
+type TimeEntryRow struct {
+	ID       int     `json:"id"`
+	SpentOn  string  `json:"spent_on"`
+	User     string  `json:"user"`
+	Activity string  `json:"activity"`
+	Comments string  `json:"comments"`
+	Hours    float64 `json:"hours"`
+}
+
+// GetTimeEntries — трудозатраты задачи из Redmine, свежие сверху.
+// assignee=1 — только текущего исполнителя, bugs=1 — только на исправление ошибок.
+func (h *TaskHandler) GetTimeEntries(w http.ResponseWriter, r *http.Request) {
+	externalID, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil {
+		utils.Error(w, http.StatusBadRequest, "INVALID_ID")
+		return
+	}
+	h.importIssueIfMissing(middleware.GetScope(r), externalID)
+	if !requireIssue(w, r, *h.DB, externalID) {
+		return
+	}
+	userID := 0
+	if r.URL.Query().Get("assignee") == "1" {
+		var assignee *int
+		if err := (*h.DB).QueryRow("SELECT assigned_to_id FROM issues WHERE external_id = $1", externalID).Scan(&assignee); err != nil || assignee == nil {
+			// Нет исполнителя — нет и его трудозатрат
+			utils.JSON(w, http.StatusOK, map[string]interface{}{"entries": []TimeEntryRow{}})
+			return
+		}
+		userID = *assignee
+	}
+	onlyBugs := r.URL.Query().Get("bugs") == "1"
+	client := h.getRedmineClient()
+	if client == nil {
+		utils.Error(w, http.StatusServiceUnavailable, "SOURCE_NOT_CONFIGURED")
+		return
+	}
+	entries, err := client.GetIssueTimeEntries(externalID, userID)
+	if err != nil {
+		slog.Warn("Time entries from Redmine failed", "issue", externalID, "error", err)
+		utils.Error(w, http.StatusBadGateway, "SOURCE_UNAVAILABLE")
+		return
+	}
+	rows := []TimeEntryRow{}
+	for _, e := range entries {
+		if onlyBugs && !redmine.IsBugActivity(e.Activity) {
+			continue
+		}
+		rows = append(rows, TimeEntryRow{ID: e.ID, SpentOn: e.SpentOn, User: e.UserName, Activity: e.Activity, Comments: e.Comments, Hours: utils.Round2(e.Hours)})
+	}
+	sort.SliceStable(rows, func(i, j int) bool {
+		if rows[i].SpentOn != rows[j].SpentOn {
+			return rows[i].SpentOn > rows[j].SpentOn
+		}
+		return rows[i].ID > rows[j].ID
+	})
+	utils.JSON(w, http.StatusOK, map[string]interface{}{"entries": rows})
+}
+
 // importIssueIfMissing берёт задачу из Redmine и сохраняет её, если её нет
 // в базе и пользователь вправе её видеть: чужую задачу по номеру в базу не
 // затянуть. Ошибки не мешают ответу: задачи просто не окажется.

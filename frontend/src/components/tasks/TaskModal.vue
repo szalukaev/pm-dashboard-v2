@@ -198,8 +198,8 @@
             </svg>
             <div>
               <span class="m-label">{{ $t('tasks.mobile.card.hours') }}</span>
-              <b class="m-big">{{ formatHours(task.spent_hours) }}<small v-if="task.estimated_hours">/{{ formatHours(task.estimated_hours) }}</small></b>
-              <span v-if="assigneeHours !== null && editFields.assigned_to_name" class="m-small" data-testid="assignee-hours">{{ $t('tasks.mobile.card.assignee_hours') }} <b class="m-accent">{{ formatHours(assigneeHours) }}</b></span>
+              <b class="m-big"><button type="button" class="m-num" data-testid="hours-all" @click="openEntries(false, false)">{{ formatHours(task.spent_hours) }}</button><small v-if="task.estimated_hours">/{{ formatHours(task.estimated_hours) }}</small></b>
+              <span v-if="assigneeHours !== null && editFields.assigned_to_name" class="m-small" data-testid="assignee-hours">{{ $t('tasks.mobile.card.assignee_hours') }} <button type="button" class="m-num m-accent" data-testid="hours-assignee" @click="openEntries(true, false)">{{ formatHours(assigneeHours) }}</button></span>
             </div>
           </div>
         </div>
@@ -207,8 +207,8 @@
         <!-- Ошибки — отдельной заметной плашкой: всего по задаче и доля исполнителя -->
         <div v-if="task.bug_fix_hours" class="m-box m-bugs" data-testid="bug-hours">
           <span class="m-label">{{ $t('tasks.mobile.card.bugs') }}</span>
-          <b class="m-big">{{ formatHours(task.bug_fix_hours) }}<span v-if="bugSharePct" class="m-pill">{{ $t('tasks.mobile.card.bugs_share', { pct: bugSharePct }) }}</span></b>
-          <span v-if="assigneeBugHours !== null && editFields.assigned_to_name" class="m-small" data-testid="assignee-bug-hours">{{ $t('tasks.mobile.card.bugs_assignee') }} <b class="m-accent">{{ formatHours(assigneeBugHours) }}</b></span>
+          <b class="m-big"><button type="button" class="m-num" data-testid="hours-bugs" @click="openEntries(false, true)">{{ formatHours(task.bug_fix_hours) }}</button><span v-if="bugSharePct" class="m-pill">{{ $t('tasks.mobile.card.bugs_share', { pct: bugSharePct }) }}</span></b>
+          <span v-if="assigneeBugHours !== null && editFields.assigned_to_name" class="m-small" data-testid="assignee-bug-hours">{{ $t('tasks.mobile.card.bugs_assignee') }} <button type="button" class="m-num m-accent" data-testid="hours-assignee-bugs" @click="openEntries(true, true)">{{ formatHours(assigneeBugHours) }}</button></span>
         </div>
 
         <label class="m-assignee">
@@ -273,6 +273,9 @@
 
     <!-- Картинки задачи на весь экран -->
     <AppImageViewer v-model:index="viewerIndex" :images="viewerImages" />
+
+    <!-- Трудозатраты по нажатой цифре часов -->
+    <TimeEntriesModal :query="entriesQuery" @close="entriesQuery = null" />
   </AppModal>
 </template>
 
@@ -287,6 +290,7 @@ import { FileText } from 'lucide-vue-next'
 import AppModal from '../ui/AppModal.vue'
 import AppImageViewer, { type ViewerImage } from '../ui/AppImageViewer.vue'
 import AppSpinner from '../ui/AppSpinner.vue'
+import TimeEntriesModal, { type TimeEntriesQuery } from './TimeEntriesModal.vue'
 import AppButton from '../ui/AppButton.vue'
 import { useTasksStore, type Task } from '../../stores/tasks'
 import { useSettingsStore } from '../../stores/settings'
@@ -543,6 +547,13 @@ async function loadAssigneeHours(id: number) {
       assigneeBugHours.value = data.bug_fix_hours ?? null
     }
   } catch {}
+}
+
+// Список трудозатрат за нажатой цифрой: всё, исполнителя, ошибки, ошибки исполнителя
+const entriesQuery = ref<TimeEntriesQuery | null>(null)
+
+function openEntries(assignee: boolean, bugs: boolean) {
+  if (task.value) entriesQuery.value = { taskId: task.value.external_id, assignee, bugs }
 }
 
 // Доля баг-часов от всего факта по задаче, целым числом
@@ -1433,6 +1444,23 @@ button.related-row:hover {
 .m-small {
   font-size: 12px;
   color: var(--text-muted);
+}
+
+/* Цифра часов — кнопка: открывает список трудозатрат */
+.m-num {
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.m-num:hover {
+  text-decoration-style: solid;
 }
 
 /* Цифры исполнителя — ярче подписи */
