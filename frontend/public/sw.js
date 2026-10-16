@@ -4,7 +4,7 @@
 // случай, когда сети нет), а файлы сборки с хешем в имени не меняются и
 // берутся из кэша.
 // Новое имя сбрасывает кэш, куда раньше могла попасть страница вместо JS-файла
-const CACHE_NAME = 'pm-dashboard-v3.1.7'
+const CACHE_NAME = 'pm-dashboard-v3.1.8'
 // Сколько ждать сеть, прежде чем показать сохранённую страницу: на плохой
 // мобильной сети запрос иначе висит до тайм-аута телефона (минута и больше)
 const NAVIGATE_TIMEOUT_MS = 4000
@@ -19,7 +19,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
+      Promise.all(keys.filter((key) => key !== CACHE_NAME && key !== PENDING_CACHE).map((key) => caches.delete(key)))
     )
   )
   self.clients.claim()
@@ -115,9 +115,30 @@ self.addEventListener('push', (event) => {
   )
 })
 
-// Нажатие на push: уведомление в колокольчике отмечается прочитанным, затем
-// открытое окно приложения само переходит по ссылке (WindowClient.navigate
-// в Safari нет), а если окна нет — открывается новое сразу по ссылке
+// Куда надо перейти по нажатому push: запоминается, пока страница его не
+// откроет. Сообщение свёрнутой странице может потеряться (её заморозила
+// система), и тогда она заберёт ссылку отсюда, когда снова станет видимой
+const PENDING_CACHE = 'pmd-pending-open'
+const PENDING_KEY = '/__pending-open'
+
+function rememberPending(url) {
+  return caches
+    .open(PENDING_CACHE)
+    .then((cache) => cache.put(PENDING_KEY, new Response(JSON.stringify({ url, at: Date.now() }))))
+    .catch(() => {})
+}
+
+// Окно для перехода: в фокусе, затем видимое, затем любое своё
+function pickWindow(windows) {
+  const own = windows.filter((w) => new URL(w.url).origin === self.location.origin)
+  return own.find((w) => w.focused) || own.find((w) => w.visibilityState === 'visible') || own[0]
+}
+
+// Нажатие на push: открытое окно приложения выводится вперёд и само
+// переходит по ссылке (WindowClient.navigate в Safari нет), а если окна нет
+// или вывести его не удалось — открывается новое сразу по ссылке. Отметка
+// «прочитано» уходит параллельно: ожидание сети съело бы время, в которое
+// браузер разрешает вывести окно вперёд
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
   const url = event.notification.data?.url || '/notifications'
@@ -128,16 +149,13 @@ self.addEventListener('notificationclick', (event) => {
   const markRead = id
     ? fetch('/api/notifications/' + id + '/read', { method: 'POST', credentials: 'include' }).catch(() => {})
     : Promise.resolve()
-  event.waitUntil(
-    markRead.then(() =>
-      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
-        const open = windows.find((w) => new URL(w.url).origin === self.location.origin)
-        if (open) {
-          open.postMessage({ type: 'open-url', url, id })
-          return open.focus()
-        }
-        return self.clients.openWindow(target)
-      })
-    )
-  )
+  const open = self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
+    const win = pickWindow(windows)
+    if (!win) return self.clients.openWindow(target)
+    return rememberPending(url).then(() => {
+      win.postMessage({ type: 'open-url', url, id })
+      return win.focus().catch(() => self.clients.openWindow(target))
+    })
+  })
+  event.waitUntil(Promise.all([markRead, open]))
 })

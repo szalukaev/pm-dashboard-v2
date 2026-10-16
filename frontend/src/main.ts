@@ -50,6 +50,49 @@ if ('serviceWorker' in navigator) {
   })
 }
 
+// Переход по ссылке нажатого push. Если адрес уже тот же (карточка этой
+// задачи открывалась раньше), router.push ничего не сделает — сначала
+// уходим с него, чтобы карточка открылась снова
+async function openPushUrl(url: string) {
+  if (router.currentRoute.value.fullPath === url) {
+    await router.replace(router.currentRoute.value.path)
+  }
+  router.push(url)
+}
+
+// Ссылка нажатого push, которую service worker запомнил на случай, если его
+// сообщение до страницы не дошло. Забирается один раз; старая не нужна
+const PENDING_MAX_AGE = 2 * 60 * 1000
+
+async function takePendingPush(): Promise<string> {
+  if (!('caches' in window)) return ''
+  try {
+    const cache = await caches.open('pmd-pending-open')
+    const response = await cache.match('/__pending-open')
+    if (!response) return ''
+    await cache.delete('/__pending-open')
+    const { url, at } = await response.json()
+    if (typeof url !== 'string' || !url.startsWith('/') || Date.now() - at > PENDING_MAX_AGE) return ''
+    return url
+  } catch {
+    return ''
+  }
+}
+
+// Страница снова видна или только загрузилась: открыть потерянный переход.
+// Окно, открытое сразу по ссылке push, уже на нужном адресе — повторять не надо
+async function openPendingPush() {
+  const url = await takePendingPush()
+  if (url && url !== window.location.pathname + window.location.search) openPushUrl(url)
+}
+
+if ('serviceWorker' in navigator) {
+  openPendingPush()
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') openPendingPush()
+  })
+}
+
 // Service worker сообщает, что push дошёл до устройства и показан ли он
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('message', async (event) => {
@@ -57,11 +100,12 @@ if ('serviceWorker' in navigator) {
     // Нажали на push, а приложение уже открыто: переход по ссылке уведомления
     // (задача откроется карточкой), колокольчик — с отметкой «прочитано»
     if (data.type === 'open-url' && typeof data.url === 'string' && data.url.startsWith('/')) {
+      await takePendingPush()
       if (data.id) {
         const { useNotificationsStore } = await import('./stores/notifications')
         useNotificationsStore().fetch()
       }
-      router.push(data.url)
+      openPushUrl(data.url)
       return
     }
     if (data.type !== 'push-shown' && data.type !== 'push-error') return
