@@ -58,6 +58,9 @@ type TaskGroup struct {
 	TaskCount     int     `json:"task_count"`
 	EstimateTotal float64 `json:"estimate_total"`
 	FactTotal     float64 `json:"fact_total"`
+	// Факт только по задачам с оценкой — для шкалы перерасхода: срочные
+	// задачи без оценки не должны давать ложный перерасход
+	EstimatedFactTotal float64 `json:"estimated_fact_total"`
 	// Сколько задач группы требуют внимания — метки в заголовке группы
 	Overdue    int            `json:"overdue"`
 	Overrun    int            `json:"overrun"`
@@ -326,6 +329,7 @@ func (h *TaskHandler) listTaskGroups(w http.ResponseWriter, groupExpr, order, co
 	// #nosec G701 -- выражение группировки из taskGrouping — константа; условие прав из Scope и фильтры-константы из кода, значения через $n
 	rows, err := (*h.DB).Query(`SELECT `+groupExpr+` AS name, COUNT(*),
 		COALESCE(SUM(estimated_hours), 0), COALESCE(SUM(spent_hours), 0),
+		COALESCE(SUM(spent_hours) FILTER (WHERE estimated_hours > 0), 0),
 		COUNT(*) FILTER (WHERE `+attentionSQL("overdue")+`),
 		COUNT(*) FILTER (WHERE `+attentionSQL("overrun")+`),
 		COUNT(*) FILTER (WHERE `+attentionSQL("unassigned")+`)
@@ -341,7 +345,7 @@ func (h *TaskHandler) listTaskGroups(w http.ResponseWriter, groupExpr, order, co
 	total := 0
 	for rows.Next() {
 		g := TaskGroup{Tasks: []TaskResponse{}}
-		if rows.Scan(&g.Name, &g.TaskCount, &g.EstimateTotal, &g.FactTotal, &g.Overdue, &g.Overrun, &g.Unassigned) != nil {
+		if rows.Scan(&g.Name, &g.TaskCount, &g.EstimateTotal, &g.FactTotal, &g.EstimatedFactTotal, &g.Overdue, &g.Overrun, &g.Unassigned) != nil {
 			continue
 		}
 		total += g.TaskCount

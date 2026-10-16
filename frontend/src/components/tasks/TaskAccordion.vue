@@ -31,14 +31,38 @@
             <span v-if="group.overdue" class="flag overdue">{{ $t('tasks.attention.group_overdue', { n: group.overdue }) }}</span>
             <span v-if="group.overrun" class="flag overrun">{{ $t('tasks.attention.group_overrun', { n: group.overrun }) }}</span>
             <span v-if="group.unassigned && groupBy !== 'assignee'" class="flag">{{ $t('tasks.attention.group_unassigned', { n: group.unassigned }) }}</span>
-            <!-- Загрузка исполнителя: факт против оценки, перерасход оранжевым -->
+            <!-- Загрузка исполнителя: факт против оценки, перерасход оранжевым.
+                 Считаются только задачи с оценкой; по клику — список задач с перерасходом -->
             <span
-              v-if="groupBy === 'assignee' && (group.estimate_total || group.fact_total)"
-              class="load"
-              :title="$t('tasks.attention.load', { fact: formatTotal(group.fact_total), estimate: formatTotal(group.estimate_total) })"
+              v-if="groupBy === 'assignee' && group.estimate_total"
+              class="load-wrap"
+              @click.stop="toggleOverrunList(group.name)"
             >
-              <i class="used" :style="{ width: loadUsedPct(group) + '%' }"></i>
-              <i class="extra" :style="{ width: loadOverPct(group) + '%' }"></i>
+              <span class="load">
+                <i class="used" :style="{ width: loadUsedPct(group) + '%' }"></i>
+                <i class="extra" :style="{ width: loadOverPct(group) + '%' }"></i>
+              </span>
+              <span class="load-tip" role="tooltip">
+                <span>{{ $t('tasks.attention.load_estimate') }}: <b>{{ formatTotal(group.estimate_total) }}</b></span>
+                <span>{{ $t('tasks.attention.load_fact') }}: <b>{{ formatTotal(group.estimated_fact_total) }}</b></span>
+                <span>{{ $t('tasks.attention.load_overrun_pct') }}: <b>{{ overrunPct(group) }}%</b></span>
+              </span>
+              <span v-if="overrunList.group === group.name" class="overrun-list" @click.stop>
+                <span class="overrun-title">{{ $t('tasks.attention.overrun_list_title') }}</span>
+                <span v-if="overrunList.loading" class="overrun-empty">{{ $t('common.loading') }}</span>
+                <span v-else-if="!overrunList.tasks.length" class="overrun-empty">{{ $t('tasks.attention.overrun_list_empty') }}</span>
+                <button
+                  v-for="task in overrunList.tasks"
+                  v-else
+                  :key="task.external_id"
+                  type="button"
+                  class="overrun-item"
+                  @click="openOverrunTask(task)"
+                >
+                  <span class="overrun-subject">#{{ task.external_id }} {{ task.subject }}</span>
+                  <span class="overrun-hours">{{ formatTotal(task.estimated_hours || 0) }} → <b>{{ formatTotal(task.spent_hours) }}</b> (+{{ taskOverrunPct(task) }}%)</span>
+                </button>
+              </span>
             </span>
           </span>
         </div>
@@ -65,7 +89,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, reactive, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ChevronDown, Folder, User, CircleDot } from 'lucide-vue-next'
 import { statusColor } from '../../utils/statusColor'
@@ -74,10 +98,10 @@ import TaskTable from './TaskTable.vue'
 import { useMobileTasks } from '../../composables/useMobileTasks'
 import { useMemberAvatars } from '../../composables/useMemberAvatars'
 import AppPagination from '../ui/AppPagination.vue'
-import { useTasksStore, type TaskGroup } from '../../stores/tasks'
+import { useTasksStore, type TaskGroup, type Task } from '../../stores/tasks'
 
 const props = defineProps<{ groups: TaskGroup[]; groupBy: string }>()
-defineEmits(['open-task', 'sort-change'])
+const emit = defineEmits(['open-task', 'sort-change'])
 
 const { t } = useI18n()
 
@@ -115,16 +139,59 @@ function problems(g: TaskGroup): number {
   return g.overdue + g.overrun + g.unassigned
 }
 
-// Полоса загрузки: доля факта до оценки и перерасход сверх неё
+// Полоса загрузки: доля факта до оценки и перерасход сверх неё. Факт берётся
+// только по задачам с оценкой — срочные задачи без оценки перерасходом не считаются
 function loadUsedPct(g: TaskGroup): number {
-  const max = Math.max(g.estimate_total, g.fact_total)
-  return max ? Math.min(g.fact_total, g.estimate_total) / max * 100 : 0
+  const max = Math.max(g.estimate_total, g.estimated_fact_total)
+  return max ? Math.min(g.estimated_fact_total, g.estimate_total) / max * 100 : 0
 }
 
 function loadOverPct(g: TaskGroup): number {
-  const max = Math.max(g.estimate_total, g.fact_total)
-  return max && g.fact_total > g.estimate_total ? (g.fact_total - g.estimate_total) / max * 100 : 0
+  const max = Math.max(g.estimate_total, g.estimated_fact_total)
+  return max && g.estimated_fact_total > g.estimate_total ? (g.estimated_fact_total - g.estimate_total) / max * 100 : 0
 }
+
+function overrunPct(g: TaskGroup): number {
+  if (!g.estimate_total || g.estimated_fact_total <= g.estimate_total) return 0
+  return Math.round((g.estimated_fact_total - g.estimate_total) / g.estimate_total * 100)
+}
+
+function taskOverrunPct(task: Task): number {
+  const est = task.estimated_hours || 0
+  return est ? Math.round((task.spent_hours - est) / est * 100) : 0
+}
+
+// Список задач с перерасходом под шкалой; открыт не больше чем у одной группы
+const overrunList = reactive<{ group: string; loading: boolean; tasks: Task[] }>({ group: '', loading: false, tasks: [] })
+let overrunRequest = 0
+
+async function toggleOverrunList(name: string) {
+  if (overrunList.group === name) {
+    overrunList.group = ''
+    return
+  }
+  const requestId = ++overrunRequest
+  Object.assign(overrunList, { group: name, loading: true, tasks: [] })
+  try {
+    const list = await store.fetchOverrunTasks(name)
+    if (requestId === overrunRequest) overrunList.tasks = list
+  } catch {
+    if (requestId === overrunRequest) overrunList.tasks = []
+  } finally {
+    if (requestId === overrunRequest) overrunList.loading = false
+  }
+}
+
+function openOverrunTask(task: Task) {
+  overrunList.group = ''
+  emit('open-task', task)
+}
+
+function closeOverrunList(e: MouseEvent) {
+  if (overrunList.group && !(e.target as HTMLElement).closest?.('.load-wrap')) overrunList.group = ''
+}
+onMounted(() => document.addEventListener('click', closeOverrunList))
+onBeforeUnmount(() => document.removeEventListener('click', closeOverrunList))
 
 // По умолчанию группы свёрнуты; раскрытые хранятся в сторе и сохраняются
 // вместе с фильтрами, поэтому переживают закрытие браузера.
@@ -164,10 +231,11 @@ function formatTotal(h: number): string {
   margin-bottom: 8px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  overflow: hidden;
+  /* Без обрезки: подсказка и список перерасхода выходят за рамку группы */
 }
 
 .assignee-header {
+  border-radius: 7px 7px 0 0;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -176,6 +244,10 @@ function formatTotal(h: number): string {
   cursor: pointer;
   user-select: none;
   transition: background 0.1s;
+}
+
+.assignee-header:only-child {
+  border-radius: 7px;
 }
 
 .assignee-header:hover {
@@ -305,6 +377,103 @@ function formatTotal(h: number): string {
   border-radius: 3px;
   background: var(--surface-3);
   overflow: hidden;
+}
+
+.load-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 0;
+  cursor: pointer;
+}
+
+.load-tip {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 20;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-card);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.load-wrap:hover .load-tip {
+  display: flex;
+}
+
+/* Пока открыт список, подсказка не мешает */
+.load-wrap:has(.overrun-list) .load-tip {
+  display: none;
+}
+
+.overrun-list {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  width: 380px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  cursor: default;
+  font-size: 12px;
+}
+
+.overrun-title {
+  padding: 4px 6px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.overrun-empty {
+  padding: 6px;
+  color: var(--text-muted);
+}
+
+.overrun-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.overrun-item:hover {
+  background: var(--surface-3);
+}
+
+.overrun-subject {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.overrun-hours {
+  color: var(--text-muted);
+}
+
+.overrun-hours b {
+  color: var(--orange);
 }
 
 .load .used {

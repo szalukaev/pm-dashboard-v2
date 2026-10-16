@@ -34,6 +34,8 @@ export interface TaskGroup {
   task_count: number
   estimate_total: number
   fact_total: number
+  // Факт только по задачам с оценкой
+  estimated_fact_total: number
   // Сколько задач группы требуют внимания
   overdue: number
   overrun: number
@@ -52,6 +54,7 @@ interface GroupHeader {
   task_count: number
   estimate_total: number
   fact_total: number
+  estimated_fact_total: number
   overdue: number
   overrun: number
   unassigned: number
@@ -197,6 +200,7 @@ export const useTasksStore = defineStore('tasks', () => {
           task_count: g.task_count,
           estimate_total: g.estimate_total,
           fact_total: g.fact_total,
+          estimated_fact_total: g.estimated_fact_total || 0,
           overdue: g.overdue || 0,
           overrun: g.overrun || 0,
           unassigned: g.unassigned || 0,
@@ -261,6 +265,16 @@ export const useTasksStore = defineStore('tasks', () => {
     }
     const { data } = await axios.get('/api/tasks', { params })
     return data
+  }
+
+  // Задачи группы с перерасходом — список по клику на шкалу загрузки
+  async function fetchOverrunTasks(group: string): Promise<Task[]> {
+    const params: Record<string, string | number> = {
+      ...queryParams(), attention: 'overrun', group_by: filters.value.group_by, group,
+      limit: 200, offset: 0, sort_by: 'fact', sort_dir: 'desc',
+    }
+    const { data } = await axios.get('/api/tasks', { params })
+    return data.tasks || []
   }
 
   // Загружает текущую страницу группы. Заполнить группу может только самый
@@ -512,7 +526,7 @@ export const useTasksStore = defineStore('tasks', () => {
   }
 
   return {
-    tasks, groups, loading, error, total, attentionCounts, toggleAttention, useGrouping, filters, expandedGroups,
+    tasks, groups, loading, error, total, attentionCounts, fetchOverrunTasks, toggleAttention, useGrouping, filters, expandedGroups,
     offset, pageSize, setPage, setGroupPage, setPageSize,
     isGroupExpanded, toggleGroup, setGrouping,
     projects, categories, projectCategories, members, statuses, priorities,

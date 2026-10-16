@@ -255,7 +255,11 @@
       "group_overdue": "{n} просрочено",
       "group_overrun": "{n} перерасход",
       "group_unassigned": "{n} без исполнителя",
-      "load": "Факт {fact} из оценки {estimate}"
+      "load_estimate": "Оценка",
+      "load_fact": "Факт",
+      "load_overrun_pct": "Перерасход",
+      "overrun_list_title": "Задачи с перерасходом",
+      "overrun_list_empty": "Задач с перерасходом нет"
     },
     "table": {
       "name": "Наименование",

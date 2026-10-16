@@ -255,7 +255,11 @@
       "group_overdue": "{n} overdue",
       "group_overrun": "{n} over estimate",
       "group_unassigned": "{n} unassigned",
-      "load": "Actual {fact} of {estimate} estimated"
+      "load_estimate": "Estimate",
+      "load_fact": "Actual",
+      "load_overrun_pct": "Overrun",
+      "overrun_list_title": "Tasks over estimate",
+      "overrun_list_empty": "No tasks over estimate"
     },
     "table": {
       "name": "Name",
