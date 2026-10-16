@@ -65,7 +65,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ChevronDown } from 'lucide-vue-next'
 import KanbanCard from './KanbanCard.vue'
@@ -83,14 +83,7 @@ const STRIP_MAX = 24
 const openIds = ref<Set<string>>(new Set())
 const moving = ref<Card | null>(null)
 
-// При первой загрузке открыта первая непустая колонка
-watch(() => props.columns, cols => {
-  if (openIds.value.size === 0) {
-    const first = cols.find(c => c.tasks.length > 0)
-    if (first) openIds.value = new Set([first.id])
-  }
-}, { immediate: true })
-
+// При заходе все колонки свёрнуты
 function isOpen(id: string) {
   return openIds.value.has(id)
 }
