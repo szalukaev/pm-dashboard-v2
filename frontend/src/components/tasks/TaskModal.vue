@@ -218,9 +218,9 @@
           </span>
           <span class="m-assignee-name">{{ editFields.assigned_to_name || $t('tasks.modal.no_assignee') }}</span>
           <span class="m-chev">›</span>
-          <select v-model="editFields.assigned_to_name" :disabled="!auth.canWrite" :aria-label="$t('tasks.table.assignee')" @change="saveField('assigned_to_name')">
+          <select v-model="assigneeId" :disabled="!auth.canWrite" :aria-label="$t('tasks.table.assignee')" @change="saveAssignee">
             <option value="">{{ $t('tasks.modal.no_assignee') }}</option>
-            <option v-for="m in memberNames" :key="m" :value="m">{{ m }}</option>
+            <option v-for="m in memberOptions" :key="m.id" :value="m.id">{{ m.name }}</option>
           </select>
         </label>
 
@@ -454,12 +454,47 @@ const sendingComment = ref(false)
 
 const priorityNames = computed(() => priorities.value.map(p => p.name))
 
-const memberNames = computed(() => {
+// Исполнитель выбирается по номеру сотрудника: имена бывают одинаковыми.
+// Текущий остаётся в списке, даже если его нет в выбранной команде.
+const memberOptions = computed(() => {
   const selectedTeam = settings.value.selected_team || []
   const all = members.value
-  if (selectedTeam.length === 0) return all.map(m => m.name).sort()
-  return all.filter(m => selectedTeam.includes(m.id)).map(m => m.name).sort()
+  const list = (selectedTeam.length === 0 ? all : all.filter(m => selectedTeam.includes(m.id)))
+    .slice().sort((a, b) => a.name.localeCompare(b.name))
+  const id = task.value?.assigned_to_id
+  if (id != null && !list.some(m => m.id === id)) list.unshift({ id, name: task.value?.assigned_to_name || String(id) })
+  return list
 })
+
+const assigneeId = ref<number | ''>('')
+
+async function saveAssignee() {
+  if (!task.value) return
+  const current = task.value
+  const oldId = current.assigned_to_id ?? null
+  const oldName = current.assigned_to_name || ''
+  const id = assigneeId.value === '' ? null : Number(assigneeId.value)
+  if (id === oldId) return
+  const name = id === null ? '' : members.value.find(m => m.id === id)?.name || ''
+  try {
+    const result = await store.updateTask(current.external_id, { assigned_to_id: id }, true)
+    if (result && result.redmine_ok === false) {
+      toast(result.redmine_error === 'REDMINE_CHANGE_REJECTED' ? i18n.t('kanban.move_rejected')
+        : i18n.t('tasks.messages.redmine_sync_error') + ': ' + (result.redmine_error || ''), 'error')
+      assigneeId.value = oldId ?? ''
+      return
+    }
+    current.assigned_to_id = id
+    current.assigned_to_name = name
+    editFields.assigned_to_name = name
+    showChange(oldName || '—', name || '—', i18n.t(fieldLabels.assigned_to_name), current.external_id)
+    // Новый исполнитель — его часы по задаче
+    loadAssigneeHours(current.external_id)
+  } catch {
+    assigneeId.value = oldId ?? ''
+    swalError(i18n.t('tasks.messages.save_error'))
+  }
+}
 
 // Все категории проекта задачи; текущую по-прежнему можно выбрать.
 const taskCategories = computed(() => {
@@ -649,6 +684,7 @@ watch(currentId, async (id) => {
   editFields.status_name = loaded.status_name
   editFields.priority_name = loaded.priority_name
   editFields.assigned_to_name = loaded.assigned_to_name || ''
+  assigneeId.value = loaded.assigned_to_id ?? ''
   editFields.category_name = loaded.category_name || ''
   editFields.due_date = (loaded.due_date || '').slice(0, 10)
   editFields.estimated_hours = loaded.estimated_hours ?? ''
@@ -693,8 +729,6 @@ async function saveField(field: keyof typeof editFields) {
     }
     t[field] = field === 'estimated_hours' && value !== null ? Number(value) : value
     showChange(String(old ?? '—'), String(value ?? '—'), i18n.t(fieldLabels[field]), task.value.external_id)
-    // Новый исполнитель — его часы по задаче
-    if (field === 'assigned_to_name') loadAssigneeHours(task.value.external_id)
   } catch {
     editFields[field] = old ?? ''
     swalError(i18n.t('tasks.messages.save_error'))

@@ -142,6 +142,10 @@ type debugResponseWriter struct {
 	size   int
 }
 
+// Unwrap открывает исходный ResponseWriter для http.ResponseController
+// (например, чтобы продлить срок записи большого файла).
+func (w *debugResponseWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+
 func (w *debugResponseWriter) WriteHeader(code int) {
 	w.status = code
 	w.ResponseWriter.WriteHeader(code)

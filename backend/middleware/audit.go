@@ -30,6 +30,9 @@ type auditResponseWriter struct {
 	body       bytes.Buffer
 }
 
+// Unwrap открывает исходный ResponseWriter для http.ResponseController.
+func (w *auditResponseWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+
 func (w *auditResponseWriter) WriteHeader(code int) {
 	w.statusCode = code
 	w.ResponseWriter.WriteHeader(code)

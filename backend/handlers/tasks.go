@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"pm-dashboard/access"
 	"pm-dashboard/datasource/manager"
@@ -592,15 +593,32 @@ func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 			localSets["priority_name"] = strValue
 			localSets["priority_id"] = priorityID
 			redmineFields["priority_id"] = priorityID
-		case "assigned_to_name":
-			if strValue == "" {
+		case "assigned_to_id", "assigned_to_name":
+			// Исполнитель задаётся номером сотрудника: имена бывают
+			// одинаковыми. По имени — для страниц, открытых до обновления.
+			var assigneeID int
+			var assigneeName string
+			var lookup error
+			switch {
+			case field == "assigned_to_id" && value == nil, field == "assigned_to_name" && strValue == "":
 				localSets["assigned_to_name"] = ""
 				localSets["assigned_to_id"] = nil
 				redmineFields["assigned_to_id"] = ""
-				break
+				editable = append(editable, "assigned_to_name")
+				continue
+			case field == "assigned_to_id":
+				id, ok := value.(float64)
+				if !ok || id != float64(int(id)) {
+					utils.Error(w, http.StatusBadRequest, "INVALID_VALUE")
+					return
+				}
+				assigneeID = int(id)
+				lookup = (*h.DB).QueryRow("SELECT name FROM members WHERE external_id = $1 AND data_source = 'redmine'", assigneeID).Scan(&assigneeName)
+			default:
+				assigneeName = strValue
+				lookup = (*h.DB).QueryRow("SELECT external_id FROM members WHERE name = $1 AND data_source = 'redmine' LIMIT 1", strValue).Scan(&assigneeID)
 			}
-			var assigneeID int
-			if err := (*h.DB).QueryRow("SELECT external_id FROM members WHERE name = $1 AND data_source = 'redmine' LIMIT 1", strValue).Scan(&assigneeID); err != nil {
+			if lookup != nil {
 				utils.Error(w, http.StatusBadRequest, "MEMBER_NOT_FOUND")
 				return
 			}
@@ -609,9 +627,12 @@ func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 				utils.Error(w, http.StatusForbidden, "MEMBER_NOT_ALLOWED")
 				return
 			}
-			localSets["assigned_to_name"] = strValue
+			localSets["assigned_to_name"] = assigneeName
 			localSets["assigned_to_id"] = assigneeID
 			redmineFields["assigned_to_id"] = assigneeID
+			// Прежнее значение и уведомление — по имени, как и раньше
+			editable = append(editable, "assigned_to_name")
+			continue
 		case "start_date", "due_date":
 			if strValue == "" {
 				localSets[field] = nil
@@ -865,6 +886,9 @@ var inlineImageTypes = map[string]bool{
 	"image/bmp":  true,
 }
 
+// attachmentWriteTimeout — сколько может идти отдача одного файла задачи.
+const attachmentWriteTimeout = 30 * time.Minute
+
 // GetTaskAttachment отдаёт файл задачи из Redmine через сервер (у браузера
 // нет учётных данных Redmine). Отдаются только файлы этой задачи.
 func (h *TaskHandler) GetTaskAttachment(w http.ResponseWriter, r *http.Request) {
@@ -926,6 +950,11 @@ func (h *TaskHandler) GetTaskAttachment(w http.ResponseWriter, r *http.Request) 
 	w.Header().Set("Cache-Control", "private, max-age=3600")
 	if att.Filesize > 0 {
 		w.Header().Set("Content-Length", strconv.FormatInt(att.Filesize, 10))
+	}
+	// Общий предел ответа сервера (30 с) большой файл на медленной связи
+	// не успевает: для файла задачи срок отдельный
+	if err := http.NewResponseController(w).SetWriteDeadline(time.Now().Add(attachmentWriteTimeout)); err != nil {
+		slog.Warn("Attachment: write deadline not extended", "issue", externalID, "error", err)
 	}
 	_, _ = io.Copy(w, body)
 }

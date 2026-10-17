@@ -65,11 +65,11 @@
               <select
                 :disabled="!auth.canWrite"
                 class="cell-input assignee"
-                :value="task.assigned_to_name || ''"
-                @change="saveInlineEdit(task, 'assigned_to_name', ($event.target as HTMLSelectElement).value)"
+                :value="task.assigned_to_id ?? ''"
+                @change="saveAssignee(task, ($event.target as HTMLSelectElement).value)"
               >
                 <option value="">{{ $t('tasks.table.unassigned') }}</option>
-                <option v-for="m in withCurrent(memberNames, task.assigned_to_name)" :key="m" :value="m">{{ m }}</option>
+                <option v-for="m in withCurrentMember(memberOptions, task)" :key="m.id" :value="m.id">{{ m.name }}</option>
               </select>
               </span>
             </td>
@@ -233,11 +233,41 @@ const priorityNames = computed(() => priorities.value.map(p => p.name))
 // Закрытой задачу делают группы статусов из настроек, а не название статуса
 const closedStatusIds = computed(() => new Set(statuses.value.filter(s => s.group === 'closed').map(s => s.id)))
 
-const memberNames = computed(() => {
+// Исполнитель выбирается по номеру сотрудника: имена бывают одинаковыми
+const memberOptions = computed(() => {
   const selectedTeam = settings.value.selected_team || []
-  if (selectedTeam.length === 0) return members.value.map(m => m.name).sort()
-  return members.value.filter(m => selectedTeam.includes(m.id)).map(m => m.name).sort()
+  const list = selectedTeam.length === 0 ? members.value : members.value.filter(m => selectedTeam.includes(m.id))
+  return [...list].sort((a, b) => a.name.localeCompare(b.name))
 })
+
+function withCurrentMember(list: { id: number; name: string }[], task: Task) {
+  const id = task.assigned_to_id
+  return id != null && !list.some(m => m.id === id) ? [{ id, name: task.assigned_to_name || String(id) }, ...list] : list
+}
+
+async function saveAssignee(task: Task, value: string) {
+  const oldId = task.assigned_to_id ?? null
+  const oldName = task.assigned_to_name || ''
+  const id = value === '' ? null : Number(value)
+  if (id === oldId) return
+  const name = id === null ? '' : members.value.find(m => m.id === id)?.name || ''
+  const revert = () => { task.assigned_to_id = oldId; task.assigned_to_name = oldName }
+  task.assigned_to_id = id
+  task.assigned_to_name = name
+  try {
+    const result = await tasksStore.updateTask(task.external_id, { assigned_to_id: id }, true)
+    if (result && result.redmine_ok === false) {
+      revert()
+      toast(result.redmine_error === 'REDMINE_CHANGE_REJECTED' ? t('kanban.move_rejected')
+        : t('tasks.messages.redmine_sync_error') + ': ' + (result.redmine_error || ''), 'error')
+      return
+    }
+    showChange(oldName || '—', name || '—', t(fieldLabels.assigned_to_name), task.external_id)
+  } catch {
+    revert()
+    toast(t('tasks.messages.save_error'), 'error')
+  }
+}
 
 // Текущее значение должно оставаться в списке выбора, даже если его там нет.
 function withCurrent(list: string[], current?: string | null): string[] {
