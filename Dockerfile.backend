@@ -12,7 +12,8 @@ FROM alpine:3.19
 # tzdata: сервер ведёт расписания и дни истории в часовом поясе из TZ.
 RUN apk add --no-cache ca-certificates tzdata
 COPY --from=builder /pm-dashboard /usr/local/bin/
-COPY --from=builder /app/invoice /app/invoice
+# Из пакета счетов нужен только встроенный шаблон: исходники в образ не идут
+COPY --from=builder /app/invoice/invoice_template.docx /app/invoice/invoice_template.docx
 # Файлы миграций должны быть в образе; иначе RunMigrations переходит на
 # встроенный SQL, и будущие NNN_*.up.sql не применяются.
 COPY --from=builder /app/db/migrations /app/db/migrations
