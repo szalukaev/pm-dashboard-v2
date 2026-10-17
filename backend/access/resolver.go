@@ -152,7 +152,13 @@ func (r *Resolver) Scope(userID int) (*Scope, error) {
 	var sourceProjectsJSON, sourceMembersJSON []byte
 	err := db.QueryRow("SELECT role, is_blocked, member_id, source_projects, source_members FROM users WHERE id = $1", userID).
 		Scan(&role, &blocked, &facts.memberID, &sourceProjectsJSON, &sourceMembersJSON)
-	if err != nil || blocked {
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return nil, ErrUserNotFound
+	case err != nil:
+		// Сбой базы — не повод считать пользователя неизвестным
+		return nil, err
+	case blocked:
 		return nil, ErrUserNotFound
 	}
 	if err := json.Unmarshal(sourceProjectsJSON, &facts.sourceProjects); err != nil {

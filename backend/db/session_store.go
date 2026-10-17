@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -10,6 +11,10 @@ import (
 
 	"github.com/redis/go-redis/v9"
 )
+
+// ErrNoSession — сессии нет: не было, истекла или испорчена. Остальные
+// ошибки Get — сбой хранилища, при котором сессия может быть жива.
+var ErrNoSession = errors.New("session not found")
 
 // SessionStore — хранилище сессий
 type SessionStore interface {
@@ -121,14 +126,14 @@ func (s *RedisSessionStore) Get(ctx context.Context, sessionID string) (int, err
 	key := "session:" + sessionID
 	val, err := s.client.Get(ctx, key).Result()
 	if err == redis.Nil {
-		return 0, fmt.Errorf("session not found")
+		return 0, ErrNoSession
 	}
 	if err != nil {
 		return 0, fmt.Errorf("redis error: %w", err)
 	}
 	userID, err := strconv.Atoi(val)
 	if err != nil {
-		return 0, fmt.Errorf("invalid session data")
+		return 0, ErrNoSession
 	}
 	return userID, nil
 }
@@ -181,12 +186,12 @@ func (s *MemorySessionStore) Get(ctx context.Context, sessionID string) (int, er
 	entry, ok := s.sessions[sessionID]
 	if !ok {
 		s.mu.Unlock()
-		return 0, fmt.Errorf("session not found")
+		return 0, ErrNoSession
 	}
 	if time.Now().After(entry.expires) {
 		delete(s.sessions, sessionID)
 		s.mu.Unlock()
-		return 0, fmt.Errorf("session expired")
+		return 0, ErrNoSession
 	}
 	s.mu.Unlock()
 	return entry.userID, nil

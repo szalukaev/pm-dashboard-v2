@@ -79,9 +79,13 @@ export const useAuthStore = defineStore('auth', () => {
       const { data } = await axios.get('/api/auth/me')
       user.value = data
       isAuthenticated.value = true
-    } catch {
-      user.value = null
-      isAuthenticated.value = false
+    } catch (e: any) {
+      // Выход — только если сервер отказал в сессии. Сбой базы или сети
+      // вошедшего пользователя не разлогинивает: следующий запрос пройдёт.
+      if (e?.response?.status === 401 || !user.value) {
+        user.value = null
+        isAuthenticated.value = false
+      }
     }
   }
 

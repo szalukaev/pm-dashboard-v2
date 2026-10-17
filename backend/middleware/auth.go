@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -40,8 +41,14 @@ func RequireAuth(sessionStore db.SessionStore, pgDB **sql.DB) func(http.Handler)
 
 			// Сессия ищется в Redis или в хранилище в памяти
 			userID, err := sessionStore.Get(r.Context(), cookie.Value)
-			if err != nil {
+			if errors.Is(err, db.ErrNoSession) {
 				http.Error(w, `{"error":"UNAUTHORIZED"}`, http.StatusUnauthorized)
+				return
+			}
+			if err != nil {
+				// Хранилище сессий не ответило — сессия, возможно, жива
+				slog.Warn("Session store failed", "error", err)
+				http.Error(w, `{"error":"SERVICE_UNAVAILABLE"}`, http.StatusServiceUnavailable)
 				return
 			}
 
@@ -49,8 +56,15 @@ func RequireAuth(sessionStore db.SessionStore, pgDB **sql.DB) func(http.Handler)
 			// удалённого или заблокированного пользователя Scope нет: его
 			// сессии перестают работать сразу.
 			scope, err := (&access.Resolver{DB: pgDB}).Scope(userID)
-			if err != nil {
+			if errors.Is(err, access.ErrUserNotFound) {
 				http.Error(w, `{"error":"UNAUTHORIZED"}`, http.StatusUnauthorized)
+				return
+			}
+			if err != nil {
+				// База на мгновение недоступна: сессия жива, пользователь
+				// остаётся в системе и повторит запрос
+				slog.Warn("Could not resolve user rights", "user", userID, "error", err)
+				http.Error(w, `{"error":"SERVICE_UNAVAILABLE"}`, http.StatusServiceUnavailable)
 				return
 			}
 			role := "user"
