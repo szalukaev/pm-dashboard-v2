@@ -143,7 +143,7 @@ func (h *AnalyticsHandler) stats(scope *access.Scope, now time.Time, period Peri
 	}
 	stats = append(stats, StatCard{Label: "overdue", Value: float64(overdue), Variant: "danger"})
 
-	// Bugs
+	// Ошибки
 	var bugs int
 	q = `SELECT COUNT(*) FROM issues WHERE ` + projectFilter + `
 		AND ` + bugStatus("status_id")

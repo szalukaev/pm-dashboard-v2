@@ -79,7 +79,7 @@ if [ -z "$board_serial" ]; then
 fi
 
 mkdir -p "$(dirname "$TARGET")"
-# Docker creates a directory in place of a mounted file that did not exist
+# Docker создаёт каталог на месте монтируемого файла, которого не было
 if [ -d "$TARGET" ]; then
     rmdir "$TARGET" 2>/dev/null || {
         echo "ERROR: $TARGET is a directory that is not empty; remove it and run again." >&2
