@@ -16,6 +16,10 @@ import (
 // maxAuditBodyBytes — сколько байт тела запроса читается для журнала аудита.
 const maxAuditBodyBytes = 1 << 20 // 1 МиБ
 
+// maxAuditResponseBytes — сколько байт ответа запоминается, чтобы найти id
+// созданной записи; обрезанный ответ просто не даст id.
+const maxAuditResponseBytes = 64 << 10 // 64 КиБ
+
 type AuditMiddleware struct {
 	DB **sql.DB
 }
@@ -32,7 +36,14 @@ func (w *auditResponseWriter) WriteHeader(code int) {
 }
 
 func (w *auditResponseWriter) Write(b []byte) (int, error) {
-	w.body.Write(b)
+	// Из ответа нужен только id созданной записи: большой ответ целиком
+	// в памяти не держится
+	if room := maxAuditResponseBytes - w.body.Len(); room > 0 {
+		if len(b) < room {
+			room = len(b)
+		}
+		w.body.Write(b[:room])
+	}
 	return w.ResponseWriter.Write(b)
 }
 

@@ -119,8 +119,10 @@ func (s *Service) loadKeys() (*Keys, error) {
 // подпись только с настоящим контактом, им и становится этот адрес.
 func (s *Service) Subscribe(userID int, sub Subscription, userAgent, origin string) error {
 	if strings.HasPrefix(origin, "https://") && len(origin) < 200 {
-		(*s.DB).Exec(`INSERT INTO settings (key, value) VALUES ($1, to_jsonb($2::text))
-			ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`, subjectKey, origin)
+		if _, err := (*s.DB).Exec(`INSERT INTO settings (key, value) VALUES ($1, to_jsonb($2::text))
+			ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`, subjectKey, origin); err != nil {
+			slog.Warn("Push: subject write failed", "error", err)
+		}
 	}
 	if len(userAgent) > 255 {
 		userAgent = userAgent[:255]
@@ -210,7 +212,7 @@ func (s *Service) notify(userID int, msg Message) []Result {
 			subs = append(subs, sub)
 		}
 	}
-	rows.Close()
+	_ = rows.Close()
 	if len(subs) == 0 {
 		return results
 	}
@@ -234,7 +236,7 @@ func (s *Service) notify(userID int, msg Message) []Result {
 			continue
 		}
 		reason, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		result.Status = resp.StatusCode
 		if resp.StatusCode >= 400 {
 			result.Error = strings.TrimSpace(string(reason))
@@ -243,7 +245,9 @@ func (s *Service) notify(userID int, msg Message) []Result {
 		switch {
 		case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusGone:
 			// Подписка отозвана (приложение удалено, разрешение снято)
-			(*s.DB).Exec(`DELETE FROM push_subscriptions WHERE endpoint = $1`, subs[i].Endpoint)
+			if _, err := (*s.DB).Exec(`DELETE FROM push_subscriptions WHERE endpoint = $1`, subs[i].Endpoint); err != nil {
+				slog.Warn("Push: revoked subscription not deleted", "user", userID, "error", err)
+			}
 		case resp.StatusCode >= 400:
 			slog.Warn("Push: rejected", "user", userID, "status", resp.StatusCode)
 		}

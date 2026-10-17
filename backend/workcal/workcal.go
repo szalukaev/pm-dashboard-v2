@@ -112,8 +112,10 @@ func (s *Service) Get(year int) Calendar {
 	if days, err := s.fetch(year); err == nil {
 		if *s.DB != nil {
 			data, _ := json.Marshal(stored{Days: days, FetchedAt: time.Now()})
-			(*s.DB).Exec(`INSERT INTO settings (key, value) VALUES ($1, $2::jsonb)
-				ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`, key, string(data))
+			if _, err := (*s.DB).Exec(`INSERT INTO settings (key, value) VALUES ($1, $2::jsonb)
+				ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`, key, string(data)); err != nil {
+				slog.Warn("Work calendar: cache write failed", "year", year, "error", err)
+			}
 		}
 		return Calendar{Year: year, Days: days, Source: "isdayoff"}
 	} else {
