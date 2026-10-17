@@ -18,7 +18,4 @@ require (
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
 	golang.org/x/net v0.25.0 // indirect
-	pmd-license v0.0.0
 )
-
-replace pmd-license => ./_private/pmd-license

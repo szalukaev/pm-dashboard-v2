@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
+	"pm-dashboard/license"
 	"pm-dashboard/utils"
-	"pmd-license/license"
 )
 
 // LicenseHandler — HTTP-часть лицензии: её состояние для каждого

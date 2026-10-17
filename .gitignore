@@ -5,10 +5,6 @@
 # Go
 backend/vendor/
 backend/tmp/
-# Модуль лицензирования pmd-license: хранится отдельно, при деплое копируется сюда
-backend/_private/
-# Собранные поставки для клиентов (scripts/build-release.sh)
-release/
 *.exe
 *.exe~
 *.dll

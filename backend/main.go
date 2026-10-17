@@ -18,15 +18,15 @@ import (
 	"pm-dashboard/db"
 	"pm-dashboard/handlers"
 	"pm-dashboard/jobs"
+	"pm-dashboard/license"
 	"pm-dashboard/mail"
 	"pm-dashboard/middleware"
 	"pm-dashboard/notify"
 	"pm-dashboard/push"
+	"pm-dashboard/workcal"
 	"pm-dashboard/secrets"
 	"pm-dashboard/snapshots"
 	"pm-dashboard/utils"
-	"pm-dashboard/workcal"
-	"pmd-license/license"
 
 	"github.com/gorilla/mux"
 )
